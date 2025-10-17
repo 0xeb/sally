@@ -2388,48 +2388,47 @@ BOOL AddToListOfDisabledCustomIconOverlays(const char* name);
 // nacte ikonu z ImageResDLL
 HICON SalLoadImage(int vistaResID, int otherResID, int cx, int cy, UINT flags);
 
-// nacte ikonu pro archivy
+// loads an icon for archives
 HICON LoadArchiveIcon(int cx, int cy, UINT flags);
 
-// ziska login pro zadanou sitovou cestu, pripadne obnovi jeji mapovani
+// obtains credentials for the given network path and optionally restores its mapping
 BOOL RestoreNetworkConnection(HWND parent, const char* name, const char* remoteName, DWORD* retErr = NULL,
                               LPNETRESOURCE lpNetResource = NULL);
 
-// sestavi text do sloupce Type v panelu pro neasociovany soubor (napr. "AAA File" nebo "File")
+// builds text for the Type column for an unassociated file (e.g., "AAA File" or just "File")
 void GetCommonFileTypeStr(char* buf, int* resLen, const char* ext);
 
-// najde zdvojene separatory a vymaze ty nadbytecne (na Viste se mi objevily zdvojene
-// separatory v kontextovem menu na .bar souborech)
+// finds duplicate separators and removes the redundant ones (on Vista duplicate
+// separators appeared in the context menu for .bar files)
 void RemoveUselessSeparatorsFromMenu(HMENU h);
 
-// vraci adresar "Open Salamander" na ceste CSIDL_APPDATA do 'buf' (buffer o velikosti MAX_PATH)
+// returns the "Open Salamander" directory under CSIDL_APPDATA into 'buf' (buffer of size MAX_PATH)
 BOOL GetOurPathInRoamingAPPDATA(char* buf);
 
-// vytvori adresar "Open Salamander" na ceste CSIDL_APPDATA; vraci TRUE pokud se cesta
-// vejde do MAX_PATH (jeji existence neni zarucena, vysledek CreateDirectory se nekontroluje);
-// neni-li 'buf' NULL, jde o buffer o velikosti MAX_PATH, ve kterem se vraci tato cesta
-// POZOR: pouziti jen Vista+
+// creates the "Open Salamander" directory under CSIDL_APPDATA; returns TRUE if the path
+// fits into MAX_PATH (its existence is not guaranteed; CreateDirectory result is not checked);
+// if 'buf' is not NULL, it is a buffer of size MAX_PATH where the path is returned
+// NOTE: Vista+ only
 BOOL CreateOurPathInRoamingAPPDATA(char* buf);
 
 #ifndef _WIN64
 
-// jen 32-bitova verze pod jen Win64: zjistuje jestli jde o cestu, kterou redirector presmeruje do
-// SysWOW64 nebo naopak zpet do System32
+// 32-bit build on Win64 only: checks whether the path is redirected by the file system redirector
+// to SysWOW64 or back to System32
 BOOL IsWin64RedirectedDir(const char* path, char** lastSubDir, BOOL failIfDirWithSameNameExists);
 
-// jen 32-bitova verze pod Win64: zjistuje jestli selectiona obsahuje pseudo-adresar, ktery redirector
-// presmeruje do SysWOW64 nebo naopak zpet do System32 a zaroven na disku neexistuje stejne pojmenovany
-// adresar (pseudo-adresar pridany jen na zaklade AddWin64RedirectedDir)
+// 32-bit build on Win64 only: checks whether the selection contains a pseudo-directory that the
+// redirector maps to SysWOW64 or back to System32, and that there is no real directory with the
+// same name on disk (pseudo-directory added only via AddWin64RedirectedDir)
 BOOL ContainsWin64RedirectedDir(CFilesWindow* panel, int* indexes, int count, char* redirectedDir,
                                 BOOL onlyAdded);
 
 #endif // _WIN64
 
-// nase varianty funkci RegQueryValue a RegQueryValueEx, narozdil od API variant
-// zajistuji pridani null-terminatoru pro typy REG_SZ, REG_MULTI_SZ a REG_EXPAND_SZ
-// POZOR: pri zjistovani potrebne velikosti bufferu vraci o jeden nebo dva (dva
-//        jen u REG_MULTI_SZ) znaky vic pro pripad, ze by string bylo potreba
-//        zakoncit nulou/nulami
+// our variants of RegQueryValue and RegQueryValueEx; unlike the WinAPI versions they ensure a
+// null terminator is present for REG_SZ, REG_MULTI_SZ, and REG_EXPAND_SZ
+// NOTE: when determining the required buffer size they return one or two extra characters (two
+//       only for REG_MULTI_SZ) to allow for terminating null(s)
 extern "C"
 {
     LONG SalRegQueryValue(HKEY hKey, LPCSTR lpSubKey, LPSTR lpData, PLONG lpcbData);
@@ -2437,16 +2436,16 @@ extern "C"
                             LPDWORD lpType, LPBYTE lpData, LPDWORD lpcbData);
 }
 
-// Win7 a novejsi OS - notifikace od taskbar, ze doslo k vytvoreni tlacitka pro okno
-// nastavuje se pri startu Salamandera, testovat zda je nenulova
+// Win7 and newer OS: taskbar notification that a button has been created for a window
+// set during Salamander startup; check if it is nonzero
 extern UINT TaskbarBtnCreatedMsg;
 
-// vrati rozmer ikony s ohledem na promennou SystemDPI
-// pokud je 'large' TRUE, vraci rozmer pro velkou ikonu, jinak pro malou
+// returns icon size with respect to SystemDPI
+// if 'large' is TRUE, returns the size for a large icon, otherwise for a small one
 int GetIconSizeForSystemDPI(CIconSizeEnum iconSize);
 
-// vraci aktualni systemove DPI (96, 120, 144, ...)
+// returns current system DPI (96, 120, 144, ...)
 int GetSystemDPI();
 
-// vraci scale odpovidajici aktualnimu DPI; misto 1.0 vraci 100, pro 1.25 vraci 125, atd
+// returns scale corresponding to current DPI; instead of 1.0 returns 100, for 1.25 returns 125, etc.
 int GetScaleForSystemDPI();
