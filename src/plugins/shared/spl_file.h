@@ -23,6 +23,16 @@
 //
 // CSalamanderSafeFileAbstract
 //
+// English summary: SafeFile method family provides robust file operations. The methods
+// detect API error states and show appropriate error dialogs. Dialogs may include
+// various button combinations (OK, Retry/Cancel, Retry/Skip/Skip all/Cancel),
+// configured by the caller via parameters. During error handling, methods need the
+// file name and original CreateFile parameters to be able to close and reopen the
+// handle, reposition the pointer, and retry the operation. Therefore, SafeFileRead
+// and SafeFileWrite may change SAFE_FILE::HFile while recovering from errors. For
+// this reason a dedicated SAFE_FILE structure is used to hold operation context.
+// The optional 'silentMask' bit-field allows suppressing prompts (Skip all / Overwrite all)
+// and records user choices across a group of operations.
 // Rodina metod SafeFile slouzi pro osetrenou praci se soubory. Metody kontroluji
 // chybove stavy API volani a zobrazuji odpovidajici chybove hlasky. Chybove hlasky
 // mohou obsahovat ruzne kombinace tlacitek. Od OK, pres Retry/Cancel, az po
