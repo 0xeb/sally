@@ -3,62 +3,59 @@
 
 #pragma once
 
-// aktualni verze konfigurace (popis viz. mainwnd2.cpp)
+// current configuration version (see mainwnd2.cpp for description)
 extern const DWORD THIS_CONFIG_VERSION;
 
-// Expirace verze: pro beta a PB verze odkomentovat, pro ostre verze zakomentovat:
+// Version expiration: uncomment for beta and PB builds; comment out for release builds:
 //#define USE_BETA_EXPIRATION_DATE
 
-// pro PB (EAP) verze odkomentovat, pro ostatni verze zakomentovat:
+// For PB (EAP) builds uncomment; for other builds keep commented:
 //#define THIS_IS_EAP_VERSION
 
 #ifdef USE_BETA_EXPIRATION_DATE
 
-// urcuje prvni den, kdy uz tato beta verze nepobezi
+// specifies the first day when this beta version stops running
 extern SYSTEMTIME BETA_EXPIRATION_DATE;
 
 #endif // USE_BETA_EXPIRATION_DATE
 
-// jen pro DEBUG verzi Salama: umozni debugovat tvorbu bugreportu (defaultne se nedela,
-// exceptiona se jen preda MSVC debuggeru)
+// DEBUG builds only: enables debugging of bug report creation (by default no bug report is created;
+// the exception is passed to the MSVC debugger)
 //#define ENABLE_BUGREPORT_DEBUGGING   1
 
-// slouzi pro detekci, zda wheel message prisla pres hook nebo primo
-extern BOOL MouseWheelMSGThroughHook; // TRUE: zprava sla skrz hook v case MouseWheelMSGTime; FALSE: zprava sla skrz panel v case MouseWheelMSGTime
-extern DWORD MouseWheelMSGTime;       // casove razitko pri posledni zprave
-#define MOUSEWHEELMSG_VALID 100       // [ms] pocet milisekund, po ktere je validni jeden kanal (hook vs okno)
+// used to detect whether the wheel message came through a hook or directly
+extern BOOL MouseWheelMSGThroughHook; // TRUE: message went through a hook at MouseWheelMSGTime; FALSE: through the panel at MouseWheelMSGTime
+extern DWORD MouseWheelMSGTime;       // timestamp of the last message
+#define MOUSEWHEELMSG_VALID 100       // [ms] number of milliseconds one channel (hook vs window) remains valid
 
 enum
 {
     otViewerWindow = 10,
 };
 
-// podpora pro horizontalni scroll (funguje jiz na W2K/XP s Intellipoint ovladacema, oficialne podporeno od Visty)
+// support for horizontal scroll (works on W2K/XP with Intellipoint drivers; officially supported since Vista)
 #define WM_MOUSEHWHEEL 0x020E
 BOOL PostMouseWheelMessage(MSG* pMSG);
 
-// zjisti jestli je velka sance (jiste se to urcit neda), ze Salamander v pristich par
-// okamzicich nebude "busy" (nebude otevreny zadny modalni dialog a nebude se zpracovavat
-// zadna zprava) - v tomto pripade vraci TRUE (jinak FALSE); neni-li 'lastIdleTime' NULL,
-// vraci se v nem GetTickCount() z okamziku posledniho prechodu z "idle" do "busy" stavu
-// je mozne volat z libovolneho threadu
+// Tries to determine with high probability (not guaranteed) whether Salamander will not be "busy"
+// in the next moments (no modal dialog open and no messages being processed). In that case returns TRUE,
+// otherwise FALSE. If 'lastIdleTime' is not NULL, it receives the GetTickCount() from the moment of the last
+// transition from "idle" to "busy" state. Can be called from any thread.
 BOOL SalamanderIsNotBusy(DWORD* lastIdleTime);
 
-// otevre HTML help Salamandera nebo pluginu, jazyk helpu (adresar s .chm soubory) vybira takto:
-// -adresar ziskany z aktualniho .slg souboru Salamandera (viz SLGHelpDir v shared\versinfo.rc)
-// -HELP\ENGLISH\*.chm
-// -prvni nalezeny podadresar v podadresari HELP
-// 'helpFileName' je jmeno .chm souboru, se kterym se ma pracovat (jmeno je bez cesty), je-li NULL,
-// jde o "salamand.chm"; 'parent' je parent messageboxu s chybou; 'command' je prikaz HTML helpu,
-// viz HHCDisplayXXX; 'dwData' je parametr prikazu HTML helpu, viz HHCDisplayXXX
-// je mozne volat z libovolneho threadu
-// Pokud je 'quiet' TRUE, nezobrazi se chybova hlaska.
-// Vraci TRUE, pokud se help podarilo otevrite, jinak vraci FALSE;
+// Opens Salamander or plug-in HTML help. The help language (directory with .chm files) is chosen as follows:
+// - directory obtained from the current Salamander .slg file (see SLGHelpDir in shared\versinfo.rc)
+// - HELP\ENGLISH\*.chm
+// - the first subdirectory found under HELP
+// 'helpFileName' is the .chm file name to work with (file name without path). If NULL, "salamand.chm" is used.
+// 'parent' is the parent for any error message box; 'command' is the HTML Help command, see HHCDisplayXXX;
+// 'dwData' is the parameter for the HTML Help command, see HHCDisplayXXX. Can be called from any thread.
+// If 'quiet' is TRUE, no error message is shown. Returns TRUE on success, otherwise FALSE.
 BOOL OpenHtmlHelp(char* helpFileName, HWND parent, CHtmlHelpCommand command, DWORD_PTR dwData, BOOL quiet);
 
-extern CRITICAL_SECTION OpenHtmlHelpCS; // kriticka sekce pro OpenHtmlHelp()
+extern CRITICAL_SECTION OpenHtmlHelpCS; // critical section for OpenHtmlHelp()
 
-/* jednoduche zajisteni behu v kriticke sekci, priklad pouziti:
+/* Simple way to ensure execution within a critical section, usage example:
   static CCriticalSection cs;
   CEnterCriticalSection enterCS(cs);
 */
