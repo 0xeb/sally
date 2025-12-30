@@ -3,6 +3,10 @@
 
 #pragma once
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 #pragma warning(3 : 4706) // warning C4706: assignment within conditional expression
 
 // #define ENABLE_SH_MENU_EXT     // define this macro to include the context menu handler (not just the copy hook)
@@ -230,6 +234,10 @@ typedef struct CSalShExtSharedMem CSalShExtSharedMem;
 // parameters: path to the library, whether to skip loading the DLL when verifying its version,
 // and the registry view (0, 32-bit, or 64-bit) that should be updated
 BOOL SECRegisterToRegistry(const char* shellExtensionPath, BOOL doNotLoadDLL, REGSAM regView);
+
+#ifdef __cplusplus
+} // extern "C"
+#endif
 
 #ifdef ENABLE_SH_MENU_EXT
 
