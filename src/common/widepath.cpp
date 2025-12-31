@@ -267,3 +267,36 @@ HANDLE SalFindFirstFile(const char* fileName, WIN32_FIND_DATAW* findData)
 
     return FindFirstFileW(widePath.Get(), findData);
 }
+
+//
+// Handle-tracking variant (debug builds only)
+//
+
+#ifdef HANDLES_ENABLE
+
+#include "handles.h"
+
+HANDLE SalCreateFileTracked(
+    const char* fileName,
+    DWORD dwDesiredAccess,
+    DWORD dwShareMode,
+    LPSECURITY_ATTRIBUTES lpSecurityAttributes,
+    DWORD dwCreationDisposition,
+    DWORD dwFlagsAndAttributes,
+    HANDLE hTemplateFile,
+    const char* srcFile,
+    int srcLine)
+{
+    HANDLE h = SalCreateFile(fileName, dwDesiredAccess, dwShareMode,
+                             lpSecurityAttributes, dwCreationDisposition,
+                             dwFlagsAndAttributes, hTemplateFile);
+
+    // Track the handle using Salamander's handle tracking system
+    DWORD err = GetLastError();
+    __Handles.SetInfo(srcFile, srcLine, __otQuiet)
+        .CheckCreate(h != INVALID_HANDLE_VALUE, __htFile, __hoCreateFile, h, err, TRUE);
+
+    return h;
+}
+
+#endif // HANDLES_ENABLE

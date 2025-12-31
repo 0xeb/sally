@@ -124,3 +124,36 @@ HANDLE SalFindFirstFile(const char* fileName, WIN32_FIND_DATAW* findData);
 
 // FindNextFile (standard API, no wrapper needed since handle is already wide)
 // Use standard FindNextFileW with handle from SalFindFirstFile
+
+//
+// Handle-tracking variants for integration with Salamander's HANDLES system
+// These should be used when HANDLES_ENABLE is defined (debug builds)
+//
+// Usage:
+//   HANDLE h = SalCreateFileH(path, GENERIC_READ, FILE_SHARE_READ, NULL, OPEN_EXISTING, 0, NULL);
+//   // Handle is automatically tracked via HANDLES_ADD_EX
+//
+
+#ifdef HANDLES_ENABLE
+
+// CreateFile with handle tracking - use instead of HANDLES_Q(CreateFile(...))
+#define SalCreateFileH(fileName, dwDesiredAccess, dwShareMode, lpSecurityAttributes, dwCreationDisposition, dwFlagsAndAttributes, hTemplateFile) \
+    SalCreateFileTracked(fileName, dwDesiredAccess, dwShareMode, lpSecurityAttributes, dwCreationDisposition, dwFlagsAndAttributes, hTemplateFile, __FILE__, __LINE__)
+
+HANDLE SalCreateFileTracked(
+    const char* fileName,
+    DWORD dwDesiredAccess,
+    DWORD dwShareMode,
+    LPSECURITY_ATTRIBUTES lpSecurityAttributes,
+    DWORD dwCreationDisposition,
+    DWORD dwFlagsAndAttributes,
+    HANDLE hTemplateFile,
+    const char* srcFile,
+    int srcLine);
+
+#else // !HANDLES_ENABLE
+
+// In release builds, just use the regular wrapper
+#define SalCreateFileH SalCreateFile
+
+#endif // HANDLES_ENABLE
