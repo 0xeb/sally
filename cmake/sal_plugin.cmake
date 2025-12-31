@@ -96,19 +96,18 @@ function(sal_add_plugin)
     "${SAL_SHARED}/libs/${SAL_PLATFORM}"
   )
 
-  # Module definition file (for exports)
-  if(PLUGIN_DEF)
-    set_target_properties(${TARGET_NAME} PROPERTIES
-      LINK_FLAGS "/DEF:\"${PLUGIN_DEF}\""
-    )
-  endif()
-
   # MSVC-specific settings
   if(MSVC)
     target_compile_options(${TARGET_NAME} PRIVATE /MP /W3 /J)
-    # Disable manifest embedding (plugins don't need it)
+
+    # Build linker flags: DEF file + no manifest
+    set(PLUGIN_LINK_FLAGS "/MANIFEST:NO")
+    if(PLUGIN_DEF)
+      set(PLUGIN_LINK_FLAGS "${PLUGIN_LINK_FLAGS} /DEF:\"${PLUGIN_DEF}\"")
+    endif()
+
     set_target_properties(${TARGET_NAME} PROPERTIES
-      LINK_FLAGS "${CMAKE_MODULE_LINKER_FLAGS} /MANIFEST:NO"
+      LINK_FLAGS "${PLUGIN_LINK_FLAGS}"
     )
   endif()
 
