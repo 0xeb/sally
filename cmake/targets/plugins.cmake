@@ -24,8 +24,26 @@ sal_add_plugin(NAME checksum
 
 # -----------------------------------------------------------------------------
 # diskmap - Visual disk space usage map
-# TODO: Complex plugin - requires additional shared sources (CThreadQueue)
 # -----------------------------------------------------------------------------
+sal_add_plugin(NAME diskmap
+  SOURCES
+    # DiskMap core
+    "${SAL_PLUGINS}/diskmap/DiskMap/GUI.CWindow.cpp"
+    "${SAL_PLUGINS}/diskmap/DiskMap/GUI.MainWindow.cpp"
+    "${SAL_PLUGINS}/diskmap/DiskMap/TreeMap.FileData.CZDirectory.cpp"
+    "${SAL_PLUGINS}/diskmap/DiskMap/TreeMap.FileData.CZFile.cpp"
+    "${SAL_PLUGINS}/diskmap/DiskMap/TreeMap.Graphics.CCushionGraphics.cpp"
+    "${SAL_PLUGINS}/diskmap/DiskMap/Utils.CZLocalizer.cpp"
+    # DiskMapPlugin wrapper
+    "${SAL_PLUGINS}/diskmap/DiskMapPlugin/DiskMapPlugin.cpp"
+    "${SAL_PLUGINS}/diskmap/DiskMapPlugin/precomp.cpp"
+  RC "${SAL_PLUGINS}/diskmap/DiskMapPlugin/DiskMapPlugin.rc"
+  DEF "${SAL_PLUGINS}/diskmap/DiskMapPlugin/DiskMapPlugin.def"
+  INCLUDES
+    "${SAL_PLUGINS}/diskmap/DiskMap"
+    "${SAL_PLUGINS}/diskmap/DiskMapPlugin"
+  PCH "DiskMapPlugin/precomp.h"
+)
 
 # -----------------------------------------------------------------------------
 # nethood - Network neighborhood browser
@@ -121,8 +139,31 @@ sal_add_plugin(NAME regedt
 
 # -----------------------------------------------------------------------------
 # renamer - Batch file renamer
-# TODO: Needs shared/spl_com.h character utilities (IsDigit, IsAlpha, etc.)
 # -----------------------------------------------------------------------------
+sal_add_plugin(NAME renamer
+  SOURCES
+    "${SAL_PLUGINS}/renamer/crename2.cpp"
+    "${SAL_PLUGINS}/renamer/crenamer.cpp"
+    "${SAL_PLUGINS}/renamer/dialogs.cpp"
+    "${SAL_PLUGINS}/renamer/editor.cpp"
+    "${SAL_PLUGINS}/renamer/menu.cpp"
+    "${SAL_PLUGINS}/renamer/precomp.cpp"
+    "${SAL_PLUGINS}/renamer/preview.cpp"
+    "${SAL_PLUGINS}/renamer/regexp.cpp"
+    "${SAL_PLUGINS}/renamer/renamer.cpp"
+    "${SAL_PLUGINS}/renamer/rendlg.cpp"
+    "${SAL_PLUGINS}/renamer/rendlg2.cpp"
+    "${SAL_PLUGINS}/renamer/rendlg3.cpp"
+    "${SAL_PLUGINS}/renamer/rendlg4.cpp"
+    "${SAL_PLUGINS}/renamer/utils.cpp"
+    "${SAL_PLUGINS}/renamer/varstr.cpp"
+    # Character utilities from shared/lukas
+    "${SAL_SHARED}/lukas/str.cpp"
+  RC "${SAL_PLUGINS}/renamer/renamer.rc"
+  DEF "${SAL_PLUGINS}/renamer/renamer.def"
+  INCLUDES "${SAL_SHARED}/lukas"
+  DEFINES _CHAR_UNSIGNED DECLARE_REGIFACE_FUNCTIONS
+)
 
 # -----------------------------------------------------------------------------
 # unlha - LHA/LZH archive extractor
