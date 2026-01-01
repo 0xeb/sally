@@ -705,7 +705,7 @@ void CFilesWindow::ViewFile(char* name, BOOL altView, DWORD handlerID, int enumF
     CALL_STACK_MESSAGE6("CFilesWindow::ViewFile(%s, %d, %u, %d, %d)", name, altView, handlerID,
                         enumFileNamesSourceUID, enumFileNamesLastFileIndex);
     // verify that the file is on an accessible path
-    char path[MAX_PATH + 10];
+    CPathBuffer path;
     if (name == NULL) // file from the panel
     {
         if (Is(ptDisk) || Is(ptZIPArchive))
@@ -741,23 +741,12 @@ void CFilesWindow::ViewFile(char* name, BOOL altView, DWORD handlerID, int enumF
             {
                 if (enumFileNamesLastFileIndex == -1)
                     enumFileNamesLastFileIndex = i - Dirs->Count;
-                lstrcpyn(path, GetPath(), MAX_PATH);
+                lstrcpyn(path, GetPath(), path.Size());
                 if (GetPath()[strlen(GetPath()) - 1] != '\\')
                     strcat(path, "\\");
                 char* s = path + strlen(path);
-                if ((s - path) + f->NameLen >= MAX_PATH)
-                {
-                    if (f->DosName != NULL && strlen(f->DosName) + (s - path) < MAX_PATH)
-                        strcpy(s, f->DosName);
-                    else
-                    {
-                        SalMessageBox(HWindow, LoadStr(IDS_TOOLONGNAME), LoadStr(IDS_ERRORTITLE),
-                                      MB_OK | MB_ICONEXCLAMATION);
-                        return;
-                    }
-                }
-                else
-                    strcpy(s, f->Name);
+                // Long paths are now supported - just append the name
+                strcpy(s, f->Name);
                 // try whether the file name is valid, otherwise try its DOS name
                 // (handles files accessible only through Unicode or DOS names)
                 if (f->DosName != NULL && SalGetFileAttributes(path) == 0xffffffff)
@@ -765,15 +754,9 @@ void CFilesWindow::ViewFile(char* name, BOOL altView, DWORD handlerID, int enumF
                     DWORD err = GetLastError();
                     if (err == ERROR_FILE_NOT_FOUND || err == ERROR_INVALID_NAME)
                     {
-                        if (strlen(f->DosName) + (s - path) < MAX_PATH)
-                        {
-                            strcpy(s, f->DosName);
-                            if (SalGetFileAttributes(path) == 0xffffffff) // still error -> revert to the long name
-                            {
-                                if ((s - path) + f->NameLen < MAX_PATH)
-                                    strcpy(s, f->Name);
-                            }
-                        }
+                        strcpy(s, f->DosName);
+                        if (SalGetFileAttributes(path) == 0xffffffff) // still error -> revert to the long name
+                            strcpy(s, f->Name);
                     }
                 }
                 name = path;

@@ -2388,13 +2388,13 @@ void CMainWindow::SaveConfig(HWND parent)
     }
 }
 
-void CMainWindow::LoadPanelConfig(char* panelPath, CFilesWindow* panel, HKEY hSalamander, const char* reg)
+void CMainWindow::LoadPanelConfig(char* panelPath, int panelPathSize, CFilesWindow* panel, HKEY hSalamander, const char* reg)
 {
     HKEY actKey;
     if (OpenKey(hSalamander, reg, actKey))
     {
         DWORD value;
-        if (GetValue(actKey, PANEL_PATH_REG, REG_SZ, panelPath, MAX_PATH))
+        if (GetValue(actKey, PANEL_PATH_REG, REG_SZ, panelPath, panelPathSize))
         {
             if (GetValue(actKey, PANEL_HEADER_REG, REG_DWORD, &value, sizeof(DWORD)))
                 panel->HeaderLineVisible = value;
@@ -2794,14 +2794,14 @@ BOOL CMainWindow::LoadConfig(BOOL importingOldConfig, const CCommandLineParams* 
                 }
 
                 char name[2];
-                BYTE path[MAX_PATH];
+                BYTE path[SAL_MAX_LONG_PATH];
                 DWORD nameLen, dataLen, type;
 
                 int i;
                 for (i = 0; i < (int)values; i++)
                 {
                     nameLen = 2;
-                    dataLen = MAX_PATH;
+                    dataLen = SAL_MAX_LONG_PATH;
                     res = RegEnumValue(actKey, i, name, &nameLen, 0, &type, path, &dataLen);
                     if (res == ERROR_SUCCESS)
                         if (type == REG_SZ)
@@ -3809,14 +3809,14 @@ BOOL CMainWindow::LoadConfig(BOOL importingOldConfig, const CCommandLineParams* 
 
         //---  left and right panel
 
-        char leftPanelPath[MAX_PATH];
-        char rightPanelPath[MAX_PATH];
-        GetSystemDirectory(leftPanelPath, MAX_PATH);
+        CPathBuffer leftPanelPath;
+        CPathBuffer rightPanelPath;
+        GetSystemDirectory(leftPanelPath, leftPanelPath.Size());
         strcpy(rightPanelPath, leftPanelPath);
-        char sysDefDir[MAX_PATH];
-        lstrcpyn(sysDefDir, DefaultDir[LowerCase[leftPanelPath[0]] - 'a'], MAX_PATH);
-        LoadPanelConfig(leftPanelPath, LeftPanel, salamander, SALAMANDER_LEFTP_REG);
-        LoadPanelConfig(rightPanelPath, RightPanel, salamander, SALAMANDER_RIGHTP_REG);
+        CPathBuffer sysDefDir;
+        lstrcpyn(sysDefDir, DefaultDir[LowerCase[leftPanelPath[0]] - 'a'], sysDefDir.Size());
+        LoadPanelConfig(leftPanelPath, leftPanelPath.Size(), LeftPanel, salamander, SALAMANDER_LEFTP_REG);
+        LoadPanelConfig(rightPanelPath, rightPanelPath.Size(), RightPanel, salamander, SALAMANDER_RIGHTP_REG);
 
         CloseKey(salamander);
         salamander = NULL;
