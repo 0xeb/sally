@@ -1333,203 +1333,203 @@ public:
     // limitation: main thread
     virtual const CFileData* WINAPI GetPanelSelectedItem(int panel, int* index, BOOL* isDir) = 0;
 
-    // zjisti kolik souboru a adresaru je oznacenych v panelu; 'panel' je jeden z PANEL_XXX;
-    // neni-li 'selectedFiles' NULL, vraci v nem pocet oznacenych souboru; neni-li 'selectedDirs'
-    // NULL, vraci v nem pocet oznacenych adresaru; vraci TRUE pokud je oznaceny aspon jeden
-    // soubor nebo adresar nebo pokud je fokus na souboru nebo adresari (je-li s cim
-    // pracovat - fokus neni na up-diru)
-    // omezeni: hlavni thread (jinak se muze obsah panelu menit)
+    // finds how many files and directories are selected in panel; 'panel' is one of PANEL_XXX;
+    // if 'selectedFiles' is not NULL, returns number of selected files in it; if 'selectedDirs' is
+    // not NULL, returns number of selected directories in it; returns TRUE if at least one
+    // file or directory is selected or if focus is on file or directory (if there is something
+    // to work with - focus is not on up-dir)
+    // limitation: main thread (otherwise panel contents may change)
     virtual BOOL WINAPI GetPanelSelection(int panel, int* selectedFiles, int* selectedDirs) = 0;
 
-    // vraci top-index listboxu v panelu; 'panel' je jeden z PANEL_XXX
-    // omezeni: hlavni thread (jinak se muze obsah panelu menit)
+    // returns top-index of listbox in panel; 'panel' is one of PANEL_XXX
+    // limitation: main thread (otherwise panel contents may change)
     virtual int WINAPI GetPanelTopIndex(int panel) = 0;
 
-    // informuje hlavni okno Salamandera, ze se deaktivuje okno viewru, pokud se bude
-    // bezprostredne aktivovat hlavni okno a v panelech budou neautomaticky refreshovane
-    // disky nedojde k jejich refreshi (viewry nemeni obsah disku), nepovine (dojde
-    // k mozna zbytecnemu refrehi)
-    // mozne volat z libovolneho threadu
+    // informs Salamander main window that viewer window is being deactivated, if main window
+    // will be activated immediately and panels have non-automatically refreshed
+    // drives, they won't be refreshed (viewers don't change disk contents), optional (may cause
+    // unnecessary refresh)
+    // can be called from any thread
     virtual void WINAPI SkipOneActivateRefresh() = 0;
 
-    // oznacuje/odznacuje polozku panelu, 'file' je ukazatel na menenou polozku ziskany predchozim
-    // "get-item" volanim (metody GetPanelFocusedItem, GetPanelItem a GetPanelSelectedItem);
-    // je nutne, aby od "get-item" volani nebyl opusten plugin a volani probehlo v hlavnim
-    // threadu (aby nedoslo k obnove panelu - zneplatneni ukazatele); 'panel' musi byt shodny
-    // s parametrem 'panel' prislusneho "get-item" volani; je-li 'select' TRUE dojde k oznaceni,
-    // jinak dojde k odznaceni; po poslednim volani je nutne pouzit RepaintChangedItems('panel') pro
-    // prekresleni panelu
-    // omezeni: hlavni thread
+    // selects/deselects panel item, 'file' is pointer to changed item obtained by previous
+    // "get-item" call (methods GetPanelFocusedItem, GetPanelItem and GetPanelSelectedItem);
+    // plugin must not be left since "get-item" call and call must occur in main
+    // thread (to prevent panel refresh - pointer invalidation); 'panel' must be same
+    // as 'panel' parameter of corresponding "get-item" call; if 'select' is TRUE selection occurs,
+    // otherwise deselection occurs; after last call RepaintChangedItems('panel') must be used for
+    // panel repaint
+    // limitation: main thread
     virtual void WINAPI SelectPanelItem(int panel, const CFileData* file, BOOL select) = 0;
 
-    // provede prekresleni polozek panelu u kterych doslo ke zmenam (oznaceni); 'panel' je
-    // jeden z PANEL_XXX
-    // omezeni: hlavni thread
+    // repaints panel items that were changed (selection); 'panel' is
+    // one of PANEL_XXX
+    // limitation: main thread
     virtual void WINAPI RepaintChangedItems(int panel) = 0;
 
-    // oznacuje/odznacuje vsechny polozky v panelu, 'panel' je jeden z PANEL_XXX; je-li 'select'
-    // TRUE dojde k oznaceni, jinak dojde k odznaceni; je-li 'repaint' TRUE prekresli se vsechny
-    // zmenene polozky v panelu, jinak k prekresleni nedojde (mozne volat pozdeji RepaintChangedItems)
-    // omezeni: hlavni thread
+    // selects/deselects all items in panel, 'panel' is one of PANEL_XXX; if 'select' is
+    // TRUE selection occurs, otherwise deselection occurs; if 'repaint' is TRUE all changed
+    // items in panel are repainted, otherwise no repaint occurs (can call RepaintChangedItems later)
+    // limitation: main thread
     virtual void WINAPI SelectAllPanelItems(int panel, BOOL select, BOOL repaint) = 0;
 
-    // nastavi fokus v panelu, 'file' je ukazatel na fokusenou polozku ziskany predchozim
-    // "get-item" volanim (metody GetPanelFocusedItem, GetPanelItem a GetPanelSelectedItem);
-    // je nutne, aby od "get-item" volani nebyl opusten plugin a volani probehlo v hlavnim
-    // threadu (aby nedoslo k obnove panelu - zneplatneni ukazatele); 'panel' musi byt shodny
-    // s parametrem 'panel' prislusneho "get-item" volani; je-li 'partVis' TRUE a polozka bude
-    // viditelna jen castecne, nedojde k odrolovani panelu pri fokusu, pri FALSE odroluje panel
-    // tak, aby byla videt cela polozka
-    // omezeni: hlavni thread
+    // sets focus in panel, 'file' is pointer to focused item obtained by previous
+    // "get-item" call (methods GetPanelFocusedItem, GetPanelItem and GetPanelSelectedItem);
+    // plugin must not be left since "get-item" call and call must occur in main
+    // thread (to prevent panel refresh - pointer invalidation); 'panel' must be same
+    // as 'panel' parameter of corresponding "get-item" call; if 'partVis' is TRUE and item will
+    // be only partially visible, panel won't scroll on focus, if FALSE panel scrolls
+    // so that entire item is visible
+    // limitation: main thread
     virtual void WINAPI SetPanelFocusedItem(int panel, const CFileData* file, BOOL partVis) = 0;
 
-    // zjisti jestli se v panelu pouziva filtr a pokud se pouziva, ziska retezec s maskami
-    // tohoto filtru; 'panel' oznacuje panel, o ktery se zajimame (jedna z PANEL_XXX);
-    // 'masks' je buffer pro masky filtru o velikosti minimalne 'masksBufSize' bytu (doporucena
-    // velikost je MAX_GROUPMASK); vraci TRUE pokud se filtr pouziva a buffer 'masks' je
-    // dost velky; vraci FALSE pokud se filtr nepouziva nebo se retezec masek nevesel
-    // do 'masks'
-    // omezeni: hlavni thread
+    // finds if filter is used in panel and if so, gets mask string of
+    // this filter; 'panel' indicates panel we're interested in (one of PANEL_XXX);
+    // 'masks' is buffer for filter masks of at least 'masksBufSize' bytes (recommended
+    // size is MAX_GROUPMASK); returns TRUE if filter is used and buffer 'masks' is
+    // large enough; returns FALSE if filter is not used or mask string didn't fit
+    // in 'masks'
+    // limitation: main thread
     virtual BOOL WINAPI GetFilterFromPanel(int panel, char* masks, int masksBufSize) = 0;
 
-    // vraci pozici zdrojoveho panelu (je vlevo nebo vpravo?), vraci PANEL_LEFT nebo PANEL_RIGHT
-    // omezeni: hlavni thread
+    // returns position of source panel (is it left or right?), returns PANEL_LEFT or PANEL_RIGHT
+    // limitation: main thread
     virtual int WINAPI GetSourcePanel() = 0;
 
-    // zjistuje, ve kterem panelu je otevreny 'pluginFS'; pokud neni ani v jednom panelu,
-    // vraci FALSE; pokud vrati TRUE, je cislo panelu v 'panel' (PANEL_LEFT nebo PANEL_RIGHT)
-    // omezeni: hlavni thread (jinak se muze obsah panelu menit)
+    // finds in which panel 'pluginFS' is opened; if not in either panel,
+    // returns FALSE; if returns TRUE, panel number is in 'panel' (PANEL_LEFT or PANEL_RIGHT)
+    // limitation: main thread (otherwise panel contents may change)
     virtual BOOL WINAPI GetPanelWithPluginFS(CPluginFSInterfaceAbstract* pluginFS, int& panel) = 0;
 
-    // aktivuje druhy panel (ala klavesa TAB); panely oznacene pres PANEL_SOURCE a PANEL_TARGET
-    // se tim prirozene prohazuji
-    // omezeni: hlavni thread
+    // activates other panel (like TAB key); panels marked via PANEL_SOURCE and PANEL_TARGET
+    // are naturally swapped
+    // limitation: main thread
     virtual void WINAPI ChangePanel() = 0;
 
-    // prevod cisla na "prehlednejsi" retezec (po trech cislicich mezera), retezec vraci v
-    // 'buffer' (min. velikost 50 bytu), vraci 'buffer'
-    // mozne volat z libovolneho threadu
+    // converts number to "more readable" string (space every three digits), returns string in
+    // 'buffer' (min. size 50 bytes), returns 'buffer'
+    // can be called from any thread
     virtual char* WINAPI NumberToStr(char* buffer, const CQuadWord& number) = 0;
 
-    // tisk velikosti mista na disku do 'buf' (min. velikost bufferu je 100 bytu),
+    // prints disk size to 'buf' (min. buffer size is 100 bytes),
     // mode==0 "1.23 MB", mode==1 "1 230 000 bytes, 1.23 MB", mode==2 "1 230 000 bytes",
-    // mode==3 "12 KB" (vzdy v celych kilo bajtech), mode==4 (jako mode==0, ale vzdy
-    // aspon 3 platne cislice, napr. "2.00 MB")
-    // vraci 'buf'
-    // mozne volat z libovolneho threadu
+    // mode==3 "12 KB" (always in whole kilobytes), mode==4 (like mode==0, but always
+    // at least 3 significant digits, e.g. "2.00 MB")
+    // returns 'buf'
+    // can be called from any thread
     virtual char* WINAPI PrintDiskSize(char* buf, const CQuadWord& size, int mode) = 0;
 
-    // prevadi pocet sekund na retezec ("5 sec", "1 hr 34 min", atp.); 'buf' je
-    // buffer pro vysledny text, musi byt velky aspon 100 znaku; 'secs' je pocet sekund;
-    // vraci 'buf'
-    // mozne volat z libovolneho threadu
+    // converts number of seconds to string ("5 sec", "1 hr 34 min", etc.); 'buf' is
+    // buffer for result text, must be at least 100 characters; 'secs' is number of seconds;
+    // returns 'buf'
+    // can be called from any thread
     virtual char* WINAPI PrintTimeLeft(char* buf, const CQuadWord& secs) = 0;
 
-    // porovna root normalni (c:\path) i UNC (\\server\share\path) cesty, vraci TRUE pokud je root shodny
-    // mozne volat z libovolneho threadu
+    // compares root of normal (c:\path) and UNC (\\server\share\path) paths, returns TRUE if root is same
+    // can be called from any thread
     virtual BOOL WINAPI HasTheSameRootPath(const char* path1, const char* path2) = 0;
 
-    // Vrati pocet znaku spolecne cesty. Na normalni ceste musi byt root ukonceny zpetnym
-    // lomitkem, jinak funkce vrati 0. ("C:\"+"C:"->0, "C:\A\B"+"C:\"->3, "C:\A\B\"+"C:\A"->4,
+    // Returns number of characters in common path. On normal path root must be terminated with backslash,
+    // otherwise function returns 0. ("C:\"+"C:"->0, "C:\A\B"+"C:\"->3, "C:\A\B\"+"C:\A"->4,
     // "C:\AA\BB"+"C:\AA\CC"->5)
-    // Pracuje pro normalni i UNC cesty.
+    // Works for normal and UNC paths.
     virtual int WINAPI CommonPrefixLength(const char* path1, const char* path2) = 0;
 
-    // Vraci TRUE, pokud je cesta 'prefix' zakladem cesty 'path'. Jinak vraci FALSE.
+    // Returns TRUE if path 'prefix' is base of path 'path'. Otherwise returns FALSE.
     // "C:\aa","C:\Aa\BB"->TRUE
     // "C:\aa","C:\aaa"->FALSE
     // "C:\aa\","C:\Aa"->TRUE
     // "\\server\share","\\server\share\aaa"->TRUE
-    // Pracuje pro normalni i UNC cesty.
+    // Works for normal and UNC paths.
     virtual BOOL WINAPI PathIsPrefix(const char* prefix, const char* path) = 0;
 
-    // porovna dve normalni (c:\path) i UNC (\\server\share\path) cesty, ignoruje mala/velka pismena,
-    // ignoruje take jeden backslash na zacatku a konci cest, vraci TRUE pokud jsou cesty stejne
-    // mozne volat z libovolneho threadu
+    // compares two normal (c:\path) and UNC (\\server\share\path) paths, ignores case,
+    // also ignores one backslash at beginning and end of paths, returns TRUE if paths are same
+    // can be called from any thread
     virtual BOOL WINAPI IsTheSamePath(const char* path1, const char* path2) = 0;
 
-    // ziska root cestu z normalni (c:\path) i UNC (\\server\share\path) cesty 'path', v 'root' vraci
-    // cestu ve formatu 'c:\' nebo '\\server\share\' (min. velikost 'root' bufferu je MAX_PATH),
-    // vraci pocet znaku root cesty (bez null-terminatoru); pri UNC root ceste delsi nez MAX_PATH
-    // dojde k orezu na MAX_PATH-2 znaku a doplneni backslashe (stejne to na 100% neni root cesta)
-    // mozne volat z libovolneho threadu
+    // gets root path from normal (c:\path) or UNC (\\server\share\path) path 'path', in 'root' returns
+    // path in format 'c:\' or '\\server\share\' (min. size of 'root' buffer is MAX_PATH),
+    // returns number of characters in root path (without null-terminator); for UNC root path longer than MAX_PATH
+    // truncation to MAX_PATH-2 characters occurs with backslash added (it's not 100% a root path anyway)
+    // can be called from any thread
     virtual int WINAPI GetRootPath(char* root, const char* path) = 0;
 
-    // zkracuje normalni (c:\path) i UNC (\\server\share\path) cestu o posledni adresar
-    // (zariznuti na poslednim backslashi - v oriznute ceste zustava na konci backslash
-    // jen u 'c:\'), 'path' je in/out buffer (min. velikost strlen(path)+2 bytu),
-    // v 'cutDir' (neni-li NULL) se vraci ukazatel (do bufferu 'path' za 1. null-terminator)
-    // na posledni adresar (odriznutou cast), tato metoda nahrazuje PathRemoveFileSpec,
-    // vraci TRUE pokud doslo ke zkraceni (neslo o root cestu)
-    // mozne volat z libovolneho threadu
+    // shortens normal (c:\path) or UNC (\\server\share\path) path by last directory
+    // (cuts at last backslash - backslash remains at end of trimmed path
+    // only for 'c:\'), 'path' is in/out buffer (min. size strlen(path)+2 bytes),
+    // in 'cutDir' (if not NULL) pointer is returned (into buffer 'path' after 1st null-terminator)
+    // to last directory (cut part), this method replaces PathRemoveFileSpec,
+    // returns TRUE if shortening occurred (was not root path)
+    // can be called from any thread
     virtual BOOL WINAPI CutDirectory(char* path, char** cutDir = NULL) = 0;
 
-    // pracuje s normalnimi (c:\path) i UNC (\\server\share\path) cestami,
-    // spoji 'path' a 'name' do 'path', zajisti spojeni backslashem, 'path' je buffer alespon
-    // 'pathSize' znaku, vraci TRUE pokud se 'name' veslo za 'path'; je-li 'path' nebo 'name'
-    // prazdne, spojovaci (pocatecni/ukoncovaci) backslash nebude (napr. "c:\" + "" -> "c:")
-    // mozne volat z libovolneho threadu
+    // works with normal (c:\path) and UNC (\\server\share\path) paths,
+    // joins 'path' and 'name' into 'path', ensures joining with backslash, 'path' is buffer of at least
+    // 'pathSize' characters, returns TRUE if 'name' fit after 'path'; if 'path' or 'name' is
+    // empty, joining (initial/terminating) backslash won't be added (e.g. "c:\" + "" -> "c:")
+    // can be called from any thread
     virtual BOOL WINAPI SalPathAppend(char* path, const char* name, int pathSize) = 0;
 
-    // pracuje s normalnimi (c:\path) i UNC (\\server\share\path) cestami,
-    // pokud jeste 'path' nekonci na backslash, prida ho na konec 'path'; 'path' je buffer
-    // alespon 'pathSize' znaku; vraci TRUE pokud se backslash vesel za 'path'; je-li 'path'
-    // prazdne, backslash se neprida
-    // mozne volat z libovolneho threadu
+    // works with normal (c:\path) and UNC (\\server\share\path) paths,
+    // if 'path' doesn't end with backslash yet, adds it to end of 'path'; 'path' is buffer
+    // of at least 'pathSize' characters; returns TRUE if backslash fit after 'path'; if 'path'
+    // is empty, backslash is not added
+    // can be called from any thread
     virtual BOOL WINAPI SalPathAddBackslash(char* path, int pathSize) = 0;
 
-    // pracuje s normalnimi (c:\path) i UNC (\\server\share\path) cestami,
-    // pokud je v 'path' na konci backslash, odstrani ho
-    // mozne volat z libovolneho threadu
+    // works with normal (c:\path) and UNC (\\server\share\path) paths,
+    // if 'path' ends with backslash, removes it
+    // can be called from any thread
     virtual void WINAPI SalPathRemoveBackslash(char* path) = 0;
 
-    // pracuje s normalnimi (c:\path) i UNC (\\server\share\path) cestami,
-    // z plneho jmena udela jmeno ("c:\path\file" -> "file")
-    // mozne volat z libovolneho threadu
+    // works with normal (c:\path) and UNC (\\server\share\path) paths,
+    // makes name from full name ("c:\path\file" -> "file")
+    // can be called from any thread
     virtual void WINAPI SalPathStripPath(char* path) = 0;
 
-    // pracuje s normalnimi (c:\path) i UNC (\\server\share\path) cestami,
-    // pokud je ve jmene pripona, odstrani ji
-    // mozne volat z libovolneho threadu
+    // works with normal (c:\path) and UNC (\\server\share\path) paths,
+    // if name has extension, removes it
+    // can be called from any thread
     virtual void WINAPI SalPathRemoveExtension(char* path) = 0;
 
-    // pracuje s normalnimi (c:\path) i UNC (\\server\share\path) cestami,
-    // pokud ve jmenu 'path' jeste neni pripona, prida priponu 'extension' (napr. ".txt"),
-    // 'path' je buffer alespon 'pathSize' znaku, vraci FALSE pokud buffer 'path' nestaci
-    // pro vyslednou cestu
-    // mozne volat z libovolneho threadu
+    // works with normal (c:\path) and UNC (\\server\share\path) paths,
+    // if name 'path' doesn't have extension yet, adds extension 'extension' (e.g. ".txt"),
+    // 'path' is buffer of at least 'pathSize' characters, returns FALSE if buffer 'path' isn't enough
+    // for resulting path
+    // can be called from any thread
     virtual BOOL WINAPI SalPathAddExtension(char* path, const char* extension, int pathSize) = 0;
 
-    // pracuje s normalnimi (c:\path) i UNC (\\server\share\path) cestami,
-    // zmeni/prida priponu 'extension' (napr. ".txt") ve jmenu 'path', 'path' je buffer
-    // alespon 'pathSize' znaku, vraci FALSE pokud buffer 'path' nestaci pro vyslednou cestu
-    // mozne volat z libovolneho threadu
+    // works with normal (c:\path) and UNC (\\server\share\path) paths,
+    // changes/adds extension 'extension' (e.g. ".txt") in name 'path', 'path' is buffer
+    // of at least 'pathSize' characters, returns FALSE if buffer 'path' isn't enough for resulting path
+    // can be called from any thread
     virtual BOOL WINAPI SalPathRenameExtension(char* path, const char* extension, int pathSize) = 0;
 
-    // pracuje s normalnimi (c:\path) i UNC (\\server\share\path) cestami,
-    // vraci ukazatel do 'path' na jmeno souboru/adresare (backslash na konci 'path' ignoruje),
-    // pokud jmeno neobsahuje jine backslashe nez na konci retezce, vraci 'path'
-    // mozne volat z libovolneho threadu
+    // works with normal (c:\path) and UNC (\\server\share\path) paths,
+    // returns pointer into 'path' to file/directory name (ignores backslash at end of 'path'),
+    // if name contains no other backslashes except at end of string, returns 'path'
+    // can be called from any thread
     virtual const char* WINAPI SalPathFindFileName(const char* path) = 0;
 
-    // upravuje relativni nebo absolutni normalni (c:\path) i UNC (\\server\share\path) cestu
-    // na absolutni bez '.', '..' a koncoveho backslashe (krom typu "c:\"); je-li 'curDir' NULL,
-    // relativni cesty typu "\path" a "path" vraci chybu (neurcitelne), jinak je 'curDir' platna
-    // upravena aktualni cesta (UNC i normalni); aktualni cesty ostatnich disku (mimo
-    // 'curDir' + jen normalni, ne UNC) jsou v Salamandrovskem poli DefaultDir (pred pouzitim
-    // je dobre zavolat metodu SalUpdateDefaultDir); 'name' - in/out buffer cesty alespon 'nameBufSize'
-    // znaku; neni-li 'nextFocus' NULL a zadana relativni cesta neobsahuje backslash, provede se
-    // strcpy(nextFocus, name); vraci TRUE - jmeno 'name' je pripraveno k pouziti, jinak neni-li
-    // 'errTextID' NULL obsahuje chybu (konstanty GFN_XXX - text se da ziskat pres GetGFNErrorText)
-    // POZOR: pred pouzitim je dobre zavolat metodu SalUpdateDefaultDir
-    // omezeni: hlavni thread (jinak muze dojit ke zmenam DefaultDir v hl. threadu)
+    // adjusts relative or absolute normal (c:\path) or UNC (\\server\share\path) path
+    // to absolute without '.', '..' and trailing backslash (except for "c:\" type); if 'curDir' is NULL,
+    // relative paths like "\path" and "path" return error (indeterminate), otherwise 'curDir' is valid
+    // adjusted current path (UNC and normal); current paths of other drives (except
+    // 'curDir' + only normal, not UNC) are in Salamander's DefaultDir array (before use
+    // it's good to call SalUpdateDefaultDir method); 'name' - in/out path buffer of at least 'nameBufSize'
+    // characters; if 'nextFocus' is not NULL and given relative path doesn't contain backslash,
+    // strcpy(nextFocus, name) is performed; returns TRUE - name 'name' is ready for use, otherwise if
+    // 'errTextID' is not NULL it contains error (GFN_XXX constants - text can be obtained via GetGFNErrorText)
+    // WARNING: before use it's good to call SalUpdateDefaultDir method
+    // limitation: main thread (otherwise DefaultDir changes may occur in main thread)
     virtual BOOL WINAPI SalGetFullName(char* name, int* errTextID = NULL, const char* curDir = NULL,
                                        char* nextFocus = NULL, int nameBufSize = MAX_PATH) = 0;
 
-    // obnovi Salamandrovske pole DefaultDir podle cest v panelech, je-li 'activePrefered' TRUE,
-    // bude mit prednost cesta v aktivnim panelu (zapise se pozdeji do DefaultDir), jinak ma
-    // prednost cesta v neaktivnim panelu
-    // omezeni: hlavni thread (jinak muze dojit ke zmenam DefaultDir v hl. threadu)
+    // refreshes Salamander's DefaultDir array according to panel paths, if 'activePrefered' is TRUE,
+    // path in active panel will have priority (written later to DefaultDir), otherwise
+    // path in inactive panel has priority
+    // limitation: main thread (otherwise DefaultDir changes may occur in main thread)
     virtual void WINAPI SalUpdateDefaultDir(BOOL activePrefered) = 0;
 
     // vraci textovou reprezentaci chybove konstanty GFN_XXX; vraci 'buf' (aby slo dat GetGFNErrorText
