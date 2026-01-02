@@ -2020,8 +2020,18 @@ BOOL GetShortcutOverlay()
     {
         if (HShortcutOverlays[i] == NULL)
         {
-            HShortcutOverlays[i] = (HICON)HANDLES(LoadImage(ImageResDLL, MAKEINTRESOURCE(163),
-                                                            IMAGE_ICON, IconSizes[i], IconSizes[i], IconLRFlags));
+            // Try imageres.dll first (icon 163 = shortcut arrow)
+            if (ImageResDLL != NULL)
+            {
+                HShortcutOverlays[i] = (HICON)HANDLES(LoadImage(ImageResDLL, MAKEINTRESOURCE(163),
+                                                                IMAGE_ICON, IconSizes[i], IconSizes[i], IconLRFlags));
+            }
+            // Fallback to shell32.dll (icon 29 = shortcut arrow) for Wine compatibility
+            if (HShortcutOverlays[i] == NULL && Shell32DLL != NULL)
+            {
+                HShortcutOverlays[i] = (HICON)HANDLES(LoadImage(Shell32DLL, MAKEINTRESOURCE(29),
+                                                                IMAGE_ICON, IconSizes[i], IconSizes[i], IconLRFlags));
+            }
         }
     }
     return (HShortcutOverlays[ICONSIZE_16] != NULL &&
@@ -2187,23 +2197,29 @@ BOOL InitializeGraphics(BOOL colorsOnly)
     UpdateDefaultColors(CurrentColors, masks, TRUE, masks != NULL);
     if (!colorsOnly)
     {
-        ImageResDLL = HANDLES(LoadLibraryEx("imageres.dll", NULL, LOAD_LIBRARY_AS_DATAFILE));
-        if (ImageResDLL == NULL)
-        {
-            TRACE_E("Unable to load library imageres.dll.");
-            return FALSE;
-        }
-
+        // Load shell32.dll first - always available (including under Wine)
         Shell32DLL = HANDLES(LoadLibraryEx("shell32.dll", NULL, LOAD_LIBRARY_AS_DATAFILE));
-        if (Shell32DLL == NULL) // to se snad vubec nemuze stat (zaklad win 4.0)
+        if (Shell32DLL == NULL)
         {
             TRACE_E("Unable to load library shell32.dll.");
             return FALSE;
         }
 
-        HINSTANCE iconDLL = ImageResDLL;
-        int iconIndex = 164;
+        // Try to load imageres.dll - may fail under Wine (not included)
+        ImageResDLL = HANDLES(LoadLibraryEx("imageres.dll", NULL, LOAD_LIBRARY_AS_DATAFILE));
+        BOOL hasImageResDLL = (ImageResDLL != NULL);
+        if (!hasImageResDLL)
+        {
+            TRACE_I("imageres.dll not available - using shell32.dll fallback (Wine compatibility)");
+        }
+
+        // Use imageres.dll if available, otherwise fall back to shell32.dll
+        HINSTANCE iconDLL = hasImageResDLL ? ImageResDLL : Shell32DLL;
+        int iconIndex;
         int i;
+
+        // Shared folder overlays: imageres.dll icon 164, or shell32.dll icon 28 as fallback
+        iconIndex = hasImageResDLL ? 164 : 28;
         for (i = 0; i < ICONSIZE_COUNT; i++)
         {
             HSharedOverlays[i] = (HICON)HANDLES(LoadImage(iconDLL, MAKEINTRESOURCE(iconIndex),
@@ -2211,7 +2227,8 @@ BOOL InitializeGraphics(BOOL colorsOnly)
         }
         GetShortcutOverlay(); // HShortcutOverlayXX
 
-        iconIndex = 97;
+        // Slow file overlays: imageres.dll icon 97, or shell32.dll icon 14 as fallback
+        iconIndex = hasImageResDLL ? 97 : 14;
         for (i = 0; i < ICONSIZE_COUNT; i++)
         {
             HSlowFileOverlays[i] = (HICON)HANDLES(LoadImage(iconDLL, MAKEINTRESOURCE(iconIndex),
@@ -2220,16 +2237,37 @@ BOOL InitializeGraphics(BOOL colorsOnly)
 
         HGroupIcon = SalLoadImage(4, 20, IconSizes[ICONSIZE_16], IconSizes[ICONSIZE_16], IconLRFlags);
         HFavoritIcon = (HICON)HANDLES(LoadImage(Shell32DLL, MAKEINTRESOURCE(319), IMAGE_ICON, IconSizes[ICONSIZE_16], IconSizes[ICONSIZE_16], IconLRFlags));
-        if (HSharedOverlays[ICONSIZE_16] == NULL ||
-            HSharedOverlays[ICONSIZE_32] == NULL ||
-            HSharedOverlays[ICONSIZE_48] == NULL ||
-            HShortcutOverlays[ICONSIZE_16] == NULL ||
+        if (HFavoritIcon == NULL)
+        {
+            HFavoritIcon = (HICON)HANDLES(LoadImage(Shell32DLL, MAKEINTRESOURCE(43), IMAGE_ICON, IconSizes[ICONSIZE_16], IconSizes[ICONSIZE_16], IconLRFlags));
+        }
+
+        // Check critical icons - shortcut overlays and group icon are required
+        BOOL iconCheckFailed = FALSE;
+        if (HShortcutOverlays[ICONSIZE_16] == NULL ||
             HShortcutOverlays[ICONSIZE_32] == NULL ||
             HShortcutOverlays[ICONSIZE_48] == NULL ||
-            HSlowFileOverlays[ICONSIZE_16] == NULL ||
-            HSlowFileOverlays[ICONSIZE_32] == NULL ||
-            HSlowFileOverlays[ICONSIZE_48] == NULL ||
-            HGroupIcon == NULL || HFavoritIcon == NULL)
+            HGroupIcon == NULL)
+        {
+            iconCheckFailed = TRUE;
+        }
+
+        // Only require shared/slow overlays if imageres.dll was available
+        if (hasImageResDLL)
+        {
+            if (HSharedOverlays[ICONSIZE_16] == NULL ||
+                HSharedOverlays[ICONSIZE_32] == NULL ||
+                HSharedOverlays[ICONSIZE_48] == NULL ||
+                HSlowFileOverlays[ICONSIZE_16] == NULL ||
+                HSlowFileOverlays[ICONSIZE_32] == NULL ||
+                HSlowFileOverlays[ICONSIZE_48] == NULL ||
+                HFavoritIcon == NULL)
+            {
+                iconCheckFailed = TRUE;
+            }
+        }
+
+        if (iconCheckFailed)
         {
             TRACE_E("Unable to read icon overlays for shared directories, shortcuts or slow files, or icon for groups or favorites.");
             return FALSE;
