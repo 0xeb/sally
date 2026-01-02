@@ -1481,3 +1481,4 @@ BOOL CAssociations::IsAssociated(char* ext)
         return At(index).GetFlag() != 0;
     else
         return FALSE;
+}
