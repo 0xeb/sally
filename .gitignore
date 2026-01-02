@@ -17,3 +17,4 @@ Thumbs.db
 # Build artifacts
 build*/
 .xwin-cache/
+xwin*/
