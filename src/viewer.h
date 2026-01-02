@@ -372,7 +372,7 @@ protected:
     BOOL UseCodeTable;   // should CodeTable be used for recoding?
     char CodeTable[256]; // code table
 
-    char CurrentDir[MAX_PATH]; // path for the open dialog
+    char CurrentDir[SAL_MAX_LONG_PATH]; // path for the open dialog
 
     BOOL WaitForViewerRefresh;   // TRUE - waiting for WM_USER_VIEWERREFRESH; other commands are skipped
     __int64 LastSeekY;           // SeekY before the error

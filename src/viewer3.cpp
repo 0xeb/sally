@@ -1585,9 +1585,9 @@ CViewerWindow::WindowProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
 
                     HCURSOR oldCur = SetCursor(LoadCursor(NULL, IDC_WAIT));
 
-                    char tmpFile[MAX_PATH];
+                    CPathBuffer tmpFile;
                     char* endBackSlash = strrchr(fileName, '\\');
-                    char path[MAX_PATH];
+                    CPathBuffer path;
                     if (endBackSlash != NULL)
                     {
                         if (attr != 0xFFFFFFFF) // file overwrite -> do it via a temp file (because of self-overwrite)
@@ -1599,11 +1599,11 @@ CViewerWindow::WindowProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
                             strcpy(tmpFile, fileName);
                         if (attr == 0xFFFFFFFF || SalGetTempFileName(path, "sal", tmpFile, TRUE))
                         {
-                            HANDLE file = HANDLES_Q(CreateFile(tmpFile, GENERIC_WRITE,
-                                                               FILE_SHARE_READ, NULL,
-                                                               CREATE_ALWAYS,
-                                                               FILE_FLAG_SEQUENTIAL_SCAN,
-                                                               NULL));
+                            HANDLE file = HANDLES_Q(SalCreateFileH(tmpFile, GENERIC_WRITE,
+                                                                   FILE_SHARE_READ, NULL,
+                                                                   CREATE_ALWAYS,
+                                                                   FILE_FLAG_SEQUENTIAL_SCAN,
+                                                                   NULL));
                             if (file != INVALID_HANDLE_VALUE)
                             {
                                 __int64 off = start, len;

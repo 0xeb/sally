@@ -46,14 +46,14 @@ unsigned ThreadViewerMessageLoopBody(void* parameter)
     //  TRACE_I("MoresStanislav: ThreadViewerMessageLoopBody 1");
     CTVData* data = (CTVData*)parameter;
     CViewerWindow* view = data->View;
-    char name[MAX_PATH];
+    CPathBuffer name;
     strcpy(name, data->Name);
-    char captionBuf[MAX_PATH];
+    CPathBuffer captionBuf;
     const char* caption = NULL;
     BOOL wholeCaption = FALSE;
     if (data->Caption != NULL)
     {
-        lstrcpyn(captionBuf, data->Caption, MAX_PATH);
+        lstrcpyn(captionBuf, data->Caption, captionBuf.Size());
         caption = captionBuf;
         wholeCaption = data->WholeCaption;
     }
@@ -356,8 +356,8 @@ BOOL CViewerWindow::LoadBefore(HANDLE* hFile)
     HANDLE file;
     if (hFile == NULL || *hFile == NULL)
     {
-        file = HANDLES_Q(CreateFile(FileName, GENERIC_READ, FILE_SHARE_READ | FILE_SHARE_WRITE, NULL,
-                                    OPEN_EXISTING, FILE_FLAG_SEQUENTIAL_SCAN, NULL));
+        file = HANDLES_Q(SalCreateFileH(FileName, GENERIC_READ, FILE_SHARE_READ | FILE_SHARE_WRITE, NULL,
+                                        OPEN_EXISTING, FILE_FLAG_SEQUENTIAL_SCAN, NULL));
         if (hFile != NULL && file != INVALID_HANDLE_VALUE)
             *hFile = file;
     }
@@ -501,8 +501,8 @@ BOOL CViewerWindow::LoadBehind(HANDLE* hFile)
     HANDLE file;
     if (hFile == NULL || *hFile == NULL)
     {
-        file = HANDLES_Q(CreateFile(FileName, GENERIC_READ, FILE_SHARE_READ | FILE_SHARE_WRITE, NULL, OPEN_EXISTING,
-                                    FILE_FLAG_SEQUENTIAL_SCAN, NULL));
+        file = HANDLES_Q(SalCreateFileH(FileName, GENERIC_READ, FILE_SHARE_READ | FILE_SHARE_WRITE, NULL, OPEN_EXISTING,
+                                        FILE_FLAG_SEQUENTIAL_SCAN, NULL));
         if (hFile != NULL && file != INVALID_HANDLE_VALUE)
             *hFile = file;
     }
@@ -669,7 +669,7 @@ void CViewerWindow::HeightChanged(BOOL& fatalErr)
 void CViewerWindow::OpenFile(const char* file, const char* caption, BOOL wholeCaption)
 {
     CALL_STACK_MESSAGE3("CViewerWindow::OpenFile(%s, %s)", file, caption);
-    char fileName[MAX_PATH];
+    CPathBuffer fileName;
     strcpy(fileName, file);
 
     if (Caption != NULL)
@@ -762,8 +762,8 @@ void CViewerWindow::FileChanged(HANDLE file, BOOL testOnlyFileSize, BOOL& fatalE
     BOOL close;
     if (file == NULL)
     {
-        file = HANDLES_Q(CreateFile(FileName, GENERIC_READ, FILE_SHARE_READ | FILE_SHARE_WRITE, NULL, OPEN_EXISTING,
-                                    FILE_FLAG_SEQUENTIAL_SCAN, NULL));
+        file = HANDLES_Q(SalCreateFileH(FileName, GENERIC_READ, FILE_SHARE_READ | FILE_SHARE_WRITE, NULL, OPEN_EXISTING,
+                                        FILE_FLAG_SEQUENTIAL_SCAN, NULL));
         close = TRUE;
     }
     else

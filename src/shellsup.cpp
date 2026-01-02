@@ -2476,9 +2476,9 @@ void ExecuteAssociation(HWND hWindow, const char* path, const char* name)
         if (Configuration.UseSalOpen)
         {
             // zkusime otevrit asociaci pres salopen.exe
-            char execName[MAX_PATH + 200]; // + 200 je rezerva pro delsi jmena (blby Windows)
+            CPathBuffer execName;
             strcpy(execName, path);
-            if (SalPathAppend(execName, name, MAX_PATH + 200) && SalOpenExecute(hWindow, execName))
+            if (SalPathAppend(execName, name, execName.Size()) && SalOpenExecute(hWindow, execName))
             {
                 if (ExecuteAssociationTlsIndex != TLS_OUT_OF_INDEXES) // uz je mozne nove volani
                     TlsSetValue(ExecuteAssociationTlsIndex, (void*)0);
@@ -2534,6 +2534,25 @@ void ExecuteAssociation(HWND hWindow, const char* path, const char* name)
             }
             CALL_STACK_MESSAGE1("ExecuteAssociation::3");
             ExecuteAssociationAux3(menu);
+        }
+        else
+        {
+            // Shell IContextMenu doesn't support long paths (> MAX_PATH).
+            // Fall back to ShellExecuteEx which may work on Windows 10+
+            CPathBuffer fullPath;
+            strcpy(fullPath, path);
+            if (SalPathAppend(fullPath, name, fullPath.Size()))
+            {
+                SHELLEXECUTEINFO sei = {0};
+                sei.cbSize = sizeof(sei);
+                sei.fMask = SEE_MASK_FLAG_NO_UI;
+                sei.hwnd = hWindow;
+                sei.lpVerb = NULL; // default verb (open)
+                sei.lpFile = fullPath;
+                sei.lpDirectory = path;
+                sei.nShow = SW_SHOWNORMAL;
+                ShellExecuteEx(&sei);
+            }
         }
 
         if (ExecuteAssociationTlsIndex != TLS_OUT_OF_INDEXES) // uz je mozne nove volani

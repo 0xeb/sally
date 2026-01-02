@@ -1581,7 +1581,7 @@ BOOL GetShellFolder(const char* dir, IShellFolder*& shellFolderObj, LPITEMIDLIST
                                                            IID_IShellFolder,
                                                            (LPVOID*)&shellFolderObj))))
                 {
-                    char root[MAX_PATH];
+                    CPathBuffer root;
                     GetRootPath(root, dir);
                     if (strlen(root) < strlen(dir)) // neni to root cesta
                     {
