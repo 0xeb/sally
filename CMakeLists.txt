@@ -112,6 +112,7 @@ add_library(reglib STATIC
   "${SAL_SRC}/reglib/src/regparse.cpp"
 )
 target_include_directories(reglib PRIVATE "${SAL_SRC}/reglib/src")
+target_compile_definitions(reglib PRIVATE ${SAL_COMMON_DEFINES})
 
 # Add sources excluding reglib (it's linked separately)
 set(SAL_SOURCES_NO_REGLIB)

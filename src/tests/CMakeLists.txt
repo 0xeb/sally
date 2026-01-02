@@ -14,6 +14,7 @@ target_include_directories(test_longpath PRIVATE
 target_compile_definitions(test_longpath PRIVATE
     WIN32
     _WINDOWS
+    _CRT_SECURE_NO_WARNINGS
 )
 
 target_link_libraries(test_longpath PRIVATE
