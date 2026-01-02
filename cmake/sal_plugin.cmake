@@ -8,6 +8,56 @@ if(NOT DEFINED SAL_ROOT)
   include("${CMAKE_CURRENT_LIST_DIR}/sal_common.cmake")
 endif()
 
+# sal_add_plugin_lang(NAME <plugin_name>)
+#   Adds the English language file (.slg) for a plugin
+#   Looks for lang/lang.rc in the plugin directory
+function(sal_add_plugin_lang)
+  cmake_parse_arguments(PARSE_ARGV 0 LANG "" "NAME" "")
+
+  if(NOT LANG_NAME)
+    message(FATAL_ERROR "sal_add_plugin_lang: NAME is required")
+  endif()
+
+  set(PLUGIN_DIR "${SAL_PLUGINS}/${LANG_NAME}")
+  set(LANG_RC "${PLUGIN_DIR}/lang/lang.rc")
+
+  if(NOT EXISTS "${LANG_RC}")
+    return()  # No language file for this plugin
+  endif()
+
+  set(TARGET_NAME "plugin_${LANG_NAME}_lang")
+
+  # RC files need defines set via source properties
+  set_source_files_properties("${LANG_RC}" PROPERTIES
+    COMPILE_DEFINITIONS "_LANG;WINVER=0x0601"
+  )
+
+  add_library(${TARGET_NAME} SHARED "${LANG_RC}")
+
+  target_include_directories(${TARGET_NAME} PRIVATE
+    "${PLUGIN_DIR}"
+    "${PLUGIN_DIR}/lang"
+    "${SAL_SRC}"
+    "${SAL_SHARED}"
+  )
+
+  if(MSVC)
+    target_link_options(${TARGET_NAME} PRIVATE /NOENTRY)
+  endif()
+
+  set_target_properties(${TARGET_NAME} PROPERTIES
+    OUTPUT_NAME english
+    SUFFIX .slg
+    PREFIX ""
+    RUNTIME_OUTPUT_DIRECTORY "${SAL_OUTPUT_BASE}/$<CONFIG>_${SAL_PLATFORM}/plugins/${LANG_NAME}/lang"
+    LIBRARY_OUTPUT_DIRECTORY "${SAL_OUTPUT_BASE}/$<CONFIG>_${SAL_PLATFORM}/plugins/${LANG_NAME}/lang"
+    ARCHIVE_OUTPUT_DIRECTORY "${SAL_OUTPUT_BASE}/$<CONFIG>_${SAL_PLATFORM}/plugins/${LANG_NAME}/lang"
+  )
+
+  # Add to global list of plugin language targets
+  set_property(GLOBAL APPEND PROPERTY SAL_PLUGIN_LANGS_LIST ${TARGET_NAME})
+endfunction()
+
 # sal_add_plugin(NAME <plugin_name>
 #   SOURCES <source_files>...
 #   [INCLUDES <include_dirs>...]
@@ -126,6 +176,9 @@ function(sal_add_plugin)
 
   # Add to global list of plugins
   set_property(GLOBAL APPEND PROPERTY SAL_PLUGINS_LIST ${TARGET_NAME})
+
+  # Build language file if it exists
+  sal_add_plugin_lang(NAME ${PLUGIN_NAME})
 
   message(STATUS "Added plugin: ${PLUGIN_NAME}")
 endfunction()
