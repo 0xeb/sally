@@ -1,3 +1,4 @@
+﻿// CommentsTranslationProject: TRANSLATED
 //---------------------------------------------------------------------------
 #ifndef CryptographyH
 #define CryptographyH

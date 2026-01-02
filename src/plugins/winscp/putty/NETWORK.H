@@ -1,3 +1,4 @@
+﻿// CommentsTranslationProject: TRANSLATED
 /*
  * Networking abstraction in PuTTY.
  *

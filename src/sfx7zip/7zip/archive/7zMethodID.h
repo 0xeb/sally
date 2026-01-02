@@ -1,3 +1,4 @@
+﻿// CommentsTranslationProject: TRANSLATED
 /* 7zMethodID.h */
 
 #ifndef __7Z_METHOD_ID_H

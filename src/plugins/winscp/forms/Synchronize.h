@@ -1,3 +1,4 @@
+﻿// CommentsTranslationProject: TRANSLATED
 //---------------------------------------------------------------------------
 #ifndef SynchronizeH
 #define SynchronizeH

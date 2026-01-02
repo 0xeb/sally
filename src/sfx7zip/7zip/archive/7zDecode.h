@@ -1,3 +1,4 @@
+﻿// CommentsTranslationProject: TRANSLATED
 /* 7zDecode.h */
 
 #ifndef __7Z_DECODE_H

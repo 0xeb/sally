@@ -1,3 +1,4 @@
+﻿// CommentsTranslationProject: TRANSLATED
 #ifndef PUTTY_SSHGSS_H
 #define PUTTY_SSHGSS_H
 #include "putty.h"

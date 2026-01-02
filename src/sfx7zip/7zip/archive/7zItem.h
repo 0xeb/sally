@@ -1,3 +1,4 @@
+﻿// CommentsTranslationProject: TRANSLATED
 /* 7zItem.h */
 
 #ifndef __7Z_ITEM_H

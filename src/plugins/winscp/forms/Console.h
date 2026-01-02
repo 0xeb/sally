@@ -1,3 +1,4 @@
+﻿// CommentsTranslationProject: TRANSLATED
 //----------------------------------------------------------------------------
 #ifndef ConsoleH
 #define ConsoleH

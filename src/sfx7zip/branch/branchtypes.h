@@ -1,3 +1,4 @@
+﻿// CommentsTranslationProject: TRANSLATED
 /* BranchTypes.h */
 
 #ifndef __BRANCHTYPES_H

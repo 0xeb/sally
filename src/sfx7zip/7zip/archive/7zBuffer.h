@@ -1,3 +1,4 @@
+﻿// CommentsTranslationProject: TRANSLATED
 /* 7zBuffer.h */
 
 #ifndef __7Z_BUFFER_H

@@ -1,3 +1,4 @@
+﻿// CommentsTranslationProject: TRANSLATED
 // BranchCoder.h
 
 #ifndef __BRANCH_CODER_H

@@ -1,3 +1,4 @@
+﻿// CommentsTranslationProject: TRANSLATED
 //----------------------------------------------------------------------------
 #ifndef LoginH
 #define LoginH

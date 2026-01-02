@@ -1,3 +1,4 @@
+﻿// CommentsTranslationProject: TRANSLATED
 #include <stdio.h>
 #include <string.h>
 

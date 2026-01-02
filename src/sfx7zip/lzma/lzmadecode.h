@@ -1,3 +1,4 @@
+﻿// CommentsTranslationProject: TRANSLATED
 /* 
   LzmaDecode.h
   LZMA Decoder interface

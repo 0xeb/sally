@@ -1,3 +1,4 @@
+﻿// CommentsTranslationProject: TRANSLATED
 #ifndef PUTTY_PUTTYEXP_H
 #define PUTTY_PUTTYEXP_H
 

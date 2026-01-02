@@ -1,3 +1,4 @@
+﻿// CommentsTranslationProject: TRANSLATED
 #ifndef PUTTY_PGSSAPI_H
 #define PUTTY_PGSSAPI_H
 
