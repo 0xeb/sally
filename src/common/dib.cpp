@@ -7,7 +7,7 @@
 #include <crtdbg.h>
 #include <ostream>
 #include <limits.h>
-#include <commctrl.h> // potrebuju LPCOLORMAP
+#include <commctrl.h> // need LPCOLORMAP
 
 #if defined(_DEBUG) && defined(_MSC_VER) // without passing file+line to 'new' operator, list of memory leaks shows only 'crtdbg.h(552)'
 #define new new (_NORMAL_BLOCK, __FILE__, __LINE__)
@@ -21,8 +21,8 @@
 
 #include "dib.h"
 
-// opatreni proti runtime check failure v debug verzi: puvodni verze makra pretypovava rgb na WORD,
-// takze hlasi ztratu dat (RED slozky)
+// protection against runtime check failure in debug version: original macro version casts rgb to WORD,
+// which reports data loss (RED component)
 #undef GetGValue
 #define GetGValue(rgb) ((BYTE)(((rgb) >> 8) & 0xFF))
 
@@ -311,7 +311,7 @@ HBITMAP DIBToBitmap(HANDLE hDIB, HPALETTE hPal)
 //
 // Function:   MapColor(RGB fromColor, RGB toColor)
 //
-//             vsechny barvy fromColor premapuje na barvu toColor
+//             maps all fromColor colors to toColor color
 //
 //---------------------------------------------------------------------
 
