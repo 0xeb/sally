@@ -1,5 +1,6 @@
 ﻿// SPDX-FileCopyrightText: 2023 Open Salamander Authors
 // SPDX-License-Identifier: GPL-2.0-or-later
+// CommentsTranslationProject: TRANSLATED
 
 /*
  * regcomp and regexec -- regsub and regerror are elsewhere
@@ -65,7 +66,7 @@ public:
 
 C__RegExpSection __RegExpSection;
 
-/*    - moznost definice svych vlastnich hlasek, jinak staci nakopirovat do kodu
+/*    - option to define your own error messages, otherwise just copy into the code
 
 const char *RegExpErrorText(CRegExpErrors err)
 {
