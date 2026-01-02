@@ -767,7 +767,7 @@ const char* SALAMANDER_CUSTOMPACKERS = "Custom Packers";
 const char* SALAMANDER_CUSTOMUNPACKERS = "Custom Unpackers";
 const char* SALAMANDER_PREDPACKERS = "Predefined Packers";
 const char* SALAMANDER_ARCHIVEASSOC = "Archive Association";
-// pro SALAMANDER_CUSTOMPACKERS i SALAMANDER_CUSTOMUNPACKERS
+// for SALAMANDER_CUSTOMPACKERS and SALAMANDER_CUSTOMUNPACKERS
 const char* SALAMANDER_ANOTHERPANEL = "Use Another Panel";
 const char* SALAMANDER_PREFFERED = "Preffered";
 const char* SALAMANDER_NAMEBYARCHIVE = "Use Subdir Name By Archive";

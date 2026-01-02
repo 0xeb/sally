@@ -1,3 +1,4 @@
+﻿// CommentsTranslationProject: TRANSLATED
 /* LibTomCrypt, modular cryptographic library -- Tom St Denis
  *
  * LibTomCrypt is a library that provides various cryptographic

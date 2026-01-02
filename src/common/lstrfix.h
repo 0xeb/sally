@@ -1,13 +1,14 @@
-﻿// SPDX-FileCopyrightText: 2023 Open Salamander Authors
+// SPDX-FileCopyrightText: 2023 Open Salamander Authors
 // SPDX-License-Identifier: GPL-2.0-or-later
+// CommentsTranslationProject: TRANSLATED
 
 #pragma once
 
-// nasledujici funkce nepadaji pri praci s neplatnou pameti (ani pri praci s NULL):
-// lstrcpy, lstrcpyn, lstrlen a lstrcat (ty jsou definovane s priponou A nebo W, proto
-// je primo neredefinujeme), v zajmu snazsiho odladeni chyb potrebujeme, aby padaly,
-// protoze jinak se na chybu prijde pozdeji v miste, kde uz nemusi byt jasne, co ji
-// zpusobilo
+// The following functions do not crash when working with invalid memory (not even when working with NULL):
+// lstrcpy, lstrcpyn, lstrlen and lstrcat (they are defined with suffix A or W, therefore
+// we do not redefine them directly), for the sake of easier bug debugging we need them to crash,
+// because otherwise the error is discovered later in a place where it may not be clear what caused it
+// to happen
 #define lstrcpyA _sal_lstrcpyA
 #define lstrcpyW _sal_lstrcpyW
 #define lstrcpynA _sal_lstrcpynA

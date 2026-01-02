@@ -1,3 +1,4 @@
+﻿// CommentsTranslationProject: TRANSLATED
 /* opensslconf.h */
 /* WARNING: Generated automatically from opensslconf.h.in by Configure. */
 

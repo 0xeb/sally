@@ -11,7 +11,9 @@
 
 CREATEPROCESS_MANIFEST_RESOURCE_ID RT_MANIFEST "manifest.xml"
 
+#ifndef INSIDE_SALAMANDER
 #define INSIDE_SALAMANDER
+#endif
 #include "versinfo.rh2"
 
 #include "plugins//shared//versinfo.rc2"

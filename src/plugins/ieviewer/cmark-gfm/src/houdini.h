@@ -1,3 +1,4 @@
+﻿// CommentsTranslationProject: TRANSLATED
 #ifndef CMARK_HOUDINI_H
 #define CMARK_HOUDINI_H
 

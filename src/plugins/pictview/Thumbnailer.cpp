@@ -1,5 +1,6 @@
 ﻿// SPDX-FileCopyrightText: 2023 Open Salamander Authors
 // SPDX-License-Identifier: GPL-2.0-or-later
+// CommentsTranslationProject: TRANSLATED
 
 /* This file is based on thumbnl.cpp from Salamander core.
    Only minimal changes have been made to allow merging of possible bugfixes or updates:

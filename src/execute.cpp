@@ -124,7 +124,7 @@ const char* FILEDATA_FILETIME = "FileTime";
 const char* FILEDATA_FILEATTR = "FileAttributes";
 const char* FILEDATA_FILEDOSNAME = "FileDOSName";
 
-// pro Make File List
+// for Make File List
 const char* FILEDATA_FILENAMEPART = "FileNamePart";
 const char* FILEDATA_FILEEXTENSION = "FileExtension";
 

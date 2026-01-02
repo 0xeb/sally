@@ -1,3 +1,4 @@
+﻿// CommentsTranslationProject: TRANSLATED
 /*
  * Network proxy abstraction in PuTTY
  *

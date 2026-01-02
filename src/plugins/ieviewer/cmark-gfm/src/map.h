@@ -1,3 +1,4 @@
+﻿// CommentsTranslationProject: TRANSLATED
 #ifndef CMARK_MAP_H
 #define CMARK_MAP_H
 

@@ -1,4 +1,5 @@
-﻿#ifndef __BZIP_H__
+﻿// CommentsTranslationProject: TRANSLATED
+#ifndef __BZIP_H__
 #define __BZIP_H__
 
 class CBZip: public CZippedFile

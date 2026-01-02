@@ -1,3 +1,4 @@
+﻿// CommentsTranslationProject: TRANSLATED
 /*
  * charset.h - header file for general character set conversion
  * routines.

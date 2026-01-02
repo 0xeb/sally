@@ -1,5 +1,6 @@
 ﻿// SPDX-FileCopyrightText: 2023 Open Salamander Authors
 // SPDX-License-Identifier: GPL-2.0-or-later
+// CommentsTranslationProject: TRANSLATED
 
 //****************************************************************************
 //
@@ -25,7 +26,7 @@
 #define VERSINFO_SALAMANDER_MINORA 0
 #define VERSINFO_SALAMANDER_MINORB 0
 
-#if (VERSINFO_SALAMANDER_MINORB == 0) // nulu na setinach nepiseme 2.50 -> 2.5
+#if (VERSINFO_SALAMANDER_MINORB == 0) // we don't write zero in hundredths 2.50 -> 2.5
 #define VERSINFO_SALAMANDER_VERSION VERSINFO_xstr(VERSINFO_SALAMANDER_MAJOR) "." VERSINFO_xstr(VERSINFO_SALAMANDER_MINORA) VERSINFO_BETAVERSION_TXT
 #define VERSINFO_SAL_SHORT_VERSION VERSINFO_xstr(VERSINFO_SALAMANDER_MAJOR) VERSINFO_xstr(VERSINFO_SALAMANDER_MINORA) VERSINFO_BETAVERSIONSHORT_TXT
 #else
@@ -33,8 +34,8 @@
 #define VERSINFO_SAL_SHORT_VERSION VERSINFO_xstr(VERSINFO_SALAMANDER_MAJOR) VERSINFO_xstr(VERSINFO_SALAMANDER_MINORA) VERSINFO_xstr(VERSINFO_SALAMANDER_MINORB) VERSINFO_BETAVERSIONSHORT_TXT
 #endif
 
-#ifdef VERSINFO_MAJOR      // je definovane jen pokud se pouziva z pluginu
-#if (VERSINFO_MINORB == 0) // nulu na setinach nepiseme 2.50 -> 2.5
+#ifdef VERSINFO_MAJOR      // defined only if used from plugin
+#if (VERSINFO_MINORB == 0) // we don't write zero in hundredths 2.50 -> 2.5
 #define VERSINFO_VERSION VERSINFO_xstr(VERSINFO_MAJOR) "." VERSINFO_xstr(VERSINFO_MINORA) VERSINFO_BETAVERSION_TXT
 #define VERSINFO_VERSION_NO_PLATFORM VERSINFO_xstr(VERSINFO_MAJOR) "." VERSINFO_xstr(VERSINFO_MINORA) VERSINFO_BETAVERSION_TXT_NO_PLATFORM
 #else
@@ -51,14 +52,14 @@
 
 // VERSINFO_BUILDNUMBER:
 //
-// Slouzi ke snadnemu odliseni verzi vsech modulu mezi jednotlivymi verzemi
-// Salamandera (jde o posledni komponentu cisla verze vsech pluginu a
-// Salamandera). Zvysovat s kazdou verzi (IB, DB, PB, beta, release nebo i
-// jen testovaci verze poslana jednomu uzivateli). Prehled ruznych typu verzi
-// je v souboru doc\versions.txt. Vzdy zavest komentar s popisem, ke ktere
-// verzi Salamandera patri nove pouzite cislo buildu.
+// Used for easy differentiation of versions of all modules between individual
+// Salamander versions (this is the last component of the version number of all
+// plugins and Salamander). Increment with each version (IB, DB, PB, beta,
+// release or even just test version sent to one user). Overview of different
+// version types is in file doc\versions.txt. Always add a comment describing
+// which Salamander version the newly used build number belongs to.
 //
-// Prehled pouzitych hodnot VERSINFO_BUILDNUMBER:
+// Overview of used VERSINFO_BUILDNUMBER values:
 // 9 - 2.5 beta 9
 // 10 - 2.5 beta 10
 // 11 - 2.5 beta 11
@@ -97,37 +98,37 @@
 // 182 - 4.0 (CB182)
 // 183 - 5.0
 
-// ! DULEZITE: nova cisla buildu je nutne zapsat do vetve "default", a pak
-//             teprve do vedlejsi vetve (kompletni seznam je jen v "default" vetvi)
+// ! IMPORTANT: new build numbers must be written to the "default" branch first,
+//              and only then to the side branch (complete list is only in "default" branch)
 #define VERSINFO_BUILDNUMBER 183
 
 // VERSINFO_BETAVERSION_TXT:
 //
-// Meni se s kazdym buildem, v pripade release verze bude VERSINFO_BETAVERSION_TXT="".
-// Pokud vydavame specialni opravne beta verze typu 2.5 beta 9a, zvysime
-// VERSINFO_BUILDNUMBER o jedna a dame VERSINFO_BETAVERSION_TXT==" beta 9a".
+// Changes with each build, for release version VERSINFO_BETAVERSION_TXT="".
+// If we release special fix beta versions like 2.5 beta 9a, we increment
+// VERSINFO_BUILDNUMBER by one and set VERSINFO_BETAVERSION_TXT==" beta 9a".
 //
-// VERSINFO_BETAVERSIONSHORT_TXT slouzi pro pojmenovani bug reportu, jde o co nejkratsi zapis
+// VERSINFO_BETAVERSIONSHORT_TXT is used for naming bug reports, it's the shortest form
 
-// priklady ("x86" je pro 32-bit verzi, "x64" pro 64-bit verzi, v nasledujicich prikladech jsou
-// x86/x64 zamenne): " (x86)" (pro release verze), " beta 2 (x64)", " beta 2 (SDK x86)",
+// examples ("x86" is for 32-bit version, "x64" for 64-bit version, in the following examples
+// x86/x64 are interchangeable): " (x86)" (for release versions), " beta 2 (x64)", " beta 2 (SDK x86)",
 // " RC1 (x64)", " beta 2 (IB21 x86)", " beta 2 (DB21 x64)", " beta 2 (PB21 x86)"
 #define VERSINFO_BETAVERSION_TXT " (" SAL_VER_PLATFORM ")"
-#define VERSINFO_BETAVERSION_TXT_NO_PLATFORM "" // kopie radku vyse + smazat SAL_VER_PLATFORM + je-li zavorka prazdna, smazat ji + smazat nadbytecne mezery
+#define VERSINFO_BETAVERSION_TXT_NO_PLATFORM "" // copy of line above + delete SAL_VER_PLATFORM + if parenthesis is empty, delete it + delete extra spaces
 
-// priklady (x86/x64 viz predchozi odstavec): "x86" (pro release verze), "B2x64", "B2SDKx86",
+// examples (x86/x64 see previous paragraph): "x86" (for release versions), "B2x64", "B2SDKx86",
 // "RC1x64", "B2IB21x86", "B2DB21x64", "B2PB21x86"
 #define VERSINFO_BETAVERSIONSHORT_TXT SAL_VER_PLATFORM
 
 // LAST_VERSION_OF_SALAMANDER:
 //
-// Podpora pro kontrolu aktualnosti verze Salamandera, kterou interni pluginy
-// (distribuovane v jednom balicku se Salamanderem) provadi behem entry-pointu
-// (SalamanderPluginEntry) viz metoda CSalamanderPluginEntryAbstract::GetVersion()
-// (v spl_base.h). Slouzi hlavne pro jednoduchost: interni plugin muze volat
-// jakoukoliv metodu z rozhrani Salamandera, protoze po kontrole na posledni
-// verzi Salamandera ma jistotu, ze ji Salamander obsahuje (hrozi mu jen load
-// do novejsi verze Salamandera, ktery tyto metody musi tez obsahovat).
+// Support for checking Salamander version currency, which internal plugins
+// (distributed in one package with Salamander) perform during entry-point
+// (SalamanderPluginEntry) see method CSalamanderPluginEntryAbstract::GetVersion()
+// (in spl_base.h). Used mainly for simplicity: internal plugin can call
+// any method from Salamander interface, because after checking for the last
+// Salamander version it is certain that Salamander contains it (it only risks
+// load into a newer Salamander version, which must also contain these methods).
 //
 // Pouziva se i opacne: aby mel interni plugin jistotu, ze mu Salamander bude
 // volat vsechny metody (vcetne nejnovejsich), vraci tuto verzi, jako verzi,
@@ -187,7 +188,7 @@
 //   81 - 3.08
 // ! DULEZITE: vsechny verze z VC2008 musi byt < 100, vsechny verze z VC2019 musi byt >= 100,
 //             nova cisla verzi je nutne zapsat do vetve "default", a pak
-//             teprve do vedlejsi vetve (kompletni seznam je jen v "default" vetvi)
+//              and only then to the side branch (complete list is only in "default" branch)
 //   101 - 4.0 beta 1 (DB177)
 //   102 - 4.0
 //   103 - 5.0

@@ -1,3 +1,4 @@
+﻿// CommentsTranslationProject: TRANSLATED
 #ifndef CMARK_ITERATOR_H
 #define CMARK_ITERATOR_H
 

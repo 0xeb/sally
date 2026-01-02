@@ -1,5 +1,6 @@
 ﻿// SPDX-FileCopyrightText: 2023 Open Salamander Authors
 // SPDX-License-Identifier: GPL-2.0-or-later
+// CommentsTranslationProject: TRANSLATED
 
 /* This wrapper implements stubs for the functions exported by PVW32Cnv.dll
  * and found in struct CPVW32DLL. These stubs call a hidden remote (32-bit) process

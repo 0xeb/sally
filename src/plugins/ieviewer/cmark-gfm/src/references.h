@@ -1,3 +1,4 @@
+﻿// CommentsTranslationProject: TRANSLATED
 #ifndef CMARK_REFERENCES_H
 #define CMARK_REFERENCES_H
 

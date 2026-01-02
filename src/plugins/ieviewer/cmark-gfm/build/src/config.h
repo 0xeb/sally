@@ -1,3 +1,4 @@
+﻿// CommentsTranslationProject: TRANSLATED
 #ifndef CMARK_CONFIG_H
 #define CMARK_CONFIG_H
 

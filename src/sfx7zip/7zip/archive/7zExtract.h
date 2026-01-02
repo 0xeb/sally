@@ -1,3 +1,4 @@
+﻿// CommentsTranslationProject: TRANSLATED
 /* 7zExtract.h */
 
 #ifndef __7Z_EXTRACT_H

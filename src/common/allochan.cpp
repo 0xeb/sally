@@ -1,5 +1,6 @@
 ﻿// SPDX-FileCopyrightText: 2023 Open Salamander Authors
 // SPDX-License-Identifier: GPL-2.0-or-later
+// CommentsTranslationProject: TRANSLATED
 
 #include "precomp.h"
 
@@ -28,15 +29,15 @@
 // boundaries so we can find the real functions
 // that we need to call for initialization.
 
-#pragma warning(disable : 4075) // chceme definovat poradi inicializace modulu
+#pragma warning(disable : 4075) // we want to define the order of module initialization
 
 typedef void(__cdecl* _PVFV)(void);
 
 #pragma section(".i_alc$a", read)
-__declspec(allocate(".i_alc$a")) const _PVFV i_allochan = (_PVFV)1; // na zacatek sekce .i_alc si dame promennou i_allochan
+__declspec(allocate(".i_alc$a")) const _PVFV i_allochan = (_PVFV)1; // at the beginning of section .i_alc we put variable i_allochan
 
 #pragma section(".i_alc$z", read)
-__declspec(allocate(".i_alc$z")) const _PVFV i_allochan_end = (_PVFV)1; // a na konec sekce .i_alc si dame promennou i_allochan_end
+__declspec(allocate(".i_alc$z")) const _PVFV i_allochan_end = (_PVFV)1; // and at the end of section .i_alc we put variable i_allochan_end
 
 void Initialize__Allochan()
 {
@@ -56,8 +57,8 @@ public:
     C__AllocHandlerInit()
     {
         InitializeCriticalSection(&CriticalSection);
-        OldNewHandler = _set_new_handler(AltapNewHandler); // operator new ma volat pri nedostatku pameti nas new-handler
-        OldNewMode = _set_new_mode(1);                     // malloc ma volat pri nedostatku pameti nas new-handler
+        OldNewHandler = _set_new_handler(AltapNewHandler); // operator new should call our new-handler when out of memory
+        OldNewMode = _set_new_mode(1);                     // malloc should call our new-handler when out of memory
     }
     ~C__AllocHandlerInit()
     {
@@ -101,7 +102,7 @@ int C__AllocHandlerInit::AltapNewHandler(size_t size)
     int ret = 1;
     int ti = GetTickCount();
     EnterCriticalSection(&__AllocHandlerInit.CriticalSection);
-    if (GetTickCount() - ti <= 500) // message-box budeme ukazovat jen pokud jsme pred momentem usera nenutili resit stejny problem v jinem threadu
+    if (GetTickCount() - ti <= 500) // show message-box only if we haven't just forced the user to solve the same problem in another thread
     {
         TCHAR buf[550];
         _sntprintf_s(buf, _countof(buf) - 1, __AllocHandlerMessage, size);
@@ -112,7 +113,7 @@ int C__AllocHandlerInit::AltapNewHandler(size_t size)
             if (res == 0)
             {
                 TRACE_ET(_T("AltapNewHandler: unable to open message-box!"));
-                Sleep(1000); // nechame masinu oddechnout a zkusime ukazat msgbox znovu
+                Sleep(1000); // let the machine rest and try to show msgbox again
             }
         } while (res == 0);
         if (res == IDABORT) // terminate
@@ -123,15 +124,15 @@ int C__AllocHandlerInit::AltapNewHandler(size_t size)
                 if (res == 0)
                 {
                     TRACE_ET(_T("AltapNewHandler: unable to open message-box with abort-warning!"));
-                    Sleep(1000); // nechame masinu oddechnout a zkusime ukazat msgbox znovu
+                    Sleep(1000); // let the machine rest and try to show msgbox again
                 }
             } while (res == 0);
             if (res == IDYES)
-                TerminateProcess(GetCurrentProcess(), 777); // tvrdsi exit (ExitProcess jeste neco vola)
+                TerminateProcess(GetCurrentProcess(), 777); // harder exit (ExitProcess still calls something)
         }
         else
         {
-            if (res == IDIGNORE) // uzivatel chce poslat problem alokace do aplikace (return NULL), mista, kde se alokuji velke bloky by mely byt osetrene (jinak to spadne pri pristupu na NULL)
+            if (res == IDIGNORE) // user wants to send the allocation problem to the application (return NULL), places where large blocks are allocated should be handled (otherwise it will crash when accessing NULL)
             {
                 do
                 {
@@ -139,16 +140,16 @@ int C__AllocHandlerInit::AltapNewHandler(size_t size)
                     if (res == 0)
                     {
                         TRACE_ET(_T("AltapNewHandler: unable to open message-box with ignore-warning!"));
-                        Sleep(1000); // nechame masinu oddechnout a zkusime ukazat msgbox znovu
+                        Sleep(1000); // let the machine rest and try to show msgbox again
                     }
                 } while (res == 0);
                 if (res == IDYES)
-                    ret = 0; // vracime NULL do aplikace
+                    ret = 0; // return NULL to the application
             }
         }
     }
     LeaveCriticalSection(&__AllocHandlerInit.CriticalSection);
-    return ret; // retry nebo NULL
+    return ret; // retry or NULL
 }
 
 #endif // ALLOCHAN_DISABLE

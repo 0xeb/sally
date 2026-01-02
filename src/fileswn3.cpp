@@ -1536,7 +1536,7 @@ BOOL CFilesWindow::ReadDirectory(HWND parent, BOOL isRefresh)
                                     // need a pointer to CFileData for PluginFSDir, because moving occurs in Files and Dirs
                                     // e.g. when sorting (Files and Dirs are arrays of CFileData, not (CFileData *), that's why these problems exist)
                                     if (Configuration.NotHiddenSystemFiles &&
-                                        (f->Hidden || //both Hidden a Attr jsou nulovane pokud jsou neplatne -> testy failnou
+                                        (f->Hidden || //both Hidden and Attr are zeroed if they are invalid -> tests fail
                                          (f->Attr & (FILE_ATTRIBUTE_HIDDEN | FILE_ATTRIBUTE_SYSTEM))))
                                     { // skip hidden file/directory
                                         continue;

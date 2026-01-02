@@ -669,7 +669,7 @@ void CCacheDirData::FlushCache(const char* name)
     GetNameIndex(name, i);       // we'll find the index (match/insertion) from which it makes sense to search for the same prefixes
     for (; i < Names.Count; i++) // names are sorted -> elements with the same prefix are continuously next to each other
     {
-        if (strncmp(Names[i]->GetName(), name, nameLen) == 0) // mame ho
+        if (strncmp(Names[i]->GetName(), name, nameLen) == 0) // we have it
         {
             CCacheData* data = Names[i];
             if (data->IsLocked())

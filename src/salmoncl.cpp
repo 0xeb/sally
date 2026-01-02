@@ -1,5 +1,6 @@
 ﻿// SPDX-FileCopyrightText: 2023 Open Salamander Authors
 // SPDX-License-Identifier: GPL-2.0-or-later
+// CommentsTranslationProject: TRANSLATED
 
 #include "precomp.h"
 
@@ -11,12 +12,12 @@ HANDLE HSalmonProcess = NULL;
 
 //****************************************************************************
 
-// POZOR: bezime z entry point, pred inicializaci RTL, globalnich objektu, atd
-// nevolat TRACE, HANDLES, RTL, ...
+// WARNING: we are running from entry point, before RTL initialization, global objects, etc.
+// do not call TRACE, HANDLES, RTL, ...
 
 HANDLE GetBugReporterRegistryMutex()
 {
-    // prava uplne otevrena pro vsechny procesy
+    // permissions fully open for all processes
     SECURITY_ATTRIBUTES secAttr;
     char secDesc[SECURITY_DESCRIPTOR_MIN_LENGTH];
     secAttr.nLength = sizeof(secAttr);
@@ -24,11 +25,11 @@ HANDLE GetBugReporterRegistryMutex()
     secAttr.lpSecurityDescriptor = &secDesc;
     InitializeSecurityDescriptor(secAttr.lpSecurityDescriptor, SECURITY_DESCRIPTOR_REVISION);
     SetSecurityDescriptorDacl(secAttr.lpSecurityDescriptor, TRUE, 0, FALSE);
-    // do nazvu mutexu by bylo sikovne pridat SID, protoze procesy s ruznym SID bezi s jinym HKCU stromem
-    // ale pro jednoduchost na to kaslem a mutex bude opravdu globalni
+    // it would be convenient to add SID to the mutex name, because processes with different SID run with a different HKCU tree
+    // but for simplicity we skip that and the mutex will be truly global
     const char* MUTEX_NAME = "Global\\AltapSalamanderBugReporterRegistryMutex";
     HANDLE hMutex = NOHANDLES(CreateMutex(&secAttr, FALSE, MUTEX_NAME));
-    if (hMutex == NULL) // uz create umi otevrite existujici mutex, ale muze selhat, proto pak zkusime jeste open
+    if (hMutex == NULL) // create can already open an existing mutex, but it can fail, so we try open afterwards
         hMutex = NOHANDLES(OpenMutex(SYNCHRONIZE, FALSE, MUTEX_NAME));
     return hMutex;
 }
@@ -38,8 +39,8 @@ BOOL SalmonGetBugReportUID(DWORD64* uid)
     const char* BUG_REPORTER_KEY = "Software\\Open Salamander\\Bug Reporter";
     const char* BUG_REPORTER_UID = "ID";
 
-    // tato sekce se pousti pri startu Salamandera a teoreticky muze dojit k soucasnemu ctani/zapisu registry
-    // proto budeme pristup hlidat globalnim mutexem
+    // this section runs at Salamander startup and theoretically concurrent registry read/write can occur
+    // therefore we will guard access with a global mutex
     HANDLE hMutex = GetBugReporterRegistryMutex();
     if (hMutex != NULL)
         WaitForSingleObject(hMutex, INFINITE);
@@ -48,7 +49,7 @@ BOOL SalmonGetBugReportUID(DWORD64* uid)
     LONG res = NOHANDLES(RegOpenKeyEx(HKEY_CURRENT_USER, BUG_REPORTER_KEY, 0, KEY_READ, &hKey));
     if (res == ERROR_SUCCESS)
     {
-        // pokusime se nacist stary udaj, pokud existuje
+        // try to load the old value if it exists
         DWORD gettedType;
         DWORD bufferSize = sizeof(*uid);
         res = RegQueryValueEx(hKey, BUG_REPORTER_UID, 0, &gettedType, (BYTE*)uid, &bufferSize);
@@ -56,17 +57,17 @@ BOOL SalmonGetBugReportUID(DWORD64* uid)
             *uid = 0;
         NOHANDLES(RegCloseKey(hKey));
     }
-    // pokud UID zatim neexistuje, vytvorime ho a ulozime
+    // if UID does not exist yet, we create and save it
     if (*uid == 0)
     {
         GUID guid;
         if (CoCreateGuid(&guid) == S_OK)
         {
-            // nebudeme ukladat a odesilat cely GUID, staci jeho polovina, xornuta s druhou
+            // we won't store and send the entire GUID, half of it XORed with the other half is enough
             DWORD64* dw64 = (DWORD64*)&guid;
             *uid = dw64[0] ^ dw64[1];
 
-            // pokusime se ho ulozit
+            // try to save it
             DWORD createType;
             LONG res2 = NOHANDLES(RegCreateKeyEx(HKEY_CURRENT_USER, BUG_REPORTER_KEY, 0, NULL, REG_OPTION_NON_VOLATILE,
                                                  KEY_READ | KEY_WRITE, NULL, &hKey, &createType));
@@ -74,7 +75,7 @@ BOOL SalmonGetBugReportUID(DWORD64* uid)
             {
                 res2 = RegSetValueEx(hKey, BUG_REPORTER_UID, 0, REG_QWORD, (BYTE*)uid, sizeof(*uid));
                 if (res2 != ERROR_SUCCESS)
-                    *uid = 0; // pri selhani chceme nulu
+                    *uid = 0; // on failure we want zero
                 NOHANDLES(RegCloseKey(hKey));
             }
         }
@@ -90,7 +91,7 @@ BOOL SalmonGetBugReportUID(DWORD64* uid)
 
 BOOL SalmonSharedMemInit(CSalmonSharedMemory* mem)
 {
-    SECURITY_ATTRIBUTES sa; // povolime dedeni handlu do child procesu (mohou pak pracovat primo s nasim eventem)
+    SECURITY_ATTRIBUTES sa; // allow handle inheritance to child process (they can then work directly with our event)
     sa.nLength = sizeof(sa);
     sa.lpSecurityDescriptor = NULL;
     sa.bInheritHandle = TRUE;
@@ -98,7 +99,7 @@ BOOL SalmonSharedMemInit(CSalmonSharedMemory* mem)
     RtlFillMemory(mem, sizeof(CSalmonSharedMemory), 0);
 
     mem->Version = SALMON_SHARED_MEMORY_VERSION;
-    // salmon bude spusten jako child proces s bInheritHandles==TRUE, takze muze pristupovat primo k temto handlum
+    // salmon will be started as a child process with bInheritHandles==TRUE, so it can access these handles directly
     mem->ProcessId = GetCurrentProcessId();
     mem->Process = NOHANDLES(OpenProcess(SYNCHRONIZE | PROCESS_QUERY_INFORMATION | PROCESS_VM_READ, TRUE, mem->ProcessId));
     mem->Fire = NOHANDLES(CreateEvent(&sa, TRUE, FALSE, NULL));      // "nonsignaled" state, manual
@@ -106,17 +107,17 @@ BOOL SalmonSharedMemInit(CSalmonSharedMemory* mem)
     mem->SetSLG = NOHANDLES(CreateEvent(&sa, TRUE, FALSE, NULL));    // "nonsignaled" state, manual
     mem->CheckBugs = NOHANDLES(CreateEvent(&sa, TRUE, FALSE, NULL)); // "nonsignaled" state, manual
 
-    // cestu pro bug reporty nove davame do LOCAL_APPDATA, kam standardne minidumpy uklada Windows WER
-    // cestu hned nevytvarime, o to se postarame az v okamziku padu
+    // we now put the path for bug reports into LOCAL_APPDATA, where Windows WER stores minidumps by default
+    // we don't create the path immediately, we take care of that at the moment of the crash
     if (SHGetFolderPath(NULL, CSIDL_LOCAL_APPDATA, NULL, 0, mem->BugPath) == S_OK)
     {
         int len = lstrlen(mem->BugPath);
-        if (len > 0 && mem->BugPath[len - 1] == '\\') // radeji overime zpetne lomitko na konci cesty
+        if (len > 0 && mem->BugPath[len - 1] == '\\') // better verify the trailing backslash at the end of the path
             mem->BugPath[len - 1] = 0;
         lstrcat(mem->BugPath, "\\Open Salamander");
     }
 
-    // zaklad jmena pro bug reporty
+    // base name for bug reports
     strcpy(mem->BugName, "AS" VERSINFO_SAL_SHORT_VERSION);
 
     return (mem->Process != NULL && mem->Fire != NULL && mem->Done != NULL && mem->SetSLG != NULL &&
@@ -125,9 +126,9 @@ BOOL SalmonSharedMemInit(CSalmonSharedMemory* mem)
 
 void GetStartupSLGName(char* slgName, DWORD slgNameMax)
 {
-    // vytahneme z registry nazev SLG, ktere se pravdepodobne bude pouzivat
-    // dale za behu Salamandera muze dojit k volbe jineho, ktere se dodatecne zmeni
-    // toto slouzi pouze jako default; pokud zaznam nenalezneme, predame prazdny retezec
+    // extract from registry the SLG name that will probably be used
+    // later during Salamander runtime a different one may be selected, which will be changed afterwards
+    // this serves only as a default; if the record is not found, we pass an empty string
     slgName[0] = 0;
 
     char keyName[MAX_PATH];
@@ -162,9 +163,9 @@ BOOL SalmonStartProcess(const char* fileMappingName) //Configuration.LoadedSLGNa
     GetModuleFileName(NULL, cmd, MAX_PATH);
     *(strrchr(cmd, '\\') + 1) = 0;
     lstrcat(cmd, "utils\\salmon.exe");
-    AddDoubleQuotesIfNeeded(cmd, MAX_PATH); // CreateProcess chce mit jmeno s mezerama v uvozovkach (jinak zkousi ruzny varianty, viz help)
+    AddDoubleQuotesIfNeeded(cmd, MAX_PATH); // CreateProcess wants the name with spaces in quotes (otherwise it tries various variants, see help)
     GetStartupSLGName(slgName, sizeof(slgName));
-    wsprintf(cmd + strlen(cmd), " \"%s\" \"%s\"", fileMappingName, slgName); // slgName muze byt prazdny retezec, pokud neexistuje konfigurace
+    wsprintf(cmd + strlen(cmd), " \"%s\" \"%s\"", fileMappingName, slgName); // slgName can be an empty string if configuration does not exist
     memset(&si, 0, sizeof(STARTUPINFO));
     si.cb = sizeof(STARTUPINFO);
     si.wShowWindow = SW_SHOWNORMAL;
@@ -172,8 +173,8 @@ BOOL SalmonStartProcess(const char* fileMappingName) //Configuration.LoadedSLGNa
     *(strrchr(rtlDir, '\\') + 1) = 0;
     GetCurrentDirectory(MAX_PATH, oldCurDir);
 
-    // dalsi pokus o reseni problemu nez rozdelime SALMON.EXE na EXE+DLL
-    // zkusime pro child process (SALMON.EXE) rozsirit PATH env promennou o cestu k RTL
+    // another attempt to solve the problem before we split SALMON.EXE into EXE+DLL
+    // we try to extend the PATH env variable for the child process (SALMON.EXE) with the path to RTL
     if (GetEnvironmentVariable("PATH", envPATH, MAX_ENV_PATH) != 0)
     {
         if (lstrlen(envPATH) + 2 + lstrlen(rtlDir) < MAX_ENV_PATH)
@@ -190,10 +191,10 @@ BOOL SalmonStartProcess(const char* fileMappingName) //Configuration.LoadedSLGNa
     else
         envPATH[0] = 0;
 
-    // puvodne jsme pouze predavali rtlDir do CreateProcess, ale v nekterych kombinacich s UAC salmon.exe nebylo mozne spustit,
-    // protoze nevidel RTL: https://forum.altap.cz/viewtopic.php?f=2&t=6957&p=26548#p26548
-    // zkusime jeste navic nastavit current directory
-    // pokud nezabere, muzeme zkusit do CreateProcess misto rtlDir predat NULL, pak by se podle MSDN mel podedit current directory od spoustejiciho procesu
+    // originally we only passed rtlDir to CreateProcess, but in some UAC combinations salmon.exe could not be started,
+    // because it couldn't see RTL: https://forum.altap.cz/viewtopic.php?f=2&t=6957&p=26548#p26548
+    // let's also try setting the current directory
+    // if that doesn't work, we can try passing NULL instead of rtlDir to CreateProcess, then according to MSDN the current directory should be inherited from the launching process
     SetCurrentDirectory(rtlDir);
     // EDIT 4/2014: udelal jsem nekolik testu s Support@bluesware.ch a chr.mue@gmail.com viz maily
     // Vidim dve mozna reseni: zkusime rozsirit pro child proces PATH env promennou k SALRTL.

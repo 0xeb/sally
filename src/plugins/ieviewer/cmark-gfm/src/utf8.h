@@ -1,3 +1,4 @@
+﻿// CommentsTranslationProject: TRANSLATED
 #ifndef CMARK_UTF8_H
 #define CMARK_UTF8_H
 

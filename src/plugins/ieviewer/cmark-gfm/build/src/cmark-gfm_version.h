@@ -1,3 +1,4 @@
+﻿// CommentsTranslationProject: TRANSLATED
 #ifndef CMARK_GFM_VERSION_H
 #define CMARK_GFM_VERSION_H
 

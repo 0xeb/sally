@@ -1,3 +1,4 @@
+﻿// CommentsTranslationProject: TRANSLATED
 /* ---- HASH FUNCTIONS ---- */
 #ifdef LTC_SHA512
 struct sha512_state {

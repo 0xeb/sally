@@ -1,5 +1,6 @@
 ﻿// SPDX-FileCopyrightText: 2023 Open Salamander Authors
 // SPDX-License-Identifier: GPL-2.0-or-later
+// CommentsTranslationProject: TRANSLATED
 
 //****************************************************************************
 //
@@ -12,7 +13,7 @@
 #pragma once
 
 #ifdef _MSC_VER
-#pragma pack(push, enter_include_spl_thum) // aby byly struktury nezavisle na nastavenem zarovnavani
+#pragma pack(push, enter_include_spl_thum) // so that structures are independent of the set alignment
 #pragma pack(4)
 #endif // _MSC_VER
 #ifdef __BORLANDC__
@@ -24,72 +25,72 @@
 // CSalamanderThumbnailMakerAbstract
 //
 
-// informace o obrazku, ze ktereho generujeme thumbnail, tyto flagy se pouzivaji
-// v CSalamanderThumbnailMakerAbstract::SetParameters():
-#define SSTHUMB_MIRROR_HOR 1                                            // obrazek je potreba horizontalne zrcadlit
-#define SSTHUMB_MIRROR_VERT 2                                           // obrazek je potreba vertikalne zrcadlit
-#define SSTHUMB_ROTATE_90CW 4                                           // obrazek je potreba otocit o 90 stupnu ve smeru hodinovych rucicek
-#define SSTHUMB_ROTATE_180 (SSTHUMB_MIRROR_VERT | SSTHUMB_MIRROR_HOR)   // obrazek je potreba otocit o 180 stupnu
-#define SSTHUMB_ROTATE_90CCW (SSTHUMB_ROTATE_90CW | SSTHUMB_ROTATE_180) // obrazek je potreba otocit o 90 stupnu proti smeru hodinovych rucicek
-// obrazek je v horsi kvalite nebo mensi nez je potreba, Salamander po dokonceni prvniho kola
-// ziskavani "rychlych" thumbnailu zkusi pro tento obrazek ziskat "kvalitni" thumbnail
+// information about the image from which we generate the thumbnail, these flags are used
+// in CSalamanderThumbnailMakerAbstract::SetParameters():
+#define SSTHUMB_MIRROR_HOR 1                                            // the image needs to be horizontally mirrored
+#define SSTHUMB_MIRROR_VERT 2                                           // the image needs to be vertically mirrored
+#define SSTHUMB_ROTATE_90CW 4                                           // the image needs to be rotated 90 degrees clockwise
+#define SSTHUMB_ROTATE_180 (SSTHUMB_MIRROR_VERT | SSTHUMB_MIRROR_HOR)   // the image needs to be rotated 180 degrees
+#define SSTHUMB_ROTATE_90CCW (SSTHUMB_ROTATE_90CW | SSTHUMB_ROTATE_180) // the image needs to be rotated 90 degrees counter-clockwise
+// the image is in lower quality or smaller than needed, Salamander will try to get
+// a "quality" thumbnail for this image after completing the first round of getting "fast" thumbnails
 #define SSTHUMB_ONLY_PREVIEW 8
 
 class CSalamanderThumbnailMakerAbstract
 {
 public:
-    // nastaveni parametru zpracovani obrazku pri tvorbe thumbnailu; nutne volat
-    // jako prvni metodu tohoto rozhrani; 'picWidth' a 'picHeight' jsou rozmery
-    // zpracovavaneho obrazku (v bodech); 'flags' je kombinace flagu SSTHUMB_XXX,
-    // ktera udava informace o obrazku predavanem v parametru 'buffer' v metode
-    // ProcessBuffer; vraci TRUE, pokud se podarilo alokovat buffery pro zmensovani
-    // a je mozne nasledne volat ProcessBuffer; pokud vrati FALSE, doslo k chybe
-    // a je treba ukoncit nacitani thumbnailu
+    // sets parameters for image processing when creating thumbnails; must be called
+    // as the first method of this interface; 'picWidth' and 'picHeight' are dimensions
+    // of the processed image (in pixels); 'flags' is a combination of SSTHUMB_XXX flags,
+    // which provides information about the image passed in the 'buffer' parameter in the
+    // ProcessBuffer method; returns TRUE if the buffers for scaling were successfully
+    // allocated and ProcessBuffer can be called subsequently; if it returns FALSE, an error
+    // occurred and thumbnail loading must be terminated
     virtual BOOL WINAPI SetParameters(int picWidth, int picHeight, DWORD flags) = 0;
 
-    // zpracuje cast obrazku v bufferu 'buffer' (zpracovavana cast obrazku je ulozena
-    // po radcich shora dolu, body na radcich jsou ulozeny zleva doprava, kazdy bod
-    // reprezentuje 32-bitova hodnota, ktera je slozena z tri bytu s barvami R+G+B a
-    // ctvrteho bytu, ktery se ignoruje); rozlisujeme dva typy zpracovani: kopie
-    // obrazku do vysledneho thumbnailu (nepresahuje-li velikost zpracovavaneho obrazku
-    // velikost thumbnailu) a zmenseni obrazku do thumbnailu (obrazek vetsi nez
-    // thumbnail); 'buffer' je pouzit pouze pro cteni; 'rowsCount' urcuje kolik radku
-    // obrazku je v bufferu;
-    // je-li'buffer' NULL, berou se data z vlastniho bufferu (plugin ziska pres GetBuffer);
-    // vraci TRUE pokud ma plugin pokracovat s nacitanim obrazku, vraci-li FALSE,
-    // tvorba thumbnailu je hotova (byl zpracovan cely obrazek) nebo se ma co
-    // nejdrive prerusit (napr. uzivatel zmenil cestu v panelu, thumbnail tedy jiz
-    // neni potreba)
+    // processes part of the image in buffer 'buffer' (the processed part of the image is stored
+    // row by row from top to bottom, pixels in rows are stored from left to right, each pixel
+    // is represented by a 32-bit value composed of three bytes with R+G+B colors and
+    // a fourth byte that is ignored); we distinguish two types of processing: copying
+    // the image to the resulting thumbnail (if the size of the processed image does not exceed
+    // the thumbnail size) and scaling down the image to the thumbnail (image larger than
+    // thumbnail); 'buffer' is used only for reading; 'rowsCount' specifies how many rows
+    // of the image are in the buffer;
+    // if 'buffer' is NULL, data is taken from the internal buffer (plugin gets it via GetBuffer);
+    // returns TRUE if the plugin should continue loading the image, returns FALSE if
+    // thumbnail creation is complete (the entire image was processed) or should be
+    // interrupted as soon as possible (e.g., user changed the path in the panel, so the thumbnail
+    // is no longer needed)
     //
-    // POZOR: pokud je spustena metoda CPluginInterfaceForThumbLoader::LoadThumbnail,
-    // je blokovana zmena cesty v panelu. Z toho duvodu je treba predavat a hlavne
-    // nacitat vetsi obrazky po castech a testovatovanim navratove hodnoty
-    // metody ProcessBuffer overovat, zda se nacitani nema prerusit.
-    // Pokud je treba provest casove narocnejsi operace pred volanim metody SetParameters
-    // nebo pred volanim ProcessBuffer, je behem teto doby nutne obcas volat GetCancelProcessing.
+    // WARNING: while the CPluginInterfaceForThumbLoader::LoadThumbnail method is running,
+    // path changes in the panel are blocked. For this reason, larger images need to be passed
+    // and especially loaded in parts, and by testing the return value of
+    // the ProcessBuffer method, verify whether loading should be interrupted.
+    // If time-consuming operations need to be performed before calling SetParameters
+    // or before calling ProcessBuffer, GetCancelProcessing must be called occasionally during this time.
     virtual BOOL WINAPI ProcessBuffer(void* buffer, int rowsCount) = 0;
 
-    // vraci vlastni buffer o velikosti potrebne k ulozeni 'rowsCount' radku obrazku
-    // (4 * 'rowsCount' * 'picWidth' bytu); je-li objekt v chybovem stavu (po volani
-    // SetError), vraci NULL;
-    // plugin nesmi dealokovat ziskany buffer (dealokuje se v Salamanderovi automaticky)
+    // returns internal buffer of the size needed to store 'rowsCount' rows of the image
+    // (4 * 'rowsCount' * 'picWidth' bytes); if the object is in an error state (after calling
+    // SetError), returns NULL;
+    // the plugin must not deallocate the obtained buffer (it is deallocated automatically in Salamander)
     virtual void* WINAPI GetBuffer(int rowsCount) = 0;
 
-    // oznameni chyby pri ziskavani obrazku (thumbnail je povazovan za vadny
-    // a nepouzije se), ostatni metody tohoto rozhrani budou od chvile volani
-    // SetError uz jen vracet chyby (GetBuffer a SetParameters) nebo preruseni
-    // prace (ProcessBuffer)
+    // notification of an error when obtaining the image (the thumbnail is considered invalid
+    // and will not be used), other methods of this interface will from the moment of calling
+    // SetError only return errors (GetBuffer and SetParameters) or work interruption
+    // (ProcessBuffer)
     virtual void WINAPI SetError() = 0;
 
-    // vraci TRUE, pokud ma plugin preprusit nacitani thumbnailu
-    // vraci FALSE, pokud ma plugin pokracovat s nacitanim obrazku
+    // returns TRUE if the plugin should interrupt thumbnail loading
+    // returns FALSE if the plugin should continue loading the image
     //
-    // metodu lze volat pred i po volani metody SetParameters
+    // this method can be called before or after calling the SetParameters method
     //
-    // slouzi k detekci pozadavku na preruseni v pripadech, kdy plugin
-    // potrebuje vykonat casove narocne operace jeste pred volanim SetParameters
-    // nebo v pripade, kdy plugin potrebuje obrazek predrenderovat, tedy po volani
-    // SetParameters, ale pred volanim ProcessBuffer
+    // serves to detect interruption requests in cases when the plugin
+    // needs to perform time-consuming operations before calling SetParameters
+    // or in case the plugin needs to pre-render the image, i.e., after calling
+    // SetParameters, but before calling ProcessBuffer
     virtual BOOL WINAPI GetCancelProcessing() = 0;
 };
 
@@ -101,38 +102,38 @@ public:
 class CPluginInterfaceForThumbLoaderAbstract
 {
 #ifdef INSIDE_SALAMANDER
-private: // ochrana proti nespravnemu primemu volani metod (viz CPluginInterfaceForThumbLoaderEncapsulation)
+private: // protection against incorrect direct method calls (see CPluginInterfaceForThumbLoaderEncapsulation)
     friend class CPluginInterfaceForThumbLoaderEncapsulation;
 #else  // INSIDE_SALAMANDER
 public:
 #endif // INSIDE_SALAMANDER
 
-    // nacte thumbnail pro soubor 'filename'; 'thumbWidth' a 'thumbHeight' jsou
-    // rozmery pozadovaneho thumbnailu; 'thumbMaker' je rozhrani algoritmu pro
-    // tvorbu thumbnailu (umi prijmout hotovy thumbnail nebo ho vyrobit zmensenim
-    // obrazku); vraci TRUE pokud je format souboru 'filename' znamy, pokud vrati
-    // FALSE, Salamander zkusi nacist thumbnail pomoci jineho pluginu; chybu pri
-    // ziskavani thumbnailu (napr. chybu cteni souboru) plugin hlasi pomoci
-    // rozhrani 'thumbMaker' - viz metoda SetError; 'fastThumbnail' je TRUE v prvnim
-    // kole cteni thumbnailu - cilem je vratit thumbnail co nejrychleji (klidne
-    // v horsi kvalite nebo mensi nez je potreba), v druhem kole cteni thumbnailu
-    // (jen pokud se v prvnim kole nastavi flag SSTHUMB_ONLY_PREVIEW) je
-    // 'fastThumbnail' FALSE - cilem je vratit kvalitni thumbnail
-    // omezeni: jelikoz se vola z threadu pro nacitani ikon (neni to hlavni thread), lze z
-    // CSalamanderGeneralAbstract pouzivat jen metody, ktere lze volat z libovolneho threadu
+    // loads thumbnail for file 'filename'; 'thumbWidth' and 'thumbHeight' are
+    // dimensions of the requested thumbnail; 'thumbMaker' is the interface to the algorithm for
+    // creating thumbnails (can accept a finished thumbnail or create it by scaling down
+    // the image); returns TRUE if the format of file 'filename' is known, if it returns
+    // FALSE, Salamander will try to load the thumbnail using another plugin; errors when
+    // obtaining the thumbnail (e.g., file read error) are reported by the plugin using
+    // the 'thumbMaker' interface - see the SetError method; 'fastThumbnail' is TRUE in the first
+    // round of reading thumbnails - the goal is to return a thumbnail as quickly as possible (even
+    // in lower quality or smaller than needed), in the second round of reading thumbnails
+    // (only if the SSTHUMB_ONLY_PREVIEW flag was set in the first round)
+    // 'fastThumbnail' is FALSE - the goal is to return a quality thumbnail
+    // limitation: since it is called from the icon loading thread (not the main thread), only
+    // methods from CSalamanderGeneralAbstract that can be called from any thread can be used
     //
-    // Doporucene schema implementace:
-    //   - pokusit se otevrit obrazek
-    //   - pokud se nepodari, vratit FALSE
-    //   - extrahovat rozmery obrazku
-    //   - predat je do Salamandera pres thumbMaker->SetParameters
-    //   - pokud vrati FALSE, uklid a odchod (nepovedlo se alokovat buffery)
-    //   - SMYCKA
-    //     - nacist cast dat z obrazku
-    //     - poslat je do Salamandera pres thumbMaker->ProcessBuffer
-    //     - pokud vrati FALSE, uklid a odchod (preruseni z duvodu zmeny cesty)
-    //     - pokracovat ve SMYCCE, dokud nebude cely obrazek predan
-    //   - uklid a odchod
+    // Recommended implementation schema:
+    //   - try to open the image
+    //   - if unsuccessful, return FALSE
+    //   - extract image dimensions
+    //   - pass them to Salamander via thumbMaker->SetParameters
+    //   - if it returns FALSE, cleanup and exit (failed to allocate buffers)
+    //   - LOOP
+    //     - load part of the data from the image
+    //     - send them to Salamander via thumbMaker->ProcessBuffer
+    //     - if it returns FALSE, cleanup and exit (interruption due to path change)
+    //     - continue in the LOOP until the entire image is passed
+    //   - cleanup and exit
     virtual BOOL WINAPI LoadThumbnail(const char* filename, int thumbWidth, int thumbHeight,
                                       CSalamanderThumbnailMakerAbstract* thumbMaker,
                                       BOOL fastThumbnail) = 0;

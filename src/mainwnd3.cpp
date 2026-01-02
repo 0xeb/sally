@@ -836,7 +836,7 @@ BOOL CMainWindow::SHChangeNotifyInitialize()
                                                       WM_USER_SHCHANGENOTIFY,
                                                       1, &entry);
 
-    // dealokace pidl
+    // deallocate pidl
     IMalloc* alloc;
     if (SUCCEEDED(CoGetMalloc(1, &alloc)))
     {
@@ -2005,7 +2005,7 @@ MENU_TEMPLATE_ITEM AddToSystemMenu[] =
     {
         // we catch messages coming especially from newer mice (4th button and above)
         // and multimedia keyboards
-        // viz https://forum.altap.cz/viewtopic.php?t=192
+        // see https://forum.altap.cz/viewtopic.php?t=192
         DWORD cmd = GET_APPCOMMAND_LPARAM(lParam);
         switch (cmd)
         {

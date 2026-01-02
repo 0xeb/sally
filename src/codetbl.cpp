@@ -1044,7 +1044,7 @@ void CCodeTables::RecognizeFileType(const char* pattern, int patternLen, BOOL fo
                             if (c1 == 2 && c2 == 1)
                             {
                                 if (s > (const unsigned char*)testBuf && IsAlpha[*(s - 1)])
-                                    penalty += PENALTY_UPPER_TO_LOWER; // the word "Úrok" would otherwise be re-encoded as MACCE (uppercase 'U' changes to lowercase 'r' in MACCE)
+                                    penalty += PENALTY_UPPER_TO_LOWER; // the word "Interest" would otherwise be re-encoded as MACCE (uppercase 'U' changes to lowercase 'r' in MACCE)
                             }
                             else
                             {

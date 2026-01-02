@@ -1,3 +1,4 @@
+﻿// CommentsTranslationProject: TRANSLATED
 #ifndef CMARK_BUFFER_H
 #define CMARK_BUFFER_H
 

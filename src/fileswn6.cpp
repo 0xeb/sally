@@ -1335,7 +1335,7 @@ BOOL CFilesWindow::BuildScriptMain(COperations* script, CActionType type,
             }
             i++;
             // oneFile points to the selected or caret item in the filebox
-            if (oneFile->Attr & FILE_ATTRIBUTE_DIRECTORY) // jde o ptDisk
+            if (oneFile->Attr & FILE_ATTRIBUTE_DIRECTORY) // it is about ptDisk
             {
                 if (subDirectories)
                 {

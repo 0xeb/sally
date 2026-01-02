@@ -1,3 +1,4 @@
+﻿// CommentsTranslationProject: TRANSLATED
 #ifndef CMARK_SYNTAX_EXTENSION_H
 #define CMARK_SYNTAX_EXTENSION_H
 

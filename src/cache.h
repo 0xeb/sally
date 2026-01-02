@@ -4,7 +4,7 @@
 
 #pragma once
 
-// disck cache initialization, returns success
+// disk cache initialization, returns success
 BOOL InitializeDiskCache();
 
 // how long time to wait between checking the state of watched objects

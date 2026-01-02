@@ -1,3 +1,4 @@
+﻿// CommentsTranslationProject: TRANSLATED
 // ICoder.h
 
 #ifndef __ICODER_H

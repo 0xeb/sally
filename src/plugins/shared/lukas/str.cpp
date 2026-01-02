@@ -1,5 +1,6 @@
 ﻿// SPDX-FileCopyrightText: 2023 Open Salamander Authors
 // SPDX-License-Identifier: GPL-2.0-or-later
+// CommentsTranslationProject: TRANSLATED
 
 #include "precomp.h"
 
@@ -9,7 +10,6 @@ WORD CType[256];
 
 // ****************************************************************************
 //
-// automaticka inicializace modulu
 // automatic module initialization
 //
 
@@ -38,8 +38,6 @@ CSTR::CSTR()
 
 // ****************************************************************************
 
-// optimalizace: předpokládá, že s2 je v lowercase
-
 // optimization: assumes s2 is lowercase
 int MemCmpI(const char* s1, const char* s2, int n)
 {
@@ -53,8 +51,6 @@ int MemCmpI(const char* s1, const char* s2, int n)
     }
     return 0;
 }
-
-// optimalizace: předpokládá, že s je v lowercase
 
 // optimization: assumes s is lowercase
 char* MemChrI(char* s, char c, int n)

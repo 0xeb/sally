@@ -1,3 +1,4 @@
+﻿// CommentsTranslationProject: TRANSLATED
 /* crypto/ecdsa/ecdsa.h */
 /**
  * \file   crypto/ecdsa/ecdsa.h Include file for the OpenSSL ECDSA functions

@@ -1,3 +1,4 @@
+﻿// CommentsTranslationProject: TRANSLATED
 #ifndef TOMCRYPT_H_
 #define TOMCRYPT_H_
 #include <assert.h>

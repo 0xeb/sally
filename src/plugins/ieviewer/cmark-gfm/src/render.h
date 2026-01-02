@@ -1,3 +1,4 @@
+﻿// CommentsTranslationProject: TRANSLATED
 #ifndef CMARK_RENDER_H
 #define CMARK_RENDER_H
 

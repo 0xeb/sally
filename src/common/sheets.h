@@ -1,5 +1,6 @@
 ﻿// SPDX-FileCopyrightText: 2023 Open Salamander Authors
 // SPDX-License-Identifier: GPL-2.0-or-later
+// CommentsTranslationProject: TRANSLATED
 
 #pragma once
 
@@ -10,17 +11,17 @@ class CTreePropHolderDlg;
 
 struct CElasticLayoutCtrl
 {
-    HWND HCtrl; // handl prvku, ktery mame posouvat
-    POINT Pos;  // pozice prvku vuci spodni hrane opsane obalky
+    HWND HCtrl; // handle of control that we want to move
+    POINT Pos;  // position of control relative to bottom edge of bounding box
 };
 
-// pomocna trida slouzici pro layout prvku dialogu na zaklade jeho velikosti
+// helper class used for control layout in dialog based on its size
 class CElasticLayout
 {
 public:
     CElasticLayout(HWND hWindow);
     void AddResizeCtrl(int resID);
-    // provede rozmisteni prvku
+    // performs arrangement of controls
     void LayoutCtrls();
 
 protected:
@@ -29,25 +30,25 @@ protected:
     void FindMoveCtrls();
 
 protected:
-    // handle dialogu, jehoz layout zajistujeme
+    // handle of dialog whose layout we ensure
     HWND HWindow;
-    // delici linka, od ktere jiz prvky posouvame (lezi na spodni hrane ResizeCntrls)
-    // client souradnice v bodech
+    // dividing line from which we move controls (lies on bottom edge of ResizeCntrls)
+    // client coordinates in points
     int SplitY;
-    // prvky ktere s velikosti natahujeme (typicky listview)
+    // controls that we stretch with size (typically listview)
     TDirectArray<CElasticLayoutCtrl> ResizeCtrls;
-    // docasne pole plnene z FindMoveCtrls; idealne by slo o lokalni promennou, ale
-    // pro pohodlne volani callbacku FindMoveControls (kam ho potrebujeme predat)
-    // ho umistuji jako atribut tridy
+    // temporary array filled from FindMoveCtrls; ideally it would be a local variable, but
+    // for convenient calling of callback FindMoveControls (where we need to pass it)
+    // we place it as a class attribute
     TDirectArray<CElasticLayoutCtrl> MoveCtrls;
 };
 
 class CPropSheetPage : protected CDialog
 {
 public:
-    using CDialog::SetObjectOrigin; // zpristupneni povolenych metod predku
+    using CDialog::SetObjectOrigin; // access to allowed methods of parent
     using CDialog::Transfer;
-    using CDialog::HWindow; // HWindow zustane take pristupne
+    using CDialog::HWindow; // HWindow remains also accessible
 
     CPropSheetPage(const TCHAR* title, HINSTANCE modul, int resID,
                    DWORD flags /* = PSP_USETITLE*/, HICON icon,
@@ -79,13 +80,13 @@ protected:
     DWORD Flags;
     HICON Icon;
 
-    CPropertyDialog* ParentDialog; // vlastnik teto stranky
-    // pro TreeDialog
+    CPropertyDialog* ParentDialog; // owner of this page
+    // for TreeDialog
     CPropSheetPage* ParentPage;
     HTREEITEM HTreeItem;
     BOOL* Expanded;
 
-    // pokud je ruzne od NULL, se zmenou velikosti dialogu menime layout prvku
+    // if different from NULL, we change the layout of controls when dialog size changes
     CElasticLayout* ElasticLayout;
 
     friend class CPropertyDialog;
@@ -119,7 +120,7 @@ public:
     virtual int GetCurSel();
 
 protected:
-    HWND Parent; // parametry pro vytvareni dialogu
+    HWND Parent; // parameters for dialog creation
     HWND HWindow;
     HINSTANCE Modul;
     HICON Icon;
@@ -128,7 +129,7 @@ protected:
     DWORD Flags;
     PFNPROPSHEETCALLBACK Callback;
 
-    DWORD* LastPage; // posledni zvolena stranka (muze byt NULL, pokud nezajima)
+    DWORD* LastPage; // last selected page (can be NULL if not interested)
 
     friend class CPropSheetPage;
 };
@@ -137,8 +138,8 @@ protected:
 
 class CTreePropDialog;
 
-// sedivy stinovany pruh nad property sheet v tree variante PropertyDialog,
-// kde je zobrazen nazev aktualni stranky
+// gray shaded bar above property sheet in tree variant of PropertyDialog,
+// where the name of current page is displayed
 class CTPHCaptionWindow : protected CWindow
 {
 protected:
@@ -155,7 +156,7 @@ protected:
     virtual LRESULT WindowProc(UINT uMsg, WPARAM wParam, LPARAM lParam);
 };
 
-// na grip controlu chceme pouze top-down kurzor
+// on grip control we want only top-down cursor
 class CTPHGripWindow : public CWindow
 {
 public:
@@ -165,7 +166,7 @@ protected:
     virtual LRESULT WindowProc(UINT uMsg, WPARAM wParam, LPARAM lParam);
 };
 
-// dialog, ktery drzi treeview, stinovany nadpis a aktualni property sheet
+// dialog that holds treeview, shaded title and current property sheet
 class CTreePropHolderDlg : public CDialog
 {
 protected:
@@ -176,17 +177,17 @@ protected:
     RECT ChildDialogRect;
     int CurrentPageIndex;
     CPropSheetPage* ChildDialog;
-    int ExitButton; // idcko tlacitka, ktere ukoncilo dialog
+    int ExitButton; // ID of button that closed the dialog
 
-    // rozmery v bodech
-    SIZE MinWindowSize;  // minimalni rozmery dialogu (urcene podle nejvetsiho child dlg)
-    DWORD* WindowHeight; // aktualni vyska dialogu
-    int TreeWidth;       // sirka treeview, pocitana na zaklade obsahu
-    int CaptionHeight;   // vyska titulku
-    SIZE ButtonSize;     // rozmery tlacitek na spodni hrane dialogu
-    int ButtonMargin;    // mezera mezi tlacitky
-    SIZE GripSize;       // rozmery resize gripu v pravem spodnim rohu dialogu
-    SIZE MarginSize;     // vodorovny a svisly okraj
+    // dimensions in points
+    SIZE MinWindowSize;  // minimal dimensions of dialog (determined by largest child dlg)
+    DWORD* WindowHeight; // current height of dialog
+    int TreeWidth;       // width of treeview, calculated based on content
+    int CaptionHeight;   // height of title
+    SIZE ButtonSize;     // dimensions of buttons on bottom edge of dialog
+    int ButtonMargin;    // spacing between buttons
+    SIZE GripSize;       // dimensions of resize grip in right bottom corner of dialog
+    SIZE MarginSize;     // horizontal and vertical margin
 
 public:
     CTreePropHolderDlg(HWND hParent, DWORD* windowHeight);
@@ -205,7 +206,7 @@ protected:
     friend class CTreePropDialog;
 };
 
-// datovy drzak stranek pro tree verzi PropertyDialog
+// data holder for pages in tree version of PropertyDialog
 class CTreePropDialog : public CPropertyDialog
 {
 protected:
@@ -235,6 +236,6 @@ protected:
     //    DLGTEMPLATE *DoLockDlgRes(int page);
     friend class CTreePropHolderDlg;
 
-    // pouze pro forwarding zprav z CTreePropHolderDlg
+    // only for forwarding messages from CTreePropHolderDlg
     virtual void DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam) {};
 };

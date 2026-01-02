@@ -1,3 +1,4 @@
+﻿// CommentsTranslationProject: TRANSLATED
 #ifndef CMARK_PLUGIN_H
 #define CMARK_PLUGIN_H
 

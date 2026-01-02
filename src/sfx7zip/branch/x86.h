@@ -1,3 +1,4 @@
+﻿// CommentsTranslationProject: TRANSLATED
 // x86.h
 
 #ifndef __X86_H

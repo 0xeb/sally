@@ -1,5 +1,6 @@
 ﻿// SPDX-FileCopyrightText: 2023 Open Salamander Authors
 // SPDX-License-Identifier: GPL-2.0-or-later
+// CommentsTranslationProject: TRANSLATED
 
 #include "precomp.h"
 
@@ -10,8 +11,8 @@
 #include "geticon.h"
 #include "logo.h"
 
-// melo by byt nasobkem hodnoty IL_ITEMS_IN_ROW
-// aby se plne vyuzil prostor v bitmape
+// should be a multiple of IL_ITEMS_IN_ROW value
+// to fully utilize the space in the bitmap
 #define ICONS_IN_LIST 100
 
 //
@@ -21,11 +22,11 @@
 
 CIconCache::CIconCache()
     : TDirectArray<CIconData>(50, 30),
-      IconsCache(10, 5),     // jedna polozka je CIconList drzici ICONS_IN_LIST ikonek
-      ThumbnailsCache(1, 20) // ziskavani thumbnailu je pomale, relokace je v tom hracka
+      IconsCache(10, 5),     // one item is CIconList holding ICONS_IN_LIST icons
+      ThumbnailsCache(1, 20) // getting thumbnails is slow, relocation is a trifle
 {
     IconsCount = 0;
-    IconSize = ICONSIZE_COUNT; // zatim nenastaveno; pokus o pridani ikonky bez predchoziho volani SetIconSize() zpusobi TRACE_E
+    IconSize = ICONSIZE_COUNT; // not set yet; attempt to add icon without calling SetIconSize() first will cause TRACE_E
     DataIfaceForFS = NULL;
 }
 
@@ -35,12 +36,12 @@ CIconCache::~CIconCache()
 }
 
 inline int CompareDWORDS(const char* s1, const char* s2, int length)
-{ // porovna nejvyse 'length' DWORDu
+{ // compares at most 'length' DWORDs
     //  int res;
     const char* end = s1 + length;
     while (s1 <= end)
     {
-        //    if ((res = *(DWORD *)s1 - *(DWORD *)s2) != 0) return res;  // takhle to nejde (zkus si 0x8 a 0x0 ve 4-bitovych cislech)
+        //    if ((res = *(DWORD *)s1 - *(DWORD *)s2) != 0) return res;  // this doesn't work (try 0x8 and 0x0 in 4-bit numbers)
         if (*(DWORD*)s1 > *(DWORD*)s2)
             return 1;
         else
@@ -56,12 +57,12 @@ inline int CompareDWORDS(const char* s1, const char* s2, int length)
 
 void CIconCache::SortArray(int left, int right, CPluginDataInterfaceEncapsulation* dataIface)
 {
-    if (dataIface != NULL) // jde o pitFromPlugin: nechame plugin, aby polozky porovnal sam (musi jit o porovnani
-    {                      // beze shod zadnych dvou polozek listingu)
+    if (dataIface != NULL) // this is pitFromPlugin: let the plugin compare items itself (it must be comparison
+    {                      // with no ties between any two listing items)
         DataIfaceForFS = dataIface;
         BOOL ok = TRUE;
         int i;
-        for (i = left; i <= right; i++) // jeden paranoicky testik
+        for (i = left; i <= right; i++) // one paranoid test
         {
             if (Data[i].GetFSFileData() == NULL)
             {
@@ -74,7 +75,7 @@ void CIconCache::SortArray(int left, int right, CPluginDataInterfaceEncapsulatio
             SortArrayForFSInt(left, right);
         DataIfaceForFS = NULL;
     }
-    else // klasicke razeni podle jmen
+    else // classic sorting by name
     {
         SortArrayInt(left, right);
     }
@@ -106,7 +107,7 @@ LABEL_SortArrayInt:
         }
     } while (i <= j);
 
-    // nasledujici "hezky" kod jsme nahradili kodem podstatne setricim stack (max. log(N) zanoreni rekurze)
+    // the following "nice" code was replaced with code that significantly saves stack space (max. log(N) recursion nesting)
     //  if (left < j) SortArrayInt(left, j);
     //  if (i < right) SortArrayInt(i, right);
 
@@ -114,7 +115,7 @@ LABEL_SortArrayInt:
     {
         if (i < right)
         {
-            if (j - left < right - i) // je potreba seradit obe "poloviny", tedy do rekurze posleme tu mensi, tu druhou zpracujeme pres "goto"
+            if (j - left < right - i) // need to sort both "halves", so we send the smaller one to recursion, process the other via "goto"
             {
                 SortArrayInt(left, j);
                 left = i;
@@ -168,7 +169,7 @@ LABEL_SortArrayForFSInt:
         }
     } while (i <= j);
 
-    // nasledujici "hezky" kod jsme nahradili kodem podstatne setricim stack (max. log(N) zanoreni rekurze)
+    // the following "nice" code was replaced with code that significantly saves stack space (max. log(N) recursion nesting)
     //  if (left < j) SortArrayForFSInt(left, j);
     //  if (i < right) SortArrayForFSInt(i, right);
 
@@ -176,7 +177,7 @@ LABEL_SortArrayForFSInt:
     {
         if (i < right)
         {
-            if (j - left < right - i) // je potreba seradit obe "poloviny", tedy do rekurze posleme tu mensi, tu druhou zpracujeme pres "goto"
+            if (j - left < right - i) // need to sort both "halves", so we send the smaller one to recursion, process the other via "goto"
             {
                 SortArrayForFSInt(left, j);
                 left = i;
@@ -208,7 +209,7 @@ LABEL_SortArrayForFSInt:
 BOOL CIconCache::GetIndex(const char* name, int& index, CPluginDataInterfaceEncapsulation* dataIface,
                           const CFileData* file)
 {
-    if (Count == 0 || dataIface != NULL && file == NULL) // overime platnost 'file'
+    if (Count == 0 || dataIface != NULL && file == NULL) // verify validity of 'file''
     {
         if (dataIface != NULL && file == NULL)
             TRACE_E("CIconCache::GetIndex(): 'file' may not be NULL when 'dataIface' is not NULL! item=" << name);
@@ -216,8 +217,8 @@ BOOL CIconCache::GetIndex(const char* name, int& index, CPluginDataInterfaceEnca
         return FALSE;
     }
 
-    if (dataIface != NULL) // jde o pitFromPlugin: nechame plugin, aby polozky porovnal sam (musi jit o porovnani
-    {                      // beze shod zadnych dvou polozek listingu)
+    if (dataIface != NULL) // this is pitFromPlugin: let the plugin compare items itself (it must be comparison
+    {                      // with no ties between any two listing items)
         int l = 0, r = Count - 1, m;
         int res;
         while (1)
@@ -232,34 +233,34 @@ BOOL CIconCache::GetIndex(const char* name, int& index, CPluginDataInterfaceEnca
                         "for item: "
                         << At(m).NameAndData);
                 index = 0;
-                return FALSE; // chyba -> vratime treba: nenalezeno, vlozit na zacatek pole
+                return FALSE; // error -> return maybe: not found, insert at beginning of array
             }
-            if (res == 0) // nalezeno
+            if (res == 0) // found
             {
                 index = m;
                 return TRUE;
             }
             else if (res > 0)
             {
-                if (l == r || l > m - 1) // nenalezeno
+                if (l == r || l > m - 1) // not found
                 {
-                    index = m; // mel by byt na teto pozici
+                    index = m; // should be at this position
                     return FALSE;
                 }
                 r = m - 1;
             }
             else
             {
-                if (l == r) // nenalezeno
+                if (l == r) // not found
                 {
-                    index = m + 1; // mel by byt az za touto pozici
+                    index = m + 1; // should be after this position
                     return FALSE;
                 }
                 l = m + 1;
             }
         }
     }
-    else // klasicke hledani podle jmena
+    else // classic search by name
     {
         int length = (int)strlen(name);
         int l = 0, r = Count - 1, m;
@@ -268,25 +269,25 @@ BOOL CIconCache::GetIndex(const char* name, int& index, CPluginDataInterfaceEnca
         {
             m = (l + r) / 2;
             res = CompareDWORDS(At(m).NameAndData, name, length);
-            if (res == 0) // nalezeno
+            if (res == 0) // found
             {
                 index = m;
                 return TRUE;
             }
             else if (res > 0)
             {
-                if (l == r || l > m - 1) // nenalezeno
+                if (l == r || l > m - 1) // not found
                 {
-                    index = m; // mel by byt na teto pozici
+                    index = m; // should be at this position
                     return FALSE;
                 }
                 r = m - 1;
             }
             else
             {
-                if (l == r) // nenalezeno
+                if (l == r) // not found
                 {
-                    index = m + 1; // mel by byt az za touto pozici
+                    index = m + 1; // should be after this position
                     return FALSE;
                 }
                 l = m + 1;
@@ -307,22 +308,22 @@ void CIconCache::Release()
     DestroyMembers();
     IconsCount = 0;
 
-    // destrukce raw dat z ThumbnailsCache
+    // destruction of raw data from ThumbnailsCache
     for (i = 0; i < ThumbnailsCache.Count; i++)
     {
         CThumbnailData* data = &ThumbnailsCache[i];
         if (data->Bits != NULL)
-            free(data->Bits); // alokovano v CSalamanderThumbnailMaker::RenderToThumbnailData()
+            free(data->Bits); // allocated in CSalamanderThumbnailMaker::RenderToThumbnailData()
     }
     ThumbnailsCache.DestroyMembers();
 }
 
 void CIconCache::Destroy()
 {
-    // uvonime alokovana data a pole samotne
+    // free allocated data and array itself
     Release();
 
-    // destrukce imagelistu z IconsCache
+    // destruction of image lists from IconsCache
     IconsCache.DestroyMembers();
 }
 
@@ -330,8 +331,8 @@ void CIconCache::ColorsChanged()
 {
     CALL_STACK_MESSAGE1("CIconCache::ColorsChanged()");
     // tato funkce je volana pri zmene barev nebo barevne hloubky obrazovky
-    // druhy pripad neni reseny -- bylo by treba znovu konstruovat bitmapy
-    // v imagelistech pro aktualni barevnou hloubku
+    // the second case is not handled -- would need to reconstruct bitmaps
+    // in image lists for current color depth
     COLORREF bkColor = GetCOLORREF(CurrentColors[ITEM_BK_NORMAL]);
     int i;
     for (i = 0; i < IconsCache.Count; i++)
@@ -341,8 +342,8 @@ void CIconCache::ColorsChanged()
             il->SetBkColor(bkColor);
     }
 
-    // thumbnaily je potreba prekreslit, pokud se zmenila barva pozadi, budou se ikonky s pruhlednymi
-    // castmi kreslit do nove barvy pozadi
+    // thumbnails need to be redrawn if background color changed, icons with transparent
+    // parts will be drawn with new background color
     for (i = 0; i < Count; i++)
     {
         CIconData* icon = &At(i);
@@ -355,7 +356,7 @@ int CIconCache::AllocIcon(CIconList** iconList, int* iconListIndex)
 {
     SLOW_CALL_STACK_MESSAGE1("CIconCache::AllocIcon()");
     int cache = IconsCount / ICONS_IN_LIST; // cache
-    int index = IconsCount % ICONS_IN_LIST; // index v ramci teto cache
+    int index = IconsCount % ICONS_IN_LIST; // index within this cache
     if (cache >= IconsCache.Count)
     {
         if (cache > IconsCache.Count)
@@ -408,11 +409,11 @@ int CIconCache::AllocThumbnail()
 {
     CALL_STACK_MESSAGE1("CIconCache::AllocThumbnail()");
 
-    // stuktura pro drzeni thumbnailu
+    // structure for holding thumbnail
     CThumbnailData data;
     memset(&data, 0, sizeof(CThumbnailData));
 
-    // zaradime jej do seznamu
+    // add it to the list
     int index = ThumbnailsCache.Add(data);
     if (!ThumbnailsCache.IsGood())
     {
@@ -420,7 +421,7 @@ int CIconCache::AllocThumbnail()
         return -1;
     }
 
-    // vratime index pridaneho prvku
+    // return index of added element
     return index;
 }
 
@@ -446,7 +447,7 @@ BOOL CIconCache::GetIcon(int iconIndex, CIconList** iconList, int* iconListIndex
     if (iconIndex >= 0 && iconIndex < IconsCount)
     {
         int cache = iconIndex / ICONS_IN_LIST; // cache
-        int index = iconIndex % ICONS_IN_LIST; // index v ramci cache
+        int index = iconIndex % ICONS_IN_LIST; // index within cache
         if (cache < IconsCache.Count)
         {
             *iconList = IconsCache[cache];
@@ -473,8 +474,8 @@ void CIconCache::GetIconsAndThumbsFrom(CIconCache* icons, CPluginDataInterfaceEn
     int index1 = 0;
     int index2 = 0;
 
-    if (dataIface != NULL) // jde o pitFromPlugin: nechame plugin, aby polozky porovnal sam (musi jit o porovnani
-    {                      // beze shod zadnych dvou polozek listingu)
+    if (dataIface != NULL) // this is pitFromPlugin: let the plugin compare items itself (it must be comparison
+    {                      // with no ties between any two listing items)
         const CFileData *file1, *file2;
 
         if (index1 < Count)
@@ -879,10 +880,10 @@ void CAssociations::Release()
 
 void CAssociations::Destroy()
 {
-    // uvonime alokovana data a pole samotne
+    // free allocated data and array itself
     Release();
 
-    // destrukce imagelistu z IconsCache
+    // destruction of image lists from IconsCache
     int i;
     for (i = 0; i < ICONSIZE_COUNT; i++)
         Icons[i].IconsCache.DestroyMembers();
@@ -892,8 +893,8 @@ void CAssociations::ColorsChanged()
 {
     CALL_STACK_MESSAGE1("CAssociations::ColorsChanged()");
     // tato funkce je volana pri zmene barev nebo barevne hloubky obrazovky
-    // druhy pripad neni reseny -- bylo by treba znovu konstruovat bitmapy
-    // v imagelistech pro aktualni barevnou hloubku
+    // the second case is not handled -- would need to reconstruct bitmaps
+    // in image lists for current color depth
     COLORREF bkColor = GetCOLORREF(CurrentColors[ITEM_BK_NORMAL]);
     int j;
     for (j = 0; j < ICONSIZE_COUNT; j++)
@@ -927,25 +928,25 @@ BOOL CAssociations::GetIndex(const char* name, int& index)
     {
         m = (l + r) / 2;
         res = CompareDWORDS(At(m).ExtensionAndData, name, length);
-        if (res == 0) // nalezeno
+        if (res == 0) // found
         {
             index = m;
             return TRUE;
         }
         else if (res > 0)
         {
-            if (l == r || l > m - 1) // nenalezeno
+            if (l == r || l > m - 1) // not found
             {
-                index = m; // mel by byt na teto pozici
+                index = m; // should be at this position
                 return FALSE;
             }
             r = m - 1;
         }
         else
         {
-            if (l == r) // nenalezeno
+            if (l == r) // not found
             {
-                index = m + 1; // mel by byt az za touto pozici
+                index = m + 1; // should be after this position
                 return FALSE;
             }
             l = m + 1;
@@ -957,7 +958,7 @@ int CAssociations::AllocIcon(CIconList** iconList, int* iconListIndex, CIconSize
 {
     CALL_STACK_MESSAGE1("CAssociations::AllocIcon()");
     int cache = Icons[iconSize].IconsCount / ICONS_IN_LIST; // cache
-    int index = Icons[iconSize].IconsCount % ICONS_IN_LIST; // index v ramci teto cache
+    int index = Icons[iconSize].IconsCount % ICONS_IN_LIST; // index within this cache
     if (cache >= Icons[iconSize].IconsCache.Count)
     {
         if (cache > Icons[iconSize].IconsCache.Count)
@@ -1008,7 +1009,7 @@ BOOL CAssociations::GetIcon(int iconIndex, CIconList** iconList, int* iconListIn
     if (iconIndex >= 0 && iconIndex < Icons[iconSize].IconsCount)
     {
         int cache = iconIndex / ICONS_IN_LIST; // cache
-        int index = iconIndex % ICONS_IN_LIST; // index v ramci cache
+        int index = iconIndex % ICONS_IN_LIST; // index within cache
         if (cache < Icons[iconSize].IconsCache.Count)
         {
             *iconList = Icons[iconSize].IconsCache[cache];
@@ -1054,7 +1055,7 @@ LABEL_SortArray:
         }
     } while (i <= j);
 
-    // nasledujici "hezky" kod jsme nahradili kodem podstatne setricim stack (max. log(N) zanoreni rekurze)
+    // the following "nice" code was replaced with code that significantly saves stack space (max. log(N) recursion nesting)
     //  if (left < j) SortArray(left, j);
     //  if (i < right) SortArray(i, right);
 
@@ -1062,7 +1063,7 @@ LABEL_SortArray:
     {
         if (i < right)
         {
-            if (j - left < right - i) // je potreba seradit obe "poloviny", tedy do rekurze posleme tu mensi, tu druhou zpracujeme pres "goto"
+            if (j - left < right - i) // need to sort both "halves", so we send the smaller one to recursion, process the other via "goto"
             {
                 SortArray(left, j);
                 left = i;
@@ -1265,7 +1266,7 @@ void CAssociations::ReadAssociations(BOOL showWaitWnd)
                     *(DWORD*)s = 0; // nulovani konce stringu
 
                     int index;
-                    if (!GetIndex(e, index)) // nenalezeno, ma smysl zkoumat + pripadne pridat
+                    if (!GetIndex(e, index)) // not found, ma smysl zkoumat + pripadne pridat
                     {
                         if (GetIconFromAssocAux(TRUE, systemFileAssoc, ext, (LONG)strlen(ext) + 1, data, iconLocation, NULL))
                         {
@@ -1352,13 +1353,13 @@ void CAssociations::ReadAssociations(BOOL showWaitWnd)
 
                     if (SalRegQueryValueEx(extKey, "Application", NULL, NULL, NULL, NULL) == ERROR_SUCCESS)
                     {
-                        if (found) // nalezeno, nastavime, ze ma asociaci
+                        if (found) // found, nastavime, ze ma asociaci
                         {
                             CAssociationData* iconData = &(At(index));
                             iconData->SetFlag(1); // soubory s touto priponou jdou otevirat
                                                   // iconData->SetIndexAll(-1);  // prepnuti na statickou ikonu zlobi s CDR a CPT Corelackymi soubory s nahledy v ikonach, radsi nechame ikonu v nastaveni z HKEY_CLASSES_ROOT
                         }
-                        else // nenalezeno, vlozime jako statickou ikonu
+                        else // not found, vlozime jako statickou ikonu
                         {
                             data.SetFlag(1); // soubory s touto priponou jdou otevirat
                             data.SetIndexAll(-1);

@@ -1,5 +1,6 @@
 ﻿// SPDX-FileCopyrightText: 2023 Open Salamander Authors
 // SPDX-License-Identifier: GPL-2.0-or-later
+// CommentsTranslationProject: TRANSLATED
 
 #include "precomp.h"
 
@@ -881,7 +882,7 @@ void CMainWindow::SpawnWorker(const char* path1, const char* path2,
         {
             delete worker;
             SetEvent(WorkerEvent); // so we do not wait for it in vain
-            TRACE_I("Nepovedlo se spustit diff worker thread.");
+            TRACE_I("Failed to start diff worker thread.");
         }
         else
         {

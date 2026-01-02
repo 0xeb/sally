@@ -1,3 +1,4 @@
+﻿// CommentsTranslationProject: TRANSLATED
 /*
  * storage.h: interface defining functions for storage and recovery
  * of PuTTY's persistent data.

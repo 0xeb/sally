@@ -1,3 +1,4 @@
+﻿// CommentsTranslationProject: TRANSLATED
 #ifndef CMARK_GFM_EXTENSION_API_H
 #define CMARK_GFM_EXTENSION_API_H
 

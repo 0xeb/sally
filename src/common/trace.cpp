@@ -1,5 +1,6 @@
 ﻿// SPDX-FileCopyrightText: 2023 Open Salamander Authors
 // SPDX-License-Identifier: GPL-2.0-or-later
+// CommentsTranslationProject: TRANSLATED
 
 #include "precomp.h"
 
@@ -19,15 +20,15 @@
 // boundaries so we can find the real functions
 // that we need to call for initialization.
 
-#pragma warning(disable : 4075) // chceme definovat poradi inicializace modulu
+#pragma warning(disable : 4075) // we want to define module initialization order
 
 typedef void(__cdecl* _PVFV)(void);
 
 #pragma section(".i_trc$a", read)
-__declspec(allocate(".i_trc$a")) const _PVFV i_trace = (_PVFV)1; // na zacatek sekce .i_trc si dame promennou i_trace
+__declspec(allocate(".i_trc$a")) const _PVFV i_trace = (_PVFV)1; // at the beginning of section .i_trc we place variable i_trace
 
 #pragma section(".i_trc$z", read)
-__declspec(allocate(".i_trc$z")) const _PVFV i_trace_end = (_PVFV)1; // a na konec sekce .i_trc si dame promennou i_trace_end
+__declspec(allocate(".i_trc$z")) const _PVFV i_trace_end = (_PVFV)1; // and at the end of section .i_trc we place variable i_trace_end
 
 void Initialize__Trace()
 {
@@ -161,25 +162,25 @@ BOOL C__TraceThreadCache::GetIndex(DWORD tid, int& index)
     {
         m = (l + r) / 2;
         DWORD hw = Data[m].TID;
-        if (hw == tid) // nalezeno
+        if (hw == tid) // found
         {
             index = m;
             return TRUE;
         }
         else if (hw > tid)
         {
-            if (l == r || l > m - 1) // nenalezeno
+            if (l == r || l > m - 1) // not found
             {
-                index = m; // mel by byt na teto pozici
+                index = m; // should be at this position
                 return FALSE;
             }
             r = m - 1;
         }
         else
         {
-            if (l == r) // nenalezeno
+            if (l == r) // not found
             {
-                index = m + 1; // mel by byt az za touto pozici
+                index = m + 1; // should be after this position
                 return FALSE;
             }
             l = m + 1;
@@ -193,18 +194,18 @@ BOOL C__TraceThreadCache::Add(HANDLE handle, DWORD tid)
     BOOL found = GetIndex(tid, index);
     if (!found)
     {
-        if (Available == Count) // je plno, vyhazime mrtvy thready
+        if (Available == Count) // full, discarding dead threads
         {
             DWORD code;
             for (int i = Count - 1; i >= 0; i--)
             {
                 if (!GetExitCodeThread(Data[i].Handle, &code) || code != STILL_ACTIVE)
                 {
-                    DWORD id = Data[i].TID;                         // aktualizace cache:
-                    if (CacheUID[__TraceCacheGetIndex(id)] != -1 && // platny zaznam
-                        CacheTID[__TraceCacheGetIndex(id)] == id)   // shodny TID
+                    DWORD id = Data[i].TID;                         // cache update:
+                    if (CacheUID[__TraceCacheGetIndex(id)] != -1 && // valid record
+                        CacheTID[__TraceCacheGetIndex(id)] == id)   // matching TID
                     {
-                        CacheUID[__TraceCacheGetIndex(id)] = -1; // zneplatneni
+                        CacheUID[__TraceCacheGetIndex(id)] = -1; // invalidation
                     }
 
                     CloseHandle(Data[i].Handle);
@@ -219,7 +220,7 @@ BOOL C__TraceThreadCache::Add(HANDLE handle, DWORD tid)
         if (Available == Count && !EnlargeArray())
             return FALSE;
 
-        Move(1, index, Count - index); // vlozime novy zaznam
+        Move(1, index, Count - index); // insert new record
         Data[index].Handle = handle;
         Data[index].TID = tid;
         Data[index].UID = UniqueThreadID;
@@ -231,7 +232,7 @@ BOOL C__TraceThreadCache::Add(HANDLE handle, DWORD tid)
         Data[index].Handle = handle;
         Data[index].UID = UniqueThreadID;
     }
-    // aktualizace cache
+    // cache update
     CacheTID[__TraceCacheGetIndex(tid)] = tid;
     CacheUID[__TraceCacheGetIndex(tid)] = UniqueThreadID++;
 
@@ -241,10 +242,10 @@ BOOL C__TraceThreadCache::Add(HANDLE handle, DWORD tid)
 DWORD
 C__TraceThreadCache::GetUniqueThreadId(DWORD tid)
 {
-    if (CacheUID[__TraceCacheGetIndex(tid)] != -1 && // je-li platny zaznam
-        CacheTID[__TraceCacheGetIndex(tid)] == tid)  // a je-li shodny s tid
+    if (CacheUID[__TraceCacheGetIndex(tid)] != -1 && // if valid record
+        CacheTID[__TraceCacheGetIndex(tid)] == tid)  // and if matches tid
     {
-        return CacheUID[__TraceCacheGetIndex(tid)]; // uid je v cache
+        return CacheUID[__TraceCacheGetIndex(tid)]; // uid is in cache
     }
 
     int index;
@@ -255,7 +256,7 @@ C__TraceThreadCache::GetUniqueThreadId(DWORD tid)
         return Data[index].UID;
     }
     else
-        return -1; // nenalezeno -> to by se nemelo stat
+        return -1; // not found -> this should not happen
 }
 
 //*****************************************************************************
@@ -371,20 +372,20 @@ CWStr::CWStr(const char* s)
 C__Trace::C__Trace() : TraceStrStream(&TraceStringBuf), TraceStrStreamW(&TraceStringBufW)
 {
 #ifdef _DEBUG
-    // nove streamy pouzivaji interne locales, ktere maji implementovany
-    // jednotlive "facets" pomoci lazy creation - jsou alokovany na heapu
-    // kdyz jsou potreba, tedy kdyz nekdo posle do streamu neco, co ma
-    // formatovani zavisle na lokalich pravidlech, treba cislo, datum,
-    // nebo boolean. Tyto "facets" jsou pak dealokovany pri exitu
-    // programu s prioritou compiler, tzn. po nasi kontrole memory leaku.
-    // Takze pokud nekdo pouzije stream k vypisu cehokoli lokalizovatelneho,
-    // nas debug heap zacne hlasit memory leaky, i kdyz zadne nejsou. Abychom
-    // tomu predesli, donutime locales vytvorit vsechny "facets" ted, dokud
-    // jeste nehlidame heap.
-    // Zatim pouzivame pouze vystupni stream a pouze se stringy (bez konverze)
-    // a cisly. Takze poslat cislo do stringstreamu by melo stacit. Pokud
-    // v budoucnu zacneme pouzivat streamy vic a debug heap zacne hlasit
-    // leaky, budeme zde muset pridat vic vstupu/vystupu.
+    // new streams use internal locales, which have implemented
+    // individual "facets" via lazy creation - are allocated on heap
+    // when needed, i.e. when someone sends something to stream that has
+    // formatting dependent on locale rules, like number, date,
+    // or boolean. These "facets" are then deallocated on exit
+    // of program with compiler priority, i.e. after our memory leak check.
+    // So if someone uses stream to output anything localizable,
+    // our debug heap will report memory leaks, even if there are none. To
+    // prevent this, we force locales to create all "facets" now, while
+    // we are not yet checking heap.
+    // For now we use only output stream and only with strings (without conversion)
+    // and numbers. So sending a number to stringstream should suffice. If
+    // in the future we start using streams more and debug heap starts reporting
+    // leaks, we will have to add more inputs/outputs here.
     std::stringstream s;
     s << 1;
     std::wstringstream s2;
@@ -446,7 +447,7 @@ BOOL C__Trace::Connect(BOOL onUserRequest)
             lstrcpynW(s, L"altap_traces", int(end - s));
             s += wcslen(s);
 
-            if ((s - tmpDir) + 15 < MAX_PATH) // dost mista pro pripojeni "_2000000000.log"
+            if ((s - tmpDir) + 15 < MAX_PATH) // enough space to append "_2000000000.log"
             {
                 int num = 1;
                 while (1)
@@ -462,11 +463,11 @@ BOOL C__Trace::Connect(BOOL onUserRequest)
                     }
                     DWORD err = GetLastError();
                     if (err != ERROR_FILE_EXISTS && err != ERROR_ALREADY_EXISTS)
-                        break; // neocekavana chyba (a neni ji kam vypsat)
+                        break; // unexpected error (and nowhere to output it)
                 }
                 if (HTraceFile == INVALID_HANDLE_VALUE)
                     HTraceFile = NULL;
-                else // zapis headeru do souboru (identifikace sloupcu)
+                else // write header to file (column identification)
                 {
                     DWORD wr;
                     const WCHAR* fileHeader = L"\xFEFF" /* BOM */ L"Type\tTID\t"
@@ -482,20 +483,20 @@ BOOL C__Trace::Connect(BOOL onUserRequest)
     }
 #endif // TRACE_TO_FILE
 
-    if (HWritePipe != NULL) // test spojeni se serverem, jestli je down, HWritePipe se zavre a nasledne zkusime reconnect
+    if (HWritePipe != NULL) // test server connection, if down, HWritePipe will close and we will try to reconnect
         TRACE_I("Connect request received when already connected to Trace Server.");
 
     BOOL ret = FALSE;
     if (HWritePipe != NULL)
-        ret = TRUE; // pokud je jiz spojeni navazano
+        ret = TRUE; // if connection is already established
     else
     {
-        // pokusim se otevrit Mutex pro pristup ke sdilene pameti
+        // try to open Mutex for access to shared memory
         HANDLE hOpenConnectionMutex;
         hOpenConnectionMutex = OpenMutex(/*MUTEX_ALL_ACCESS*/ SYNCHRONIZE, FALSE, __OPEN_CONNECTION_MUTEX);
-        if (hOpenConnectionMutex != NULL) // server nalezen
+        if (hOpenConnectionMutex != NULL) // server found
         {
-            // prevezmu ConnectionMutex
+            // take over ConnectionMutex
             DWORD waitRet;
             while (1)
             {
@@ -504,16 +505,16 @@ BOOL C__Trace::Connect(BOOL onUserRequest)
                 if (waitRet != WAIT_ABANDONED)
                     break;
             }
-            if (waitRet == WAIT_OBJECT_0) // podaril se prevzit
+            if (waitRet == WAIT_OBJECT_0) // successfully acquired
             {
-                // otevru FileMapping
+                // open FileMapping
                 HANDLE hFileMapping;
                 hFileMapping = OpenFileMapping(FILE_MAP_ALL_ACCESS, FALSE, __FILE_MAPPING_NAME);
                 if (hFileMapping != NULL)
                 {
-                    // namapuju spolecnou pamet
+                    // map shared memory
                     char* mapAddress;
-                    mapAddress = (char*)MapViewOfFile(hFileMapping, FILE_MAP_ALL_ACCESS, // FIXME_X64 nepredavame x86/x64 nekompatibilni data?
+                    mapAddress = (char*)MapViewOfFile(hFileMapping, FILE_MAP_ALL_ACCESS, // FIXME_X64 are we not passing x86/x64 incompatible data?
                                                       0, 0, __SIZEOF_CLIENTSERVERINITDATA);
                     if (mapAddress != NULL)
                     {
@@ -523,7 +524,7 @@ BOOL C__Trace::Connect(BOOL onUserRequest)
                         {
                             HANDLE HReadPipe;
 
-                            // vytvorim anonymous pipe
+                            // create anonymous pipe
                             SECURITY_ATTRIBUTES sa;
                             char secDesc[SECURITY_DESCRIPTOR_MIN_LENGTH];
                             sa.nLength = sizeof(sa);
@@ -534,104 +535,104 @@ BOOL C__Trace::Connect(BOOL onUserRequest)
                             SetSecurityDescriptorDacl(sa.lpSecurityDescriptor, TRUE, 0, FALSE);
                             if (CreatePipe(&HReadPipe, &HWritePipe, &sa, __PIPE_SIZE * 1024))
                             {
-                                // zapisu do sdilene pameti handle pro cteni z pipy
+                                // write handle for reading from pipe to shared memory
                                 int expectedServerVer = TRACE_CLIENT_VERSION;
-                                *(int*)&mapAddress[0] = expectedServerVer - 1;               // Version (zkousime nejdrive starsi zpusob connectu)
-                                *(DWORD*)&mapAddress[4] = GetCurrentProcessId();             // ClientOrServerProcessId (tady jde o PID klienta)
-                                *(DWORD*)&mapAddress[8] = (DWORD)(DWORD_PTR)HReadPipe;       // HReadOrWritePipe (tady jde o HReadPipe)
+                                *(int*)&mapAddress[0] = expectedServerVer - 1;               // Version (try oldest connection method first)
+                                *(DWORD*)&mapAddress[4] = GetCurrentProcessId();             // ClientOrServerProcessId (here it is client PID)
+                                *(DWORD*)&mapAddress[8] = (DWORD)(DWORD_PTR)HReadPipe;       // HReadOrWritePipe (here it is HReadPipe)
                                 *(DWORD*)&mapAddress[12] = (DWORD)(DWORD_PTR)HPipeSemaphore; // HPipeSemaphore
 
-                                // otevru hReadyEvent
+                                // open hReadyEvent
                                 HANDLE hReadyEvent;
                                 hReadyEvent = OpenEvent(EVENT_ALL_ACCESS, TRUE, __CONNECT_DATA_READY_EVENT_NAME);
-                                // otevru hAcceptedEvent
+                                // open hAcceptedEvent
                                 HANDLE hAcceptedEvent;
                                 hAcceptedEvent = OpenEvent(EVENT_ALL_ACCESS, TRUE, __CONNECT_DATA_ACCEPTED_EVENT_NAME);
                                 if (hReadyEvent != NULL && hAcceptedEvent != NULL)
                                 {
-                                    ResetEvent(hAcceptedEvent); // chci jen cerstvou odpoved serveru
+                                    ResetEvent(hAcceptedEvent); // I want only a fresh server response
 
                                     while (1)
                                     {
-                                        SetEvent(hReadyEvent); // reknu serveru, ze jsem pripravil data
+                                        SetEvent(hReadyEvent); // tell server I have prepared data
 
-                                        // pockam, az server data zpracuje
+                                        // wait for server to process data
                                         waitRet = WaitForSingleObject(hAcceptedEvent, __COMMUNICATION_WAIT_TIMEOUT);
                                         if (waitRet == WAIT_OBJECT_0)
                                         {
-                                            // hlaska vypisovana na starem neunikodovem Trace Serveru (musi byt ANSI)
+                                            // message displayed on old non-Unicode Trace Server (must be ANSI)
                                             const char* oldTraceServerA = "Disconnecting: this is not Unicode version of Trace Server.";
 
-                                            // podivam se na vysledek ze serveru
+                                            // check the result from server
                                             if (*((BOOL*)mapAddress) == TRUE)
                                             {
-                                                if (expectedServerVer == TRACE_CLIENT_VERSION) // hura, povedlo se pripojit na novy Trace Server!
+                                                if (expectedServerVer == TRACE_CLIENT_VERSION) // great, successfully connected to new Trace Server!
                                                 {
 #ifdef TRACE_IGNORE_AUTOCLEAR
-                                                    ret = SendIgnoreAutoClear(TRUE); // ignorovat, pri chybe provedeme disconnect
+                                                    ret = SendIgnoreAutoClear(TRUE); // ignore, on error we will disconnect
 #else                                                                                // TRACE_IGNORE_AUTOCLEAR
-                                                    ret = SendIgnoreAutoClear(FALSE); // neignorovat, pri chybe provedeme disconnect
+                                                    ret = SendIgnoreAutoClear(FALSE); // do not ignore, on error we will disconnect
 #endif                                                                               // TRACE_IGNORE_AUTOCLEAR
                                                 }
                                                 else
                                                     TRACE_E(oldTraceServerA);
                                             }
-                                            else // nepovedlo se: zkusime pipe vytvorit na strane serveru
+                                            else // failed: try to create pipe on server side
                                             {
-                                                // zapisu do sdilene pameti novou verzi, tim pozadam server o poslani handlu pro zapis do pipy
+                                                // write new version to shared memory, thus asking server to send handle for writing to pipe
                                                 *(int*)&mapAddress[0] = expectedServerVer; // Version
 
-                                                SetEvent(hReadyEvent); // reknu serveru, ze jsem pripravil data
+                                                SetEvent(hReadyEvent); // tell server I have prepared data
 
-                                                // pockam, az server data zpracuje
+                                                // wait for server to process data
                                                 waitRet = WaitForSingleObject(hAcceptedEvent, __COMMUNICATION_WAIT_TIMEOUT);
-                                                if (waitRet == WAIT_OBJECT_0 && *((BOOL*)mapAddress) == TRUE) // podivam se na vysledek ze serveru
+                                                if (waitRet == WAIT_OBJECT_0 && *((BOOL*)mapAddress) == TRUE) // check the result from server
                                                 {
                                                     HANDLE hWritePipeFromSrv = NULL;
                                                     HANDLE hPipeSemaphoreFromSrv = NULL;
 
-                                                    // ziskani handlu server procesu
+                                                    // obtain server process handle
                                                     HANDLE hServerProcess = OpenProcess(PROCESS_DUP_HANDLE, FALSE,
-                                                                                        *(DWORD*)&mapAddress[4] /* ClientOrServerProcessId (tady jde o PID serveru) */);
-                                                    // ziskani handlu pipy a semaforu
+                                                                                        *(DWORD*)&mapAddress[4] /* ClientOrServerProcessId (here it is server PID) */);
+                                                    // obtain pipe and semaphore handles
                                                     if (hServerProcess != NULL &&
-                                                        DuplicateHandle(hServerProcess, (HANDLE)(DWORD_PTR)(*(DWORD*)&mapAddress[8]) /* HReadOrWritePipe (tady jde o HWritePipe) */, // server
-                                                                        GetCurrentProcess(), &hWritePipeFromSrv,                                                                     // klient
+                                                        DuplicateHandle(hServerProcess, (HANDLE)(DWORD_PTR)(*(DWORD*)&mapAddress[8]) /* HReadOrWritePipe (here it is HWritePipe) */, // server
+                                                                        GetCurrentProcess(), &hWritePipeFromSrv,                                                                     // client
                                                                         GENERIC_WRITE, FALSE, 0) &&
                                                         DuplicateHandle(hServerProcess, (HANDLE)(DWORD_PTR)(*(DWORD*)&mapAddress[12]) /* HPipeSemaphore */, // server
-                                                                        GetCurrentProcess(), &hPipeSemaphoreFromSrv,                                        // klient
+                                                                        GetCurrentProcess(), &hPipeSemaphoreFromSrv,                                        // client
                                                                         0, FALSE, DUPLICATE_SAME_ACCESS))
                                                     {
-                                                        *((int*)mapAddress) = 3;                         // zapis vysledku -> 3 = povedlo se, handly mame
-                                                        *(DWORD*)&mapAddress[4] = GetCurrentProcessId(); // ClientOrServerProcessId (tady jde o PID klienta)
+                                                        *((int*)mapAddress) = 3;                         // write result -> 3 = succeeded, we have handles
+                                                        *(DWORD*)&mapAddress[4] = GetCurrentProcessId(); // ClientOrServerProcessId (here it is client PID)
                                                     }
                                                     else
                                                     {
-                                                        *((BOOL*)mapAddress) = FALSE; // zapis vysledku -> nepovedlo se
+                                                        *((BOOL*)mapAddress) = FALSE; // write result -> failed
                                                     }
                                                     if (hServerProcess != NULL)
                                                         CloseHandle(hServerProcess);
 
-                                                    SetEvent(hReadyEvent); // reknu serveru, ze jsem data precetl a zapsal vysledek
+                                                    SetEvent(hReadyEvent); // tell server I have read data and written result
 
-                                                    // pri uspechu: pockam, az server nastartuje thread cteni dat z pipy a posle vysledek
-                                                    // pri neuspechu: dame serveru vedet, ze se to nepovedlo, vrati nam opet neuspech
+                                                    // on success: wait for server to start thread reading data from pipe and sends result
+                                                    // on failure: tell server it failed, return failure again
                                                     waitRet = WaitForSingleObject(hAcceptedEvent, __COMMUNICATION_WAIT_TIMEOUT);
-                                                    if (waitRet == WAIT_OBJECT_0 && // podivam se na vysledek ze serveru
-                                                        *((int*)mapAddress) == 2 /* 2 = uspesne nastartovany cteci thread v serveru */)
+                                                    if (waitRet == WAIT_OBJECT_0 && // check the result from server
+                                                        *((int*)mapAddress) == 2 /* 2 = reading thread successfully started in server */)
                                                     {
                                                         CloseHandle(HPipeSemaphore);
-                                                        HPipeSemaphore = hPipeSemaphoreFromSrv; // pouzijeme semafor ze serveru (ten klientsky zavreme)
+                                                        HPipeSemaphore = hPipeSemaphoreFromSrv; // use semaphore from server (close client one)
 
                                                         CloseHandle(HWritePipe);
-                                                        HWritePipe = hWritePipeFromSrv; // pouzijeme pipu ze serveru (tu klientskou zavreme)
+                                                        HWritePipe = hWritePipeFromSrv; // use pipe from server (close client one)
 
-                                                        if (expectedServerVer == TRACE_CLIENT_VERSION) // hura, povedlo se pripojit na novy Trace Server!
+                                                        if (expectedServerVer == TRACE_CLIENT_VERSION) // great, successfully connected to new Trace Server!
                                                         {
 #ifdef TRACE_IGNORE_AUTOCLEAR
-                                                            ret = SendIgnoreAutoClear(TRUE); // ignorovat, pri chybe provedeme disconnect
+                                                            ret = SendIgnoreAutoClear(TRUE); // ignore, on error we will disconnect
 #else                                                                                        // TRACE_IGNORE_AUTOCLEAR
-                                                            ret = SendIgnoreAutoClear(FALSE); // neignorovat, pri chybe provedeme disconnect
+                                                            ret = SendIgnoreAutoClear(FALSE); // do not ignore, on error we will disconnect
 #endif                                                                                       // TRACE_IGNORE_AUTOCLEAR
                                                         }
                                                         else
@@ -645,12 +646,12 @@ BOOL C__Trace::Connect(BOOL onUserRequest)
                                                             CloseHandle(hPipeSemaphoreFromSrv);
                                                     }
                                                 }
-                                                else // connect se nepovedl ani jednim zpusobem (asi stary Trace Server)
+                                                else // connection failed both ways (probably old Trace Server)
                                                 {
-                                                    if (expectedServerVer == TRACE_CLIENT_VERSION) // zkouseli jsme novou verzi serveru
+                                                    if (expectedServerVer == TRACE_CLIENT_VERSION) // we tried new server version
                                                     {
-                                                        expectedServerVer = TRACE_CLIENT_VERSION - 2; // ted zkusime starsi verzi serveru
-                                                        // zapisu do sdilene pameti verzi, kterou zvlada stara verze serveru
+                                                        expectedServerVer = TRACE_CLIENT_VERSION - 2; // now try older server version
+                                                        // write version to shared memory that old server version supports
                                                         *(int*)&mapAddress[0] = expectedServerVer - 1; // Version
                                                         continue;
                                                     }
@@ -681,7 +682,7 @@ BOOL C__Trace::Connect(BOOL onUserRequest)
                     }
                     CloseHandle(hFileMapping);
                 }
-                ReleaseMutex(hOpenConnectionMutex); // muzou se connectit jini clienti
+                ReleaseMutex(hOpenConnectionMutex); // other clients can connect
             }
             CloseHandle(hOpenConnectionMutex);
         }
@@ -752,12 +753,12 @@ BOOL C__Trace::WritePipe(LPCVOID lpBuffer, DWORD nNumberOfBytesToWrite)
             BytesAllocatedForWriteToPipe += 1024;
         else
         {
-            if (res == WAIT_TIMEOUT) // timeout, zkontrolujem, jestli pipe na server jeste zije
+            if (res == WAIT_TIMEOUT) // timeout, check if server pipe is still alive
             {
                 if (!WriteFile(HWritePipe, lpBuffer, 0, &numberOfBytesWritten, NULL))
                     return FALSE;
             }
-            else // jina chyba, radsi koncime, at z toho neni nekonecny cyklus
+            else // other error, better quit to avoid infinite loop
                 return FALSE;
         }
     }
@@ -811,7 +812,7 @@ BOOL C__Trace::SendIgnoreAutoClear(BOOL ignore)
 {
     char data[__SIZEOF_PIPEDATAHEADER];
     *(int*)&data[0] = __mtIgnoreAutoClear; // Type
-    *(DWORD*)&data[4] = ignore ? 1 : 0;    // ThreadID: 0 = neignorovat, 1 = ignorovat auto-clear na Trace Serveru
+    *(DWORD*)&data[4] = ignore ? 1 : 0;    // ThreadID: 0 = do not ignore, 1 = ignore auto-clear on Trace Server
     return WritePipe(data, __SIZEOF_PIPEDATAHEADER);
 }
 
@@ -838,7 +839,7 @@ void C__Trace::SetThreadName(const char* name)
     EnterCriticalSection(&CriticalSection);
     DWORD storedLastError = GetLastError();
 #ifdef MULTITHREADED_TRACE_ENABLE
-    if (ThreadCache.GetUniqueThreadId(GetCurrentThreadId()) != -1) // jen s pridelenym UID, jinak by vsechny "unknown" byly najednou pojmenovany timto jmenem
+    if (ThreadCache.GetUniqueThreadId(GetCurrentThreadId()) != -1) // only with assigned UID, otherwise all "unknown" would be named with this name at once
         SendSetNameMessageToServer(name, NULL, __mtSetThreadName);
 #else  // MULTITHREADED_TRACE_ENABLE
     SendSetNameMessageToServer(name, NULL, __mtSetThreadName);
@@ -852,7 +853,7 @@ void C__Trace::SetThreadNameW(const WCHAR* name)
     EnterCriticalSection(&CriticalSection);
     DWORD storedLastError = GetLastError();
 #ifdef MULTITHREADED_TRACE_ENABLE
-    if (ThreadCache.GetUniqueThreadId(GetCurrentThreadId()) != -1) // jen s pridelenym UID, jinak by vsechny "unknown" byly najednou pojmenovany timto jmenem
+    if (ThreadCache.GetUniqueThreadId(GetCurrentThreadId()) != -1) // only with assigned UID, otherwise all "unknown" would be named with this name at once
         SendSetNameMessageToServer(NULL, name, __mtSetThreadNameW);
 #else  // MULTITHREADED_TRACE_ENABLE
     SendSetNameMessageToServer(NULL, name, __mtSetThreadNameW);
@@ -881,8 +882,8 @@ C__Trace::SetInfoW(const WCHAR* file, int line)
 
 struct C__TraceMsgBoxThreadData
 {
-    char* Msg;        // alokovany text hlasky
-    const char* File; // jen odkaz na staticky string
+    char* Msg;        // allocated message text
+    const char* File; // just a reference to static string
     int Line;
 };
 
@@ -907,8 +908,8 @@ DWORD WINAPI __TraceMsgBoxThread(void* param)
 
 struct C__TraceMsgBoxThreadDataW
 {
-    WCHAR* Msg;        // alokovany text hlasky
-    const WCHAR* File; // jen odkaz na staticky string
+    WCHAR* Msg;        // allocated message text
+    const WCHAR* File; // just a reference to static string
     int Line;
 };
 
@@ -945,7 +946,7 @@ C__Trace&
 C__Trace::SendMessageToServer(C__MessageType type, BOOL crash)
 {
     BOOL unicode = type == __mtInformationW || type == __mtErrorW;
-    // flushnuti do bufferu
+    // flush to buffer
     if (unicode)
         TraceStrStreamW.flush();
     else
@@ -966,9 +967,9 @@ C__Trace::SendMessageToServer(C__MessageType type, BOOL crash)
         ::QueryPerformanceCounter(&perfCounter);
 
         static LONGLONG lastPC = 0;
-        if (lastPC != 0 && lastPC > perfCounter.QuadPart) // counter musi stale rust, snizeni je chyba (na vicejadrovych procesorech se tahle chyba objevuje, resenim je nastaveni affinity na jedine jadro pro ladeny proces v Task Manageru)
+        if (lastPC != 0 && lastPC > perfCounter.QuadPart) // counter must always grow, decrease is an error (on multicore processors this error appears, solution is to set affinity to single core for debugged process in Task Manager)
         {
-            perfCounter.QuadPart = lastPC + 1; // umele zvysime hodnotu counteru na posledni hodnotu plus jedna (jen aby se nesnizil a nedoslo k uplne spatnemu zarazeni v Trace Serveru)
+            perfCounter.QuadPart = lastPC + 1; // artificially increase counter value to last value plus one (just so it does not decrease and does not cause completely wrong ordering in Trace Server)
             pcWarningLen = unicode ? (int)wcslen(pcWarningW) : (int)strlen(pcWarning);
             addToMessageSize = pcWarningLen;
             writePCWarning = TRUE;
@@ -985,12 +986,12 @@ C__Trace::SendMessageToServer(C__MessageType type, BOOL crash)
     {
         DWORD wr;
         WCHAR bufW[5000];
-        swprintf_s(bufW, unicode ? L"%s\t%d\t" // jmeno souboru ve FileW (unicode)
+        swprintf_s(bufW, unicode ? L"%s\t%d\t" // file name in FileW (unicode)
 #ifdef MULTITHREADED_TRACE_ENABLE
                                    L"%d\t"
 #endif // MULTITHREADED_TRACE_ENABLE
                                    L"%d.%d.%d\t%d:%02d:%02d.%03d\t%.3lf\t%s\t%d\t"
-                                 : L"%s\t%d\t" // jmeno souboru ve File (ANSI)
+                                 : L"%s\t%d\t" // file name in File (ANSI)
 #ifdef MULTITHREADED_TRACE_ENABLE
                                    L"%d\t"
 #endif // MULTITHREADED_TRACE_ENABLE
@@ -1018,15 +1019,15 @@ C__Trace::SendMessageToServer(C__MessageType type, BOOL crash)
             }
         }
         WriteFile(HTraceFile, L"\r\n", sizeof(WCHAR) * 2, &wr, NULL);
-        FlushFileBuffers(HTraceFile); // flushneme data na disk
+        FlushFileBuffers(HTraceFile); // flush data to disk
 
 #ifdef __TRACESERVER
-        // pro ladeni Trace Serveru: TRACE hlasky jdou jen do souboru, kdyz prijde TRACE_E, upozornime msgboxem
+        // for Trace Server debugging: TRACE messages go only to file, when TRACE_E arrives, notify with msgbox
         if (!crash && (type == __mtError || type == __mtErrorW))
         {
             swprintf_s(bufW, L"Error message from Trace Server has been written to file with traces:\n%s", TraceFileName);
 
-            // vypiseme hlasku v jinem threadu, aby nepumpovala zpravy aktualniho threadu
+            // print message in another thread to avoid pumping current thread messages
             DWORD id;
             HANDLE msgBoxThread = CreateThread(NULL, 0, __TraceMsgBoxThreadErrInTS, bufW, 0, &id);
             if (msgBoxThread != NULL)
@@ -1061,30 +1062,30 @@ C__Trace::SendMessageToServer(C__MessageType type, BOOL crash)
         if (!WritePipe(data, __SIZEOF_PIPEDATAHEADER) ||
             !WritePipe(unicode ? (void*)FileW : (void*)File, (DWORD)((unicode ? sizeof(WCHAR) : 1) * fileSize)) ||
             writePCWarning && !WritePipe(unicode ? (void*)pcWarningW : (void*)pcWarning,
-                                         (unicode ? sizeof(WCHAR) : 1) * pcWarningLen) || // na zacatek zpravy vypisu chybu PC, pri ladeni je to dost zasadni vec (zpravy jsou mimo realne poradi)
+                                         (unicode ? sizeof(WCHAR) : 1) * pcWarningLen) || // output PC error at the beginning of the message, during debugging this is quite important (messages are out of real order)
             !WritePipe(unicode ? (void*)TraceStringBufW.c_str() : (void*)TraceStringBuf.c_str(),
                        (unicode ? sizeof(WCHAR) : 1) * textSize))
         {
             CloseWritePipeAndSemaphore();
         }
     }
-    // jen je-li crash==TRUE:
-    // vyrobime kopii dat, start threadu pro msgbox totiz muze vyvolat dalsi TRACE
-    // hlasky (napr. v DllMain reakce na DLL_THREAD_ATTACH), pokud bysme neopustili
-    // CriticalSection, nastal by deadlock;
-    // v DllMain se nesmi pouzivat TRACE_C, jinak dojde k deadlocku:
-    //   - pokud se da do DLL_THREAD_ATTACH: chce si otevrit novy thread pro msgbox
-    //     a to je z DllMainu blokovane
-    //   - pokud se da do DLL_THREAD_DETACH: pri cekani na zavreni threadu s msgboxem
-    //     predesleho TRACE_C zachytime TRACE_C z DLL_THREAD_DETACH a nechame ho
-    //     cekat v nekonecnem cyklu, viz nize
-    // navic zavadime obranu proti mnozeni msgboxu pri vice TRACE_C zaroven, pusobilo
-    // by to jen zmatky, ted se otevre msgbox jen pro prvni a ten po uzavreni vyvola
-    // padacku, ostatni TRACE_C zustanou chyceny v nekonecne cekaji smycce, viz nize
+    // only if crash==TRUE:
+    // we create a copy of data, starting thread for msgbox can trigger another TRACE
+    // messages (e.g. in DllMain response to DLL_THREAD_ATTACH), if we did not leave
+    // CriticalSection, deadlock would occur;
+    // TRACE_C must not be used in DllMain, otherwise deadlock will occur:
+    //   - if placed in DLL_THREAD_ATTACH: wants to open new thread for msgbox
+    //     and that is blocked from DllMain
+    //   - if placed in DLL_THREAD_DETACH: while waiting for thread with msgbox to close
+    //     we catch TRACE_C from DLL_THREAD_DETACH from previous TRACE_C and let it
+    //     wait in infinite loop, see below
+    // also we introduce defense against multiplication of msgboxes when multiple TRACE_C at once
+    // would just confuse, now only first msgbox opens and after closing it triggers
+    // crash, other TRACE_C remain stuck in infinite wait loop, see below
     static BOOL msgBoxOpened = FALSE;
     C__TraceMsgBoxThreadData threadData;
     C__TraceMsgBoxThreadDataW threadDataW;
-    if (crash) // break/padacka po vypisu TRACE error hlasky (TRACE_C a TRACE_MC)
+    if (crash) // break/crash after printing TRACE error message (TRACE_C and TRACE_MC)
     {
         if (!msgBoxOpened)
         {
@@ -1120,36 +1121,36 @@ C__Trace::SendMessageToServer(C__MessageType type, BOOL crash)
         }
     }
     if (unicode)
-        TraceStringBufW.erase(); // priprava pro dalsi trace
+        TraceStringBufW.erase(); // preparation for next trace
     else
         TraceStringBuf.erase();
     LeaveCriticalSection(&CriticalSection);
     if (crash)
     {
-        if (unicode && threadDataW.Msg != NULL || // break/padacka po vypisu TRACE error hlasky (TRACE_C a TRACE_MC)
+        if (unicode && threadDataW.Msg != NULL || // break/crash after printing TRACE error message (TRACE_C and TRACE_MC)
             !unicode && threadData.Msg != NULL)
         {
-            // vypiseme hlasku v jinem threadu, aby nepumpovala zpravy aktualniho threadu
+            // print message in another thread to avoid pumping current thread messages
             DWORD id;
             HANDLE msgBoxThread = CreateThread(NULL, 0, unicode ? __TraceMsgBoxThreadW : __TraceMsgBoxThread,
                                                unicode ? (void*)&threadDataW : (void*)&threadData, 0, &id);
             if (msgBoxThread != NULL)
             {
-                WaitForSingleObject(msgBoxThread, INFINITE); // pokud se da TRACE_C do DllMain do DLL_THREAD_ATTACH, dojde k deadlocku - silne nepravdepodobne, neresime
+                WaitForSingleObject(msgBoxThread, INFINITE); // if TRACE_C is placed in DllMain in DLL_THREAD_ATTACH, deadlock will occur - highly unlikely, not handling
                 CloseHandle(msgBoxThread);
             }
             msgBoxOpened = FALSE;
             GlobalFree(unicode ? (HGLOBAL)threadDataW.Msg : (HGLOBAL)threadData.Msg);
-            // pad softu vyvolame primo v kodu, kde je umisteny TRACE_C/TRACE_MC, aby
-            // bylo v bug reportu videt presne kde makra lezi; padacka tedy nasleduje
-            // po dokonceni teto metody
+            // we trigger the crash directly in the code where TRACE_C/TRACE_MC is placed, so
+            // it is visible in bug report exactly where macros are; crash thus follows
+            // after this method completes
         }
-        else // ostatni thready s TRACE_C zablokujeme, az se zavre msgbox otevreny pro
-        {    // prvni TRACE_C, tak to tam i spadne, at v tom neni bordel
+        else // other threads with TRACE_C we block, until msgbox opened for
+        {    // first TRACE_C closes, so it will fall there too, so there is no mess
             if (msgBoxOpened)
             {
                 while (1)
-                    Sleep(1000); // blokace vede na deadlock napr. kdyz je (a nema byt) TRACE_C v DLL_THREAD_DETACH
+                    Sleep(1000); // blocking leads to deadlock e.g. when TRACE_C is (and should not be) in DLL_THREAD_DETACH
             }
         }
     }
@@ -1158,14 +1159,14 @@ C__Trace::SendMessageToServer(C__MessageType type, BOOL crash)
 
 #endif // TRACE_ENABLE
 
-// pasticka na vlastni definici techto "zakazanych" operatoru (aby fungovala kontrola
-// zakazanych kombinaci stringu WCHAR / char v jednom TRACE nebo MESSAGE makru,
-// nesmi byt nasledujici operatory definovany v jinych modulech - jinak by linker
-// neohlasil chybu - idea: v DEBUG verzi chytame chyby linkeru, v RELEASE verzi chytame
-// chyby vlastni definice operatoru; aby se otestovaly obe veci, musi byt povolene
-// TRACE_ENABLE v DEBUG i RELEASE verzi, coz napr. u Salamandera splnuje SDK build;
-// nejbeznejsi model je v DEBUG verzi mit povolene TRACE_ENABLE a v RELEASE ne, v tomto
-// pripade se provede jen prvni test, ktery je dulezitejsi (zakazane kombinace stringu
+// trick for our own definition of these "forbidden" operators (so that control
+// of forbidden combinations of WCHAR / char strings in one TRACE or MESSAGE macro
+// works) - the following operators must not be defined in other modules - otherwise linker
+// would not report error - idea: in DEBUG version we catch linker errors, in RELEASE version we catch
+// errors of operator definition; to test both things, TRACE_ENABLE must be allowed
+// in both DEBUG and RELEASE version, which e.g. Salamander SDK build satisfies;
+// the most common model is to have TRACE_ENABLE enabled in DEBUG version and disabled in RELEASE, in this
+// case only the first test is performed, which is more important (forbidden combinations of strings
 // WCHAR / char))
 #ifndef _DEBUG
 

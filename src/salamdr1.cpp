@@ -1,5 +1,6 @@
 ﻿// SPDX-FileCopyrightText: 2023 Open Salamander Authors
 // SPDX-License-Identifier: GPL-2.0-or-later
+// CommentsTranslationProject: TRANSLATED
 
 #include "precomp.h"
 #include <time.h>
@@ -46,11 +47,11 @@ extern "C"
 #include "execute.h"
 #include "drivelst.h"
 
-#pragma comment(linker, "/ENTRY:MyEntryPoint") // chceme vlastni vstupni bod do aplikace
+#pragma comment(linker, "/ENTRY:MyEntryPoint") // we want our own application entry point
 
 #pragma comment(lib, "uxtheme.lib")
 
-// zpristupnime si puvodni vstupni bod aplikace
+// make the original application entry point accessible
 extern "C" int WinMainCRTStartup();
 
 #ifdef X64_STRESS_TEST
@@ -61,64 +62,65 @@ LPVOID X64StressTestPointers[X64_STRESS_TEST_ALLOC_COUNT];
 
 void X64StressTestAlloc()
 {
-    // v teto chvili jiz loader nacetl EXE a RTL a v inicializaci RTL doslo k vytvoreni a alokaci heapu,
-    // ktery lezi na adresach pod 4GB; abychom dalsi alokace vystrcili nahoru nad 4GB, muysime zabrat spodek
-    // virtualni pameti a pak nasledne donutit RTL pomoci alokaci k rozsireni jeho heapu
+    // at this point the loader has already loaded EXE and RTL, and during RTL initialization
+    // the heap was created and allocated at addresses below 4GB; to push further allocations
+    // above 4GB, we need to occupy the lower part of virtual memory and then force RTL
+    // to expand its heap through allocations
     //
-    // zabereme prostor ve virtualni pameti
+    // occupy space in virtual memory
     UINT64 vaAllocated = 0;
     _int64 allocSize[] = {10000000, 1000000, 100000, 10000, 1000, 100, 10, 1, 0};
     for (int i = 0; allocSize[i] != 0; i++)
-        while (VirtualAlloc(0, allocSize[i], MEM_RESERVE, PAGE_NOACCESS) <= (LPVOID)(UINT_PTR)0x00000000ffffffff) // pri pristupu chceme exception a nechceme MEM_COMMIT, at zbytecne nezerem
+        while (VirtualAlloc(0, allocSize[i], MEM_RESERVE, PAGE_NOACCESS) <= (LPVOID)(UINT_PTR)0x00000000ffffffff) // we want an exception on access and don't want MEM_COMMIT to avoid wasting memory
             vaAllocated += allocSize[i];
 
-    // nyni nafoukneme RTL heap
+    // now inflate the RTL heap
     UINT64 rtlAllocated = 0;
     _int64 rtlAllocSize[] = {10000000, 1000000, 100000, 10000, 1000, 100, 10, 1, 0};
     for (int i = 0; rtlAllocSize[i] != 0; i++)
         while (_malloc_dbg(rtlAllocSize[i], _CRT_BLOCK, __FILE__, __LINE__) <= (LPVOID)(UINT_PTR)0x00000000ffffffff)
             rtlAllocated += rtlAllocSize[i];
 
-    // kontrola uspechu
-    void* testNew = new char; // new jede pres alloc, ale radeji take overime
+    // verify success
+    void* testNew = new char; // new goes through alloc, but let's verify anyway
     if (testNew <= (LPVOID)(UINT_PTR)0x00000000ffffffff)
         MessageBox(NULL, "new address <= 0x00000000ffffffff!\nPlease contact jan.rysavy@altap.cz with this information.", "X64_STRESS_TEST", MB_OK | MB_ICONEXCLAMATION);
     delete testNew;
 }
 
 #endif //X64_STRESS_TEST
-// nas vlastni vstupni bod, o ktery jsme si pozadali linker pomoci pragmy
+// our own entry point, which we requested from the linker via pragma
 int MyEntryPoint()
 {
 #ifdef X64_STRESS_TEST
-    // alokacema vyzereme spodni 4GB pameti, aby dalsi alokace mely ukazatele vetsi nez DWORD
+    // consume the lower 4GB of memory with allocations, so that further allocations have pointers larger than DWORD
     X64StressTestAlloc();
 #endif //X64_STRESS_TEST
 
     int ret = 1; // error
 
-    // spustime Salmon, chceme aby pochytal maximum nasich padu
+    // start Salmon, we want it to catch as many of our crashes as possible
     if (SalmonInit())
     {
-        // zavolame puvodni entry point aplikace a spustime tim program
+        // call the original application entry point to start the program
         ret = WinMainCRTStartup();
     }
     else
         MessageBox(NULL, "Open Salamander Bug Reporter (salmon.exe) initialization has failed. Please reinstall Open Salamander.",
                    SALAMANDER_TEXT_VERSION, MB_OK | MB_ICONSTOP);
 
-    // sem uz mi debugger nechodi, sestreli nas v RTL (testovano pod VC 2008 s nasim RTL)
+    // the debugger no longer reaches here, we get killed in RTL (tested under VC 2008 with our RTL)
 
-    // koncime
+    // we're done
     return ret;
 }
 
-BOOL SalamanderBusy = TRUE;       // je Salamander busy?
-DWORD LastSalamanderIdleTime = 0; // GetTickCount() z okamziku, kdy SalamanderBusy naposledy presel na TRUE
+BOOL SalamanderBusy = TRUE;       // is Salamander busy?
+DWORD LastSalamanderIdleTime = 0; // GetTickCount() from the moment when SalamanderBusy last changed to TRUE
 
-int PasteLinkIsRunning = 0; // pokud je vetsi nez nula, probiha prave Past Shortcuts prikaz v jednom z panelu
+int PasteLinkIsRunning = 0; // if greater than zero, the Paste Shortcuts command is currently running in one of the panels
 
-BOOL CannotCloseSalMainWnd = FALSE; // TRUE = nesmi dojit k zavreni hlavniho okna
+BOOL CannotCloseSalMainWnd = FALSE; // TRUE = the main window must not be closed
 
 DWORD MainThreadID = -1;
 
@@ -131,14 +133,14 @@ int GTDExceptionHasOccured = 0;
 int SHLExceptionHasOccured = 0;
 int RelExceptionHasOccured = 0;
 
-char DecimalSeparator[5] = "."; // "znaky" (max. 4 znaky) vytazene ze systemu
-int DecimalSeparatorLen = 1;    // delka ve znacich bez nuly na konci
+char DecimalSeparator[5] = "."; // "characters" (max. 4 characters) retrieved from the system
+int DecimalSeparatorLen = 1;    // length in characters without the null terminator
 char ThousandsSeparator[5] = " ";
 int ThousandsSeparatorLen = 1;
 
-BOOL WindowsXP64AndLater = FALSE;  // JRYFIXME - zrusit
-BOOL WindowsVistaAndLater = FALSE; // JRYFIXME - zrusit
-BOOL Windows7AndLater = FALSE;     // JRYFIXME - zrusit
+BOOL WindowsXP64AndLater = FALSE;  // JRYFIXME - remove
+BOOL WindowsVistaAndLater = FALSE; // JRYFIXME - remove
+BOOL Windows7AndLater = FALSE;     // JRYFIXME - remove
 BOOL Windows8AndLater = FALSE;
 BOOL Windows8_1AndLater = FALSE;
 BOOL Windows10AndLater = FALSE;

@@ -1,3 +1,4 @@
+﻿// CommentsTranslationProject: TRANSLATED
 #ifndef TASKLIST_H
 #define TASKLIST_H
 

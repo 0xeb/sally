@@ -1,5 +1,6 @@
 ﻿// SPDX-FileCopyrightText: 2023 Open Salamander Authors
 // SPDX-License-Identifier: GPL-2.0-or-later
+// CommentsTranslationProject: TRANSLATED
 
 #include "precomp.h"
 
@@ -32,23 +33,23 @@ int ConvertU2A(const WCHAR* src, int srcLen, char* buf, int bufSize, BOOL compos
     int res = WideCharToMultiByte(codepage, compositeCheck ? WC_COMPOSITECHECK : 0, src, srcLen, buf, bufSize, NULL, NULL);
     if (srcLen != -1 && res > 0)
         res++;
-    if (compositeCheck && res == 0 && GetLastError() != ERROR_INSUFFICIENT_BUFFER) // nektere codepage nepodporuji WC_COMPOSITECHECK
+    if (compositeCheck && res == 0 && GetLastError() != ERROR_INSUFFICIENT_BUFFER) // some codepages don't support WC_COMPOSITECHECK
     {
         res = WideCharToMultiByte(codepage, 0, src, srcLen, buf, bufSize, NULL, NULL);
         if (srcLen != -1 && res > 0)
             res++;
     }
     if (res > 0 && res <= bufSize)
-        buf[res - 1] = 0; // uspech, zakoncime string nulou
+        buf[res - 1] = 0; // success, terminate string with null
     else
     {
         if (res > bufSize || res == 0 && GetLastError() == ERROR_INSUFFICIENT_BUFFER)
         {
             SetLastError(ERROR_INSUFFICIENT_BUFFER);
-            buf[bufSize - 1] = 0; // maly buffer, vratime chybu, ale castecne prelozeny string nechame v bufferu
+            buf[bufSize - 1] = 0; // small buffer, return error, but leave partially translated string in buffer
         }
         else
-            buf[0] = 0; // jina chyba, zajistime prazdny buffer
+            buf[0] = 0; // other error, ensure empty buffer
         res = 0;
     }
     return res;
@@ -85,7 +86,7 @@ char* ConvertAllocU2A(const WCHAR* src, int srcLen, BOOL compositeCheck, UINT co
     int len = WideCharToMultiByte(codepage, flags = (compositeCheck ? WC_COMPOSITECHECK : 0), src, srcLen, NULL, 0, NULL, NULL);
     if (srcLen != -1 && len > 0)
         len++;
-    if (compositeCheck && len == 0) // nektere codepage nepodporuji WC_COMPOSITECHECK
+    if (compositeCheck && len == 0) // some codepages don't support WC_COMPOSITECHECK
     {
         len = WideCharToMultiByte(codepage, flags = 0, src, srcLen, NULL, 0, NULL, NULL);
         if (srcLen != -1 && len > 0)
@@ -104,7 +105,7 @@ char* ConvertAllocU2A(const WCHAR* src, int srcLen, BOOL compositeCheck, UINT co
         if (srcLen != -1 && res > 0)
             res++;
         if (res > 0 && res <= len)
-            txt[res - 1] = 0; // uspech, zakoncime string nulou
+            txt[res - 1] = 0; // success, terminate string with null
         else
         {
             DWORD err = GetLastError();
@@ -142,16 +143,16 @@ int ConvertA2U(const char* src, int srcLen, WCHAR* buf, int bufSizeInChars, UINT
     if (srcLen != -1 && res > 0)
         res++;
     if (res > 0 && res <= bufSizeInChars)
-        buf[res - 1] = 0; // uspech, zakoncime string nulou
+        buf[res - 1] = 0; // success, terminate string with null
     else
     {
         if (res > bufSizeInChars || res == 0 && GetLastError() == ERROR_INSUFFICIENT_BUFFER)
         {
             SetLastError(ERROR_INSUFFICIENT_BUFFER);
-            buf[bufSizeInChars - 1] = 0; // maly buffer, vratime chybu, ale castecne prelozeny string nechame v bufferu
+            buf[bufSizeInChars - 1] = 0; // small buffer, return error, but leave partially translated string in buffer
         }
         else
-            buf[0] = 0; // jina chyba, zajistime prazdny buffer
+            buf[0] = 0; // other error, ensure empty buffer
         res = 0;
     }
     return res;
@@ -200,7 +201,7 @@ WCHAR* ConvertAllocA2U(const char* src, int srcLen, UINT codepage)
         if (srcLen != -1 && res > 0)
             res++;
         if (res > 0 && res <= len)
-            txt[res - 1] = 0; // uspech, zakoncime string nulou
+            txt[res - 1] = 0; // success, terminate string with null
         else
         {
             DWORD err = GetLastError();
@@ -314,8 +315,8 @@ find the "a?" = {U+0061, U+0301} representation, if it sorts before "a" = {U+006
 words: The function assumes that CompareString(lcid, flags, string, m, string, n never returns CSTR_GREATER_THAN if
 m <= n and the strings agree in the first m TCHARs.
 
-Mozna by se hodilo pouzit "StringInfo Class", ktery umi rozebrat retezec
-na zobrazitelne znaky (sekvence WCHARu odpovidajici jednomu zobrazenemu znaku).
+It might be useful to use "StringInfo Class", which can break down a string
+into displayable characters (WCHAR sequences corresponding to a single displayed character).
 
 * /
 

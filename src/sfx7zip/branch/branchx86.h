@@ -1,3 +1,4 @@
+﻿// CommentsTranslationProject: TRANSLATED
 /* BranchX86.h */
 
 #ifndef __BRANCHX86_H

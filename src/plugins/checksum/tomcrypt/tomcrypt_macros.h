@@ -1,3 +1,4 @@
+﻿// CommentsTranslationProject: TRANSLATED
 /* fix for MSVC ...evil! */
 #ifdef _MSC_VER
    #define CONST64(n) n ## ui64

@@ -1,5 +1,6 @@
 ﻿// SPDX-FileCopyrightText: 2023 Open Salamander Authors
 // SPDX-License-Identifier: GPL-2.0-or-later
+// CommentsTranslationProject: TRANSLATED
 
 /*****************************************************************************
  * PVW32DLL.H - C Interface to PVW32.DLL and PVW32Cnv.DLL

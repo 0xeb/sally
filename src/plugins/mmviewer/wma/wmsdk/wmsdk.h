@@ -1,3 +1,4 @@
+﻿// CommentsTranslationProject: TRANSLATED
 //============================================================================
 //
 //  Microsoft Windows Media Technology

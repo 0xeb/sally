@@ -1,5 +1,6 @@
 ﻿// SPDX-FileCopyrightText: 2023 Open Salamander Authors
 // SPDX-License-Identifier: GPL-2.0-or-later
+// CommentsTranslationProject: TRANSLATED
 
 #pragma once
 
@@ -15,21 +16,21 @@ class CMenuBar;
 class CBitmap;
 
 /*
-Posilane zpravy:
+Sent messages:
   WM_INITMENUPOPUP
     hmenuPopup = (HMENU) wParam;         // handle to submenu
     uPos = (UINT) LOWORD(lParam);        // submenu item position
     fSystemMenu = (BOOL) HIWORD(lParam); // window menu flag
 
-    Tato zprava je posilana pouze v pripade windows menu popupu.
+    This message is sent only for Windows menu popup.
 
   WM_USER_INITMENUPOPUP
   WM_USER_UNINITMENUPOPUP
-    menuPopup = (CGUIMenuPopupAbstract*) wParam; // ukazatel na submenu
+    menuPopup = (CGUIMenuPopupAbstract*) wParam; // pointer to submenu
     uPos =      LOWORD(lParam);                // submenu item position
     uID =       HIWORD(lParam);                // submenu ID
 
-    Tyto dve zpravy jsou posilane vzdy - i pro menu postavene nad windows
+    These two messages are always sent - even for menu built on top of Windows
     menu popup.
 */
 
@@ -42,16 +43,16 @@ class CMenuWindowQueue
 {
 private:
     TDirectArray<HWND> Data;
-    CRITICAL_SECTION DataCriticalSection; // kriticka sekce pro pristup k datum
+    CRITICAL_SECTION DataCriticalSection; // critical section for data access
     BOOL UsingData;
 
 public:
     CMenuWindowQueue();
     ~CMenuWindowQueue();
 
-    BOOL Add(HWND hWindow);    // prida polozku do fronty, vraci uspech
-    void Remove(HWND hWindow); // odstrani polozku z fronty
-    void DispatchCloseMenu();  // posle vsem otevrenym oknum menu zpravu WM_USER_CLOSEMENU
+    BOOL Add(HWND hWindow);    // adds item to queue, returns success
+    void Remove(HWND hWindow); // removes item from queue
+    void DispatchCloseMenu();  // sends WM_USER_CLOSEMENU message to all open menu windows
 };
 
 extern CMenuWindowQueue MenuWindowQueue;
@@ -77,15 +78,15 @@ extern COldMenuHookTlsAllocator OldMenuHookTlsAllocator;
 //
 // CMenuSharedResources
 //
-// Pro jeden strom sub menu existuje pouze jedna instance techto prostredku.
-// Jsou zalozeny napriklad ve funkci Track.
-// Vsechny sub menu pak pouze dostavaji ukazatel na tyto sdilene prostredky.
+// Only one instance of these resources exists for one submenu tree.
+// They are created for example in the Track function.
+// All submenus then only receive a pointer to these shared resources.
 //
 
 class CMenuSharedResources
 {
 public:
-    // barvy
+    // colors
     COLORREF NormalBkColor;
     COLORREF SelectedBkColor;
     COLORREF NormalTextColor;
@@ -98,30 +99,30 @@ public:
     CBitmap* MonoBitmap;
 
     // temp DC
-    HDC HTempMemDC;  // memory dc pro docasne presuny
-    HDC HTemp2MemDC; // memory dc pro docasne presuny
+    HDC HTempMemDC;  // memory dc for temporary transfers
+    HDC HTemp2MemDC; // memory dc for temporary transfers
 
     // fonts
-    HFONT HNormalFont; // prubezne je vybran v HCacheMemoryDC
-    HFONT HBoldFont;   // je vybiran pouze docasne
+    HFONT HNormalFont; // continuously selected in HCacheMemoryDC
+    HFONT HBoldFont;   // selected only temporarily
 
     // menu bitmaps
-    HBITMAP HMenuBitmaps; // vytazeno ze systemu: poradi dle CMenuBitmapEnum
+    HBITMAP HMenuBitmaps; // extracted from system: order according to CMenuBitmapEnum
     int MenuBitmapWidth;
 
     // other
-    HWND HParent;          // okno, ze ktereho bylo menu vyvolano
-    int TextItemHeight;    // vyska polozky z textu
-    BOOL BitmapsZoom;      // nasobek puvodni velikost bitmap
-    DWORD ChangeTickCount; // hodnota GetTickCount z doby, kdy doslo ke zmene vybrane polozky
+    HWND HParent;          // window from which menu was invoked
+    int TextItemHeight;    // height of text item
+    BOOL BitmapsZoom;      // multiple of original bitmap size
+    DWORD ChangeTickCount; // GetTickCount value from when selected item changed
     POINT LastMouseMove;
-    CMenuBar* MenuBar; // okno je aktivovano z MenuBar; jinak je rovno NULL
-    DWORD SkillLevel;  // honodta pro retezec popupu -- urcuje, kerer itemy budou zobrazeny
-    BOOL HideAccel;    // maji se skryt akceleratory
+    CMenuBar* MenuBar; // window is activated from MenuBar; otherwise equals NULL
+    DWORD SkillLevel;  // value for popup chain -- determines which items will be displayed
+    BOOL HideAccel;    // should accelerators be hidden
 
-    const RECT* ExcludeRect; // tento obdelnik nesmime prekryt
+    const RECT* ExcludeRect; // this rectangle must not be covered
 
-    HANDLE HCloseEvent; // slouzi pro rozbehnuti message queue
+    HANDLE HCloseEvent; // serves to start message queue
 
 public:
     CMenuSharedResources();
@@ -151,28 +152,28 @@ protected:
     HICON HOverlay;
     ULONG_PTR CustomData;
     DWORD SkillLevel; // MENU_LEVEL_BEGINNER, MENU_LEVEL_INTERMEDIATE, MENU_LEVEL_ADVANCED
-    // tyto hodnoty se pouzivaji pro optimalizovany pristup je stavum polozek
-    DWORD* Enabler; // Ukazuje na promennou, ktera ridi stav polozky.
-                    // Hodnote ruzne od nuly odpovida nulovany bit MENU_STATE_GRAYED.
-                    // Nule odpovida nastaveny bit MENU_STATE_GRAYED.
+    // these values are used for optimized access to item states
+    DWORD* Enabler; // Points to variable that controls item state.
+                    // Non-zero value corresponds to cleared MENU_STATE_GRAYED bit.
+                    // Zero corresponds to set MENU_STATE_GRAYED bit.
     DWORD Flags;    // MENU_FLAG_xxx
-    DWORD Temp;     // pomocna promenna pro nektere metody
+    DWORD Temp;     // helper variable for some methods
 
-    // vypocitane hodnoty
+    // calculated values
     int Height;
     int MinWidth;
     int YOffset;
 
-    const char* ColumnL1; // text prvniho sloupce
-    int ColumnL1Len;      // pocet znaku
+    const char* ColumnL1; // first column text
+    int ColumnL1Len;      // character count
     int ColumnL1Width;
     int ColumnL1X;
-    const char* ColumnL2; // text druheho sloupce (muze byt rovno NULL)
-    int ColumnL2Len;      // pocet znaku
+    const char* ColumnL2; // second column text (can be NULL)
+    int ColumnL2Len;      // character count
     int ColumnL2Width;
     int ColumnL2X;
-    const char* ColumnR; // text praveho sloupce (muze byt rovno NULL)
-    int ColumnRLen;      // pocet znaku
+    const char* ColumnR; // right column text (can be NULL)
+    int ColumnRLen;      // character count
     int ColumnRWidth;
     int ColumnRX;
 
@@ -182,8 +183,8 @@ public:
 
     BOOL SetText(const char* text, int len = -1);
 
-    // projede retezec TypeData a podle oddelovacu a promenne threeCol
-    // nastavi promenne ColumnL1 - ColumnR, ColumnL1Len - ColumnRLen,
+    // traverses TypeData string and according to separators and threeCol variable
+    // sets variables ColumnL1 - ColumnR, ColumnL1Len - ColumnRLen,
     // ColumnL1Width - ColumnRWidth
     void DecodeSubTextLenghtsAndWidths(CMenuSharedResources* sharedRes, BOOL threeCol);
 
@@ -206,30 +207,30 @@ enum CMenuBitmapEnum
 
 enum CMenuPopupHittestEnum
 {
-    mphItem,            // na polozce, userData = index polozky
-    mphUpArrow,         // na sipce Up
-    mphDownArrow,       // na sipce Down
-    mphBorderOrOutside, // na ramecku nebo mimo
-    //  mphOutside, // mimo okno
+    mphItem,            // on item, userData = item index
+    mphUpArrow,         // on Up arrow
+    mphDownArrow,       // on Down arrow
+    mphBorderOrOutside, // on border or outside
+    //  mphOutside, // outside window
 };
 
 /*
 Items
-  Seznam polozek obsazenych v pop-up menu.
+  List of items contained in pop-up menu.
 
 HParent
-  Okno, kteremu se budou dorucovat notifikacni message.
+  Window to which notification messages will be delivered.
 
 HImageList
-  Ikonky zobrazovane pred polozkama. Ikona je urcovana promennou
-  CMenuItem::ImageIndex.
+  Icons displayed before items. Icon is determined by
+  CMenuItem::ImageIndex variable.
 
 HWindowsMenu
-  Handle windowsackeho popup menu. Pred otevrenim tohoto submenu
-  se provede enumerace jeho polozek. Ty jsou pak transformovany do docasneho
-  objetku CMenuPopup. Po zavreni tohoto submenu je docasny objekt zrusen.
-  Pro takove menu jsou posilany notifikacni message WM_INITPOPUP, WM_DRAWITEM
-  a WM_MEASUREITEM.
+  Handle of Windows popup menu. Before opening this submenu
+  enumeration of its items is performed. They are then transformed to temporary
+  CMenuPopup object. After closing this submenu the temporary object is destroyed.
+  For such menu notification messages WM_INITPOPUP, WM_DRAWITEM
+  and WM_MEASUREITEM are sent.
 */
 
 class CMenuPopup : public CWindow, public CGUIMenuPopupAbstract
@@ -239,46 +240,46 @@ protected:
     HMENU HWindowsMenu;
 
     RECT WindowRect;
-    int TotalHeight; // celkova vyska menu; nemusi byt cela zobrazena
-    int Width;       // rozmery client area
+    int TotalHeight; // total menu height; may not be fully displayed
+    int Width;       // client area dimensions
     int Height;
-    int TopItemY;           // y souradnice prvni polozky
-    BOOL UpArrowVisible;    // je zobrazena sipka nahoru?
-    BOOL UpDownTimerRunnig; // bezi nam timer?
-    BOOL DownArrowVisible;  // je zobrazena sipka dolu?
+    int TopItemY;           // y coordinate of first item
+    BOOL UpArrowVisible;    // is up arrow displayed?
+    BOOL UpDownTimerRunnig; // is timer running?
+    BOOL DownArrowVisible;  // is down arrow displayed?
     DWORD Style;            // MENU_POPUP_xxxx
     DWORD TrackFlags;       // MENU_TRACK_xxxx
     CMenuSharedResources* SharedRes;
-    CMenuPopup* OpenedSubMenu; // je-li otevreny nejaky submenu, ukazuje na nej
-    CMenuPopup* FirstPopup;    // pokud nejde o prvni okno, ukazuje na nej; v pripade prvniho okna ukazuje na sebe samo
-    int SelectedItemIndex;     // -1 == zadna
+    CMenuPopup* OpenedSubMenu; // if any submenu is open, points to it
+    CMenuPopup* FirstPopup;    // if not the first window, points to it; in case of first window points to itself
+    int SelectedItemIndex;     // -1 == none
     BOOL SelectedByMouse;      // TRUE->ByMouse FALSE->ByKeyboard
     HIMAGELIST HImageList;
     HIMAGELIST HHotImageList;
-    int ImageWidth; // rozmery jednoho obrazku z HImageList
+    int ImageWidth; // dimensions of one image from HImageList
     int ImageHeight;
-    DWORD ID;                  // kopie ID z CMenuItem
-    BOOL Closing;              // bylo zavolano HideAll a hned jak bude mozne, koncime
-    int MinWidth;              // pri rozvrhovani sirky nebude sirka mensi, nez tato hodnota
-    BOOL ModifyMode;           // pokud je menu zobrazeno, neni mozne nad nim provadet zmeny, neni-li v ModifyMode
-    DWORD SkillLevel;          // urcuje, ktere polozky budou v tomto popupu zobrazeny
+    DWORD ID;                  // copy of ID from CMenuItem
+    BOOL Closing;              // HideAll was called and we're ending as soon as possible
+    int MinWidth;              // when laying out width, width won't be less than this value
+    BOOL ModifyMode;           // if menu is displayed, changes can't be made unless in ModifyMode
+    DWORD SkillLevel;          // determines which items will be displayed in this popup
     int MouseWheelAccumulator; // vertical
 
 public:
     //
-    // Vlastni metody
+    // Custom methods
     //
 
     CMenuPopup(DWORD id = 0);
     BOOL LoadFromTemplate2(HINSTANCE hInstance, const MENU_TEMPLATE_ITEM* menuTemplate, DWORD* enablersOffset, HIMAGELIST hImageList, HIMAGELIST hHotImageList, int* addedRows);
 
     //
-    // Implementace metod CGUIMenuPopupAbstract
+    // Implementation of CGUIMenuPopupAbstract methods
     //
 
     virtual BOOL WINAPI LoadFromTemplate(HINSTANCE hInstance, const MENU_TEMPLATE_ITEM* menuTemplate, DWORD* enablersOffset, HIMAGELIST hImageList = NULL, HIMAGELIST hHotImageList = NULL);
 
-    virtual void WINAPI SetSelectedItemIndex(int index); // slouzi k prednastaveni vybrane polozky (musi byt nastaven flag MENU_TRACK_SELECT, jinak se nepouzije)
+    virtual void WINAPI SetSelectedItemIndex(int index); // serves to preset selected item (MENU_TRACK_SELECT flag must be set, otherwise not used)
     virtual int WINAPI GetSelectedItemIndex() { return SelectedItemIndex; }
 
     virtual void WINAPI SetTemplateMenu(HMENU hWindowsMenu) { HWindowsMenu = hWindowsMenu; }
@@ -306,7 +307,7 @@ public:
 
     virtual BOOL WINAPI SetItemInfo(DWORD position, BOOL byPosition, const MENU_ITEM_INFO* mii);
     virtual BOOL WINAPI GetItemInfo(DWORD position, BOOL byPosition, MENU_ITEM_INFO* mii);
-    virtual BOOL WINAPI SetStyle(DWORD style); // rodina MENU_POPUP_xxxxx
+    virtual BOOL WINAPI SetStyle(DWORD style); // MENU_POPUP_xxxxx family
     virtual BOOL WINAPI CheckItem(DWORD position, BOOL byPosition, BOOL checked);
     virtual BOOL WINAPI CheckRadioItem(DWORD positionFirst, DWORD positionLast, DWORD positionCheck, BOOL byPosition);
     virtual BOOL WINAPI SetDefaultItem(DWORD position, BOOL byPosition);
@@ -316,12 +317,12 @@ public:
     virtual void WINAPI RemoveAllItems();
     virtual BOOL WINAPI RemoveItemsRange(int firstIndex, int lastIndex);
 
-    // umoznuje provadet zmeny nad otevrenym menu popupem
-    virtual BOOL WINAPI BeginModifyMode(); // zahajeni editacniho rezimu
-    virtual BOOL WINAPI EndModifyMode();   // ukonceni rezimu - menu se prekresli
+    // allows making changes over open menu popup
+    virtual BOOL WINAPI BeginModifyMode(); // start edit mode
+    virtual BOOL WINAPI EndModifyMode();   // end mode - menu is redrawn
 
-    // urci polozky, kter budou v menu zobrazeny
-    // 'skillLevel' muze byt jedna z hodnot MENU_LEVEL_BEGINNER, MENU_LEVEL_INTERMEDIATE a MENU_LEVEL_ADVANCED
+    // determines items that will be displayed in menu
+    // 'skillLevel' can be one of MENU_LEVEL_BEGINNER, MENU_LEVEL_INTERMEDIATE and MENU_LEVEL_ADVANCED values
     virtual void WINAPI SetSkillLevel(DWORD skillLevel);
 
     // The FindItemPosition method finds a menu item position.
@@ -339,7 +340,7 @@ public:
 
     virtual BOOL WINAPI FillMenuHandle(HMENU hMenu);
     virtual BOOL WINAPI GetStatesFromHWindowsMenu(HMENU hMenu);
-    virtual void WINAPI SetImageList(HIMAGELIST hImageList, BOOL subMenu = FALSE); // pokud je subMenu==TRUE, nastavi se hadle i do submenu
+    virtual void WINAPI SetImageList(HIMAGELIST hImageList, BOOL subMenu = FALSE); // if subMenu==TRUE, handle is set to submenu as well
     virtual HIMAGELIST WINAPI GetImageList();
     virtual void WINAPI SetHotImageList(HIMAGELIST hHotImageList, BOOL subMenu = FALSE);
     virtual HIMAGELIST WINAPI GetHotImageList();
@@ -378,11 +379,11 @@ public:
     //   is nonzero if the function succeeds and zero if it fails.
     virtual DWORD WINAPI Track(DWORD trackFlags, int x, int y, HWND hwnd, const RECT* exclude);
 
-    virtual BOOL WINAPI GetItemRect(int index, RECT* rect); // vrati obsany obdelnik kolem polozky v screen souradnicich
+    virtual BOOL WINAPI GetItemRect(int index, RECT* rect); // returns bounding rectangle around item in screen coordinates
 
-    // obehne vsechny polozky a pokud maji nastaveny ukazatel 'EnablerData'
-    // porovnaja hodnotu (na kterou ukazuji) se skutecnym stavem polozky.
-    // Pokud se stav lisi, zmeni ho.
+    // traverses all items and if they have 'EnablerData' pointer set
+    // compares value (pointed to) with actual item state.
+    // If state differs, changes it.
     virtual void WINAPI UpdateItemsState();
 
     virtual void WINAPI SetMinWidth(int minWidth);
@@ -392,28 +393,28 @@ public:
     virtual void WINAPI AssignHotKeys();
 
 protected:
-    void Cleanup(); // inicializuje objekt
+    void Cleanup(); // initializes object
     BOOL LoadFromHandle();
-    void LayoutColumns(); // probehne polozky a podle jejich rozmeru nastavi hodnoty
+    void LayoutColumns(); // traverses items and sets values according to their dimensions
     DWORD GetOwnerDrawItemState(const CMenuItem* item, BOOL selected);
-    void DrawCheckBitmapVista(HDC hDC, CMenuItem* item, int yOffset, BOOL selected); // veze s alpha blendem
-    void DrawCheckBitmap(HDC hDC, CMenuItem* item, int yOffset, BOOL selected);      // check marky dodane uzivatelem (HBmpChecked a HBmpUnchecked)
-    void DrawCheckImage(HDC hDC, CMenuItem* item, int yOffset, BOOL selected);       // standardni checkmarky, ImageIndex, HIcon
-    void DrawCheckMark(HDC hDC, CMenuItem* item, int yOffset, BOOL selected);        // vola odpovidajici funkci
-    void DrawItem(HDC hDC, CMenuItem* item, int yOffset, BOOL selected);             // vykresli jednu polozku
-    void DrawUpDownItem(HDC hDC, BOOL up);                                           // vykresli polozku obsahujici sipku nahoru nebo dolu
+    void DrawCheckBitmapVista(HDC hDC, CMenuItem* item, int yOffset, BOOL selected); // draws with alpha blend
+    void DrawCheckBitmap(HDC hDC, CMenuItem* item, int yOffset, BOOL selected);      // check marks provided by user (HBmpChecked and HBmpUnchecked)
+    void DrawCheckImage(HDC hDC, CMenuItem* item, int yOffset, BOOL selected);       // standard checkmarks, ImageIndex, HIcon
+    void DrawCheckMark(HDC hDC, CMenuItem* item, int yOffset, BOOL selected);        // calls corresponding function
+    void DrawItem(HDC hDC, CMenuItem* item, int yOffset, BOOL selected);             // draws one item
+    void DrawUpDownItem(HDC hDC, BOOL up);                                           // draws item containing up or down arrow
     CMenuPopupHittestEnum HitTest(const POINT* point, int* userData);
 
     BOOL FindNextItemIndex(int fromIndex, BOOL topToDown, int* index);
-    inline CMenuPopup* FindActivePopup();       // najde posledni otevreny popup; vrati ukazatel na objekt
-    inline CMenuPopup* FindPopup(HWND hWindow); // hleda od nas az po posledniho childa; vrati ukazatel na objekt nnebo NULL
+    inline CMenuPopup* FindActivePopup();       // finds last open popup; returns pointer to object
+    inline CMenuPopup* FindPopup(HWND hWindow); // searches from us to last child; returns pointer to object or NULL
     inline void DoDispatchMessage(MSG* msg, BOOL* leaveMenu, DWORD* retValue, BOOL* dispatchLater);
     void OnTimerTimeout();
-    void CheckSelectedPath(CMenuPopup* terminator); // probehne celou vetev a nastavi SelectedItemy tak, aby vedly k poslednimu popupu
+    void CheckSelectedPath(CMenuPopup* terminator); // traverses entire branch and sets SelectedItems to lead to last popup
 
-    // k Track pridava [in] menuBar
-    //                 [in] delayedMsg
-    //                 [in] dispatchDelayedMsg: Ma se delayedMsg dorucit po navratu z teto metodu?
+    // adds to Track [in] menuBar
+    //               [in] delayedMsg
+    //               [in] dispatchDelayedMsg: Should delayedMsg be delivered after returning from this method?
     //
     DWORD TrackInternal(DWORD trackFlags, int x, int y, HWND hwnd, const RECT* exclude,
                         CMenuBar* menuBar, MSG& delayedMsg, BOOL& dispatchDelayedMsg);
@@ -428,32 +429,32 @@ protected:
     void OnChar(char key, BOOL* leaveMenu, DWORD* retValue);
     int FindNextItemIndex(int firstIndex, char key);
 
-    // pro navigaci pomoci PgDn/PgUp, hleda index prvni polozky
-    // za separatorem; pokud je 'down' TRUE, hleda smerem dolu
-    // od polozky 'firstIndex', jinak smerem nahoru
+    // for navigation using PgDn/PgUp, searches for index of first item
+    // after separator; if 'down' is TRUE, searches downward
+    // from item 'firstIndex', otherwise searches upward
     int FindGroupIndex(int firstIndex, BOOL down);
 
-    // pokud je 'byMouse' TRUE, jde o zmenu pomoci mysi, jinak jde o zmenu z klavesnice
-    // select nastaveny z klavesnice "drzi", pokud uzivatel pohybuje mysi mimo popupy
+    // if 'byMouse' is TRUE, change is made by mouse, otherwise by keyboard
+    // select set from keyboard "holds" while user moves mouse outside popups
     void SelectNewItemIndex(int newItemIndex, BOOL byMouse);
 
-    void EnsureItemVisible(int index); // pokud polozka lezi mimo zobrazenou oblast, zajisti
-                                       // odrolovani a vykresleni polozek tak, aby byla cela
-                                       // viditelna
+    void EnsureItemVisible(int index); // if item lies outside displayed area, ensures
+                                       // scrolling and drawing of items so it is fully
+                                       // visible
 
     void OnMouseWheel(WPARAM wParam, LPARAM lParam);
 
-    // x, y jsou souradnice leveho horniho rohu okna
-    // submenuItemPos slouzi k zaslani notifikace aplikaci
+    // x, y are coordinates of top left corner of window
+    // submenuItemPos serves to send notification to application
     BOOL CreatePopupWindow(CMenuPopup* firstPopup, int x, int y, int submenuItemPos, const RECT* exclude);
 
-    // Vrati handle popup window pod kurzorem; pokud je pod kurzorem child window,
-    // bude dohledan jeho parent.
+    // Returns handle of popup window under cursor; if child window is under cursor,
+    // its parent will be found.
     //
-    // Zavedeno kvuli PicaView, ktere vklada do kontextoveho menu child window,
-    // do ktereho renderuje se spozdenim obrazek. V Salamu 2.0 pri najeti na takovy
-    // obrazek doslo k odvybrani polozky v menu, protoze WindowFromPoint vratilo
-    // jine okno nez popup.
+    // Introduced due to PicaView, which inserts child window into context menu,
+    // into which it renders image with delay. In Salam 2.0 when hovering over such
+    // image, menu item was deselected because WindowFromPoint returned
+    // different window than popup.
     HWND PopupWindowFromPoint(POINT point);
 
     void ResetMouseWheelAccumulator() { MouseWheelAccumulator = 0; }
@@ -473,56 +474,56 @@ class CMenuBar : public CWindow, public CGUIMenuBarAbstract
 {
 protected:
     CMenuPopup* Menu;
-    int Width; // rozmery celeho okna
+    int Width; // dimensions of entire window
     int Height;
     HFONT HFont;
     int FontHeight;
-    int HotIndex;       // polozka, ktera je bud vysunuta nebo zamackla (zadna = -1)
-    HWND HNotifyWindow; // kam budeme dorucovat notifikace
-    BOOL MenuLoop;      // jsou rozbalovana submenu
-    DWORD RetValue;     // ktery command mame poslat do okna aplikace
+    int HotIndex;       // item that is either raised or pressed (none = -1)
+    HWND HNotifyWindow; // where we will deliver notifications
+    BOOL MenuLoop;      // are submenus being expanded
+    DWORD RetValue;     // which command to send to application window
     MSG DelayedMsg;
     BOOL DispatchDelayedMsg;
-    BOOL HotIndexIsTracked; // je otevren popup pod HotIndex?
+    BOOL HotIndexIsTracked; // is popup open under HotIndex?
     BOOL HandlingVK_MENU;
     BOOL WheelDuringMenu;
     POINT LastMouseMove;
-    BOOL Closing;        // bylo zavolano WM_USER_CLOSEMENU hned jak bude mozne, koncime
-    HANDLE HCloseEvent;  // slouzi pro rozbehnuti message queue
-    BOOL MouseIsTracked; // je mys sledovana pomoci TrackMouseEvent?
-    BOOL HelpMode;       // jsme v rezimu Context Help (Shift+F1)?
+    BOOL Closing;        // WM_USER_CLOSEMENU was called, we're ending as soon as possible
+    HANDLE HCloseEvent;  // serves to start message queue
+    BOOL MouseIsTracked; // is mouse tracked using TrackMouseEvent?
+    BOOL HelpMode;       // are we in Context Help mode (Shift+F1)?
 
-    // tyto dve promenne slouzi pro kooperaci MenuBar a MenuPopup
-    // jsou nastavovany v CMenuPopup::TrackInternal a urcuji dalsi chovani
-    // MenuBar po zavreni Popupu
-    int IndexToOpen;     // pokud bude nastavena na -1, nema se otevrit dalsi Popup,
-                         // jinak obsahuje index popupu, ktery se ma otevrit
-    BOOL OpenWithSelect; // ma se v otevrenem menu vybrat prvni polozka?
-    BOOL OpenByMouse;    // otevirano pomoci mysi nebo klavesnice?
-    BOOL ExitMenuLoop;   // Pokud je TRUE, ukoncime MenuLoop
-    BOOL HelpMode2;      // obdrzeli jmse WM_USER_HELP_MOUSEMOVE a cekame na WM_USER_HELP_MOUSELEAVE? (musime vysvecovat polozku pod kurzorem)
-    WORD UIState;        // zobrazovani akceleratoru
+    // these two variables serve for cooperation between MenuBar and MenuPopup
+    // they are set in CMenuPopup::TrackInternal and determine further behavior
+    // of MenuBar after closing Popup
+    int IndexToOpen;     // if set to -1, no Popup should be opened,
+                         // otherwise contains index of popup to open
+    BOOL OpenWithSelect; // should first item be selected in opened menu?
+    BOOL OpenByMouse;    // opened by mouse or keyboard?
+    BOOL ExitMenuLoop;   // if TRUE, we end MenuLoop
+    BOOL HelpMode2;      // did we receive WM_USER_HELP_MOUSEMOVE and are waiting for WM_USER_HELP_MOUSELEAVE? (we must highlight item under cursor)
+    WORD UIState;        // displaying accelerators
     BOOL ForceAccelVisible;
 
 public:
     //
-    // Vlastni metody
+    // Custom methods
     //
     CMenuBar(CMenuPopup* menu, HWND hNotifyWindow, CObjectOrigin origin = ooStatic);
     ~CMenuBar();
 
     //
-    // Implementace metod CGUIMenuBarAbstract
+    // Implementation of CGUIMenuBarAbstract methods
     //
 
     virtual BOOL WINAPI CreateWnd(HWND hParent);
     virtual HWND WINAPI GetHWND() { return HWindow; }
 
-    virtual int WINAPI GetNeededWidth();                 // vrati sirku, ktera bude pro okno potreba
-    virtual int WINAPI GetNeededHeight();                // vrati vysku, ktera bude pro okno potreba
-    virtual void WINAPI SetFont();                       // vytahne font pro menu bar ze systemu
-    virtual BOOL WINAPI GetItemRect(int index, RECT& r); // vrati umisteni polozky ve screen souradnicich
-    virtual void WINAPI EnterMenu();                     // user stisknul VK_MENU
+    virtual int WINAPI GetNeededWidth();                 // returns width that will be needed for window
+    virtual int WINAPI GetNeededHeight();                // returns height that will be needed for window
+    virtual void WINAPI SetFont();                       // gets font for menu bar from system
+    virtual BOOL WINAPI GetItemRect(int index, RECT& r); // returns item position in screen coordinates
+    virtual void WINAPI EnterMenu();                     // user pressed VK_MENU
     virtual BOOL WINAPI IsInMenuLoop() { return MenuLoop; }
     virtual void WINAPI SetHelpMode(BOOL helpMode) { HelpMode = helpMode; }
 
@@ -535,17 +536,17 @@ protected:
     void DrawItem(int index);
     void DrawItem(HDC hDC, int index, int x);
     void DrawAllItems(HDC hDC);
-    void RefreshMinWidths(); // obehne vsechny polozky a napocit si k nim 'MinWidth'
+    void RefreshMinWidths(); // traverses all items and calculates their 'MinWidth'
 
-    void TrackHotIndex();                                                  // zamackne HotIndex a zavola TrackPopup; vrati se po jeho zavreni
-    void EnterMenuInternal(int index, BOOL openWidthSelect, BOOL byMouse); // byMouse rika, zda jde o otevreni pres mys nebo klavesnici
+    void TrackHotIndex();                                                  // presses HotIndex and calls TrackPopup; returns after its closing
+    void EnterMenuInternal(int index, BOOL openWidthSelect, BOOL byMouse); // byMouse tells whether opening is via mouse or keyboard
 
-    // vraci TRUE, pokud je na pozici polozka; pak take nastavi 'index'
-    // jinak vraci FALSE
+    // returns TRUE if item is at position; then also sets 'index'
+    // otherwise returns FALSE
     BOOL HitTest(int xPos, int yPos, int& index);
 
-    // prohleda vlozene submenu a vrati TRUE, pokud mezi nima najde nejaky s horkou
-    // klavesou 'hotKey'; zaroven vrati jeho index
+    // searches inserted submenus and returns TRUE if it finds any with hot
+    // key 'hotKey'; also returns its index
     BOOL HotKeyIndexLookup(char hotKey, int& itemIndex);
 
     friend class CMenuPopup;
@@ -558,14 +559,14 @@ extern CMenuPopup MainMenu;
 extern CMenuPopup ArchiveMenu;
 extern CMenuPopup ArchivePanelMenu;
 
-BOOL BuildSalamanderMenus();           // sestavi globalni menu pro Salamandera
-BOOL BuildFindMenu(CMenuPopup* popup); // sestavi instanci menu pro find
+BOOL BuildSalamanderMenus();           // builds global menu for Salamander
+BOOL BuildFindMenu(CMenuPopup* popup); // builds menu instance for find
 
-// Prida do 'popup' polozky vytvorene na zaklade pole 'buttonsID'.
-// 'hWindow' je parent tlacitek, na ktere odkazuji konstanty pole 'buttonsID'.
-// Pole 'buttonsID' muze obsahovat libovolne mnozstvi cisel zakoncene 0.
-// Cislo -1 je vyhrazene pro separator a cislo -2 pro default polozku (nasledujici
-// polozka bude mit nastaven default state). Ostatni cisla jsou povazovana
-// za id tlacitek. Jejich text je vytazen a pridan do menu. Zaroven je
-// vytazen jejich Enabled stav, ktery je take promitnut do polozky v menu.
+// Adds items to 'popup' created based on 'buttonsID' array.
+// 'hWindow' is parent of buttons referenced by constants in 'buttonsID' array.
+// 'buttonsID' array can contain any number of values terminated by 0.
+// Value -1 is reserved for separator and value -2 for default item (following
+// item will have default state set). Other values are considered
+// button ids. Their text is extracted and added to menu. Also
+// their Enabled state is extracted and reflected in the menu item.
 void FillContextMenuFromButtons(CMenuPopup* popup, HWND hWindow, int* buttonsID);

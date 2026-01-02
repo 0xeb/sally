@@ -1,3 +1,4 @@
+﻿// CommentsTranslationProject: TRANSLATED
 #ifndef CMARK_SCANNERS_H
 #define CMARK_SCANNERS_H
 

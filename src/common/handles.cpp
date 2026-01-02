@@ -1,5 +1,6 @@
-﻿// SPDX-FileCopyrightText: 2023 Open Salamander Authors
+// SPDX-FileCopyrightText: 2023 Open Salamander Authors
 // SPDX-License-Identifier: GPL-2.0-or-later
+// CommentsTranslationProject: TRANSLATED
 
 #include "precomp.h"
 
@@ -7,7 +8,7 @@
 #include <tchar.h>
 #include <crtdbg.h>
 #include <ostream>
-#include <commctrl.h> // potrebuju LPCOLORMAP
+#include <commctrl.h> // I need LPCOLORMAP
 
 #if defined(_DEBUG) && defined(_MSC_VER) // without passing file+line to 'new' operator, list of memory leaks shows only 'crtdbg.h(552)'
 #define new new (_NORMAL_BLOCK, __FILE__, __LINE__)
@@ -25,15 +26,15 @@
 // boundaries so we can find the real functions
 // that we need to call for initialization.
 
-#pragma warning(disable : 4075) // chceme definovat poradi inicializace modulu
+#pragma warning(disable : 4075) // we want to define the order of module initialization
 
 typedef void(__cdecl* _PVFV)(void);
 
 #pragma section(".i_hnd$a", read)
-__declspec(allocate(".i_hnd$a")) const _PVFV i_handles = (_PVFV)1; // na zacatek sekce .i_hnd si dame promennou i_handles
+__declspec(allocate(".i_hnd$a")) const _PVFV i_handles = (_PVFV)1; // at the beginning of section .i_hnd we place the variable i_handles
 
 #pragma section(".i_hnd$z", read)
-__declspec(allocate(".i_hnd$z")) const _PVFV i_handles_end = (_PVFV)1; // a na konec sekce .i_hnd si dame promennou i_handles_end
+__declspec(allocate(".i_hnd$z")) const _PVFV i_handles_end = (_PVFV)1; // and at the end of section .i_hnd we place the variable i_handles_end
 
 void Initialize__Handles()
 {
@@ -524,13 +525,13 @@ C__Handles::C__Handles()
 #ifdef MULTITHREADED_HANDLES_ENABLE
     ::InitializeCriticalSection(&CriticalSection);
 #else  // MULTITHREADED_HANDLES_ENABLE
-    __HandlesMainThreadID = ::GetCurrentThreadId(); // jediny povoleny thread
+    __HandlesMainThreadID = ::GetCurrentThreadId(); // the only allowed thread
 #endif // MULTITHREADED_HANDLES_ENABLE
 }
 
 C__Handles::~C__Handles()
 {
-    // vyrazeni handlu, ktere se uvolnuji automaticky
+    // remove handles that are freed automatically
     for (int i = Handles.Count - 1; i >= 0; i--)
     {
         if (Handles[i].Handle.Origin == __hoLoadAccelerators)
@@ -540,15 +541,15 @@ C__Handles::~C__Handles()
         else if (Handles[i].Handle.Origin == __hoGetStockObject)
             Handles.Delete(i);
     }
-    // kontrola + vypis zbylych
+    // check + list remaining
     if (Handles.Count != 0)
     {
-        // musel jsem nahradit nize polozeny kod vyuzivajici MESSAGE_E, protoze pri volani
-        // tohoto destruktoru jsou v ALTAPDB jiz zdestruovane facets streamu a pri poslani intu
-        // nebo handlu do streamu to proste spadne (dela jen VC2010 a VC2012, ve VC2008
-        // to jeste slape); v Salamanderovi to nezlobi, asi kvuli RTL v DLLku (v ALTAPDB je
-        // static), ci co, po tom jsem uz dal nepatral, lepsi reseni by bylo zaridit
-        // destrukci facets az po tomto modulu, ale to bohuzel neumim (jen tez na "lib" urovni)
+        // I had to replace the code below that uses MESSAGE_E, because when calling
+        // this destructor, the stream facets in ALTAPDB are already destroyed and when sending an int
+        // or handle to the stream it simply crashes (only happens in VC2010 and VC2012, in VC2008
+        // it still works); in Salamander it doesn't cause issues, probably due to RTL in DLL (in ALTAPDB it is
+        // static), or whatever, I didn't investigate further, a better solution would be to arrange
+        // destruction of facets after this module, but unfortunately I don't know how (only at "lib" level)
         char msgBuf[1000];
         sprintf_s(msgBuf,
 #ifdef MESSAGES_DEBUG
@@ -572,11 +573,11 @@ C__Handles::~C__Handles()
                   MB_YESNO | MB_SETFOREGROUND) == IDYES)
 */
         {
-            ConnectToTraceServer(); // v pripade, ze nebyl nahozeny server
+            ConnectToTraceServer(); // in case the server was not started
             TRACE_I("List of opened handles:");
             for (int i = 0; i < Handles.Count; i++)
             {
-                // saskarna pres msgBuf kvuli padackam v ALTAPDB, podrobnosti viz komentar vyse
+                // workaround via msgBuf due to crashes in ALTAPDB, details see comment above
                 sprintf_s(msgBuf, "%p", Handles[i].Handle.Handle);
                 TRACE_MI(Handles[i].File, Handles[i].Line,
                          __GetHandlesTypeName(Handles[i].Handle.Type) << " - " << __GetHandlesOrigin(Handles[i].Handle.Origin) << " - " << msgBuf);
@@ -585,7 +586,7 @@ C__Handles::~C__Handles()
         else
         {
             ConnectToTraceServer();
-            // saskarna pres msgBuf kvuli padackam v ALTAPDB, podrobnosti viz komentar vyse
+            // workaround via msgBuf due to crashes in ALTAPDB, details see comment above
             sprintf_s(msgBuf, "%d", Handles.Count);
             TRACE_I(__HandlesMessageNumberOpened << msgBuf);
         }
@@ -604,7 +605,7 @@ C__Handles::SetInfo(const char* file, int line, C__HandlesOutputType outputType)
     ::EnterCriticalSection(&CriticalSection);
     if (CriticalSection.RecursionCount > 1)
     {
-        DebugBreak(); // rekurzivni volani handles !!! zase nejaka maskovana message-loopa - viz call-stack
+        DebugBreak(); // recursive handles call !!! another hidden message-loop - see call-stack
     }
 #endif // MULTITHREADED_HANDLES_ENABLE
     OutputType = outputType;
@@ -706,7 +707,7 @@ BOOL C__Handles::DeleteHandle(C__HandlesType& type, HANDLE handle,
             {
                 C__HandlesOrigin org = Handles[i].Handle.Origin;
                 if (org != __hoLoadAccelerators && org != __hoLoadIcon &&
-                    org != __hoGetStockObject) // nejde o handle, ktery nemusi byt uvolneny (prioritne uvolnujeme handly, ktere se musi uvolnit)
+                    org != __hoGetStockObject) // not a handle that doesn't need to be freed (we prioritize freeing handles that must be freed)
                 {
                     if (origin != NULL)
                         *origin = org;
@@ -721,7 +722,7 @@ BOOL C__Handles::DeleteHandle(C__HandlesType& type, HANDLE handle,
             }
         }
     }
-    if (foundTypeOK != -1) // nalezen jen handle, ktery nemusi byt uvolneny
+    if (foundTypeOK != -1) // found only a handle that doesn't need to be freed
     {
         type = Handles[foundTypeOK].Handle.Type;
         if (origin != NULL)
@@ -729,7 +730,7 @@ BOOL C__Handles::DeleteHandle(C__HandlesType& type, HANDLE handle,
         Handles.Delete(foundTypeOK);
         return TRUE;
     }
-    if (found != -1) // nalezen jen handle se shodnym cislem
+    if (found != -1) // found only a handle with matching number
     {
 #if defined(_DEBUG) || defined(__HANDLES_DEBUG)
         C__HandlesData* data = &(Handles[found]);
@@ -944,13 +945,13 @@ C__Handles::CreateFileW(LPCWSTR lpFileName, DWORD dwDesiredAccess,
     HANDLE ret = ::CreateFileW(lpFileName, dwDesiredAccess, dwShareMode,
                                lpSecurityAttributes, dwCreationDisposition,
                                dwFlagsAndAttributes, hTemplateFile);
-    WCHAR paramsBuf[800 + 200]; // na jmena souboru omezime na 800 znaku, stejne delsi nevytiskneme diky omezeni MESSAGES
+    WCHAR paramsBuf[800 + 200]; // file names limited to 800 characters, longer ones will not be printed anyway due to MESSAGES limit
     const WCHAR* params = NULL;
     if (ret == INVALID_HANDLE_VALUE) // parameters to buffer only when error occurs (can be displayed)
     {
         DWORD err = GetLastError();
         _snwprintf_s(paramsBuf, _TRUNCATE,
-                     L"dwDesiredAccess=0x%X,\ndwShareMode=0x%X,\ndwCreationDisposition=0x%X,\ndwFlagsAndAttributes=0x%X,\nlpFileName=%s", // lpFileName mame schvalne az na konci, muze byt az 32k dlouhe, orizne se
+                     L"dwDesiredAccess=0x%X,\ndwShareMode=0x%X,\ndwCreationDisposition=0x%X,\ndwFlagsAndAttributes=0x%X,\nlpFileName=%s", // lpFileName intentionally at the end, can be up to 32k long, will be truncated
                      dwDesiredAccess, dwShareMode, dwCreationDisposition, dwFlagsAndAttributes, lpFileName);
         params = paramsBuf;
         SetLastError(err);
@@ -1039,7 +1040,7 @@ HDC C__Handles::BeginPaint(HWND hwnd, LPPAINTSTRUCT lpPaint)
     ::LeaveCriticalSection(&CriticalSection);
 #endif // MULTITHREADED_HANDLES_ENABLE
 
-    HDC ret = ::BeginPaint(hwnd, lpPaint); // obsahuje message-loopu
+    HDC ret = ::BeginPaint(hwnd, lpPaint); // contains message-loop
 
 #ifdef MULTITHREADED_HANDLES_ENABLE
     ::EnterCriticalSection(&CriticalSection);
@@ -1890,8 +1891,8 @@ BOOL C__Handles::DuplicateHandle(HANDLE hSourceProcessHandle, HANDLE hSourceHand
                     "current process.");
         }
 
-        // GetCurrentProcess vraci jakysi pseudohandle, takze tahle konstrukce
-        // neni spravna, meli by se porovnat ID procesu a ne jejich handly ...
+        // GetCurrentProcess returns some kind of pseudohandle, so this construction
+        // is not correct, process IDs should be compared instead of their handles ...
 
         if ((dwOptions & DUPLICATE_CLOSE_SOURCE) &&
             hSourceProcessHandle == GetCurrentProcess())
@@ -2113,7 +2114,7 @@ BOOL C__Handles::FreeLibrary(HMODULE hLibModule)
     ::LeaveCriticalSection(&CriticalSection);
 #endif // MULTITHREADED_HANDLES_ENABLE
 
-    BOOL ret = ::FreeLibrary(hLibModule); // obsahuje volani destruktoru globalek DLLka, muze obsahovat message-loopu
+    BOOL ret = ::FreeLibrary(hLibModule); // contains calls to DLL global destructors, may contain message-loop
 
 #ifdef MULTITHREADED_HANDLES_ENABLE
     ::EnterCriticalSection(&CriticalSection);
@@ -2133,7 +2134,7 @@ VOID C__Handles::FreeLibraryAndExitThread(HMODULE hLibModule, DWORD dwExitCode)
     ::LeaveCriticalSection(&CriticalSection);
 #endif // MULTITHREADED_HANDLES_ENABLE
 
-    ::FreeLibraryAndExitThread(hLibModule, dwExitCode); // obsahuje volani destruktoru globalek DLLka, muze obsahovat message-loopu
+    ::FreeLibraryAndExitThread(hLibModule, dwExitCode); // contains calls to DLL global destructors, may contain message-loop
 
 #ifdef MULTITHREADED_HANDLES_ENABLE
     ::EnterCriticalSection(&CriticalSection);
@@ -2219,7 +2220,7 @@ BOOL C__Handles::FindCloseChangeNotification(HANDLE hChangeHandle)
     ::LeaveCriticalSection(&CriticalSection);
 #endif // MULTITHREADED_HANDLES_ENABLE
 
-    BOOL ret = ::FindCloseChangeNotification(hChangeHandle); // muze se kousnout i na dost dlouho
+    BOOL ret = ::FindCloseChangeNotification(hChangeHandle); // can take quite a long time
 
 #ifdef MULTITHREADED_HANDLES_ENABLE
     ::EnterCriticalSection(&CriticalSection);
@@ -2346,7 +2347,7 @@ HFILE
 C__Handles::OpenFile(LPCSTR lpFileName, LPOFSTRUCT lpReOpenBuff, UINT uStyle)
 {
     HFILE ret = ::OpenFile(lpFileName, lpReOpenBuff, uStyle);
-    CheckCreate(ret != HFILE_ERROR, __htFile, __hoOpenFile, (HANDLE)(UINT_PTR)ret, GetLastError(), TRUE); // lpFileName je jen char i v Unicode verzi = nepouzitelna funkce (zastarala), vyradil jsem ji z vypisu parametru
+    CheckCreate(ret != HFILE_ERROR, __htFile, __hoOpenFile, (HANDLE)(UINT_PTR)ret, GetLastError(), TRUE); // lpFileName is only char even in Unicode version = unusable function (obsolete), I removed it from parameter output
     return ret;
 }
 
@@ -2400,7 +2401,7 @@ BOOL C__Handles::EndDeferWindowPos(HDWP hWinPosInfo)
     ::LeaveCriticalSection(&CriticalSection);
 #endif // MULTITHREADED_HANDLES_ENABLE
 
-    BOOL ret = ::EndDeferWindowPos(hWinPosInfo); // obsahuje message-loopu
+    BOOL ret = ::EndDeferWindowPos(hWinPosInfo); // contains message-loop
 
 #ifdef MULTITHREADED_HANDLES_ENABLE
     ::EnterCriticalSection(&CriticalSection);

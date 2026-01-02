@@ -1,3 +1,4 @@
+﻿// CommentsTranslationProject: TRANSLATED
 #ifndef CMARK_REGISTRY_H
 #define CMARK_REGISTRY_H
 

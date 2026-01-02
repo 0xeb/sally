@@ -923,8 +923,8 @@ BOOL CheckAndConnectUNCNetworkPath(HWND parent, const char* UNCPath, BOOL& pathI
 }
 
 // ****************************************************************************
-// tenhle kod je vzaty z Knowledge Base a slouzi k ziskani informaci o typu media
-// floppy mechaniky (3.5", 5.25", 8")
+// this code is taken from Knowledge Base and serves to obtain information about media type
+// of floppy drives (3.5", 5.25", 8")
 
 /*
   GetDriveFormFactor returns the drive form factor.
@@ -1073,7 +1073,7 @@ CDrivesList::CDrivesList(CFilesWindow* filesWindow, const char* currentPath,
     CachedDrivesMask = 0;
     CachedCloudStoragesMask = 0;
 
-    // standardne nejde o post-cmd, proto nulujeme
+    // by default it is not a post-cmd, that is why we zero it
     *PostCmd = 0;
     *PostCmdParam = NULL;
     *FromContextMenu = FALSE;
@@ -1658,7 +1658,7 @@ BOOL CDrivesList::BuildData(BOOL noTimeout, TDirectArray<CDriveData>* copyDrives
     else
     {
         // remembered and not refreshed network drives will not be returned from GetLogicalDrives()
-        DWORD netDrives; // bitove pole network disku
+        DWORD netDrives; // bit array of network disks
         char netRemotePath['z' - 'a' + 1][MAX_PATH];
         GetNetworkDrives(netDrives, netRemotePath);
 

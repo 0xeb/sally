@@ -1,3 +1,4 @@
+﻿// CommentsTranslationProject: TRANSLATED
 #include "chunk.h"
 #include "cmark-gfm.h"
 

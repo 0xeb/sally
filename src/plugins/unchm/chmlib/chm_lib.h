@@ -1,3 +1,4 @@
+﻿// CommentsTranslationProject: TRANSLATED
 /* $Id$ */
 /***************************************************************************
  *             chm_lib.h - CHM archive manipulation routines               *

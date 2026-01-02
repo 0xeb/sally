@@ -72,7 +72,7 @@ struct CTmpDragDropOperData
     CDragDropOperData* Data;
 };
 
-class CCriteriaData // data pro atCopy/atMove
+class CCriteriaData // data for atCopy/atMove
 {
 public:
     BOOL OverwriteOlder;      // overwrite older, skip newer ones

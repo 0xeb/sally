@@ -26,11 +26,26 @@ We would like to thank [Fine company](https://www.finesoftware.eu/) for making t
 - [HTMLHelp Workshop 1.3](https://learn.microsoft.com/en-us/answers/questions/265752/htmlhelp-workshop-download-for-chm-compiler-instal)
 - Set the ```OPENSAL_BUILD_DIR``` environment variable to specify the build directory. Make sure the path has a trailing backslah, e.q. ```D:\Build\OpenSal\```
 
-### Building
+### Building with Visual Studio
 
 Solution ```\src\vcxproj\salamand.sln``` may be built from within Visual Studio or from the command-line using ```\src\vcxproj\rebuild.cmd```.
 
 Use ```\src\vcxproj\!populate_build_dir.cmd``` to populate build directory with files required to run Open Salamander.
+
+### Building with CMake
+
+```bash
+# Configure
+cmake -S . -B build
+
+# Build (Debug, Release, or RelWithDebInfo)
+cmake --build build --config RelWithDebInfo
+
+# Populate output directory with runtime files (toolbars, convert tables, etc.)
+cmake --build build --config RelWithDebInfo --target populate
+```
+
+Output is placed in ```build\out\salamander\<Config>_x64\```.
 
 ### Contributing
 

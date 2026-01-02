@@ -1,3 +1,4 @@
+﻿// CommentsTranslationProject: TRANSLATED
 #ifndef CMARK_GFM_AUTOLINK_H
 #define CMARK_GFM_AUTOLINK_H
 

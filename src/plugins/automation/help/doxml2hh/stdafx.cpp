@@ -1,5 +1,6 @@
 ﻿// SPDX-FileCopyrightText: 2023 Open Salamander Authors
 // SPDX-License-Identifier: GPL-2.0-or-later
+// CommentsTranslationProject: TRANSLATED
 
 // stdafx.cpp : source file that includes just the standard includes
 // doxml2hh.pch will be the pre-compiled header
