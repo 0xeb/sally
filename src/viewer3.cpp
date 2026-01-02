@@ -1599,11 +1599,11 @@ CViewerWindow::WindowProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
                             strcpy(tmpFile, fileName);
                         if (attr == 0xFFFFFFFF || SalGetTempFileName(path, "sal", tmpFile, TRUE))
                         {
-                            HANDLE file = HANDLES_Q(SalCreateFileH(tmpFile, GENERIC_WRITE,
-                                                                   FILE_SHARE_READ, NULL,
-                                                                   CREATE_ALWAYS,
-                                                                   FILE_FLAG_SEQUENTIAL_SCAN,
-                                                                   NULL));
+                            HANDLE file = SalCreateFileH(tmpFile, GENERIC_WRITE,
+                                                         FILE_SHARE_READ, NULL,
+                                                         CREATE_ALWAYS,
+                                                         FILE_FLAG_SEQUENTIAL_SCAN,
+                                                         NULL);
                             if (file != INVALID_HANDLE_VALUE)
                             {
                                 __int64 off = start, len;
