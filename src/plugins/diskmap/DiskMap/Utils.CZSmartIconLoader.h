@@ -42,7 +42,7 @@ protected:
             {
                 iconFlags = this->_requestedFlags;
                 iconlParam = this->_requestedlParam;
-                memcpy(iconFile, this->_requestedFilename, ARRAYSIZE(CZSmartIconLoader::_requestedFilename) * sizeof TCHAR);
+                memcpy(iconFile, this->_requestedFilename, ARRAYSIZE(CZSmartIconLoader::_requestedFilename) * sizeof(TCHAR));
                 currentIconId = this->_requestedIconId;
             }
             this->_worker->GetLock()->Leave();

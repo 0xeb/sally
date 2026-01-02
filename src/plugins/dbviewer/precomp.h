@@ -7,8 +7,8 @@
 
 #include <tchar.h>
 #include <windows.h>
-#include <CommDlg.h>
-#include <ShellAPI.h>
+#include <commdlg.h>
+#include <shellapi.h>
 #include <crtdbg.h>
 #include <ostream>
 #include <olectl.h>

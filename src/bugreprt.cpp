@@ -4,7 +4,7 @@
 
 #include "precomp.h"
 
-#include <Tlhelp32.h>
+#include <tlhelp32.h>
 
 #include "mainwnd.h"
 #include "drivelst.h"

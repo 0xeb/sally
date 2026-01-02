@@ -16,7 +16,7 @@
 
 #include "library\volenum.h"
 
-#pragma comment(lib, "UxTheme.lib")
+#pragma comment(lib, "uxtheme.lib")
 
 // ****************************************************************************
 //

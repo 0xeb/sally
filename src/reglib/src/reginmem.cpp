@@ -697,35 +697,25 @@ namespace RegLib
         CKey* pParentKey = NULL;
         LPCTSTR pRootName = NULL;
 
-        switch (reinterpret_cast<ULONG_PTR>(key))
-        {
-        case reinterpret_cast<ULONG_PTR>(HKEY_CLASSES_ROOT):
+        // Convert switch to if-else for Clang compatibility (HKEY_* are not constant expressions)
+        if (key == HKEY_CLASSES_ROOT)
             pRootName = _T("HKEY_CLASSES_ROOT");
-            break;
-        case reinterpret_cast<ULONG_PTR>(HKEY_CURRENT_USER):
+        else if (key == HKEY_CURRENT_USER)
             pRootName = _T("HKEY_CURRENT_USER");
-            break;
-        case reinterpret_cast<ULONG_PTR>(HKEY_LOCAL_MACHINE):
+        else if (key == HKEY_LOCAL_MACHINE)
             pRootName = _T("HKEY_LOCAL_MACHINE");
-            break;
-        case reinterpret_cast<ULONG_PTR>(HKEY_USERS):
+        else if (key == HKEY_USERS)
             pRootName = _T("HKEY_USERS");
-            break;
-        case reinterpret_cast<ULONG_PTR>(HKEY_CURRENT_CONFIG):
+        else if (key == HKEY_CURRENT_CONFIG)
             pRootName = _T("HKEY_CURRENT_CONFIG");
-            break;
-        case reinterpret_cast<ULONG_PTR>(HKEY_DYN_DATA):
+        else if (key == HKEY_DYN_DATA)
             pRootName = _T("HKEY_DYN_DATA");
-            break;
-        case reinterpret_cast<ULONG_PTR>(HKEY_PERFORMANCE_DATA):
+        else if (key == HKEY_PERFORMANCE_DATA)
             pRootName = _T("HKEY_PERFORMANCE_DATA");
-            break;
-        case 0:
-            // Invalid parent key :-(
-            return FALSE;
-        default:
+        else if (key == NULL)
+            return FALSE; // Invalid parent key
+        else
             pParentKey = (CKey*)key;
-        }
         if (pRootName)
         {
             pParentKey = RootKey.GetKey(pRootName);

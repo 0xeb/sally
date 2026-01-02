@@ -7,10 +7,10 @@
 #include "zip2sfx.rh"
 #include "spl_vers.h"
 
-IDI_SFXICON ICON "..\selfextr\icon.ico"
+IDI_SFXICON ICON "../selfextr/icon.ico"
 
-ID_SFX_MANIFEST_REGULAR	RCDATA "..\sfxregul.xml"
-ID_SFX_MANIFEST_ADMIN	RCDATA "..\sfxadmin.xml"
+ID_SFX_MANIFEST_REGULAR	RCDATA "../sfxregul.xml"
+ID_SFX_MANIFEST_ADMIN	RCDATA "../sfxadmin.xml"
 
 CREATEPROCESS_MANIFEST_RESOURCE_ID RT_MANIFEST "manifest.xml"
 

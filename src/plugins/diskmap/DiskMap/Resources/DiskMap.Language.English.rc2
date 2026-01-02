@@ -16,25 +16,25 @@ BEGIN
     BEGIN
         MENUITEM "&Open File",                       IDM_FILE_OPEN
 #ifdef SALAMANDER
-        MENUITEM "&Focus in Panel\tF",        IDM_FILE_FOCUSINSALAMANDER
+        MENUITEM "&Focus in Panel/tF",        IDM_FILE_FOCUSINSALAMANDER
 #endif
         MENUITEM SEPARATOR
-        MENUITEM "&Abort\tEsc",                      IDM_FILE_ABORT
-        MENUITEM "&Refresh\tCtrl+R",            IDM_FILE_REFRESH
+        MENUITEM "&Abort/tEsc",                      IDM_FILE_ABORT
+        MENUITEM "&Refresh/tCtrl+R",            IDM_FILE_REFRESH
         MENUITEM SEPARATOR
 #ifdef SALAMANDER
-        MENUITEM "&Close\tAlt+F4",                      IDM_FILE_EXIT
+        MENUITEM "&Close/tAlt+F4",                      IDM_FILE_EXIT
 #else
-        MENUITEM "E&xit\tAlt+F4",                       IDM_FILE_EXIT
+        MENUITEM "E&xit/tAlt+F4",                       IDM_FILE_EXIT
 #endif
     END
     POPUP "&View"
     BEGIN
-        MENUITEM "Zoom &In\t+",                 IDM_VIEW_ZOOMIN
-        MENUITEM "Zoom &Out\t -",                IDM_VIEW_ZOOMOUT
-        MENUITEM "&Unzoom\t Shift+Backspace",   IDM_VIEW_GOTOROOT
+        MENUITEM "Zoom &In/t+",                 IDM_VIEW_ZOOMIN
+        MENUITEM "Zoom &Out/t -",                IDM_VIEW_ZOOMOUT
+        MENUITEM "&Unzoom/t Shift+Backspace",   IDM_VIEW_GOTOROOT
         MENUITEM SEPARATOR
-        MENUITEM "&Log Window...\tCtrl+L",              IDM_VIEW_LOG
+        MENUITEM "&Log Window.../tCtrl+L",              IDM_VIEW_LOG
     END
 
     POPUP "&Options"
@@ -51,7 +51,7 @@ BEGIN
         MENUITEM SEPARATOR
 #endif
 	MENUITEM "&Highlight Folders",          IDM_OPTIONS_SHOWFOLDERS, CHECKED
-	MENUITEM "&Display Tooltip\tCtrl+D",    IDM_OPTIONS_SHOWTOOLTIP, CHECKED
+	MENUITEM "&Display Tooltip/tCtrl+D",    IDM_OPTIONS_SHOWTOOLTIP, CHECKED
         POPUP "Tooltip Path &Format"
         BEGIN
             MENUITEM "&Filename",            IDM_PATHFORMAT_FILENAME

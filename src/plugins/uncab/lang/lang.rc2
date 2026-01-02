@@ -9,7 +9,7 @@
 /////////////////////////////////////////////////////////////////////////////
 // Add manually edited resources here...
 
-#include "..\versinfo.rh2"
+#include "../versinfo.rh2"
 #include "versinfo.rc2"
 
 STRINGTABLE
@@ -36,7 +36,7 @@ STRINGTABLE
   IDS_BROWSEFOLDERTEXT, "Select a folder containing '%s'."
   IDS_NOTFOUND, "File not found."
   IDS_SKIPPING, "skipping file"
-  IDS_NEXTVOLTEXT, "Please insert a disk with the cabinet volume number %d or locate appropriate cabinet file on the disk.\n\nPress OK when ready."
+  IDS_NEXTVOLTEXT, "Please insert a disk with the cabinet volume number %d or locate appropriate cabinet file on the disk./n/nPress OK when ready."
 
   // FDIERROR - Error codes returned in erf.erfOper field
   IDS_CABINET_NOT_FOUND, "Cabinet not found."

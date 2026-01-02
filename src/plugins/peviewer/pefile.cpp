@@ -2212,7 +2212,7 @@ const _TCHAR* CCorHeaderDumper::GetExceptionMessage()
 // CCorMetadataDumper
 //
 
-#include <Shlwapi.h> // for StrStrI
+#include <shlwapi.h> // for StrStrI
 #pragma comment(lib, "ole32")
 #pragma comment(lib, "shlwapi")
 

@@ -9,7 +9,7 @@
 /////////////////////////////////////////////////////////////////////////////
 // Add manually edited resources here...
 
-#include "..\versinfo.rh2"
+#include "../versinfo.rh2"
 #include "versinfo.rc2"
 
 STRINGTABLE
@@ -17,6 +17,6 @@ STRINGTABLE
  IDS_PLUGIN_DESCRIPTION, "Lightweight HTML and XML viewer based on Internet Explorer."
  IDS_ABOUT, "About Plugin"
  IDS_PLUGINNAME, "Internet Explorer Viewer"
- IDS_UNABLETOOPENIE, "Unable to open Internet Explorer Viewer.\nPlease report this problem to support@altap.cz."
+ IDS_UNABLETOOPENIE, "Unable to open Internet Explorer Viewer./nPlease report this problem to support@altap.cz."
  IDS_ERRORTITLE, "Error"
 }

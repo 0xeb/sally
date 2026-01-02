@@ -1,0 +1,92 @@
+{
+    "version": 6,
+    "cmakeMinimumRequired": {
+        "major": 3,
+        "minor": 21,
+        "patch": 0
+    },
+    "configurePresets": [
+        {
+            "name": "base",
+            "hidden": true,
+            "binaryDir": "${sourceDir}/build-${presetName}"
+        },
+        {
+            "name": "x64",
+            "displayName": "Cross-compile x64 (Clang-CL)",
+            "description": "Cross-compile for Windows x64 using Clang-CL with MSVC ABI",
+            "inherits": "base",
+            "toolchainFile": "${sourceDir}/cmake/toolchain-clang-cl-x64.cmake",
+            "cacheVariables": {
+                "CMAKE_BUILD_TYPE": "Release"
+            }
+        },
+        {
+            "name": "x64-debug",
+            "displayName": "Cross-compile x64 Debug (Clang-CL)",
+            "description": "Cross-compile for Windows x64 Debug using Clang-CL",
+            "inherits": "base",
+            "toolchainFile": "${sourceDir}/cmake/toolchain-clang-cl-x64.cmake",
+            "cacheVariables": {
+                "CMAKE_BUILD_TYPE": "Debug"
+            }
+        },
+        {
+            "name": "arm64",
+            "displayName": "Cross-compile ARM64 (Clang-CL)",
+            "description": "Cross-compile for Windows ARM64 using Clang-CL with MSVC ABI",
+            "inherits": "base",
+            "toolchainFile": "${sourceDir}/cmake/toolchain-clang-cl-arm64.cmake",
+            "cacheVariables": {
+                "CMAKE_BUILD_TYPE": "Release"
+            }
+        },
+        {
+            "name": "arm64-debug",
+            "displayName": "Cross-compile ARM64 Debug (Clang-CL)",
+            "description": "Cross-compile for Windows ARM64 Debug using Clang-CL",
+            "inherits": "base",
+            "toolchainFile": "${sourceDir}/cmake/toolchain-clang-cl-arm64.cmake",
+            "cacheVariables": {
+                "CMAKE_BUILD_TYPE": "Debug"
+            }
+        },
+        {
+            "name": "msvc",
+            "displayName": "Native MSVC (Windows only)",
+            "description": "Native Windows build with Visual Studio",
+            "inherits": "base",
+            "generator": "Visual Studio 17 2022",
+            "architecture": "x64",
+            "binaryDir": "${sourceDir}/build"
+        }
+    ],
+    "buildPresets": [
+        {
+            "name": "x64",
+            "configurePreset": "x64"
+        },
+        {
+            "name": "x64-debug",
+            "configurePreset": "x64-debug"
+        },
+        {
+            "name": "arm64",
+            "configurePreset": "arm64"
+        },
+        {
+            "name": "arm64-debug",
+            "configurePreset": "arm64-debug"
+        },
+        {
+            "name": "msvc",
+            "configurePreset": "msvc",
+            "configuration": "Release"
+        },
+        {
+            "name": "msvc-debug",
+            "configurePreset": "msvc",
+            "configuration": "Debug"
+        }
+    ]
+}

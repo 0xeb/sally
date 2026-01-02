@@ -18,5 +18,5 @@
 #include "version.rc2"
 #include "typelib.rc2"
 
-IDI_MAIN                ICON                    "res\\automation.ico"
-IDB_ICONSTRIP           RCDATA                  "res\\automation_strip.png"
+IDI_MAIN                ICON                    "res//automation.ico"
+IDB_ICONSTRIP           RCDATA                  "res//automation_strip.png"

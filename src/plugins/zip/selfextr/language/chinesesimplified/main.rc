@@ -4,8 +4,8 @@
 
 #include <winresrc.h>
 
-#include "..\..\resource.h"
-#include "..\..\comdefs.h"
+#include "../../resource.h"
+#include "../../comdefs.h"
 
 
 SE_IDD_SFXDIALOG DIALOGEX 12, 65, 300, 123

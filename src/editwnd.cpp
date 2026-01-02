@@ -12,7 +12,7 @@
 #include "stswnd.h"
 #include <uxtheme.h>
 
-#include <Shlwapi.h>
+#include <shlwapi.h>
 
 //*****************************************************************************
 //

@@ -471,7 +471,7 @@ RETRY:
     {
         switch (lastError)
         {
-        case ERROR_USER_TERMINATED:
+        case (DWORD)ERROR_USER_TERMINATED:
             break;
 
         case ERROR_NOT_READY:

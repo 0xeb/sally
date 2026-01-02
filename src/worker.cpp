@@ -8,8 +8,8 @@
 #include "worker.h"
 #include "common/widepath.h"
 
-#include <Aclapi.h>
-#include <Ntsecapi.h>
+#include <aclapi.h>
+#include <ntsecapi.h>
 
 // these functions have no header, we must load them dynamically
 NTQUERYINFORMATIONFILE DynNtQueryInformationFile = NULL;

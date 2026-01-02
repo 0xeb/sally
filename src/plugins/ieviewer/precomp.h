@@ -6,7 +6,7 @@
 #define WIN32_LEAN_AND_MEAN // exclude rarely-used stuff from Windows headers
 
 #include <windows.h>
-#include <CommDlg.h>
+#include <commdlg.h>
 #include <crtdbg.h>
 #include <ostream>
 #include <olectl.h>

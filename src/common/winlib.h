@@ -323,8 +323,8 @@ protected:
 class CDialog : public CWindowsObject
 {
 public:
-    CWindowsObject::SetObjectOrigin; // kvuli zkompilovatelnosti CPropSheetPage
-    CWindowsObject::HWindow;         // kvuli zkompilovatelnosti CPropSheetPage
+    using CWindowsObject::SetObjectOrigin; // kvuli zkompilovatelnosti CPropSheetPage
+    using CWindowsObject::HWindow;         // kvuli zkompilovatelnosti CPropSheetPage
 
 #ifdef _UNICODE
     CDialog(HINSTANCE modul, int resID, HWND parent, CObjectOrigin origin = ooStandard) : CWindowsObject(origin)

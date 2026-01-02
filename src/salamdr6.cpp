@@ -3,7 +3,7 @@
 // CommentsTranslationProject: TRANSLATED
 
 #include "precomp.h"
-#include <Sddl.h>
+#include <sddl.h>
 
 #include "cfgdlg.h"
 #include "mainwnd.h"

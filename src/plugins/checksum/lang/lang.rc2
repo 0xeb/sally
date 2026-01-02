@@ -9,7 +9,7 @@
 /////////////////////////////////////////////////////////////////////////////
 // Add manually edited resources here...
 
-#include "..\versinfo.rh2"
+#include "../versinfo.rh2"
 #include "versinfo.rc2"
 
 STRINGTABLE
@@ -25,19 +25,19 @@ STRINGTABLE
  IDS_CALCULATING "Calculating..."
  IDS_CANCELED "Canceled"
  IDS_HINT "Right-click an item to copy a checksum to the clipboard."
- IDS_COPYTOCBOARD_CRC "Copy &CRC Value to Clipboard\tCtrl+C"
- IDS_COPYTOCBOARD_MD5 "Copy &MD5 Checksum to Clipboard\tCtrl+M"
- IDS_COPYTOCBOARD_SHA1 "Copy SHA-&1 Checksum to Clipboard\tCtrl+1"
- IDS_COPYTOCBOARD_SHA256 "Copy SHA-&256 Checksum to Clipboard\tCtrl+2"
- IDS_COPYTOCBOARD_SHA512 "Copy SHA-&512 Checksum to Clipboard\tCtrl+5"
- IDS_REMOVEITEM "&Remove Item\tDelete"
+ IDS_COPYTOCBOARD_CRC "Copy &CRC Value to Clipboard/tCtrl+C"
+ IDS_COPYTOCBOARD_MD5 "Copy &MD5 Checksum to Clipboard/tCtrl+M"
+ IDS_COPYTOCBOARD_SHA1 "Copy SHA-&1 Checksum to Clipboard/tCtrl+1"
+ IDS_COPYTOCBOARD_SHA256 "Copy SHA-&256 Checksum to Clipboard/tCtrl+2"
+ IDS_COPYTOCBOARD_SHA512 "Copy SHA-&512 Checksum to Clipboard/tCtrl+5"
+ IDS_REMOVEITEM "&Remove Item/tDelete"
  IDS_SAVE_TITLE  "Save Checksum File"
  IDS_SAVE_FILTER_CRC  "SFV Files (*.sfv)|*.sfv|"
  IDS_SAVE_FILTER_MD5  "MD5 Files (*.md5)|*.md5|"
  IDS_SAVE_FILTER_SHA1 "SHA-1 Files (*.sha1)|*.sha1|"
  IDS_SAVE_FILTER_SHA256 "SHA-256 Files (*.sha256)|*.sha256|"
  IDS_SAVE_FILTER_SHA512 "SHA-512 Files (*.sha512)|*.sha512|"
- IDS_SAVE_OVERWRITE, "The file '%s' already exists.\nDo you wish to overwrite it?"
+ IDS_SAVE_OVERWRITE, "The file '%s' already exists./nDo you wish to overwrite it?"
  IDS_ERRORCREATINGFILE "Error creating file."
  IDS_SKIPPEDFILES "Files skipped or canceled during the calculation were not saved."
  IDS_ERROROPENING2 "Error opening the file '%s'."

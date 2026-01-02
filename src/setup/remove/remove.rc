@@ -37,18 +37,18 @@ END
 
 3 TEXTINCLUDE 
 BEGIN
-    "#ifndef INSIDE_SETUP\r\n"
-    "#include ""remove.rc2""\r\n"
-    "#endif\r\n"
-    "\r\n"
-    "#if !defined(AFX_RESOURCE_DLL) || defined(AFX_TARG_CSY)\r\n"
-    "LANGUAGE LANG_CZECH, SUBLANG_DEFAULT\r\n"
-    "#include ""remove_cz.rc2""\r\n"
-    "LANGUAGE LANG_GERMAN, SUBLANG_NEUTRAL\r\n"
-    "#include ""remove_de.rc2""\r\n"
-    "LANGUAGE LANG_ENGLISH, SUBLANG_ENGLISH_US\r\n"
-    "#include ""remove_en.rc2""\r\n"
-    "#endif\r\n"
+    "#ifndef INSIDE_SETUP/r/n"
+    "#include ""remove.rc2""/r/n"
+    "#endif/r/n"
+    "/r/n"
+    "#if !defined(AFX_RESOURCE_DLL) || defined(AFX_TARG_CSY)/r/n"
+    "LANGUAGE LANG_CZECH, SUBLANG_DEFAULT/r/n"
+    "#include ""remove_cz.rc2""/r/n"
+    "LANGUAGE LANG_GERMAN, SUBLANG_NEUTRAL/r/n"
+    "#include ""remove_de.rc2""/r/n"
+    "LANGUAGE LANG_ENGLISH, SUBLANG_ENGLISH_US/r/n"
+    "#include ""remove_en.rc2""/r/n"
+    "#endif/r/n"
     "\0"
 END
 

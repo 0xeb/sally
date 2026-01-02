@@ -14,4 +14,4 @@
 
 #include "fx.rh"
 
-IDB_FX_PLUGIN_ICONS         RCDATA                     "res\\portables.png"
+IDB_FX_PLUGIN_ICONS         RCDATA                     "res//portables.png"

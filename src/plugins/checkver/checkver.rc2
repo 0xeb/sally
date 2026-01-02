@@ -12,6 +12,6 @@
 #include "versinfo.rh2"
 #include "versinfo.rc2"
 
-IDI_CHECKVER ICON "res\\checkver.ico"
-IDI_INTERNET ICON "res\\internet.ico"
-IDB_CHECKVER BITMAP "res\\checkver.bmp"
+IDI_CHECKVER ICON "res//checkver.ico"
+IDI_INTERNET ICON "res//internet.ico"
+IDB_CHECKVER BITMAP "res//checkver.bmp"

@@ -70,22 +70,22 @@ END
 
 // Icon with lowest ID value placed first to ensure application icon
 // remains consistent on all systems.
-EXE_ICON                ICON                    "res\\setup.ico"
+EXE_ICON                ICON                    "res//setup.ico"
 
 /////////////////////////////////////////////////////////////////////////////
 //
 // Bitmap
 //
 
-IDB_WELCOME             BITMAP                  "res\\welcome.bmp"
-IDB_ICON                BITMAP                  "res\\icon.bmp"
+IDB_WELCOME             BITMAP                  "res//welcome.bmp"
+IDB_ICON                BITMAP                  "res//icon.bmp"
 
 /////////////////////////////////////////////////////////////////////////////
 //
 // Cursor
 //
 
-IDC_HANDICON            CURSOR                  "res\\hand.cur"
+IDC_HANDICON            CURSOR                  "res//hand.cur"
 
 #ifdef APSTUDIO_INVOKED
 /////////////////////////////////////////////////////////////////////////////
@@ -105,16 +105,16 @@ END
 
 3 TEXTINCLUDE 
 BEGIN
-    "#define INSIDE_SETUP\r\n"
-    "#if !defined(AFX_RESOURCE_DLL) || defined(AFX_TARG_CSY)\r\n"
-    "#include ""remove\\resource.h""\r\n"
-    "LANGUAGE LANG_CZECH, SUBLANG_DEFAULT\r\n"
-    "#include ""remove\\remove_cz.rc2""\r\n"
-    "LANGUAGE LANG_GERMAN, SUBLANG_NEUTRAL\r\n"
-    "#include ""remove\\remove_de.rc2""\r\n"
-    "LANGUAGE LANG_ENGLISH, SUBLANG_ENGLISH_US\r\n"
-    "#include ""remove\\remove_en.rc2""\r\n"
-    "#endif\r\n"
+    "#define INSIDE_SETUP/r/n"
+    "#if !defined(AFX_RESOURCE_DLL) || defined(AFX_TARG_CSY)/r/n"
+    "#include ""remove//resource.h""/r/n"
+    "LANGUAGE LANG_CZECH, SUBLANG_DEFAULT/r/n"
+    "#include ""remove//remove_cz.rc2""/r/n"
+    "LANGUAGE LANG_GERMAN, SUBLANG_NEUTRAL/r/n"
+    "#include ""remove//remove_de.rc2""/r/n"
+    "LANGUAGE LANG_ENGLISH, SUBLANG_ENGLISH_US/r/n"
+    "#include ""remove//remove_en.rc2""/r/n"
+    "#endif/r/n"
     "\0"
 END
 
@@ -325,7 +325,7 @@ CAPTION "Vítejte"
 FONT 8, "MS Shell Dlg", 400, 0, 0x1
 BEGIN
     LTEXT           "Vítejte v instalaci programu %s",IDC_WLC_A,13,13,204,25
-    LTEXT           "Tento průvodce Vás provede instalací programu\n%s",IDC_WLC_B,13,44,181,21
+    LTEXT           "Tento průvodce Vás provede instalací programu/n%s",IDC_WLC_B,13,44,181,21
     LTEXT           "Klikněte na tlačítko Další pro pokračování.",IDC_WLC_WARNING,13,131,305,52
 END
 
@@ -363,8 +363,8 @@ BEGIN
     ERROR_LOADLICENSE       "Chyba při přístupu k licenčnímu souboru."
     IDS_INSTALLING          "%s"
     IDS_CHOOSEDIR           "Zvolte adresář"
-    IDS_NODIR               "Adresář:\n\n'%s'\n\nneexistuje. Chcete ho vytvořit?"
-    IDS_NOSPACE             "Na disku %s není dostatek místa\n\npotřebné místo: %ld bytů\ndostupné místo: %ld bytů\n\nUvoněte prosím místo na disku.\nStiskněte Storno, pokud chcete ignorovat toto varování."
+    IDS_NODIR               "Adresář:/n/n'%s'/n/nneexistuje. Chcete ho vytvořit?"
+    IDS_NOSPACE             "Na disku %s není dostatek místa/n/npotřebné místo: %ld bytů/ndostupné místo: %ld bytů/n/nUvoněte prosím místo na disku./nStiskněte Storno, pokud chcete ignorovat toto varování."
     IDS_WZR_FINISH          "&Dokončit"
     IDS_TARGETDIR           "Cílový adresář"
     IDS_PERSONAL            "Zástupce pouze pro aktuálního uživatele"
@@ -373,15 +373,15 @@ END
 STRINGTABLE 
 BEGIN
     IDS_WZR_INSTALL         "&Instalovat"
-    IDS_INSTFAILED          "Instalace není kompletní. Program %s není nainstalován.\n\nInstalační program můžete spustit později a instalaci dokončit."
-    ERROR_CMDLINE           "Použití:\nSETUP [/?] [/s] [/d dest_dir] [/id <y,n>] [/is <y,n>] [/au <y,n>]\n\n[x] znamená, že je parametr x nepovinný.\n<y,n> znamená, že jsou parametry y nebo n povinné.\n\n/? -- Zobrazí tuto zprávu o použití.\n/s -- Tichá instalace.\n/d -- Cílový adresář.\n/id -- Nainstalovat zástupce na plochu.\n/is -- Nainstalovat zástupce do nabídky Start.\n/au -- Společné složky všech uživatelů."
-    IDS_CONFLICTWITHNEWER   "Adresář '%s' již obsahuje novější verzi instalovaného programu.\n\nPro instalaci do tohoto adresáře napřed odinstalujte existující Open Salamander.\n\nPřípadně můžete zvolit jiný adresář."
-    IDS_INSTNEEDRESTART     "Instalace nebyla dokončena. Pro dokončení instalace je potřeba provést restart Windows, po kterém se odinstalují shell extensions.\n\nRestartujte prosím Windows a spusťte tento instalační program znovu pro dokončení instalace."
+    IDS_INSTFAILED          "Instalace není kompletní. Program %s není nainstalován./n/nInstalační program můžete spustit později a instalaci dokončit."
+    ERROR_CMDLINE           "Použití:/nSETUP [/?] [/s] [/d dest_dir] [/id <y,n>] [/is <y,n>] [/au <y,n>]/n/n[x] znamená, že je parametr x nepovinný./n<y,n> znamená, že jsou parametry y nebo n povinné./n/n/? -- Zobrazí tuto zprávu o použití./n/s -- Tichá instalace./n/d -- Cílový adresář./n/id -- Nainstalovat zástupce na plochu./n/is -- Nainstalovat zástupce do nabídky Start./n/au -- Společné složky všech uživatelů."
+    IDS_CONFLICTWITHNEWER   "Adresář '%s' již obsahuje novější verzi instalovaného programu./n/nPro instalaci do tohoto adresáře napřed odinstalujte existující Open Salamander./n/nPřípadně můžete zvolit jiný adresář."
+    IDS_INSTNEEDRESTART     "Instalace nebyla dokončena. Pro dokončení instalace je potřeba provést restart Windows, po kterém se odinstalují shell extensions./n/nRestartujte prosím Windows a spusťte tento instalační program znovu pro dokončení instalace."
     IDS_TARGETDIRUPGRADE    "Cílový adresář (upgrade)"
-    IDS_CONFLICTPRIOR       "Adresář '%s' již obsahuje starší verzi instalovaného programu.\n\nStiskněte OK pro jeho upgrade.\nStiskněte Storno pro instalaci do jiného adresáře."
-    IDS_CONFLICTSAME        "Adresář '%s' již obsahuje stejnou verzi instalovaného programu.\n\nStiskněte OK pro jeho opravu.\nStiskněte Storno pro instalaci do jiného adresáře."
-    IDS_PREVIEWBUILDWARNING "Toto je PREVIEW BUILD programu Open Salamander, uvolněný v Early Access Programu. Tato verze by neměla být používána v produkčním prostředí. Používejte ji pouze pro testování. Těšíme se na Vaše připomínky a náměty, které vkládejte do Early Access Program sekce na forum.altap.cz.\nPoznámka: tato verze je časově omezená."
-    IDS_BETAWARNING         "Toto je BETA verze programu Open Salamander. Tato verze by neměla být používána v produkčním prostředí. Používejte ji pouze pro testování. Těšíme se na Vaše připomínky a náměty, které vkládejte na forum.altap.cz.\nPoznámka: tato verze je časově omezená."
+    IDS_CONFLICTPRIOR       "Adresář '%s' již obsahuje starší verzi instalovaného programu./n/nStiskněte OK pro jeho upgrade./nStiskněte Storno pro instalaci do jiného adresáře."
+    IDS_CONFLICTSAME        "Adresář '%s' již obsahuje stejnou verzi instalovaného programu./n/nStiskněte OK pro jeho opravu./nStiskněte Storno pro instalaci do jiného adresáře."
+    IDS_PREVIEWBUILDWARNING "Toto je PREVIEW BUILD programu Open Salamander, uvolněný v Early Access Programu. Tato verze by neměla být používána v produkčním prostředí. Používejte ji pouze pro testování. Těšíme se na Vaše připomínky a náměty, které vkládejte do Early Access Program sekce na forum.altap.cz./nPoznámka: tato verze je časově omezená."
+    IDS_BETAWARNING         "Toto je BETA verze programu Open Salamander. Tato verze by neměla být používána v produkčním prostředí. Používejte ji pouze pro testování. Těšíme se na Vaše připomínky a náměty, které vkládejte na forum.altap.cz./nPoznámka: tato verze je časově omezená."
 END
 
 STRINGTABLE 
@@ -391,31 +391,31 @@ BEGIN
     IDS_INSERT_MENU         "Vložit zástupce programu do nabídky Start"
     IDS_INVALIDPATH         "Cílový adresář '%s' je neplatný."
     IDS_NAMEUSEDFORFILE     "Název ""%s"" byl již použit po jiný soubor."
-    IDS_CREATEDIRFAILED     "Nelze vytvořít adresář:\n%s"
+    IDS_CREATEDIRFAILED     "Nelze vytvořít adresář:/n%s"
     IDS_ERRORCREATELOG      "Chyba při vytváření log souboru %s."
-    IDS_APPRUNNING          "Instalační program detekoval, že instalovaný program je spuštěný.\nZavřete prosím program a stiskněte OK pro pokračování.\nTitulek programu je %s."
+    IDS_APPRUNNING          "Instalační program detekoval, že instalovaný program je spuštěný./nZavřete prosím program a stiskněte OK pro pokračování./nTitulek programu je %s."
     IDS_MAINWINDOWTITLE     "Instalační program"
     IDS_SETUPCOPYRIGHT1     "Copyright © 1997-2023 Open Salamander Authors"
-    IDS_INSTALL_STOP        "Instalace není kompletní. Pokud ji nyní ukončíte, program nebude nainstalován.\n\nInstalační program můžete spustit později a instalaci dokončit.\n\nUkončit instalaci?"
+    IDS_INSTALL_STOP        "Instalace není kompletní. Pokud ji nyní ukončíte, program nebude nainstalován./n/nInstalační program můžete spustit později a instalaci dokončit./n/nUkončit instalaci?"
     IDS_INSTALL_STOP_TITLE  "Ukončit instalační program"
     IDS_WIZ_TITLE           "Instalační program - %s"
 END
 
 STRINGTABLE 
 BEGIN
-    ERROR_CF_OPENFILE       "Chyba při otevírání souboru %s\n"
-    ERROR_CF_FILEINFORMATION "Chyba při získávání informací o souboru %s\n"
-    ERROR_CF_CREATEFILE     "Chyba při vytváření souboru %s\n"
-    ERROR_CF_FILESETATTR    "Chyba při nastavování atributů souboru %s\n"
-    ERROR_CF_READFILE       "Chyba při čtení ze souboru %s\n"
-    ERROR_CF_WRITEFILE      "Chyba při zápisu do souboru %s\n"
+    ERROR_CF_OPENFILE       "Chyba při otevírání souboru %s/n"
+    ERROR_CF_FILEINFORMATION "Chyba při získávání informací o souboru %s/n"
+    ERROR_CF_CREATEFILE     "Chyba při vytváření souboru %s/n"
+    ERROR_CF_FILESETATTR    "Chyba při nastavování atributů souboru %s/n"
+    ERROR_CF_READFILE       "Chyba při čtení ze souboru %s/n"
+    ERROR_CF_WRITEFILE      "Chyba při zápisu do souboru %s/n"
     ERROR_CF_GETATTR        "Chyba při získávání atributů: "
     ERROR_DLGCREATE         "Chyba při otevírání dialogu: "
 END
 
 STRINGTABLE 
 BEGIN
-    ERROR_CREATESHORTCUT    "Chyba (%08X) při vytváření zástupce %s\n"
+    ERROR_CREATESHORTCUT    "Chyba (%08X) při vytváření zástupce %s/n"
 END
 
 #endif    // Czech resources
@@ -451,7 +451,7 @@ CAPTION "Willkommen"
 FONT 8, "MS Shell Dlg", 400, 0, 0x1
 BEGIN
     LTEXT           "Willkommen zum %s Setup-Programm.",IDC_WLC_A,13,13,231,25
-    LTEXT           "Dieser Assistent wird Sie durch die Installation von\n%s führen.",IDC_WLC_B,13,44,195,21
+    LTEXT           "Dieser Assistent wird Sie durch die Installation von/n%s führen.",IDC_WLC_B,13,44,195,21
     LTEXT           "Klicken Sie auf ""Weiter"", um fortzufahren.",IDC_WLC_WARNING,13,131,333,52
 END
 
@@ -645,8 +645,8 @@ BEGIN
     ERROR_LOADLICENSE       "Fehler beim Zugriff auf Lizenzdatei."
     IDS_INSTALLING          "%s"
     IDS_CHOOSEDIR           "Wählen Sie das Verzeichnis"
-    IDS_NODIR               "Das Verzeichnis:\n\n'%s'\n\nexistiert nicht. Soll das Verzeichnis erstellt werden?"
-    IDS_NOSPACE             "Nicht genug Speicherplatz auf Laufwerk %s \n\nBenötigter Platz: %ld Bytes\nVorhandener Platz: %ld Bytes\n\nGeben Sie bitte mehr Speicherplatz frei.\nDrücken Sie ""Abbrechen"" um diese Warnung zu ignorieren."
+    IDS_NODIR               "Das Verzeichnis:/n/n'%s'/n/nexistiert nicht. Soll das Verzeichnis erstellt werden?"
+    IDS_NOSPACE             "Nicht genug Speicherplatz auf Laufwerk %s /n/nBenötigter Platz: %ld Bytes/nVorhandener Platz: %ld Bytes/n/nGeben Sie bitte mehr Speicherplatz frei./nDrücken Sie ""Abbrechen"" um diese Warnung zu ignorieren."
     IDS_WZR_FINISH          "&Fertigstellen"
     IDS_TARGETDIR           "Zielverzeichnis"
     IDS_PERSONAL            "Verknüpfungen nur für aktuellen Benutzer"
@@ -655,15 +655,15 @@ END
 STRINGTABLE 
 BEGIN
     IDS_WZR_INSTALL         "&Installieren"
-    IDS_INSTFAILED          "Das Setup ist noch nicht abgeschlossen. Die Anwendung %s wurde nicht installiert.\n\nSie können das Setup zu einem späteren Zeitpunkt nochmals ausführen, um die Installation zu vervollständigen."
-    ERROR_CMDLINE           "Verwendung:\nSETUP [/?] [/s] [/d Ziel_Verz] [/id <y,n>] [/is <y,n>] [/au <y,n>]\n\n[x] bedeutet, dass der Parameter x optional ist.\n<y,n> bedeutet, dass der Parameter y oder n benötigt wird.\n\n/? -- Generiert diesen Nutzungshinweis.\n/s -- Automatische unbeaufsichtigte Installation.\n/d -- Zielverzeichnis.\n/id -- Installiert Desktop-Verknüpfung.\n/is -- Installiert Startmenü-Verknüpfung.\n/au -- Für alle Benutzer gemeinsame Ordner."
-    IDS_CONFLICTWITHNEWER   "Das Verzeichnis '%s' enthält bereits eine neuere Version der installierten Anwendung.\n\nUm in dieses Verzeichnis zu installieren, müssen Sie die jetzige Version entfernen. Anschließend können Sie diese Version von Open Salamander installieren.\n\nAlternativ können Sie auch ein anderes Verzeichnis wählen."
-    IDS_INSTNEEDRESTART     "Das Setup ist noch nicht abgeschlossen. Ein Windows-Neustart ist nötig um die verwendeten Shell-Erweiterungen zu deinstallieren.\n\nBitte starten Sie Windows neu und führen Sie das Setup nochmals aus um die Installation zu vervollständigen."
+    IDS_INSTFAILED          "Das Setup ist noch nicht abgeschlossen. Die Anwendung %s wurde nicht installiert./n/nSie können das Setup zu einem späteren Zeitpunkt nochmals ausführen, um die Installation zu vervollständigen."
+    ERROR_CMDLINE           "Verwendung:/nSETUP [/?] [/s] [/d Ziel_Verz] [/id <y,n>] [/is <y,n>] [/au <y,n>]/n/n[x] bedeutet, dass der Parameter x optional ist./n<y,n> bedeutet, dass der Parameter y oder n benötigt wird./n/n/? -- Generiert diesen Nutzungshinweis./n/s -- Automatische unbeaufsichtigte Installation./n/d -- Zielverzeichnis./n/id -- Installiert Desktop-Verknüpfung./n/is -- Installiert Startmenü-Verknüpfung./n/au -- Für alle Benutzer gemeinsame Ordner."
+    IDS_CONFLICTWITHNEWER   "Das Verzeichnis '%s' enthält bereits eine neuere Version der installierten Anwendung./n/nUm in dieses Verzeichnis zu installieren, müssen Sie die jetzige Version entfernen. Anschließend können Sie diese Version von Open Salamander installieren./n/nAlternativ können Sie auch ein anderes Verzeichnis wählen."
+    IDS_INSTNEEDRESTART     "Das Setup ist noch nicht abgeschlossen. Ein Windows-Neustart ist nötig um die verwendeten Shell-Erweiterungen zu deinstallieren./n/nBitte starten Sie Windows neu und führen Sie das Setup nochmals aus um die Installation zu vervollständigen."
     IDS_TARGETDIRUPGRADE    "Zielverzeichnis (Aktualisierung)"
-    IDS_CONFLICTPRIOR       "Das Verzeichnis '%s' enthält bereits eine frühere Version der installierten Anwendung.\n\nDrücken Sie ""OK"", um diese zu aktualisieren.\nDrücken Sie auf ""Abbrechen"", um sie in ein anderes Verzeichnis zu installieren."
-    IDS_CONFLICTSAME        "Das Verzeichnis '%s' enthält bereits die selbe Version der installierten Anwendung.\n\nDrücken Sie ""OK"", um diese zu reparieren.\nDrücken Sie auf ""Abbrechen"", um sie in ein anderes Verzeichnis zu installieren."
-    IDS_PREVIEWBUILDWARNING "Dies ist eine Vorabversion von Open Salamander, veröffentlicht im Early Access Programm. Sie sollte NICHT in Produktionsumgebungen verwendet werden. Benutzen Sie diese nur für Testzwecke. Wir freuen uns auf Ihre Meinung in der ""Early Access Program Section"" im forum.altap.cz.\nHinweis: diese Version ist zeitlich begrenzt."
-    IDS_BETAWARNING         "Dies ist eine BETA Version von Open Salamander. Sie sollte NICHT in Produktionsumgebungen verwendet werden. Benutzen Sie diese nur für Testzwecke. Wir freuen uns auf Ihre Meinung im forum.altap.cz.\nHinweis: diese Version ist zeitlich begrenzt."
+    IDS_CONFLICTPRIOR       "Das Verzeichnis '%s' enthält bereits eine frühere Version der installierten Anwendung./n/nDrücken Sie ""OK"", um diese zu aktualisieren./nDrücken Sie auf ""Abbrechen"", um sie in ein anderes Verzeichnis zu installieren."
+    IDS_CONFLICTSAME        "Das Verzeichnis '%s' enthält bereits die selbe Version der installierten Anwendung./n/nDrücken Sie ""OK"", um diese zu reparieren./nDrücken Sie auf ""Abbrechen"", um sie in ein anderes Verzeichnis zu installieren."
+    IDS_PREVIEWBUILDWARNING "Dies ist eine Vorabversion von Open Salamander, veröffentlicht im Early Access Programm. Sie sollte NICHT in Produktionsumgebungen verwendet werden. Benutzen Sie diese nur für Testzwecke. Wir freuen uns auf Ihre Meinung in der ""Early Access Program Section"" im forum.altap.cz./nHinweis: diese Version ist zeitlich begrenzt."
+    IDS_BETAWARNING         "Dies ist eine BETA Version von Open Salamander. Sie sollte NICHT in Produktionsumgebungen verwendet werden. Benutzen Sie diese nur für Testzwecke. Wir freuen uns auf Ihre Meinung im forum.altap.cz./nHinweis: diese Version ist zeitlich begrenzt."
 END
 
 STRINGTABLE 
@@ -673,31 +673,31 @@ BEGIN
     IDS_INSERT_MENU         "Programm-Verknüpfung für das Startmenü anlegen"
     IDS_INVALIDPATH         "Das Zielbverzeichnis '%s' ist ungültig."
     IDS_NAMEUSEDFORFILE     "Der Name ""%s"" wurde bereits für eine Datei verwendet."
-    IDS_CREATEDIRFAILED     "Kann das neue Verzeichnis nicht erstellen:\n%s"
+    IDS_CREATEDIRFAILED     "Kann das neue Verzeichnis nicht erstellen:/n%s"
     IDS_ERRORCREATELOG      "Erstellen der Logdatei %s fehlgeschlagen."
-    IDS_APPRUNNING          "Das Setup hat festgestellt, dass die Anwendung bereits läuft.\nSchließen Sie diese bitte und klicken Sie ""OK"" um fortzufahren.\nName der Anwendung lautet %s."
+    IDS_APPRUNNING          "Das Setup hat festgestellt, dass die Anwendung bereits läuft./nSchließen Sie diese bitte und klicken Sie ""OK"" um fortzufahren./nName der Anwendung lautet %s."
     IDS_MAINWINDOWTITLE     "Setup"
     IDS_SETUPCOPYRIGHT1     "Copyright © 1997-2023 Open Salamander Authors"
-    IDS_INSTALL_STOP        "Das Setup ist noch nicht abgeschlossen. Wenn Sie jetzt beenden, wird das Programm nicht installiert.\n\nSie können das Setup zu einem späteren Zeitpunkt nochmals ausführen, um die Installation zu vervollständigen.\n\nSetup verlassen?"
+    IDS_INSTALL_STOP        "Das Setup ist noch nicht abgeschlossen. Wenn Sie jetzt beenden, wird das Programm nicht installiert./n/nSie können das Setup zu einem späteren Zeitpunkt nochmals ausführen, um die Installation zu vervollständigen./n/nSetup verlassen?"
     IDS_INSTALL_STOP_TITLE  "Setup verlassen"
     IDS_WIZ_TITLE           "Setup - %s"
 END
 
 STRINGTABLE 
 BEGIN
-    ERROR_CF_OPENFILE       "Fehler beim Öffnen der Datei %s\n"
-    ERROR_CF_FILEINFORMATION "Fehler beim Abrufen der Dateiinformationen %s\n"
-    ERROR_CF_CREATEFILE     "Fehler beim Erstellen der Datei %s\n"
-    ERROR_CF_FILESETATTR    "Fehler beim Setzen von Dateiattributen %s\n"
-    ERROR_CF_READFILE       "Fehler beim Lesen der Datei %s\n"
-    ERROR_CF_WRITEFILE      "Fehler beim Schreiben der Datei %s\n"
+    ERROR_CF_OPENFILE       "Fehler beim Öffnen der Datei %s/n"
+    ERROR_CF_FILEINFORMATION "Fehler beim Abrufen der Dateiinformationen %s/n"
+    ERROR_CF_CREATEFILE     "Fehler beim Erstellen der Datei %s/n"
+    ERROR_CF_FILESETATTR    "Fehler beim Setzen von Dateiattributen %s/n"
+    ERROR_CF_READFILE       "Fehler beim Lesen der Datei %s/n"
+    ERROR_CF_WRITEFILE      "Fehler beim Schreiben der Datei %s/n"
     ERROR_CF_GETATTR        "Fehler beim Abrufen der Dateiattribute: "
     ERROR_DLGCREATE         "Fehler beim Erstellen des Dialogfensters: "
 END
 
 STRINGTABLE 
 BEGIN
-    ERROR_CREATESHORTCUT    "Fehler (%08X) beim Erstellen der Verknüpfung %s\n"
+    ERROR_CREATESHORTCUT    "Fehler (%08X) beim Erstellen der Verknüpfung %s/n"
 END
 
 #endif    // German (Neutral) resources
@@ -733,7 +733,7 @@ CAPTION "Welcome"
 FONT 8, "MS Shell Dlg", 400, 0, 0x1
 BEGIN
     LTEXT           "Welcome to the %s setup program",IDC_WLC_A,13,13,203,25
-    LTEXT           "This wizard will guide you through installation of\n%s",IDC_WLC_B,13,44,173,21
+    LTEXT           "This wizard will guide you through installation of/n%s",IDC_WLC_B,13,44,173,21
     LTEXT           "Click Next to continue.",IDC_WLC_WARNING,13,131,304,52
 END
 
@@ -927,8 +927,8 @@ BEGIN
     ERROR_LOADLICENSE       "Error accessing license file."
     IDS_INSTALLING          "%s"
     IDS_CHOOSEDIR           "Choose Directory"
-    IDS_NODIR               "The directory:\n\n'%s'\n\ndoes not exist. Do you want the directory to be created?"
-    IDS_NOSPACE             "There is not enough space on disk %s\n\nspace required: %ld bytes\nspace available: %ld bytes\n\nPlease free up some disk space.\nPress Cancel to ignore this warning."
+    IDS_NODIR               "The directory:/n/n'%s'/n/ndoes not exist. Do you want the directory to be created?"
+    IDS_NOSPACE             "There is not enough space on disk %s/n/nspace required: %ld bytes/nspace available: %ld bytes/n/nPlease free up some disk space./nPress Cancel to ignore this warning."
     IDS_WZR_FINISH          "&Finish"
     IDS_TARGETDIR           "Target directory"
     IDS_PERSONAL            "Shortcuts for current user only"
@@ -937,15 +937,15 @@ END
 STRINGTABLE 
 BEGIN
     IDS_WZR_INSTALL         "&Install"
-    IDS_INSTFAILED          "Setup is not complete. Application %s is not installed.\n\nYou may run the Setup program at a later time to complete the installation."
-    ERROR_CMDLINE           "Usage:\nSETUP [/?] [/s] [/d dest_dir] [/id <y,n>] [/is <y,n>] [/au <y,n>]\n\n[x] means that parameter x is optional.\n<y,n> means that parameter y or n is required.\n\n/? -- Generates this Usage message.\n/s -- Silent unattended install.\n/d -- Destination directory.\n/id -- Install Desktop Shortcut.\n/is -- Install Start Menu Shortcut.\n/au -- All users common folders."
-    IDS_CONFLICTWITHNEWER   "The directory '%s' already contains newer version of installed application.\n\nTo install to this directory, uninstall the existing Open Salamander. Then you can install this version of Open Salamander.\n\nOtherwise you can choose another directory."
-    IDS_INSTNEEDRESTART     "Setup is not complete. Windows restart is needed to finish uninstalling shell extensions that are in use.\n\nPlease restart your Windows and run the Setup program again to complete the installation."
+    IDS_INSTFAILED          "Setup is not complete. Application %s is not installed./n/nYou may run the Setup program at a later time to complete the installation."
+    ERROR_CMDLINE           "Usage:/nSETUP [/?] [/s] [/d dest_dir] [/id <y,n>] [/is <y,n>] [/au <y,n>]/n/n[x] means that parameter x is optional./n<y,n> means that parameter y or n is required./n/n/? -- Generates this Usage message./n/s -- Silent unattended install./n/d -- Destination directory./n/id -- Install Desktop Shortcut./n/is -- Install Start Menu Shortcut./n/au -- All users common folders."
+    IDS_CONFLICTWITHNEWER   "The directory '%s' already contains newer version of installed application./n/nTo install to this directory, uninstall the existing Open Salamander. Then you can install this version of Open Salamander./n/nOtherwise you can choose another directory."
+    IDS_INSTNEEDRESTART     "Setup is not complete. Windows restart is needed to finish uninstalling shell extensions that are in use./n/nPlease restart your Windows and run the Setup program again to complete the installation."
     IDS_TARGETDIRUPGRADE    "Target directory (Upgrade)"
-    IDS_CONFLICTPRIOR       "The directory '%s' already contains a prior version of the installed application.\n\nPress OK to upgrade it.\nPress Cancel to install to another directory."
-    IDS_CONFLICTSAME        "The directory '%s' already contains the same version of the installed application.\n\nPress OK to repair it.\nPress Cancel to install to another directory."
-    IDS_PREVIEWBUILDWARNING "This is PREVIEW BUILD of Open Salamander, released in Early Access Program. It should NOT be used in production environments. Use it for testing only. We are looking for your feedback at Early Access Program section on forum.altap.cz.\nNote: this version is time limited."
-    IDS_BETAWARNING         "This is BETA version of Open Salamander. It should NOT be used in production environments. Use it for testing purpose only. We are looking for your feedback on forum.altap.cz.\nNote: this version is time limited."
+    IDS_CONFLICTPRIOR       "The directory '%s' already contains a prior version of the installed application./n/nPress OK to upgrade it./nPress Cancel to install to another directory."
+    IDS_CONFLICTSAME        "The directory '%s' already contains the same version of the installed application./n/nPress OK to repair it./nPress Cancel to install to another directory."
+    IDS_PREVIEWBUILDWARNING "This is PREVIEW BUILD of Open Salamander, released in Early Access Program. It should NOT be used in production environments. Use it for testing only. We are looking for your feedback at Early Access Program section on forum.altap.cz./nNote: this version is time limited."
+    IDS_BETAWARNING         "This is BETA version of Open Salamander. It should NOT be used in production environments. Use it for testing purpose only. We are looking for your feedback on forum.altap.cz./nNote: this version is time limited."
 END
 
 STRINGTABLE 
@@ -955,31 +955,31 @@ BEGIN
     IDS_INSERT_MENU         "Insert program shortcut in Start Menu"
     IDS_INVALIDPATH         "Destination directory '%s' is invalid."
     IDS_NAMEUSEDFORFILE     "The name ""%s"" has already been used for a file."
-    IDS_CREATEDIRFAILED     "Unable to create new directory:\n%s"
+    IDS_CREATEDIRFAILED     "Unable to create new directory:/n%s"
     IDS_ERRORCREATELOG      "Creating log file %s failed."
-    IDS_APPRUNNING          "Setup has detected that installed application is running.\nPlease close it and click OK to continue.\nApplication title is %s."
+    IDS_APPRUNNING          "Setup has detected that installed application is running./nPlease close it and click OK to continue./nApplication title is %s."
     IDS_MAINWINDOWTITLE     "Setup"
     IDS_SETUPCOPYRIGHT1     "Copyright © 1997-2023 Open Salamander Authors"
-    IDS_INSTALL_STOP        "Setup is not complete. If you quit now, the program will not be installed.\n\nYou may run the Setup program again at another time to complete the installation.\n\nExit Setup?"
+    IDS_INSTALL_STOP        "Setup is not complete. If you quit now, the program will not be installed./n/nYou may run the Setup program again at another time to complete the installation./n/nExit Setup?"
     IDS_INSTALL_STOP_TITLE  "Exit Setup"
     IDS_WIZ_TITLE           "Setup - %s"
 END
 
 STRINGTABLE 
 BEGIN
-    ERROR_CF_OPENFILE       "Error opening file %s\n"
-    ERROR_CF_FILEINFORMATION "Error getting file informations %s\n"
-    ERROR_CF_CREATEFILE     "Error creating file %s\n"
-    ERROR_CF_FILESETATTR    "Error setting file attributes %s\n"
-    ERROR_CF_READFILE       "Error reading file %s\n"
-    ERROR_CF_WRITEFILE      "Error writing file %s\n"
+    ERROR_CF_OPENFILE       "Error opening file %s/n"
+    ERROR_CF_FILEINFORMATION "Error getting file informations %s/n"
+    ERROR_CF_CREATEFILE     "Error creating file %s/n"
+    ERROR_CF_FILESETATTR    "Error setting file attributes %s/n"
+    ERROR_CF_READFILE       "Error reading file %s/n"
+    ERROR_CF_WRITEFILE      "Error writing file %s/n"
     ERROR_CF_GETATTR        "Error getting file attributes: "
     ERROR_DLGCREATE         "Error creating dialog window: "
 END
 
 STRINGTABLE 
 BEGIN
-    ERROR_CREATESHORTCUT    "Error (%08X) creating shortcut %s\n"
+    ERROR_CREATESHORTCUT    "Error (%08X) creating shortcut %s/n"
 END
 
 #endif    // English (U.S.) resources
@@ -994,13 +994,13 @@ END
 //
 #define INSIDE_SETUP
 #if !defined(AFX_RESOURCE_DLL) || defined(AFX_TARG_CSY)
-#include "remove\resource.h"
+#include "remove/resource.h"
 LANGUAGE LANG_CZECH, SUBLANG_DEFAULT
-#include "remove\remove_cz.rc2"
+#include "remove/remove_cz.rc2"
 LANGUAGE LANG_GERMAN, SUBLANG_NEUTRAL
-#include "remove\remove_de.rc2"
+#include "remove/remove_de.rc2"
 LANGUAGE LANG_ENGLISH, SUBLANG_ENGLISH_US
-#include "remove\remove_en.rc2"
+#include "remove/remove_en.rc2"
 #endif
 
 /////////////////////////////////////////////////////////////////////////////

@@ -36,10 +36,10 @@ END
 
 2 TEXTINCLUDE 
 BEGIN
-    "#include ""winresrc.h""\r\n"
-    "\r\n"
-    "#include ""resource.h""\r\n"
-    "#include ""comdefs.h""\r\n"
+    "#include ""winresrc.h""/r/n"
+    "/r/n"
+    "#include ""resource.h""/r/n"
+    "#include ""comdefs.h""/r/n"
     "\0"
 END
 
@@ -65,7 +65,7 @@ SE_IDI_ICON             ICON                    "icon.ico"
 
 
 
-// insert the core of main.rc here: start after the line "#include "..\..\comdefs.h"" and copy it to the end of the file
+// insert the core of main.rc here: start after the line "#include "../../comdefs.h"" and copy it to the end of the file
 
 
 

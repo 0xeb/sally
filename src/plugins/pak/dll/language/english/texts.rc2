@@ -9,7 +9,7 @@
 /////////////////////////////////////////////////////////////////////////////
 // Add manually edited resources here...
 
-#include "..\..\texts.rh2"
+#include "../../texts.rh2"
 
 STRINGTABLE 
 {

@@ -23,7 +23,7 @@
 #include "persistence.h"
 #include "abortmodal.h"
 
-#pragma comment(lib, "UxTheme.lib")
+#pragma comment(lib, "uxtheme.lib")
 
 CAutomationMenuExtInterface g_oMenuExtInterface;
 extern CSalamanderGeneralAbstract* SalamanderGeneral;

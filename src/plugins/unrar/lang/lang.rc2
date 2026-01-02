@@ -9,7 +9,7 @@
 /////////////////////////////////////////////////////////////////////////////
 // Add manually edited resources here...
 
-#include "..\versinfo.rh2"
+#include "../versinfo.rh2"
 #include "versinfo.rc2"
 
 STRINGTABLE
@@ -46,7 +46,7 @@ STRINGTABLE
   IDS_ERROR, "Error"
   IDS_NOTFOUND, "File not found"
   IDS_BADDLL, "Incorrect version of unrar.dll. Please reinstall the UnRAR plugin."
-  IDS_SELECTFIRST, "It seems this is a multi-volume archive. If so, please select the first archive volume and press OK.\n\nIf it is not a multi-volume archive, press Cancel."
+  IDS_SELECTFIRST, "It seems this is a multi-volume archive. If so, please select the first archive volume and press OK./n/nIf it is not a multi-volume archive, press Cancel."
   IDS_SELECTFIRSTTITLE, "Select First Volume"
   IDS_FILENOTFOUND "File not found in the archive."
   IDS_LISTINFO_PAKEDSIZE      "Packed"

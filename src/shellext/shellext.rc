@@ -4,7 +4,7 @@
 
 #include <winresrc.h>
 
-#include "..\plugins\shared\spl_vers.h"
+#include "../plugins/shared/spl_vers.h"
 
 #define FILE_SALVER "5.0"   // without the build number and platform, e.g. "3.1 beta 1"
 #define FILE_VER "1.49\0"

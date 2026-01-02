@@ -177,7 +177,7 @@ extern "C"
 
     typedef struct tagHH_POPUP
     {
-        int cbStruct;           // sizeof this structure
+        int cbStruct;           // sizeof(this) structure
         HINSTANCE hinst;        // instance handle for string resource
         UINT idString;          // string resource id, or text id if pszFile is specified in HtmlHelp call
         LPCTSTR pszText;        // used if idString is zero
@@ -190,7 +190,7 @@ extern "C"
 
     typedef struct tagHH_AKLINK
     {
-        int cbStruct;        // sizeof this structure
+        int cbStruct;        // sizeof(this) structure
         BOOL fReserved;      // must be FALSE (really!)
         LPCTSTR pszKeywords; // semi-colon separated keywords
         LPCTSTR pszUrl;      // URL to jump to if no keywords found (may be NULL)

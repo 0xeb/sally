@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 
 #include "precomp.h"
-#include <Ntddscsi.h>
+#include <ntddscsi.h>
 
 #include "cfgdlg.h"
 #include "plugins.h"

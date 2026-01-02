@@ -11,7 +11,7 @@
 //
 #include "winresrc.h"
 
-#include "..\zip.rh2"
+#include "../zip.rh2"
 
 /////////////////////////////////////////////////////////////////////////////
 #undef APSTUDIO_READONLY_SYMBOLS
@@ -35,18 +35,18 @@ END
 
 2 TEXTINCLUDE 
 BEGIN
-    "#include ""winresrc.h""\r\n"
-    "\r\n"
-    "#include ""..\\zip.rh2""\r\n"
+    "#include ""winresrc.h""/r/n"
+    "/r/n"
+    "#include ""..//zip.rh2""/r/n"
     "\0"
 END
 
 3 TEXTINCLUDE 
 BEGIN
-    "#if !defined(AFX_RESOURCE_DLL) || defined(AFX_TARG_NEU)\r\n"
-    "LANGUAGE LANG_NEUTRAL,SUBLANG_NEUTRAL\r\n"
-    "#include ""lang.rc2""   // non-Microsoft Visual C++ edited resources\r\n"
-    "#endif\r\n"
+    "#if !defined(AFX_RESOURCE_DLL) || defined(AFX_TARG_NEU)/r/n"
+    "LANGUAGE LANG_NEUTRAL,SUBLANG_NEUTRAL/r/n"
+    "#include ""lang.rc2""   // non-Microsoft Visual C++ edited resources/r/n"
+    "#endif/r/n"
     "\0"
 END
 
@@ -375,7 +375,7 @@ CAPTION "Wait For"
 FONT 8, "MS Shell Dlg", 400, 0, 0x1
 BEGIN
     LTEXT           "This option enables you to wait for another process than the process you specified in the field 'Command'. After this process is finished the self-extractor remove temporary files and finish itself.",IDC_STATIC_1,12,9,200,32
-    LTEXT           "It is necessary only if the installation program launch another executable which continues installation while the original installation program is finished.\nIn this manner behaves e.g some versions of Install Shield.",IDC_STATIC_2,12,49,200,32
+    LTEXT           "It is necessary only if the installation program launch another executable which continues installation while the original installation program is finished./nIn this manner behaves e.g some versions of Install Shield.",IDC_STATIC_2,12,49,200,32
     LTEXT           "&Filename of the executable:",IDC_STATIC_3,12,89,103,8
     EDITTEXT        IDC_FILENAME,12,99,200,12,ES_AUTOHSCROLL
     LTEXT           "",IDC_STATIC_4,3,121,221,1,SS_ETCHEDHORZ | WS_GROUP
@@ -411,23 +411,23 @@ IDM_SFXMENU MENU
 BEGIN
     POPUP "&File"
     BEGIN
-        MENUITEM "&Export Settings...\tCtrl+E", CM_SFX_EXPORT
-        MENUITEM "&Import Settings...\tCtrl+I", CM_SFX_IMPORT
+        MENUITEM "&Export Settings.../tCtrl+E", CM_SFX_EXPORT
+        MENUITEM "&Import Settings.../tCtrl+I", CM_SFX_IMPORT
     END
     POPUP "&View"
     BEGIN
-        MENUITEM "Pre&view SFX Dialog Box...\tCtr+V", CM_SFX_PREVIEW
+        MENUITEM "Pre&view SFX Dialog Box.../tCtr+V", CM_SFX_PREVIEW
     END
     POPUP "&Options"
     BEGIN
-        MENUITEM "&Reset All\tCtrl+Shift+R",    CM_SFX_RESETALL
-        MENUITEM "Reset &Values\tCtrl+R",       CM_SFX_RESETVALUES
-        MENUITEM "Reset &Texts\tCtrl+T",        CM_SFX_RESETTEXTS
+        MENUITEM "&Reset All/tCtrl+Shift+R",    CM_SFX_RESETALL
+        MENUITEM "Reset &Values/tCtrl+R",       CM_SFX_RESETVALUES
+        MENUITEM "Reset &Texts/tCtrl+T",        CM_SFX_RESETTEXTS
         MENUITEM SEPARATOR
-        MENUITEM "&Add to Favorites...\tCtrl+A", CM_SFX_ADD
-        MENUITEM "&Favorites\tCtrl+F",          CM_SFX_FAVORITIES
+        MENUITEM "&Add to Favorites.../tCtrl+A", CM_SFX_ADD
+        MENUITEM "&Favorites/tCtrl+F",          CM_SFX_FAVORITIES
         MENUITEM SEPARATOR
-        MENUITEM "&Last Used\tCtrl+L",          CM_SFX_LASTUSED
+        MENUITEM "&Last Used/tCtrl+L",          CM_SFX_LASTUSED
     END
 END
 
@@ -448,7 +448,7 @@ BEGIN
     BEGIN
         MENUITEM "&Save",                       CM_SAVE
         MENUITEM SEPARATOR
-        MENUITEM "&Close\tAlt+F4",              CM_CLOSE
+        MENUITEM "&Close/tAlt+F4",              CM_CLOSE
     END
 END
 

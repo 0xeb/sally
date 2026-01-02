@@ -369,8 +369,8 @@ protected:
         if (dta != NULL)
         {
             NONCLIENTMETRICS ncm;
-            ncm.cbSize = sizeof ncm;
-            SystemParametersInfo(SPI_GETNONCLIENTMETRICS, sizeof ncm, &ncm, 0);
+            ncm.cbSize = sizeof(ncm);
+            SystemParametersInfo(SPI_GETNONCLIENTMETRICS, sizeof(ncm), &ncm, 0);
 
             HFONT hfnormal = CreateFontIndirect(&ncm.lfStatusFont);
 

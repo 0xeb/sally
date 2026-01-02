@@ -3,9 +3,9 @@
 
 #include "precomp.h"
 
-#include <Shlobj.h>
-#include <Shellapi.h>
-#include <Sddl.h>
+#include <shlobj.h>
+#include <shellapi.h>
+#include <sddl.h>
 
 HINSTANCE HLanguage = NULL;
 CSalmonSharedMemory* SalmonSharedMemory = NULL;

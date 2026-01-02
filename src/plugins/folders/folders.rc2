@@ -12,4 +12,4 @@
 #include "versinfo.rh2"
 #include "versinfo.rc2"
 
-IDB_FOLDERS BITMAP "res\\folders.bmp"
+IDB_FOLDERS BITMAP "res//folders.bmp"

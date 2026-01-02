@@ -11,7 +11,7 @@
 //
 #include "winresrc.h"
 
-#include "..\filecomp.rh2"
+#include "../filecomp.rh2"
 
 /////////////////////////////////////////////////////////////////////////////
 #undef APSTUDIO_READONLY_SYMBOLS
@@ -35,18 +35,18 @@ END
 
 2 TEXTINCLUDE 
 BEGIN
-    "#include ""winresrc.h""\r\n"
-    "\r\n"
-    "#include ""..\\filecomp.rh2""\r\n"
+    "#include ""winresrc.h""/r/n"
+    "/r/n"
+    "#include ""..//filecomp.rh2""/r/n"
     "\0"
 END
 
 3 TEXTINCLUDE 
 BEGIN
-    "#if !defined(AFX_RESOURCE_DLL) || defined(AFX_TARG_NEU)\r\n"
-    "LANGUAGE LANG_NEUTRAL,SUBLANG_NEUTRAL\r\n"
-    "#include ""lang.rc2""   // non-Microsoft Visual C++ edited resources\r\n"
-    "#endif\r\n"
+    "#if !defined(AFX_RESOURCE_DLL) || defined(AFX_TARG_NEU)/r/n"
+    "LANGUAGE LANG_NEUTRAL,SUBLANG_NEUTRAL/r/n"
+    "#include ""lang.rc2""   // non-Microsoft Visual C++ edited resources/r/n"
+    "#endif/r/n"
     "\0"
 END
 
@@ -62,33 +62,33 @@ IDM_MENU MENU
 BEGIN
     POPUP "&File"
     BEGIN
-        MENUITEM "Compare...\tCtrl+O",          CM_COMPARE
-        MENUITEM "Recompare\tCtrl+R",           CM_RECOMPARE
+        MENUITEM "Compare.../tCtrl+O",          CM_COMPARE
+        MENUITEM "Recompare/tCtrl+R",           CM_RECOMPARE
         MENUITEM SEPARATOR
-        MENUITEM "E&xit\tAlt+F4",               CM_EXIT
+        MENUITEM "E&xit/tAlt+F4",               CM_EXIT
     END
     POPUP "&Edit"
     BEGIN
-        MENUITEM "Copy\tCtrl+C",                CM_COPY
+        MENUITEM "Copy/tCtrl+C",                CM_COPY
     END
     POPUP "&View"
     BEGIN
-        MENUITEM "Show &White Space\tCtrl+W",   CM_SHOWWHITESPACE
-        MENUITEM "Show Only &Differences\tCtrl+D", CM_ONLYDIFFERENCES
-        MENUITEM "D&etailed Differences\tF4",   CM_DETAILDIFF
+        MENUITEM "Show &White Space/tCtrl+W",   CM_SHOWWHITESPACE
+        MENUITEM "Show Only &Differences/tCtrl+D", CM_ONLYDIFFERENCES
+        MENUITEM "D&etailed Differences/tF4",   CM_DETAILDIFF
         MENUITEM SEPARATOR
-        MENUITEM "&First Difference\tAlt+Home", CM_FIRSTDIFF
-        MENUITEM "&Previous Difference\tAlt+Up Arrow", CM_PREVDIFF
-        MENUITEM "&Next Difference\tAlt+Down Arrow", CM_NEXTDIFF
-        MENUITEM "&Last Difference\tAlt+End",   CM_LASTDIFF
+        MENUITEM "&First Difference/tAlt+Home", CM_FIRSTDIFF
+        MENUITEM "&Previous Difference/tAlt+Up Arrow", CM_PREVDIFF
+        MENUITEM "&Next Difference/tAlt+Down Arrow", CM_NEXTDIFF
+        MENUITEM "&Last Difference/tAlt+End",   CM_LASTDIFF
         MENUITEM SEPARATOR
-        MENUITEM "&Show Caret\tF2",             CM_SHOWCARET
+        MENUITEM "&Show Caret/tF2",             CM_SHOWCARET
         MENUITEM SEPARATOR
-        MENUITEM "Maximize Left File &View\tCtrl+,", CM_MAXLEFTVIEW
-        MENUITEM "Maximize Ri&ght File View\tCtrl+.", CM_MAXRIGHTVIEW
-        MENUITEM "Si&ze File Views Equally\tCtrl+E", CM_SAMESIZEVIEW
-        MENUITEM "&Toggle Full Screen\tF11",    CM_MAXIMIZE
-        MENUITEM "&Horizontal View\tCtrl+H",    CM_VIEW_HORIZONTAL
+        MENUITEM "Maximize Left File &View/tCtrl+,", CM_MAXLEFTVIEW
+        MENUITEM "Maximize Ri&ght File View/tCtrl+.", CM_MAXRIGHTVIEW
+        MENUITEM "Si&ze File Views Equally/tCtrl+E", CM_SAMESIZEVIEW
+        MENUITEM "&Toggle Full Screen/tF11",    CM_MAXIMIZE
+        MENUITEM "&Horizontal View/tCtrl+H",    CM_VIEW_HORIZONTAL
     END
     POPUP "&Options"
     BEGIN
@@ -98,7 +98,7 @@ BEGIN
     END
     POPUP "&Help"
     BEGIN
-        MENUITEM "&Contents\tF1",               CM_HELP
+        MENUITEM "&Contents/tF1",               CM_HELP
         MENUITEM "&Keyboard Shortcuts",         CM_HELPKEYBOARD
         MENUITEM SEPARATOR
         MENUITEM "&About",                      CM_ABOUT

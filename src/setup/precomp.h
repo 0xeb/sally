@@ -4,7 +4,7 @@
 #pragma once
 
 #include <windows.h>
-#include <Shlobj.h>
+#include <shlobj.h>
 #include <Shobjidl.h>
 
 #include "lstrfix.h"

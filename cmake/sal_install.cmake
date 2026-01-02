@@ -16,6 +16,11 @@ endfunction()
 
 # Install MSVC runtime libraries
 function(sal_install_runtime)
+  # Skip for cross-compilation - runtime DLLs must be provided separately
+  if(CMAKE_CROSSCOMPILING)
+    message(STATUS "Cross-compiling: skipping MSVC runtime installation")
+    return()
+  endif()
   if(MSVC)
     include(InstallRequiredSystemLibraries)
     if(CMAKE_INSTALL_SYSTEM_RUNTIME_LIBS)

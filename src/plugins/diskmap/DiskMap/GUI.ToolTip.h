@@ -475,7 +475,7 @@ public:
         RECT rcWork;
         HMONITOR hmn = MonitorFromPoint(pt, MONITOR_DEFAULTTONEAREST);
         MONITORINFO mni;
-        mni.cbSize = sizeof mni;
+        mni.cbSize = sizeof(mni);
         if (GetMonitorInfo(hmn, &mni))
         {
             rcWork = mni.rcWork;
@@ -624,8 +624,8 @@ public:
             delete this->_sFormatter;
 
         NONCLIENTMETRICS ncm;
-        ncm.cbSize = sizeof ncm;
-        SystemParametersInfo(SPI_GETNONCLIENTMETRICS, sizeof ncm, &ncm, 0);
+        ncm.cbSize = sizeof(ncm);
+        SystemParametersInfo(SPI_GETNONCLIENTMETRICS, sizeof(ncm), &ncm, 0);
         LOGFONT cpt = ncm.lfStatusFont;
         cpt.lfWeight = FW_BOLD;
         this->_hftitle = CreateFontIndirect(&cpt);

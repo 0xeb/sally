@@ -53,44 +53,44 @@ IDM_MAINMENU MENU
 BEGIN
     POPUP "&File"
     BEGIN
-        MENUITEM "&Open Project...\tCtrl+O",    CM_OPEN
+        MENUITEM "&Open Project.../tCtrl+O",    CM_OPEN
         POPUP "Open &Recent"
         BEGIN
             MENUITEM "Empty",                       CM_OPEN_RECENT_FIRST
         END
         MENUITEM SEPARATOR
-        MENUITEM "Open MUI &Packages...\tCtrl+P", ID_FILE_OPENMUI
+        MENUITEM "Open MUI &Packages.../tCtrl+P", ID_FILE_OPENMUI
         MENUITEM SEPARATOR
-        MENUITEM "Sa&ve All\tCtrl+S",           CM_SAVE
+        MENUITEM "Sa&ve All/tCtrl+S",           CM_SAVE
         MENUITEM "&Close Project",              CM_CLOSE
         MENUITEM SEPARATOR
-        MENUITEM "&Import Translation from Old Project...\tCtrl+I", CM_IMPORT
+        MENUITEM "&Import Translation from Old Project.../tCtrl+I", CM_IMPORT
         MENUITEM SEPARATOR
-        MENUITEM "I&mport Translation from Text Archive...\tCtrl+M", ID_FILE_IMPORTTEXT
-        MENUITEM "Export Tr&anslation as Text Archive...\tCtrl+D", ID_FILE_EXPORTTEXT
+        MENUITEM "I&mport Translation from Text Archive.../tCtrl+M", ID_FILE_IMPORTTEXT
+        MENUITEM "Export Tr&anslation as Text Archive.../tCtrl+D", ID_FILE_EXPORTTEXT
         MENUITEM SEPARATOR
-        MENUITEM "&Export Translated Texts for Spell Check...\tCtrl+E", CM_EXPORT
+        MENUITEM "&Export Translated Texts for Spell Check.../tCtrl+E", CM_EXPORT
         MENUITEM SEPARATOR
-        MENUITEM "&Translation Properties...\tCtrl+T", CM_PROPERTIES
+        MENUITEM "&Translation Properties.../tCtrl+T", CM_PROPERTIES
         MENUITEM SEPARATOR
         MENUITEM "E&xit",                       CM_EXIT
     END
     POPUP "&Edit"
     BEGIN
-        MENUITEM "&Find Text...\tCtrl+F",       CM_EDIT_FIND
-        MENUITEM "Find &Untranslated Texts\tCtrl+U", ID_EDIT_FINDUNTRANSLATED
-        MENUITEM "Find Dialogs Needing &Relayout\tCtrl+R", ID_EDIT_FINDRELAYOUT
+        MENUITEM "&Find Text.../tCtrl+F",       CM_EDIT_FIND
+        MENUITEM "Find &Untranslated Texts/tCtrl+U", ID_EDIT_FINDUNTRANSLATED
+        MENUITEM "Find Dialogs Needing &Relayout/tCtrl+R", ID_EDIT_FINDRELAYOUT
         MENUITEM "Find Dialogs With &Outer Controls", ID_EDIT_FINDOUTER
         MENUITEM SEPARATOR
-        MENUITEM "&Next Output Row\tF4",        CM_GOTO_NEXT
-        MENUITEM "&Previous Output Row\tShift+F4", CM_GOTO_PREV
+        MENUITEM "&Next Output Row/tF4",        CM_GOTO_NEXT
+        MENUITEM "&Previous Output Row/tShift+F4", CM_GOTO_PREV
         MENUITEM SEPARATOR
-        MENUITEM "&Toggle Bookmark\tCtrl+F2",   ID_EDIT_TOGGLEBOOKMARK
-        MENUITEM "Ne&xt Bookmark\tF2",          ID_EDIT_NEXTBOOKMARK
-        MENUITEM "Pre&vious Bookmark\tShift+F2", ID_EDIT_PREVIOUSEBOOKMARK
-        MENUITEM "&Clear Bookmarks\tCtrl+Shift+F2", ID_EDIT_CLEARBOOKMARKS
+        MENUITEM "&Toggle Bookmark/tCtrl+F2",   ID_EDIT_TOGGLEBOOKMARK
+        MENUITEM "Ne&xt Bookmark/tF2",          ID_EDIT_NEXTBOOKMARK
+        MENUITEM "Pre&vious Bookmark/tShift+F2", ID_EDIT_PREVIOUSEBOOKMARK
+        MENUITEM "&Clear Bookmarks/tCtrl+Shift+F2", ID_EDIT_CLEARBOOKMARKS
         MENUITEM SEPARATOR
-        MENUITEM "&Edit Item Text\tF3",         ID_EDIT_TRANSLATED
+        MENUITEM "&Edit Item Text/tF3",         ID_EDIT_TRANSLATED
     END
     POPUP "&Preview"
     BEGIN
@@ -100,31 +100,31 @@ BEGIN
     END
     POPUP "&Tools"
     BEGIN
-        MENUITEM "&Validate Translation...\tCtrl+Q", CM_HOTKEY_CONFLICTS
-        MENUITEM "&Edit Dialog Layout...\tCtrl+L", ID_TOOLS_EDITLAYOUT
+        MENUITEM "&Validate Translation.../tCtrl+Q", CM_HOTKEY_CONFLICTS
+        MENUITEM "&Edit Dialog Layout.../tCtrl+L", ID_TOOLS_EDITLAYOUT
         MENUITEM SEPARATOR
-        MENUITEM "&Save All and Restart Open Salamander\tF5", ID_TOOLS_RESTART
-        MENUITEM "&Kill Open Salamander\tShift+F5", ID_TOOLS_KILL
+        MENUITEM "&Save All and Restart Open Salamander/tF5", ID_TOOLS_RESTART
+        MENUITEM "&Kill Open Salamander/tShift+F5", ID_TOOLS_KILL
         MENUITEM SEPARATOR
-        MENUITEM "&Mark Changed Strings as Translated\tCtrl+K", ID_TOOLS_MARKASTR
-        MENUITEM "&Reset Dialogs Layouts to Original\tCtrl+N", ID_TOOLS_RESETDLGSTOORIG
-        MENUITEM "&Clear Dialog Relayout Flag\tCtrl+J", ID_TOOLS_CLEARDLGRELAYOUT
+        MENUITEM "&Mark Changed Strings as Translated/tCtrl+K", ID_TOOLS_MARKASTR
+        MENUITEM "&Reset Dialogs Layouts to Original/tCtrl+N", ID_TOOLS_RESETDLGSTOORIG
+        MENUITEM "&Clear Dialog Relayout Flag/tCtrl+J", ID_TOOLS_CLEARDLGRELAYOUT
         MENUITEM SEPARATOR
         MENUITEM "&Options...",                 CM_TOOLS_OPTIONS
     END
     POPUP "&Window"
     BEGIN
-        MENUITEM "Ne&xt\tCtrl+Tab",             CM_WND_NEXT
-        MENUITEM "Pre&vious\tCtrl+Shift+Tab",   CM_WND_PREVIOUS
+        MENUITEM "Ne&xt/tCtrl+Tab",             CM_WND_NEXT
+        MENUITEM "Pre&vious/tCtrl+Shift+Tab",   CM_WND_PREVIOUS
         MENUITEM SEPARATOR
         MENUITEM "&Cascade",                    CM_WND_CASCADE
         MENUITEM "T&itle",                      CM_WND_TITLE
         MENUITEM SEPARATOR
-        MENUITEM "&Navigator\tAlt+1",           CM_WND_TREE
-        MENUITEM "&Texts\tAlt+2",               CM_WND_TEXT
-        MENUITEM "&Resource Symbols\tAlt+3",    CM_WND_RH
-        MENUITEM "&Output\tAlt+4",              CM_WND_OUTPUT
-        MENUITEM "&Preview\tAlt+5",             CM_WND_PREVIEW
+        MENUITEM "&Navigator/tAlt+1",           CM_WND_TREE
+        MENUITEM "&Texts/tAlt+2",               CM_WND_TEXT
+        MENUITEM "&Resource Symbols/tAlt+3",    CM_WND_RH
+        MENUITEM "&Output/tAlt+4",              CM_WND_OUTPUT
+        MENUITEM "&Preview/tAlt+5",             CM_WND_PREVIEW
     END
     POPUP "&Help"
     BEGIN
@@ -142,26 +142,26 @@ BEGIN
     END
     POPUP "&Edit"
     BEGIN
-        MENUITEM "&Undo\tCtrl+Z",               ID_LAYOUT_EDIT_UNDO
-        MENUITEM "&Redo\tCtrl+Y",               ID_LAYOUT_EDIT_REDO
+        MENUITEM "&Undo/tCtrl+Z",               ID_LAYOUT_EDIT_UNDO
+        MENUITEM "&Redo/tCtrl+Y",               ID_LAYOUT_EDIT_REDO
         MENUITEM SEPARATOR
-        MENUITEM "Select &All\tCtrl+A",         ID_LAYOUT_EDIT_SELECTALL
-        MENUITEM "&Deselect All\tCtrl+D",       ID_LAYOUT_EDIT_DESELECTALL
+        MENUITEM "Select &All/tCtrl+A",         ID_LAYOUT_EDIT_SELECTALL
+        MENUITEM "&Deselect All/tCtrl+D",       ID_LAYOUT_EDIT_DESELECTALL
     END
     POPUP "&Position"
     BEGIN
-        MENUITEM "Align &Left\tCtrl+Left",      ID_LAYOUT_ALIGN_LEFT
-        MENUITEM "Align &Right\tCtrl+Right",    ID_LAYOUT_ALIGN_RIGHT
-        MENUITEM "Align &Top\tCtrl+Top",        ID_LAYOUT_ALIGN_TOP
-        MENUITEM "Align &Bottom\t Ctrl+Down",   ID_LAYOUT_ALIGN_BOTTOM
+        MENUITEM "Align &Left/tCtrl+Left",      ID_LAYOUT_ALIGN_LEFT
+        MENUITEM "Align &Right/tCtrl+Right",    ID_LAYOUT_ALIGN_RIGHT
+        MENUITEM "Align &Top/tCtrl+Top",        ID_LAYOUT_ALIGN_TOP
+        MENUITEM "Align &Bottom/t Ctrl+Down",   ID_LAYOUT_ALIGN_BOTTOM
         MENUITEM SEPARATOR
-        MENUITEM "Equal &Horizontal Spacing\tH", ID_EQUAL_H_SPACING
-        MENUITEM "Equal &Vertical Spacing\tV",  ID_EQUAL_V_SPACING
+        MENUITEM "Equal &Horizontal Spacing/tH", ID_EQUAL_H_SPACING
+        MENUITEM "Equal &Vertical Spacing/tV",  ID_EQUAL_V_SPACING
         MENUITEM SEPARATOR
         MENUITEM "Center Horizontal",           ID_LAYOUT_CENTER_H
         MENUITEM "Center Vertical",             ID_LAYOUT_CENTER_V
         MENUITEM SEPARATOR
-        MENUITEM "Center Horizontal To Dialog\tC", ID_LAYOUT_CENTER_H2D
+        MENUITEM "Center Horizontal To Dialog/tC", ID_LAYOUT_CENTER_H2D
         MENUITEM "Center Vertical To Dialog",   ID_LAYOUT_CENTER_V2D
     END
     POPUP "&Resize"
@@ -172,28 +172,28 @@ BEGIN
         MENUITEM "H&eight To Largest",          ID_LAYOUT_RESIZE_HEIGHTLARGE
         MENUITEM "He&ight To Smallest",         ID_LAYOUT_RESIZE_HEIGHTSMALL
         MENUITEM SEPARATOR
-        MENUITEM "Se&t Size...\tE",             ID_LAYOUT_RESIZE_SETSIZE
+        MENUITEM "Se&t Size.../tE",             ID_LAYOUT_RESIZE_SETSIZE
         MENUITEM SEPARATOR
-        MENUITEM "Si&ze to Content\tS",         ID_LAYOUT_RESIZE_SIZETOCONTENT
+        MENUITEM "Si&ze to Content/tS",         ID_LAYOUT_RESIZE_SIZETOCONTENT
     END
     POPUP "&Tools"
     BEGIN
-        MENUITEM "&Outline Controls\tO",        ID_LAYOUT_TOOLS_OUTLINE
+        MENUITEM "&Outline Controls/tO",        ID_LAYOUT_TOOLS_OUTLINE
         MENUITEM SEPARATOR
-        MENUITEM "&Preview Original Layout\tP", ID_LAYOUT_TOOLS_PREVIEWORIGINAL
-        MENUITEM "Preview &Unchanged Layout\tU", ID_LAYOUT_TOOLS_PREVIEWUNCHANGED
+        MENUITEM "&Preview Original Layout/tP", ID_LAYOUT_TOOLS_PREVIEWORIGINAL
+        MENUITEM "Preview &Unchanged Layout/tU", ID_LAYOUT_TOOLS_PREVIEWUNCHANGED
         MENUITEM SEPARATOR
-        MENUITEM "&Test Dialog Box\tT",         ID_LAYOUT_TOOLS_TESTDLGBOX
+        MENUITEM "&Test Dialog Box/tT",         ID_LAYOUT_TOOLS_TESTDLGBOX
         MENUITEM SEPARATOR
-        MENUITEM "Ali&gn To\tG",                ID_LAYOUT_ALIGN_EDGE_TO
+        MENUITEM "Ali&gn To/tG",                ID_LAYOUT_ALIGN_EDGE_TO
         MENUITEM SEPARATOR
-        MENUITEM "&Normalize Standard Layout\tN", ID_LAYOUT_TOOLS_NORMALIZE_STD
-        MENUITEM "Normalize &Wide Layout\tShift+N", ID_LAYOUT_TOOLS_NORMALIZE_WIDE
-        MENUITEM "&Reset To Original Layout\tR", ID_LAYOUT_TOOLS_RESET
+        MENUITEM "&Normalize Standard Layout/tN", ID_LAYOUT_TOOLS_NORMALIZE_STD
+        MENUITEM "Normalize &Wide Layout/tShift+N", ID_LAYOUT_TOOLS_NORMALIZE_WIDE
+        MENUITEM "&Reset To Original Layout/tR", ID_LAYOUT_TOOLS_RESET
     END
     POPUP "Pr&ojects"
     BEGIN
-        MENUITEM "&Open Layout Editor For Next Project\tQ", ID_LAYOUT_PROJECT_NEXT
+        MENUITEM "&Open Layout Editor For Next Project/tQ", ID_LAYOUT_PROJECT_NEXT
         MENUITEM SEPARATOR
         MENUITEM "dummy",                       ID_LAYOUT_PROJECT_0
     END
@@ -391,7 +391,7 @@ BEGIN
                     "Button",BS_AUTOCHECKBOX | WS_TABSTOP,18,35,167,12
     CONTROL         "Inconsistent &format specifier (%d, %s, etc.)",IDC_VAL_PRINTFSPECIFIER,
                     "Button",BS_AUTOCHECKBOX | WS_TABSTOP,18,48,198,12
-    CONTROL         "Inconsistent &control characters (\\r, \\n, \\t, etc.)",IDC_VAL_CONTROLCHARS,
+    CONTROL         "Inconsistent &control characters (//r, //n, //t, etc.)",IDC_VAL_CONTROLCHARS,
                     "Button",BS_AUTOCHECKBOX | WS_TABSTOP,18,61,168,12
     CONTROL         "Inconsistent &strings with CSV (comma separated values)",IDC_VAL_STRINGSWITHCSV,
                     "Button",BS_AUTOCHECKBOX | WS_TABSTOP,18,74,195,12
@@ -508,13 +508,13 @@ END
 
 2 TEXTINCLUDE 
 BEGIN
-    "#include ""winresrc.h""\r\n"
+    "#include ""winresrc.h""/r/n"
     "\0"
 END
 
 3 TEXTINCLUDE 
 BEGIN
-    "\r\n"
+    "/r/n"
     "\0"
 END
 

@@ -3,7 +3,7 @@
 
 #include "precomp.h"
 #include <shlobj.h>
-#include <Shlwapi.h>
+#include <shlwapi.h>
 
 #include "infinst.h"
 #include "resource.h"

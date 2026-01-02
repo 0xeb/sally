@@ -9,7 +9,7 @@
 /////////////////////////////////////////////////////////////////////////////
 // Add manually edited resources here...
 
-#include "..\versinfo.rh2"
+#include "../versinfo.rh2"
 #include "versinfo.rc2"
 
 STRINGTABLE
@@ -17,7 +17,7 @@ STRINGTABLE
  IDS_PLUGIN_DESCRIPTION, "Browse and extract LHA archives."
  IDS_ABOUT, "About Plugin"
  IDS_FILECORRUPT, "Invalid LZH file or unknown file format."
- IDS_CHECKSUMERROR, "Header checksum error.\nThe archive is corrupt - not all files can be listed."
+ IDS_CHECKSUMERROR, "Header checksum error./nThe archive is corrupt - not all files can be listed."
  IDS_LOWMEM, "Out of memory."
  IDS_WRITEERROR, "Write error"
  IDS_PLUGINNAME, "UnLHA"

@@ -9,7 +9,7 @@
 /////////////////////////////////////////////////////////////////////////////
 // Add manually edited resources here...
 
-#include "..\versinfo.rh2"
+#include "../versinfo.rh2"
 #include "versinfo.rc2"
 
 STRINGTABLE
@@ -20,7 +20,7 @@ STRINGTABLE
  IDS_SELECTDIR, "Select the target directory."
  IDS_ZEROSIZE, "The file is not large enough to be split."
  IDS_INSERTDISK, "Insert a formatted disk with enough free space."
- IDS_FIXEDNOSENSE, "Using Autodetect on a fixed drive has no sense.\nDo you want to continue?"
+ IDS_FIXEDNOSENSE, "Using Autodetect on a fixed drive has no sense./nDo you want to continue?"
  IDS_OUTOFSPACE, "Not enough free space on the target disk."
  IDS_OUTOFMEM, "Out of memory."
  IDS_READERROR, "Read error"
@@ -28,13 +28,13 @@ STRINGTABLE
  IDS_INSERTNEXT, "Insert next disk and press OK."
  IDS_SPLIT, "Split"
  IDS_COMBINE, "Combine"
- IDS_TOOMANYPARTS, "The number of parts is greater than 100.\nDo you really want to continue?"
+ IDS_TOOMANYPARTS, "The number of parts is greater than 100./nDo you really want to continue?"
  IDS_WRITING, "Writing"
  IDS_TOOLONGNAME, "The original file name is too long and the resulting batch file may not work on some systems. Do you want to continue?"
  IDS_ADDFILTER, "All files (*.*)"
  IDS_ADDTITLE, "Add partial files"
  IDS_BROWSETITLE, "Choose target file"
- IDS_CRCERROR, "CRC failed.\n\nThe partial files are damaged, are not complete or were combined\nin a wrong order. The output file is probably invalid."
+ IDS_CRCERROR, "CRC failed./n/nThe partial files are damaged, are not complete or were combined/nin a wrong order. The output file is probably invalid."
  IDS_PROCESSING, "Processing"
  IDS_ZEROFILES, "Nothing to combine."
  IDS_CANCEL, "Do you want to cancel this operation?"
@@ -44,10 +44,10 @@ STRINGTABLE
  IDS_CRCNOTFOUND, "NOT FOUND"
  IDS_CALCCRC, "Calculate CRC"
  IDS_SPLITTITLE, "Split ""%%s"" (%s bytes) to:"
- IDS_144FLOPPY, "1.44 MB (3.5\042 Floppy)"
- IDS_720FLOPPY, "720 KB (3.5\042 Floppy)"
- IDS_12FLOPPY, "1.2 MB (5.25\042 Floppy)"
- IDS_360FLOPPY, "360 KB (5.25\042 Floppy)"
+ IDS_144FLOPPY, "1.44 MB (3.5/042 Floppy)"
+ IDS_720FLOPPY, "720 KB (3.5/042 Floppy)"
+ IDS_12FLOPPY, "1.2 MB (5.25/042 Floppy)"
+ IDS_360FLOPPY, "360 KB (5.25/042 Floppy)"
  IDS_AUTODETECT, "Autodetect"
  IDS_FILECRCTITLE, "CRC32 of the file ""%s"" is:"
  IDS_BATTOOLONG, "Error creating the batch file."

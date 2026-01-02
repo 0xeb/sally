@@ -12,4 +12,4 @@
 #include "versinfo.rh2"
 #include "versinfo.rc2"
 
-IDB_UNISO BITMAP "res\\uniso.bmp"
+IDB_UNISO BITMAP "res//uniso.bmp"

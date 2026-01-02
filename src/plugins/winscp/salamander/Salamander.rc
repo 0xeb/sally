@@ -1,9 +1,9 @@
 ﻿#include "Salamander.rh"
 
-#include "..\\resource\\TextsCore1.rc"
-#include "..\\resource\\TextsCore2.rc"
-#include "..\\resource\\TextsWin1.rc"
-#include "..\\resource\\TextsWin2.rc"
+#include "..//resource//TextsCore1.rc"
+#include "..//resource//TextsCore2.rc"
+#include "..//resource//TextsWin1.rc"
+#include "..//resource//TextsWin2.rc"
 #include "SalamanderTexts.rc"
 
 IDD_PROGRESS DIALOG 0, 0, 210, 99

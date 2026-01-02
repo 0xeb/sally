@@ -38,5 +38,5 @@ END
 STRINGTABLE
 BEGIN
 	IDS_FX_CHANGEPATHERRORTITLE	"Error Changing Directory"
-	IDS_FX_CHANGEPATHERRORFMT	"Path: ""%s""\r\nError: %s"
+	IDS_FX_CHANGEPATHERRORFMT	"Path: ""%s""/r/nError: %s"
 END

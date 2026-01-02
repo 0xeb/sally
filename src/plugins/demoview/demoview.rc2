@@ -20,6 +20,6 @@
 #include "versinfo.rh2"
 #include "versinfo.rc2"
 
-IDB_PLUGINICO BITMAP "res\\plugico.bmp"
-IDB_TOOLBAR16 BITMAP "res\\tb16.bmp"
-IDB_TOOLBAR256 BITMAP "res\\tb256.bmp"
+IDB_PLUGINICO BITMAP "res//plugico.bmp"
+IDB_TOOLBAR16 BITMAP "res//tb16.bmp"
+IDB_TOOLBAR256 BITMAP "res//tb256.bmp"

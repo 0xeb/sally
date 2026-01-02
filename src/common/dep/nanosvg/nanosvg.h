@@ -610,7 +610,7 @@ static NSVGparser* nsvg__createParser()
 
 	// Init style
 	nsvg__xformIdentity(p->attr[0].xform);
-	memset(p->attr[0].id, 0, sizeof p->attr[0].id);
+	memset(p->attr[0].id, 0, sizeof(p)->attr[0].id);
 	p->attr[0].fillColor = NSVG_RGB(0,0,0);
 	p->attr[0].strokeColor = NSVG_RGB(0,0,0);
 	p->attr[0].opacity = 1;
@@ -929,7 +929,7 @@ static void nsvg__addShape(NSVGparser* p)
 	if (shape == NULL) goto error;
 	memset(shape, 0, sizeof(NSVGshape));
 
-	memcpy(shape->id, attr->id, sizeof shape->id);
+	memcpy(shape->id, attr->id, sizeof(shape)->id);
 	scale = nsvg__getAverageScale(attr->xform);
 	shape->strokeWidth = attr->strokeWidth * scale;
 	shape->strokeDashOffset = attr->strokeDashOffset * scale;

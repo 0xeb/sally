@@ -33,7 +33,7 @@
 #include "tserver.rh"
 #include "tserver.rh2"
 
-#pragma comment(lib, "UxTheme.lib")
+#pragma comment(lib, "uxtheme.lib")
 
 #ifndef MULTITHREADED_HEAP_ENABLE
 #pragma error "macro MULTITHREADED_HEAP_ENABLE not defined";

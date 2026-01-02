@@ -67,8 +67,8 @@ LANGUAGE LANG_ENGLISH, SUBLANG_ENGLISH_US
 // #define MY_RESIZE_DIALOG  DIALOG 0, 0, xs, ys  MY_MODAL_RESIZE_DIALOG_STYLE  MY_FONT
 #define MY_PAGE           DIALOG 0, 0, xs, ys  MY_PAGE_STYLE  MY_FONT
 
-#define OK_CANCEL \
-  DEFPUSHBUTTON  "OK",     IDOK,     bx2, by, bxs, bys \
+#define OK_CANCEL /
+  DEFPUSHBUTTON  "OK",     IDOK,     bx2, by, bxs, bys /
   PUSHBUTTON     "Cancel", IDCANCEL, bx1, by, bxs, bys
 
 

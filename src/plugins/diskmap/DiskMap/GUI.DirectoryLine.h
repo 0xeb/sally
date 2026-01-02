@@ -737,7 +737,7 @@ public:
         this->CalcColors(this->_isActive);
 
         LOGFONT lf;
-        SystemParametersInfo(SPI_GETICONTITLELOGFONT, sizeof lf, &lf, 0);
+        SystemParametersInfo(SPI_GETICONTITLELOGFONT, sizeof(lf), &lf, 0);
         lf.lfItalic = FALSE; //HACK: force italics off so characters do not overflow the width (Overhang/Underhang: GetCharABCWidths() and GetCharABCWidthsFloat())
         this->_hfont = CreateFontIndirect(&lf);
 
@@ -773,7 +773,7 @@ public:
                 if (!this->_trackingMouse && ni != NODEID_NONE)
                 {
                     TRACKMOUSEEVENT trme;
-                    trme.cbSize = sizeof trme;
+                    trme.cbSize = sizeof(trme);
                     trme.dwFlags = TME_LEAVE;
                     trme.hwndTrack = this->_hWnd;
                     this->_trackingMouse = TrackMouseEvent(&trme);
@@ -824,7 +824,7 @@ public:
             if (!this->_trackingMouse)
             {
                 TRACKMOUSEEVENT trme;
-                trme.cbSize = sizeof trme;
+                trme.cbSize = sizeof(trme);
                 trme.dwFlags = TME_LEAVE;
                 trme.hwndTrack = this->_hWnd;
                 this->_trackingMouse = TrackMouseEvent(&trme);

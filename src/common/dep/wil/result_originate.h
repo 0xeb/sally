@@ -26,7 +26,7 @@
 #define __WIL_RESULT_ORIGINATE_INCLUDED
 
 #include "result.h"
-#include <OleAuto.h> // RestrictedErrorInfo uses BSTRs :(
+#include <oleauto.h> // RestrictedErrorInfo uses BSTRs :(
 #include <winstring.h>
 #include "resource.h"
 #include "com.h"

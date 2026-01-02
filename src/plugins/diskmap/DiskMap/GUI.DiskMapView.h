@@ -86,8 +86,8 @@ protected:
             //HACK: this was put together quickly to have something for version 1.0; fortunately it should not happen too often
             //TODO: rework properly
             NONCLIENTMETRICS ncm;
-            ncm.cbSize = sizeof ncm;
-            SystemParametersInfo(SPI_GETNONCLIENTMETRICS, sizeof ncm, &ncm, 0);
+            ncm.cbSize = sizeof(ncm);
+            SystemParametersInfo(SPI_GETNONCLIENTMETRICS, sizeof(ncm), &ncm, 0);
             HFONT hfnormal = CreateFontIndirect(&ncm.lfStatusFont);
 
             HFONT ofont = SelectFont(hdc, hfnormal);
@@ -254,7 +254,7 @@ protected:
             if (isMouse && !this->_trackingMouse)
             {
                 TRACKMOUSEEVENT trme;
-                trme.cbSize = sizeof trme;
+                trme.cbSize = sizeof(trme);
                 trme.dwFlags = TME_LEAVE;
                 trme.hwndTrack = this->_hWnd;
                 this->_trackingMouse = TrackMouseEvent(&trme);

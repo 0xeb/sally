@@ -477,7 +477,7 @@ BOOL CPluginDataInterface::GetInfoLineContent(
             // for simplicity we do not use "plural" strings (see SalamanderGeneral->ExpandPluralString())
             char formatA[200];
             SG->ExpandPluralString(formatA, 200, LoadStr(IDS_SELECTEDSIZE), 1, (CQuadWord*)&selectedSize);
-            prefix = SalPrintf(buffer, 1000, formatA, selectedSize);
+            prefix = SalPrintf(buffer, 1000, formatA, selectedSize.Value);
 
             /*    // example of using the standard string
       SalamanderGeneral->ExpandPluralBytesFilesDirs(buffer, 1000, selectedSize, selectedFiles,

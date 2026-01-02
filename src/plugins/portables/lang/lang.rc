@@ -11,8 +11,8 @@
 //
 #include "winresrc.h"
 
-#include "..\wpd.rh2"
-#include "..\fx_lang.rh"
+#include "../wpd.rh2"
+#include "../fx_lang.rh"
 
 /////////////////////////////////////////////////////////////////////////////
 #undef APSTUDIO_READONLY_SYMBOLS
@@ -36,19 +36,19 @@ END
 
 2 TEXTINCLUDE 
 BEGIN
-    "#include ""winresrc.h""\r\n"
-    "\r\n"
-    "#include ""..\\wpd.rh2""\r\n"
-    "#include ""..\\fx_lang.rh""\r\n"
+    "#include ""winresrc.h""/r/n"
+    "/r/n"
+    "#include ""..//wpd.rh2""/r/n"
+    "#include ""..//fx_lang.rh""/r/n"
     "\0"
 END
 
 3 TEXTINCLUDE 
 BEGIN
-    "#if !defined(AFX_RESOURCE_DLL) || defined(AFX_TARG_NEU)\r\n"
-    "LANGUAGE LANG_NEUTRAL,SUBLANG_NEUTRAL\r\n"
-    "#include ""lang.rc2""   // non-Microsoft Visual C++ edited resources\r\n"
-    "#endif\r\n"
+    "#if !defined(AFX_RESOURCE_DLL) || defined(AFX_TARG_NEU)/r/n"
+    "LANGUAGE LANG_NEUTRAL,SUBLANG_NEUTRAL/r/n"
+    "#include ""lang.rc2""   // non-Microsoft Visual C++ edited resources/r/n"
+    "#endif/r/n"
     "\0"
 END
 

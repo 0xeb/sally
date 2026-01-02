@@ -17,7 +17,7 @@
 #include "execute.h"
 #include "tasklist.h"
 
-#include <Shlwapi.h>
+#include <shlwapi.h>
 
 const char* MINIMIZED_FINDING_CAPTION = "(%d) %s [%s %s]";
 const char* NORMAL_FINDING_CAPTION = "%s [%s %s]";

@@ -33,16 +33,16 @@ END
 
 2 TEXTINCLUDE 
 BEGIN
-    "#include ""winresrc.h""\r\n"
+    "#include ""winresrc.h""/r/n"
     "\0"
 END
 
 3 TEXTINCLUDE 
 BEGIN
-    "#if !defined(AFX_RESOURCE_DLL) || defined(AFX_TARG_NEU)\r\n"
-    "LANGUAGE LANG_NEUTRAL,SUBLANG_NEUTRAL\r\n"
-    "#include ""..\\version.rc2""\r\n"
-    "#endif\r\n"
+    "#if !defined(AFX_RESOURCE_DLL) || defined(AFX_TARG_NEU)/r/n"
+    "LANGUAGE LANG_NEUTRAL,SUBLANG_NEUTRAL/r/n"
+    "#include ""..//version.rc2""/r/n"
+    "#endif/r/n"
     "\0"
 END
 
@@ -131,18 +131,18 @@ END
 STRINGTABLE
 BEGIN
     IDS_SCRIPTERROR         "Automation Script Error"
-    IDS_LINE                "Line:\t%u\r\n"
-    IDS_COLUMN              "Column:\t%u\r\n"
-    IDS_ERROR               "Error:\t%s"
+    IDS_LINE                "Line:/t%u/r/n"
+    IDS_COLUMN              "Column:/t%u/r/n"
+    IDS_ERROR               "Error:/t%s"
     IDS_RUNFOCUSED          "Run Focused Script"
     IDS_PROGRESSTITLE       "Operation Progress"
-    IDS_SOURCE              "Source:\t%s\r\n"
+    IDS_SOURCE              "Source:/t%s/r/n"
     IDS_SCRIPTPOPUPMENU     "Open Script Menu"
     IDS_MENUEMPTY           "(no script)"
-    IDS_LOADERRFMT          "Failed to execute script '%s'.\r\n%s"
+    IDS_LOADERRFMT          "Failed to execute script '%s'./r/n%s"
     IDS_UNKERROR            "Unknown error."
-    IDS_ABORT               "1\t&Abort"
-    IDS_DEBUGABORT          "1\t&Debug\t2\t&Abort"
+    IDS_ABORT               "1/t&Abort"
+    IDS_DEBUGABORT          "1/t&Debug/t2/t&Abort"
     IDS_ADDDIRTITLE         "Script Directory"
     IDS_ADDDIRDESCR         "Select script repository directory."
 END
@@ -175,7 +175,7 @@ END
 STRINGTABLE
 BEGIN
     IDS_ABORTCAPTION        "Abort Script"
-    IDS_ABORTTIP            "Abort Running Script\tCtrl+Break"
+    IDS_ABORTTIP            "Abort Running Script/tCtrl+Break"
     IDS_MAINWINDOWLOCKED    "Open Salamander window is locked by Automation plugin. Please finish running script."
     IDS_ENGINECREATEFAIL    "Failed to initialize the scripting engine."
 END
@@ -192,7 +192,7 @@ END
 //
 #if !defined(AFX_RESOURCE_DLL) || defined(AFX_TARG_NEU)
 LANGUAGE LANG_NEUTRAL,SUBLANG_NEUTRAL
-#include "..\version.rc2"
+#include "../version.rc2"
 #endif
 
 /////////////////////////////////////////////////////////////////////////////

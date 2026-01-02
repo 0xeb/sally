@@ -3,8 +3,8 @@
 
 #include "precomp.h"
 
-#include <Objbase.h>
-#include <WTypes.h>
+#include <objbase.h>
+#include <wtypes.h>
 
 #include "config.h"
 

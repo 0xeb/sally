@@ -12,7 +12,7 @@
 #include "versinfo.rh2"
 #include "versinfo.rc2"
 
-IDI_SFXICON ICON "selfextr\icon.ico"
+IDI_SFXICON ICON "selfextr/icon.ico"
 IDI_LOCK ICON "lock.ico"
 IDI_COMMENT ICON "comment.ico"
 IDB_ZIP BITMAP "zip.bmp"

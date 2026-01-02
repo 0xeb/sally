@@ -9,7 +9,7 @@
 /////////////////////////////////////////////////////////////////////////////
 // Add manually edited resources here...
 
-#include "..\versinfo.rh2"
+#include "../versinfo.rh2"
 #include "versinfo.rc2"
 
 STRINGTABLE
@@ -91,43 +91,43 @@ STRINGTABLE
 
  // File
  IDS_MENU_FILE, "&File"
- IDS_MENU_FILE_OPEN, "&Open...\tCtr+O"
- IDS_MENU_FILE_REFRESH, "&Refresh\tCtr+R"
- IDS_MENU_FILE_PROPERTIES, "Prop&erties...\tCtrl+F1"
+ IDS_MENU_FILE_OPEN, "&Open.../tCtr+O"
+ IDS_MENU_FILE_REFRESH, "&Refresh/tCtr+R"
+ IDS_MENU_FILE_PROPERTIES, "Prop&erties.../tCtrl+F1"
  IDS_MENU_FILE_OTHER, "O&ther Files"
- IDS_MENU_FILE_PREV, "&Previous\tBackspace"
- IDS_MENU_FILE_NEXT, "&Next\tSpace"
- IDS_MENU_FILE_PREVSEL, "P&revious Selected\tCtrl+Backspace"
- IDS_MENU_FILE_NEXTSEL, "N&ext Selected\tCtrl+Space"
- IDS_MENU_FILE_FIRST, "&First\tShift+Backspace"
- IDS_MENU_FILE_LAST, "&Last\tShift+Space"
- IDS_MENU_FILE_EXIT, "E&xit\tAlt+F4"
+ IDS_MENU_FILE_PREV, "&Previous/tBackspace"
+ IDS_MENU_FILE_NEXT, "&Next/tSpace"
+ IDS_MENU_FILE_PREVSEL, "P&revious Selected/tCtrl+Backspace"
+ IDS_MENU_FILE_NEXTSEL, "N&ext Selected/tCtrl+Space"
+ IDS_MENU_FILE_FIRST, "&First/tShift+Backspace"
+ IDS_MENU_FILE_LAST, "&Last/tShift+Space"
+ IDS_MENU_FILE_EXIT, "E&xit/tAlt+F4"
 
  // Edit
  IDS_MENU_EDIT, "&Edit"
- IDS_MENU_EDIT_COPY, "&Copy\tCtrl+C"
- IDS_MENU_EDIT_SELECT_ALL, "&Select All\tCtrl+A"
- IDS_MENU_EDIT_FIND, "&Find...\tCtrl+F"
- IDS_MENU_EDIT_FIND_NEXT, "Find &Next\tCtrl+N"
- IDS_MENU_EDIT_FIND_PREV, "Find &Previous\tCtrl+P"
- IDS_MENU_EDIT_TOGGLE_BM, "&Toggle Bookmark\tCtrl+F2"
- IDS_MENU_EDIT_NEXT_BM, "N&ext Bookmark\tF2"
- IDS_MENU_EDIT_PREV_BM, "P&revious Bookmark\tShift+F2"
- IDS_MENU_EDIT_CLEAR_ALL_BM, "Clear &All Bookmarks\tCtrl+Shift+F2"
+ IDS_MENU_EDIT_COPY, "&Copy/tCtrl+C"
+ IDS_MENU_EDIT_SELECT_ALL, "&Select All/tCtrl+A"
+ IDS_MENU_EDIT_FIND, "&Find.../tCtrl+F"
+ IDS_MENU_EDIT_FIND_NEXT, "Find &Next/tCtrl+N"
+ IDS_MENU_EDIT_FIND_PREV, "Find &Previous/tCtrl+P"
+ IDS_MENU_EDIT_TOGGLE_BM, "&Toggle Bookmark/tCtrl+F2"
+ IDS_MENU_EDIT_NEXT_BM, "N&ext Bookmark/tF2"
+ IDS_MENU_EDIT_PREV_BM, "P&revious Bookmark/tShift+F2"
+ IDS_MENU_EDIT_CLEAR_ALL_BM, "Clear &All Bookmarks/tCtrl+Shift+F2"
 
  // View
  IDS_MENU_VIEW, "&View"
- IDS_MENU_VIEW_GOTO "&Go to Record...\tG"
- IDS_MENU_VIEW_FIELDS, "Fi&elds...\tI"
- IDS_MENU_VIEW_FULLSCREEN, "&Full Screen\tF11"
+ IDS_MENU_VIEW_GOTO "&Go to Record.../tG"
+ IDS_MENU_VIEW_FIELDS, "Fi&elds.../tI"
+ IDS_MENU_VIEW_FULLSCREEN, "&Full Screen/tF11"
 
  // Convert
  IDS_MENU_CONVERT, "&Convert"
  IDS_MENU_CONVERT_RECOGNIZE, "&Auto-Select"
  IDS_MENU_CONVERT_CODING_FIRST, "&Don't Convert"
  IDS_MENU_CONVERT_CODING_DEF, "Set as Default"
- IDS_MENU_CONVERT_CODING_NEXT, "Next\tF8"
- IDS_MENU_CONVERT_CODING_PREV, "Previous\tShift+F8"
+ IDS_MENU_CONVERT_CODING_NEXT, "Next/tF8"
+ IDS_MENU_CONVERT_CODING_PREV, "Previous/tShift+F8"
 
  // Options
  IDS_MENU_OPTIONS, "&Options"
@@ -136,16 +136,16 @@ STRINGTABLE
 
  // Help
  IDS_MENU_HELP, "&Help"
- IDS_MENU_HELP_CONTENTS, "&Contents\tF1"
+ IDS_MENU_HELP_CONTENTS, "&Contents/tF1"
  IDS_MENU_HELP_INDEX, "&Index..."
  IDS_MENU_HELP_SEARCH, "&Search..."
  IDS_MENU_HELP_ABOUT, "&About..."
 
  // Toolbar Tooltips
- IDS_TBTT_COPY, "Copy\tCtrl+C"
- IDS_TBTT_OPEN, "Open\tCtrl+O"
- IDS_TBTT_FIND, "Find\tCtrl+F"
- IDS_TBTT_PROPERTIES, "Properties\tCtrl+F1"
- IDS_TBTT_FULLSCREEN, "Full Screen\tF11"
- IDS_TBTT_GOTO, "Current Record/Record Count\tG"
+ IDS_TBTT_COPY, "Copy/tCtrl+C"
+ IDS_TBTT_OPEN, "Open/tCtrl+O"
+ IDS_TBTT_FIND, "Find/tCtrl+F"
+ IDS_TBTT_PROPERTIES, "Properties/tCtrl+F1"
+ IDS_TBTT_FULLSCREEN, "Full Screen/tF11"
+ IDS_TBTT_GOTO, "Current Record/Record Count/tG"
 }

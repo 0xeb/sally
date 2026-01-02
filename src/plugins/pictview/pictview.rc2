@@ -16,22 +16,22 @@
 #include "versinfo.rh2"
 #include "versinfo.rc2"
 
-IDI_WINDOW_ICON ICON       "res\\pictview.ico"
-IDI_SB_ANCHOR   ICON       "res\\sb_anch.ico"
-IDI_SB_CURSOR   ICON       "res\\sb_curs.ico"
-IDI_SB_PIPETTE  ICON       "res\\sb_pipt.ico"
-IDI_SB_SIZE     ICON       "res\\sb_size.ico"
+IDI_WINDOW_ICON ICON       "res//pictview.ico"
+IDI_SB_ANCHOR   ICON       "res//sb_anch.ico"
+IDI_SB_CURSOR   ICON       "res//sb_curs.ico"
+IDI_SB_PIPETTE  ICON       "res//sb_pipt.ico"
+IDI_SB_SIZE     ICON       "res//sb_size.ico"
 
-IDC_HAND1       CURSOR     "res\\hand1.cur"
-IDC_HAND2       CURSOR     "res\\hand2.cur"
-IDC_PIPETA      CURSOR     "res\\pipeta.cur"
-IDC_ZOOMIN      CURSOR     "res\\zoomin.cur"
-IDC_ZOOMOUT     CURSOR     "res\\zoomout.cur"
-IDC_SELECT      CURSOR     "res\\select.cur"
+IDC_HAND1       CURSOR     "res//hand1.cur"
+IDC_HAND2       CURSOR     "res//hand2.cur"
+IDC_PIPETA      CURSOR     "res//pipeta.cur"
+IDC_ZOOMIN      CURSOR     "res//zoomin.cur"
+IDC_ZOOMOUT     CURSOR     "res//zoomout.cur"
+IDC_SELECT      CURSOR     "res//select.cur"
 
-IDB_TOOLBAR16   BITMAP     "res\\tb16.bmp"
-IDB_TOOLBAR256  BITMAP     "res\\tb256.bmp"
-IDB_PICTVIEW    BITMAP     "res\\pictview.bmp"
+IDB_TOOLBAR16   BITMAP     "res//tb16.bmp"
+IDB_TOOLBAR256  BITMAP     "res//tb256.bmp"
+IDB_PICTVIEW    BITMAP     "res//pictview.bmp"
 
 IDA_ACCELERATORS ACCELERATORS
 {

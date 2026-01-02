@@ -2,11 +2,11 @@
 #error this file is not editable by Microsoft Visual C++
 #endif //APSTUDIO_INVOKED
 
-#include "..\plugins\shared\spl_vers.h"
+#include "../plugins/shared/spl_vers.h"
 
 CREATEPROCESS_MANIFEST_RESOURCE_ID RT_MANIFEST "manifest.xml"
 
-1 ICON "res\\salmon.ico"
+1 ICON "res/salmon.ico"
 
 1 VERSIONINFO
  FILEVERSION 1,0,3,VERSINFO_BUILDNUMBER
@@ -26,7 +26,7 @@ CREATEPROCESS_MANIFEST_RESOURCE_ID RT_MANIFEST "manifest.xml"
    VALUE "FileVersion", "1.0\0"
    VALUE "InternalName", "salmon\0"
    VALUE "OriginalFilename", "salmon.exe\0"
-   VALUE "LegalCopyright", "Copyright \251 2012-2023 Open Salamander Authors\0"
+   VALUE "LegalCopyright", "Copyright (c) 2012-2023 Open Salamander Authors\0"
    VALUE "ProductVersion", VERSINFO_SALAMANDER_VERSION "\0"
    VALUE "ProductName", "Open Salamander\0"
   }

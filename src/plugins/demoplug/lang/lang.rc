@@ -11,7 +11,7 @@
 //
 #include "winresrc.h"
 
-#include "..\demoplug.rh2"
+#include "../demoplug.rh2"
 
 /////////////////////////////////////////////////////////////////////////////
 #undef APSTUDIO_READONLY_SYMBOLS
@@ -35,18 +35,18 @@ END
 
 2 TEXTINCLUDE 
 BEGIN
-    "#include ""winresrc.h""\r\n"
-    "\r\n"
-    "#include ""..\\demoplug.rh2""\r\n"
+    "#include ""winresrc.h""/r/n"
+    "/r/n"
+    "#include ""..//demoplug.rh2""/r/n"
     "\0"
 END
 
 3 TEXTINCLUDE 
 BEGIN
-    "#if !defined(AFX_RESOURCE_DLL) || defined(AFX_TARG_NEU)\r\n"
-    "LANGUAGE LANG_NEUTRAL,SUBLANG_NEUTRAL\r\n"
-    "#include ""lang.rc2""   // non-Microsoft Visual C++ edited resources\r\n"
-    "#endif\r\n"
+    "#if !defined(AFX_RESOURCE_DLL) || defined(AFX_TARG_NEU)/r/n"
+    "LANGUAGE LANG_NEUTRAL,SUBLANG_NEUTRAL/r/n"
+    "#include ""lang.rc2""   // non-Microsoft Visual C++ edited resources/r/n"
+    "#endif/r/n"
     "\0"
 END
 
@@ -151,7 +151,7 @@ BEGIN
     LTEXT           "STF_END_ELLIPSIS",IDC_STATIC_7,14,66,75,8
     LTEXT           "Long long long long long long long long long string.",IDC_CE_STEND,102,66,152,8
     LTEXT           "STF_PATH_ELLIPSIS",IDC_STATIC_8,14,76,75,8
-    LTEXT           "C:\\Program Files\\Some Application With Long Path\\example.exe",IDC_CE_STPATH,102,76,152,8
+    LTEXT           "C://Program Files//Some Application With Long Path//example.exe",IDC_CE_STPATH,102,76,152,8
     LTEXT           "STF_PATH_ELLIPSIS",IDC_STATIC_9,14,87,75,8
     LTEXT           "ftp://ftp.altap.cz/pub/salamander/example.exe",IDC_CE_STPATH2,102,87,152,8
     RTEXT           "Drag texts to change their size.",IDC_STATIC_10,151,97,103,8

@@ -268,7 +268,7 @@ public:
     size_t FormatShortFileSize(TCHAR* s, size_t slen, UINT64 size)
     {
         static const TCHAR expch[] = TEXT(" KMGTPEZY");
-        static const int maxexp = sizeof expch / sizeof TCHAR - 2;
+        static const int maxexp = sizeof(expch) / sizeof(TCHAR) - 2;
         size_t len = 0;
         int exp = 0;
         //C4244 ok: we only need the first few digits because we compute the short form "1.45TB"

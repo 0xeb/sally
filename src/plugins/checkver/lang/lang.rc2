@@ -9,7 +9,7 @@
 /////////////////////////////////////////////////////////////////////////////
 // Add manually edited resources here...
 
-#include "..\versinfo.rh2"
+#include "../versinfo.rh2"
 #include "versinfo.rc2"
 
 STRINGTABLE
@@ -20,15 +20,15 @@ STRINGTABLE
  IDS_CTXMENU_COPY, "Copy URL to Clipboard"
  IDS_CTXMENU_FILTER, "Ignore %s..."
  IDS_PLUGINNAME, "Check Version"
- IDS_FILTER_CONFIRM, "Do you want to ignore %s? This module will be added to Filters and all its versions will be ignored.\nNote: module can be removed from Filters in configuration dialog of Check Version plugin."
- IDS_FILTERVER_CONFIRM, "Do you want to ignore %s? This version of module will be added to Filters and so it will be ignored.\nNote: this version of module can be removed from Filters in configuration dialog of Check Version plugin."
+ IDS_FILTER_CONFIRM, "Do you want to ignore %s? This module will be added to Filters and all its versions will be ignored./nNote: module can be removed from Filters in configuration dialog of Check Version plugin."
+ IDS_FILTERVER_CONFIRM, "Do you want to ignore %s? This version of module will be added to Filters and so it will be ignored./nNote: this version of module can be removed from Filters in configuration dialog of Check Version plugin."
  IDS_REMOVE_CNFRM, "Do you want to remove %s from Fiters?"
- IDS_SETDEF_CNFRM, "Filters listbox will be emptied.\n\nDo you want to set default values?"
- IDS_OPENED_WINDOWS, "Some Check Version windows are opened.\nDo you want to close them?"
- IDS_ABORT_DOWNLOAD, "Plugin is working with Internet.\nDo you want to abort this Internet session?"
+ IDS_SETDEF_CNFRM, "Filters listbox will be emptied./n/nDo you want to set default values?"
+ IDS_OPENED_WINDOWS, "Some Check Version windows are opened./nDo you want to close them?"
+ IDS_ABORT_DOWNLOAD, "Plugin is working with Internet./nDo you want to abort this Internet session?"
  IDS_INET_INIT, "Initializing Internet connection..."
  IDS_INET_INIT_FAILED, "Initializing failed: %s"
- IDS_INET_CONNECT, "Connecting to \tuwww.altap.cz\tlhttps://www.altap.cz\tn..."
+ IDS_INET_CONNECT, "Connecting to /tuwww.altap.cz/tlhttps://www.altap.cz/tn..."
  IDS_INET_CONNECT_FAILED, "Connecting failed: %s"
  IDS_INET_READ, "Reading information about new versions..."
  IDS_INET_READ_FAILED, "Reading failed: %s"
@@ -59,7 +59,7 @@ STRINGTABLE
  IDS_INET_PROTOCOL, "If you cannot connect, click Configure and change Internet protocol."
  IDS_CHECK_FOR_NEW_VER, "&Check For New Versions..."
  IDS_UPDATE_SCRIPT_LANG, "EN"
- IDS_DONOTUSEFTP, "You have selected FTP protocol. CheckVer plugin is not able to get information about updated or new plugins over FTP. If you can use HTTP, we strongly recommend it.\n\nDo you want to use HTTP protocol instead of FTP?"
+ IDS_DONOTUSEFTP, "You have selected FTP protocol. CheckVer plugin is not able to get information about updated or new plugins over FTP. If you can use HTTP, we strongly recommend it./n/nDo you want to use HTTP protocol instead of FTP?"
  IDS_LOGWNDHELP1, "Click module name to download updated version."
  IDS_LOGWNDHELP2, "Right click module name to see all actions."
  IDS_SHOWDETAILS, "show details"

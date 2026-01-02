@@ -42,8 +42,8 @@ public:
         this->_hfnormal = NULL;
 
         NONCLIENTMETRICS ncm;
-        ncm.cbSize = sizeof ncm;
-        SystemParametersInfo(SPI_GETNONCLIENTMETRICS, sizeof ncm, &ncm, 0);
+        ncm.cbSize = sizeof(ncm);
+        SystemParametersInfo(SPI_GETNONCLIENTMETRICS, sizeof(ncm), &ncm, 0);
         this->_hfnormal = CreateFontIndirect(&ncm.lfStatusFont);
 
         this->_title = new CZResourceString(IDS_DISKMAP_LOAD_TITLE);

@@ -45,9 +45,9 @@ protected:
 class CPropSheetPage : protected CDialog
 {
 public:
-    CDialog::SetObjectOrigin; // zpristupneni povolenych metod predku
-    CDialog::Transfer;
-    CDialog::HWindow; // HWindow zustane take pristupne
+    using CDialog::SetObjectOrigin; // zpristupneni povolenych metod predku
+    using CDialog::Transfer;
+    using CDialog::HWindow; // HWindow zustane take pristupne
 
     CPropSheetPage(const TCHAR* title, HINSTANCE modul, int resID,
                    DWORD flags /* = PSP_USETITLE*/, HICON icon,

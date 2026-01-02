@@ -77,7 +77,7 @@ public:
         flags |= SHGFI_ICON;     //get the icon
         flags &= SHGFI_ICONMASK; //remove unwanted flags
         SHFILEINFO shfi;
-        if (SHGetFileInfo(path, 0, &shfi, sizeof shfi, flags) == 0)
+        if (SHGetFileInfo(path, 0, &shfi, sizeof(shfi), flags) == 0)
             return NULL;
         return shfi.hIcon;
     }

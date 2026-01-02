@@ -3,11 +3,11 @@
 
 #include "precomp.h"
 
-#include "unOLE2.h"
+#include "unole2.h"
 #include "dialogs.h"
 
-#include "unOLE2.rh"
-#include "unOLE2.rh2"
+#include "unole2.rh"
+#include "unole2.rh2"
 #include "lang\lang.rh"
 
 WNDPROC OrigTextControlProc;

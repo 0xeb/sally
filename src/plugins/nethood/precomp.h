@@ -21,7 +21,7 @@
 #define WIN32_LEAN_AND_MEAN // exclude rarely-used stuff from Windows headers
 
 #include <windows.h>
-#include <CommDlg.h>
+#include <commdlg.h>
 #include <windowsx.h>
 #include <shlwapi.h>
 #include <shellapi.h>

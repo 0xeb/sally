@@ -35,18 +35,18 @@ END
 
 2 TEXTINCLUDE 
 BEGIN
-    "#include ""winresrc.h""\r\n"
-    "\r\n"
-    "#include ""tserver.rh2""\r\n"
+    "#include ""winresrc.h""/r/n"
+    "/r/n"
+    "#include ""tserver.rh2""/r/n"
     "\0"
 END
 
 3 TEXTINCLUDE 
 BEGIN
-    "#if !defined(AFX_RESOURCE_DLL) || defined(AFX_TARG_NEU)\r\n"
-    "LANGUAGE LANG_NEUTRAL,SUBLANG_NEUTRAL\r\n"
-    "#include ""tserver.rc2""   // non-Microsoft Visual C++ edited resources\r\n"
-    "#endif\r\n"
+    "#if !defined(AFX_RESOURCE_DLL) || defined(AFX_TARG_NEU)/r/n"
+    "LANGUAGE LANG_NEUTRAL,SUBLANG_NEUTRAL/r/n"
+    "#include ""tserver.rc2""   // non-Microsoft Visual C++ edited resources/r/n"
+    "#endif/r/n"
     "\0"
 END
 
@@ -63,12 +63,12 @@ BEGIN
     POPUP "&Log"
     BEGIN
         MENUITEM "&Export...",                  CM_EXPORT
-        MENUITEM "&Clear\tDelete",              CM_CLEAR
+        MENUITEM "&Clear/tDelete",              CM_CLEAR
         MENUITEM SEPARATOR
         MENUITEM "&Show line in source code",   CM_SHOWINMSVC
-        MENUITEM "Show line &details...\tTab",  CM_DETAILS
+        MENUITEM "Show line &details.../tTab",  CM_DETAILS
         MENUITEM SEPARATOR
-        MENUITEM "Show time &differences\tSpace", CM_DIFFTIME
+        MENUITEM "Show time &differences/tSpace", CM_DIFFTIME
         MENUITEM SEPARATOR
         MENUITEM "&Exit",                       CM_EXIT
     END

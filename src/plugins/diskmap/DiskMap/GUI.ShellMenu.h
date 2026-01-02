@@ -87,7 +87,7 @@ protected:
         if (pidl == NULL)
             return 0;
         DWORD res = 0;
-        res += sizeof pidl->mkid.cb;
+        res += sizeof(pidl->mkid.cb);
         while (pidl->mkid.cb != 0)
         {
             res += pidl->mkid.cb;

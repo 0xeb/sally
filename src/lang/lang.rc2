@@ -9,8 +9,8 @@
 /////////////////////////////////////////////////////////////////////////////
 // Add manually edited resources here...
 
-#include "..\\versinfo.rh2"
-#include "..\\plugins\\shared\\versinfo.rc2"
+#include "..//versinfo.rh2"
+#include "..//plugins//shared//versinfo.rc2"
 
 #include "texts.rc2"   // non-Microsoft Visual C++ edited resources
 
@@ -31,56 +31,56 @@ IDM_VIEWERMENU MENU
 {
  POPUP "&File"
  {
-  MENUITEM "&Open...\tCtrl+O", CM_OPENFILE
-  MENUITEM "&Refresh\tCtrl+R", CM_REREADFILE
+  MENUITEM "&Open.../tCtrl+O", CM_OPENFILE
+  MENUITEM "&Refresh/tCtrl+R", CM_REREADFILE
   MENUITEM SEPARATOR
   
 // POZOR: pokud se zmeni index tohoto submenu, je potreba zmenit VIEWER_FILE_MENU_OTHFILESINDEX
   POPUP "Ot&her Files"
   {
-   MENUITEM "&Previous\tBackspace", CM_PREVFILE
-   MENUITEM "&Next\tSpace", CM_NEXTFILE
+   MENUITEM "&Previous/tBackspace", CM_PREVFILE
+   MENUITEM "&Next/tSpace", CM_NEXTFILE
    MENUITEM SEPARATOR
-   MENUITEM "P&revious Selected\tCtrl+Backspace", CM_PREVSELFILE
-   MENUITEM "N&ext Selected\tCtrl+Space", CM_NEXTSELFILE
+   MENUITEM "P&revious Selected/tCtrl+Backspace", CM_PREVSELFILE
+   MENUITEM "N&ext Selected/tCtrl+Space", CM_NEXTSELFILE
    MENUITEM SEPARATOR
-   MENUITEM "&First\tShift+Backspace", CM_FIRSTFILE
-   MENUITEM "&Last\tShift+Space", CM_LASTFILE
+   MENUITEM "&First/tShift+Backspace", CM_FIRSTFILE
+   MENUITEM "&Last/tShift+Space", CM_LASTFILE
   } 
   
   MENUITEM SEPARATOR
-  MENUITEM "E&xit\tAlt+F4", CM_EXIT
+  MENUITEM "E&xit/tAlt+F4", CM_EXIT
  }
 
  POPUP "&Edit"
  {
-  MENUITEM "&Copy\tCtrl+C", CM_COPYTOCLIP
-  MENUITEM "C&opy to File...\tCtrl+S", CM_COPYTOFILE
+  MENUITEM "&Copy/tCtrl+C", CM_COPYTOCLIP
+  MENUITEM "C&opy to File.../tCtrl+S", CM_COPYTOFILE
   MENUITEM SEPARATOR
-  MENUITEM "Select &All\tCtrl+A", CM_SELECTALLTEXT
+  MENUITEM "Select &All/tCtrl+A", CM_SELECTALLTEXT
  }
 
  POPUP "&Search"
  {
-  MENUITEM "&Find...\tCtrl+F", CM_FINDSET
-  MENUITEM "Find &Next\tCtrl+N", CM_FINDNEXT
-  MENUITEM "Find &Previous\tCtrl+P", CM_FINDPREV
+  MENUITEM "&Find.../tCtrl+F", CM_FINDSET
+  MENUITEM "Find &Next/tCtrl+N", CM_FINDNEXT
+  MENUITEM "Find &Previous/tCtrl+P", CM_FINDPREV
  }
 
  POPUP "&View"
  {
   MENUITEM "&Auto-Select", CM_VIEW_AUTOSEL
   MENUITEM SEPARATOR
-  MENUITEM "&Hex\tCtrl+H", CM_TO_HEX
-  MENUITEM "&Text\tCtrl+T", CM_TO_TEXT
+  MENUITEM "&Hex/tCtrl+H", CM_TO_HEX
+  MENUITEM "&Text/tCtrl+T", CM_TO_TEXT
   MENUITEM SEPARATOR
   MENUITEM "&Set as Default", CM_VIEW_SETDEFAULT
   MENUITEM SEPARATOR
-  MENUITEM "&Full Screen\tF11", CM_VIEW_FULLSCREEN
+  MENUITEM "&Full Screen/tF11", CM_VIEW_FULLSCREEN
   MENUITEM SEPARATOR
-  MENUITEM "&Go To Offset...\tCtrl+G", CM_GOTOOFFSET
+  MENUITEM "&Go To Offset.../tCtrl+G", CM_GOTOOFFSET
   MENUITEM SEPARATOR
-  MENUITEM "&Wrap\tCtrl+W", CM_WRAPED
+  MENUITEM "&Wrap/tCtrl+W", CM_WRAPED
  }
 
  POPUP "&Options"
@@ -92,7 +92,7 @@ IDM_VIEWERMENU MENU
 
  POPUP "&Help"
  {
-  MENUITEM "&Contents\tF1", CM_VIEWERHLP_INTRO
+  MENUITEM "&Contents/tF1", CM_VIEWERHLP_INTRO
   MENUITEM "&Keyboard Shortcuts", CM_VIEWERHLP_KEYBOARD
  }
 }
@@ -101,20 +101,20 @@ IDM_VIEWERCONTEXTMENU MENU
 {
  POPUP ""
  {
-  MENUITEM "&Copy\tCtrl+C", CM_COPYTOCLIP
+  MENUITEM "&Copy/tCtrl+C", CM_COPYTOCLIP
   MENUITEM "C&opy to...", CM_COPYTOFILE
   MENUITEM SEPARATOR
-  MENUITEM "Select &All\tCtrl+A", CM_SELECTALLTEXT
+  MENUITEM "Select &All/tCtrl+A", CM_SELECTALLTEXT
   MENUITEM SEPARATOR
-  MENUITEM "&Find...\tCtrl+F", CM_FINDSET
-  MENUITEM "Find &Next\tCtrl+N", CM_FINDNEXT
-  MENUITEM "Find &Previous\tCtrl+P", CM_FINDPREV
+  MENUITEM "&Find.../tCtrl+F", CM_FINDSET
+  MENUITEM "Find &Next/tCtrl+N", CM_FINDNEXT
+  MENUITEM "Find &Previous/tCtrl+P", CM_FINDPREV
   MENUITEM SEPARATOR
-  MENUITEM "&Hex\tCtrl+H", CM_TO_HEX
-  MENUITEM "&Text\tCtrl+T", CM_TO_TEXT
+  MENUITEM "&Hex/tCtrl+H", CM_TO_HEX
+  MENUITEM "&Text/tCtrl+T", CM_TO_TEXT
   MENUITEM SEPARATOR
-  MENUITEM "&Go To Offset...\tCtrl+G", CM_GOTOOFFSET
+  MENUITEM "&Go To Offset.../tCtrl+G", CM_GOTOOFFSET
   MENUITEM SEPARATOR
-  MENUITEM "&Wrap\tCtrl+W", CM_WRAPED
+  MENUITEM "&Wrap/tCtrl+W", CM_WRAPED
  }
 }

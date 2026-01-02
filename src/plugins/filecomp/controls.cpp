@@ -5,7 +5,7 @@
 
 #include <uxtheme.h>
 
-#include <Shlwapi.h>
+#include <shlwapi.h>
 
 //#pragma comment(lib, "Shlwapi.lib")  // Petr: this does not work for me in VC2008, so I add it to the project
 

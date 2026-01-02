@@ -9,7 +9,7 @@
 /////////////////////////////////////////////////////////////////////////////
 // Add manually edited resources here...
 
-#include "..\versinfo.rh2"
+#include "../versinfo.rh2"
 #include "versinfo.rc2"
 
 // String Table
@@ -18,5 +18,5 @@ STRINGTABLE
     IDS_PLUGINNAME              "Folders"
     IDS_ABOUT                   "About Plugin"
     IDS_PLUGIN_DESCRIPTION      "Browse folders such as Desktop, Control Panel, Recycle Bin, etc."
-    IDS_DRIVEMENUTEXT,          "'\tDesktop"
+    IDS_DRIVEMENUTEXT,          "'/tDesktop"
 }

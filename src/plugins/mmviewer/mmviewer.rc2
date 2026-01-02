@@ -18,16 +18,16 @@
 
 // Icon with lowest ID value placed first to ensure application icon
 // remains consistent on all systems.
-IDI_MAIN                ICON    DISCARDABLE     "res\\main.ico"
-IDI_DISKEXPLORER        ICON    DISCARDABLE     "res\\diskexpl.ico"
+IDI_MAIN                ICON    DISCARDABLE     "res//main.ico"
+IDI_DISKEXPLORER        ICON    DISCARDABLE     "res//diskexpl.ico"
 
 //
 // Bitmap
 //
 
-IDB_TOOLBAR16           BITMAP  MOVEABLE PURE   "res\\tb16.bmp"
-IDB_TOOLBARMAIN         BITMAP  MOVEABLE PURE   "res\\tb.bmp"
-IDB_TOOLBAR256          BITMAP  MOVEABLE PURE   "res\\tb256.bmp"
+IDB_TOOLBAR16           BITMAP  MOVEABLE PURE   "res//tb16.bmp"
+IDB_TOOLBARMAIN         BITMAP  MOVEABLE PURE   "res//tb.bmp"
+IDB_TOOLBAR256          BITMAP  MOVEABLE PURE   "res//tb256.bmp"
 
 //
 // Accelerator

@@ -12,4 +12,4 @@
 #error this file is not editable by Microsoft Visual C++
 #endif //APSTUDIO_INVOKED
 
-1	TYPELIB		"generated\\automation.tlb"
+1	TYPELIB		"generated//automation.tlb"

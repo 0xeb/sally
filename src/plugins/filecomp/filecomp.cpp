@@ -3,7 +3,7 @@
 
 #include "precomp.h"
 
-#pragma comment(lib, "UxTheme.lib")
+#pragma comment(lib, "uxtheme.lib")
 
 // enables dumping blocks that remain allocated on the heap after the plugin finishes
 // #define DUMP_MEM

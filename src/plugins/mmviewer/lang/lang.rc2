@@ -9,7 +9,7 @@
 /////////////////////////////////////////////////////////////////////////////
 // Add manually edited resources here...
 
-#include "..\versinfo.rh2"
+#include "../versinfo.rh2"
 #include "versinfo.rc2"
 
 //
@@ -22,27 +22,27 @@ BEGIN
     IDS_ABOUT               "About Plugin"
     IDS_PLUGIN_NAME         "Multimedia Viewer"
     IDS_OPENED_WINDOWS      "Some Multimedia Viewer windows are opened. Do you want to close them?"
-    IDS_ERROR_OPENING       "Error opening %s.\nThis format is not supported by Multimedia Viewer."
+    IDS_ERROR_OPENING       "Error opening %s./nThis format is not supported by Multimedia Viewer."
 END
 
 STRINGTABLE DISCARDABLE
 BEGIN
     IDS_MENU_FILES          "&File"
-    IDS_MENU_FILES_OPEN     "&Open...\tCtr+O"
-    IDS_MENU_FILES_EXPORT_HTML     "Export to &HTML...\tCtr+H"
-    //IDS_MENU_FILES_EXPORT_XML     "Export to &XML...\tCtr+X"
-    IDS_MENU_FILES_PROPERTIES "Prop&erties...\tCtrl+F1"
-    IDS_MENU_FILES_EXIT     "E&xit\tAlt+F4"
+    IDS_MENU_FILES_OPEN     "&Open.../tCtr+O"
+    IDS_MENU_FILES_EXPORT_HTML     "Export to &HTML.../tCtr+H"
+    //IDS_MENU_FILES_EXPORT_XML     "Export to &XML.../tCtr+X"
+    IDS_MENU_FILES_PROPERTIES "Prop&erties.../tCtrl+F1"
+    IDS_MENU_FILES_EXIT     "E&xit/tAlt+F4"
 
     IDS_MENU_FILE_OTHER     "O&ther Files"
-    IDS_MENU_FILE_FIRST     "&First\tShift+Backspace"
-    IDS_MENU_FILE_LAST      "&Last\tShift+Space"
-    IDS_MENU_FILE_PREV      "&Previous\tBackspace"
-    IDS_MENU_FILE_NEXT      "&Next\tSpace"
+    IDS_MENU_FILE_FIRST     "&First/tShift+Backspace"
+    IDS_MENU_FILE_LAST      "&Last/tShift+Space"
+    IDS_MENU_FILE_PREV      "&Previous/tBackspace"
+    IDS_MENU_FILE_NEXT      "&Next/tSpace"
 
     IDS_MENU_EDIT           "&Edit"
-    IDS_MENU_EDIT_COPY      "&Copy All\tCtrl+A"
-    //IDS_MENU_EDIT_SELECT_ALL "&Select All\tCtrl+A"
+    IDS_MENU_EDIT_COPY      "&Copy All/tCtrl+A"
+    //IDS_MENU_EDIT_SELECT_ALL "&Select All/tCtrl+A"
 END
 
 STRINGTABLE DISCARDABLE
@@ -52,7 +52,7 @@ END
 
 STRINGTABLE DISCARDABLE
 BEGIN
-    IDS_MENU_VIEW_FULLSCREEN "&Full Screen\tF11"
+    IDS_MENU_VIEW_FULLSCREEN "&Full Screen/tF11"
 END
 
 STRINGTABLE DISCARDABLE
@@ -69,15 +69,15 @@ END
 
 STRINGTABLE DISCARDABLE
 BEGIN
-    IDS_TBTT_COPY           "Copy All\tCtrl+A"
-    IDS_TBTT_OPEN           "Open\tCtrl+O"
-    IDS_TBTT_EXP_HTML       "Export to HTML\tCtrl+H"
-    //IDS_TBTT_EXP_XML        "Export to XML\tCtrl+X"
-    IDS_TBTT_FIND           "Find\tCtrl+F"
-    IDS_TBTT_PROPERTIES     "Properties\tCtrl+F1"
-    IDS_TBTT_FULLSCREEN     "Full Screen\tF11"
-    IDS_TBTT_PREV           "Open Previous\tBackspace"
-    IDS_TBTT_NEXT           "Open Next\tSpace"
+    IDS_TBTT_COPY           "Copy All/tCtrl+A"
+    IDS_TBTT_OPEN           "Open/tCtrl+O"
+    IDS_TBTT_EXP_HTML       "Export to HTML/tCtrl+H"
+    //IDS_TBTT_EXP_XML        "Export to XML/tCtrl+X"
+    IDS_TBTT_FIND           "Find/tCtrl+F"
+    IDS_TBTT_PROPERTIES     "Properties/tCtrl+F1"
+    IDS_TBTT_FULLSCREEN     "Full Screen/tF11"
+    IDS_TBTT_PREV           "Open Previous/tBackspace"
+    IDS_TBTT_NEXT           "Open Next/tSpace"
 END
 
 STRINGTABLE DISCARDABLE

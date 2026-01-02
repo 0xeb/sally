@@ -18,7 +18,7 @@
 //
 // Internal helper: Check if path is UNC (starts with \\)
 //
-static BOOL IsUNCPath(const char* path)
+static BOOL IsUNCPathLocal(const char* path)
 {
     return path != NULL && path[0] == '\\' && path[1] == '\\';
 }
@@ -56,7 +56,7 @@ wchar_t* SalAllocWidePath(const char* ansiPath)
 
     // Determine if we need the \\?\ prefix
     BOOL needsPrefix = (ansiLen >= SAL_LONG_PATH_THRESHOLD) && !PathHasLongPrefix(ansiPath);
-    BOOL isUNC = IsUNCPath(ansiPath);
+    BOOL isUNC = IsUNCPathLocal(ansiPath);
 
     // Calculate total buffer size needed
     // \\?\        = 4 chars

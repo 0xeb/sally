@@ -48,7 +48,7 @@ extern "C"
 
 #pragma comment(linker, "/ENTRY:MyEntryPoint") // chceme vlastni vstupni bod do aplikace
 
-#pragma comment(lib, "UxTheme.lib")
+#pragma comment(lib, "uxtheme.lib")
 
 // zpristupnime si puvodni vstupni bod aplikace
 extern "C" int WinMainCRTStartup();

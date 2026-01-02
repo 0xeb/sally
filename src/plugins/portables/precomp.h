@@ -22,7 +22,7 @@
 #define _WIN32_WINNT 0x0501
 
 #include <windows.h>
-#include <CommDlg.h>
+#include <commdlg.h>
 #include <windowsx.h>
 #include <shlwapi.h>
 #include <shellapi.h>
