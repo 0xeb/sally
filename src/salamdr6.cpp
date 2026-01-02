@@ -1765,15 +1765,31 @@ void GetIfPathIsInaccessibleGoTo(char* path, BOOL forceIsMyDocs)
 HICON SalLoadImage(int vistaResID, int otherResID, int cx, int cy, UINT flags)
 {
     // JRYFIXME - convert to calling SalLoadIcon
-    return SalLoadIcon(ImageResDLL, vistaResID, cx);
-    //return (HICON)HANDLES(LoadImage(ImageResDLL, MAKEINTRESOURCE(vistaResID), IMAGE_ICON, cx, cy, flags));
+    // Try imageres.dll first, fall back to shell32.dll for Wine compatibility
+    if (ImageResDLL != NULL)
+    {
+        return SalLoadIcon(ImageResDLL, vistaResID, cx);
+    }
+    else if (Shell32DLL != NULL)
+    {
+        return SalLoadIcon(Shell32DLL, otherResID, cx);
+    }
+    return NULL;
 }
 
 HICON LoadArchiveIcon(int cx, int cy, UINT flags)
 {
     // JRYFIXME - convert to calling SalLoadIcon
-    return SalLoadIcon(ImageResDLL, 174, cx);
-    //return (HICON)HANDLES(LoadImage(ImageResDLL, MAKEINTRESOURCE(174), IMAGE_ICON, cx, cy, flags));
+    // Try imageres.dll (174), fall back to shell32.dll (165) for Wine compatibility
+    if (ImageResDLL != NULL)
+    {
+        return SalLoadIcon(ImageResDLL, 174, cx);
+    }
+    else if (Shell32DLL != NULL)
+    {
+        return SalLoadIcon(Shell32DLL, 165, cx);
+    }
+    return NULL;
 }
 
 BOOL DuplicateBackslashes(char* buffer, int bufferSize)
