@@ -503,318 +503,318 @@ typedef void(WINAPI* SalPluginOperationFromDisk)(const char* sourcePath, SalEnum
 #define SASF_CASESENSITIVE 0x01 // case sensitivity is important (if not set, search is case insensitive)
 #define SASF_FORWARD 0x02       // search forward direction (if not set, search is backward)
 
-// ikony pro GetSalamanderIcon
+// icons for GetSalamanderIcon
 #define SALICON_EXECUTABLE 1    // exe/bat/pif/com
 #define SALICON_DIRECTORY 2     // dir
-#define SALICON_NONASSOCIATED 3 // neasociovany soubor
-#define SALICON_ASSOCIATED 4    // asociovany soubor
+#define SALICON_NONASSOCIATED 3 // non-associated file
+#define SALICON_ASSOCIATED 4    // associated file
 #define SALICON_UPDIR 5         // up-dir ".."
-#define SALICON_ARCHIVE 6       // archiv
+#define SALICON_ARCHIVE 6       // archive
 
-// velikosti ikon pro GetSalamanderIcon
+// icon sizes for GetSalamanderIcon
 #define SALICONSIZE_16 1 // 16x16
 #define SALICONSIZE_32 2 // 32x32
 #define SALICONSIZE_48 3 // 48x48
 
-// interface objektu Boyer-Moorova algoritmu pro vyhledavani v textu
-// POZOR: kazdy alokovany objekt je mozne pouzivat jen v ramci jednoho threadu
-// (nemusi jit o hlavni thread, nemusi jit u vsech objektu o jeden thread)
+// interface of Boyer-Moore algorithm object for text searching
+// WARNING: each allocated object can only be used within a single thread
+// (does not have to be the main thread, does not have to be the same thread for all objects)
 class CSalamanderBMSearchData
 {
 public:
-    // nastaveni vzorku; 'pattern' je null-terminated text vzorku; 'flags' jsou priznaky
-    // algoritmu (viz konstanty SASF_XXX)
+    // set pattern; 'pattern' is null-terminated pattern text; 'flags' are algorithm flags
+    // (see SASF_XXX constants)
     virtual void WINAPI Set(const char* pattern, WORD flags) = 0;
 
-    // nastaveni vzorku; 'pattern' je binarni vzorek o delce 'length' (buffer 'pattern' musi
-    // mit delku alespon ('length' + 1) znaku - jen pro kompatibilitu s textovymi vzorky);
-    // 'flags' jsou priznaky algoritmu (viz konstanty SASF_XXX)
+    // set pattern; 'pattern' is binary pattern of length 'length' (buffer 'pattern' must
+    // have length at least ('length' + 1) characters - for compatibility with text patterns);
+    // 'flags' are algorithm flags (see SASF_XXX constants)
     virtual void WINAPI Set(const char* pattern, const int length, WORD flags) = 0;
 
-    // nastaveni priznaku algoritmu; 'flags' jsou priznaky algoritmu (viz konstanty SASF_XXX)
+    // set algorithm flags; 'flags' are algorithm flags (see SASF_XXX constants)
     virtual void WINAPI SetFlags(WORD flags) = 0;
 
-    // vraci delku vzorku (pouzitelne az po uspesnem volani metody Set)
+    // returns pattern length (usable after successful call to Set method)
     virtual int WINAPI GetLength() const = 0;
 
-    // vraci vzorek (pouzitelne az po uspesnem volani metody Set)
+    // returns pattern (usable after successful call to Set method)
     virtual const char* WINAPI GetPattern() const = 0;
 
-    // vraci TRUE pokud je mozne zacit vyhledavat (vzorek i priznaky byly uspesne nastaveny,
-    // neuspech hrozi jen pri prazdnem vzorku)
+    // returns TRUE if searching can begin (pattern and flags were successfully set,
+    // failure only occurs with empty pattern)
     virtual BOOL WINAPI IsGood() const = 0;
 
-    // hledani vzorku v textu 'text' o delce 'length' od offsetu 'start' smerem dopredu;
-    // vraci offset nalezeneho vzorku nebo -1 pokud vzorek nebyl nalezen;
-    // POZOR: algoritmus musi mit nastaveny priznak SASF_FORWARD
+    // search for pattern in text 'text' of length 'length' from offset 'start' forward;
+    // returns offset of found pattern or -1 if pattern was not found;
+    // WARNING: algorithm must have SASF_FORWARD flag set
     virtual int WINAPI SearchForward(const char* text, int length, int start) = 0;
 
-    // hledani vzorku v textu 'text' o delce 'length' smerem zpet (zacina hledat na konci textu);
-    // vraci offset nalezeneho vzorku nebo -1 pokud vzorek nebyl nalezen;
-    // POZOR: algoritmus nesmi mit nastaveny priznak SASF_FORWARD
+    // search for pattern in text 'text' of length 'length' backward (starts searching at end of text);
+    // returns offset of found pattern or -1 if pattern was not found;
+    // WARNING: algorithm must NOT have SASF_FORWARD flag set
     virtual int WINAPI SearchBackward(const char* text, int length) = 0;
 };
 
-// interface objektu algoritmu pro vyhledavani pomoci regularnich vyrazu v textu
-// POZOR: kazdy alokovany objekt je mozne pouzivat jen v ramci jednoho threadu
-// (nemusi jit o hlavni thread, nemusi jit u vsech objektu o jeden thread)
+// interface of regular expression search algorithm object for text searching
+// WARNING: each allocated object can only be used within a single thread
+// (does not have to be the main thread, does not have to be the same thread for all objects)
 class CSalamanderREGEXPSearchData
 {
 public:
-    // nastaveni regularniho vyrazu; 'pattern' je null-terminated text regularniho vyrazu; 'flags'
-    // jsou priznaky algoritmu (viz konstanty SASF_XXX); pri chybe vraci FALSE a popis chyby
-    // je mozne ziskat volanim metody GetLastErrorText
+    // set regular expression; 'pattern' is null-terminated regular expression text; 'flags'
+    // are algorithm flags (see SASF_XXX constants); on error returns FALSE and error description
+    // can be obtained by calling GetLastErrorText method
     virtual BOOL WINAPI Set(const char* pattern, WORD flags) = 0;
 
-    // nastaveni priznaku algoritmu; 'flags' jsou priznaky algoritmu (viz konstanty SASF_XXX);
-    // pri chybe vraci FALSE a popis chyby je mozne ziskat volanim metody GetLastErrorText
+    // set algorithm flags; 'flags' are algorithm flags (see SASF_XXX constants);
+    // on error returns FALSE and error description can be obtained by calling GetLastErrorText method
     virtual BOOL WINAPI SetFlags(WORD flags) = 0;
 
-    // vraci text chyby, ktera nastala v poslednim volani Set nebo SetFlags (muze byt i NULL)
+    // returns error text from last Set or SetFlags call (can be NULL)
     virtual const char* WINAPI GetLastErrorText() const = 0;
 
-    // vraci text regularniho vyrazu (pouzitelne az po uspesnem volani metody Set)
+    // returns regular expression text (usable after successful call to Set method)
     virtual const char* WINAPI GetPattern() const = 0;
 
-    // nastaveni radky textu (radka je od 'start' do 'end', 'end' ukazuje za posledni znak radky),
-    // ve kterem se vyhledava; vraci vzdy TRUE
+    // set text line (line is from 'start' to 'end', 'end' points past the last character of line),
+    // in which to search; always returns TRUE
     virtual BOOL WINAPI SetLine(const char* start, const char* end) = 0;
 
-    // hledani podretezce odpovidajiciho regularnimu vyrazu v radce nastavene metodou SetLine;
-    // hleda od offsetu 'start' smerem dopredu; vraci offset nalezeneho podretezce a jeho delku
-    // (ve 'foundLen') nebo -1 pokud podretezec nebyl nalezen;
-    // POZOR: algoritmus musi mit nastaveny priznak SASF_FORWARD
+    // search for substring matching regular expression in line set by SetLine method;
+    // searches from offset 'start' forward; returns offset of found substring and its length
+    // (in 'foundLen') or -1 if substring was not found;
+    // WARNING: algorithm must have SASF_FORWARD flag set
     virtual int WINAPI SearchForward(int start, int& foundLen) = 0;
 
-    // hledani podretezce odpovidajiciho regularnimu vyrazu v radce nastavene metodou SetLine;
-    // hleda smerem zpet (zacina hledat na konci textu o delce 'length' od zacatku radky);
-    // vraci offset nalezeneho podretezce a jeho delku (ve 'foundLen') nebo -1 pokud podretezec
-    // nebyl nalezen;
-    // POZOR: algoritmus nesmi mit nastaveny priznak SASF_FORWARD
+    // search for substring matching regular expression in line set by SetLine method;
+    // searches backward (starts searching at end of text of length 'length' from beginning of line);
+    // returns offset of found substring and its length (in 'foundLen') or -1 if substring
+    // was not found;
+    // WARNING: algorithm must NOT have SASF_FORWARD flag set
     virtual int WINAPI SearchBackward(int length, int& foundLen) = 0;
 };
 
-// typy prikazu Salamandera pouzite v metode CSalamanderGeneralAbstract::EnumSalamanderCommands
+// command types used in CSalamanderGeneralAbstract::EnumSalamanderCommands method
 #define sctyUnknown 0
-#define sctyForFocusedFile 1                 // jen pro focusly soubor (napr. View)
-#define sctyForFocusedFileOrDirectory 2      // pro focusly soubor nebo adresar (napr. Open)
-#define sctyForSelectedFilesAndDirectories 3 // pro oznacene/fokusle soubory a adresare (napr. Copy)
-#define sctyForCurrentPath 4                 // pro aktualni cestu v panelu (napr. Create Directory)
-#define sctyForConnectedDrivesAndFS 5        // pro pripojene svazky a FS (napr. Disconnect)
+#define sctyForFocusedFile 1                 // only for focused file (e.g. View)
+#define sctyForFocusedFileOrDirectory 2      // for focused file or directory (e.g. Open)
+#define sctyForSelectedFilesAndDirectories 3 // for selected/focused files and directories (e.g. Copy)
+#define sctyForCurrentPath 4                 // for current path in panel (e.g. Create Directory)
+#define sctyForConnectedDrivesAndFS 5        // for connected drives and FS (e.g. Disconnect)
 
-// prikazy Salamandera pouzite v metodach CSalamanderGeneralAbstract::EnumSalamanderCommands
-// a CSalamanderGeneralAbstract::PostSalamanderCommand
-// (POZOR: pro cisla prikazu je rezerovan jen interval <0, 499>)
-#define SALCMD_VIEW 0     // view (klavesa F3 v panelu)
-#define SALCMD_ALTVIEW 1  // alternate view (klavesa Alt+F3 v panelu)
-#define SALCMD_VIEWWITH 2 // view with (klavesa Ctrl+Shift+F3 v panelu)
-#define SALCMD_EDIT 3     // edit (klavesa F4 v panelu)
-#define SALCMD_EDITWITH 4 // edit with (klavesa Ctrl+Shift+F4 v panelu)
+// Salamander commands used in CSalamanderGeneralAbstract::EnumSalamanderCommands
+// and CSalamanderGeneralAbstract::PostSalamanderCommand methods
+// (WARNING: command numbers are reserved only in interval <0, 499>)
+#define SALCMD_VIEW 0     // view (F3 key in panel)
+#define SALCMD_ALTVIEW 1  // alternate view (Alt+F3 key in panel)
+#define SALCMD_VIEWWITH 2 // view with (Ctrl+Shift+F3 key in panel)
+#define SALCMD_EDIT 3     // edit (F4 key in panel)
+#define SALCMD_EDITWITH 4 // edit with (Ctrl+Shift+F4 key in panel)
 
-#define SALCMD_OPEN 20        // open (klavesa Enter v panelu)
-#define SALCMD_QUICKRENAME 21 // quick rename (klavesa F2 v panelu)
+#define SALCMD_OPEN 20        // open (Enter key in panel)
+#define SALCMD_QUICKRENAME 21 // quick rename (F2 key in panel)
 
-#define SALCMD_COPY 40          // copy (klavesa F5 v panelu)
-#define SALCMD_MOVE 41          // move/rename (klavesa F6 v panelu)
-#define SALCMD_EMAIL 42         // email (klavesa Ctrl+E v panelu)
-#define SALCMD_DELETE 43        // delete (klavesa Delete v panelu)
-#define SALCMD_PROPERTIES 44    // show properties (klavesa Alt+Enter v panelu)
-#define SALCMD_CHANGECASE 45    // change case (klavesa Ctrl+F7 v panelu)
-#define SALCMD_CHANGEATTRS 46   // change attributes (klavesa Ctrl+F2 v panelu)
-#define SALCMD_OCCUPIEDSPACE 47 // calculate occupied space (klavesa Alt+F10 v panelu)
+#define SALCMD_COPY 40          // copy (F5 key in panel)
+#define SALCMD_MOVE 41          // move/rename (F6 key in panel)
+#define SALCMD_EMAIL 42         // email (Ctrl+E key in panel)
+#define SALCMD_DELETE 43        // delete (Delete key in panel)
+#define SALCMD_PROPERTIES 44    // show properties (Alt+Enter key in panel)
+#define SALCMD_CHANGECASE 45    // change case (Ctrl+F7 key in panel)
+#define SALCMD_CHANGEATTRS 46   // change attributes (Ctrl+F2 key in panel)
+#define SALCMD_OCCUPIEDSPACE 47 // calculate occupied space (Alt+F10 key in panel)
 
-#define SALCMD_EDITNEWFILE 70     // edit new file (klavesa Shift+F4 v panelu)
-#define SALCMD_REFRESH 71         // refresh (klavesa Ctrl+R v panelu)
-#define SALCMD_CREATEDIRECTORY 72 // create directory (klavesa F7 v panelu)
-#define SALCMD_DRIVEINFO 73       // drive info (klavesa Ctrl+F1 v panelu)
-#define SALCMD_CALCDIRSIZES 74    // calculate directory sizes (klavesa Ctrl+Shift+F10 v panelu)
+#define SALCMD_EDITNEWFILE 70     // edit new file (Shift+F4 key in panel)
+#define SALCMD_REFRESH 71         // refresh (Ctrl+R key in panel)
+#define SALCMD_CREATEDIRECTORY 72 // create directory (F7 key in panel)
+#define SALCMD_DRIVEINFO 73       // drive info (Ctrl+F1 key in panel)
+#define SALCMD_CALCDIRSIZES 74    // calculate directory sizes (Ctrl+Shift+F10 key in panel)
 
-#define SALCMD_DISCONNECT 90 // disconnect (network drive or plugin-fs) (klavesa F12 v panelu)
+#define SALCMD_DISCONNECT 90 // disconnect (network drive or plugin-fs) (F12 key in panel)
 
-#define MAX_GROUPMASK 1001 // max. pocet znaku (vcetne nuly na konci) ve skupinove masce
+#define MAX_GROUPMASK 1001 // max. number of characters (including null terminator) in group mask
 
-// identifikatory sdilenych historii (posledne pouzitych hodnot v comboboxech) pro
+// shared history identifiers (last used values in comboboxes) for
 // CSalamanderGeneral::GetStdHistoryValues()
-#define SALHIST_QUICKRENAME 1 // jmena v Quick Rename dialogu (F2)
-#define SALHIST_COPYMOVETGT 2 // cilove cesty v Copy/Move dialogu (F5/F6)
-#define SALHIST_CREATEDIR 3   // jmena adresaru v Create Directory dialogu (F7)
-#define SALHIST_CHANGEDIR 4   // cesty v Change Directory dialogu (Shift+F7)
-#define SALHIST_EDITNEW 5     // jmena v Edit New dialogu (Shift+F4)
-#define SALHIST_CONVERT 6     // jmena v Conver dialogu (Ctrl+K)
+#define SALHIST_QUICKRENAME 1 // names in Quick Rename dialog (F2)
+#define SALHIST_COPYMOVETGT 2 // target paths in Copy/Move dialog (F5/F6)
+#define SALHIST_CREATEDIR 3   // directory names in Create Directory dialog (F7)
+#define SALHIST_CHANGEDIR 4   // paths in Change Directory dialog (Shift+F7)
+#define SALHIST_EDITNEW 5     // names in Edit New dialog (Shift+F4)
+#define SALHIST_CONVERT 6     // names in Convert dialog (Ctrl+K)
 
-// interface objektu pro praci se skupinou souborovych masek
-// POZOR: metody objektu nejsou synchronizovane, takze je mozne je pouzivat jen
-//        v ramci jednoho threadu (nemusi jit o hlavni thread) nebo si jejich
-//        synchronizaci musi zajistit plugin (nesmi se provadet "zapis" behem
-//        provadeni jine metody; "zapis"=SetMasksString+PrepareMasks;
-//        provadeni "cteni" je mozne z vice threadu najednou; "cteni"=GetMasksString+
-//        AgreeMasks)
+// interface of object for working with a group of file masks
+// WARNING: object methods are not synchronized, so they can only be used
+//          within a single thread (does not have to be the main thread) or
+//          the plugin must ensure synchronization (no "write" can be performed during
+//          execution of another method; "write"=SetMasksString+PrepareMasks;
+//          "read" can be performed from multiple threads simultaneously; "read"=GetMasksString+
+//          AgreeMasks)
 //
-// Zivotni cyklus objektu:
-//   1) Alokujeme metodou CSalamanderGeneralAbstract::AllocSalamanderMaskGroup
-//   2) V metode SetMasksString predame skupinu masek.
-//   3) Zavolame PrepareMasks pro stavbu vnitrnich dat; v pripade neuspechu
-//      zobrazime chybne misto a po oprave masky se vracime do bodu (3)
-//   4) Libovolne volame AgreeMasks pro zjisteni, zda jmeno odpovida skupine masek.
-//   5) Po pripadnem zavolani SetMasksString pokracujeme od (3)
-//   6) Destrukce objektu metodou CSalamanderGeneralAbstract::FreeSalamanderMaskGroup
+// Object lifecycle:
+//   1) Allocate using CSalamanderGeneralAbstract::AllocSalamanderMaskGroup method
+//   2) Pass the mask group in SetMasksString method
+//   3) Call PrepareMasks to build internal data; on failure
+//      display error location and after fixing the mask return to step (3)
+//   4) Call AgreeMasks as needed to check if name matches the mask group
+//   5) After optional call to SetMasksString continue from step (3)
+//   6) Destroy object using CSalamanderGeneralAbstract::FreeSalamanderMaskGroup method
 //
-// Maska:
-//   '?' - libovolny znak
-//   '*' - libovolny retezec (i prazdny)
-//   '#' - libovolna cislice (pouze je-li 'extendedMode'==TRUE)
+// Mask:
+//   '?' - any character
+//   '*' - any string (including empty)
+//   '#' - any digit (only if 'extendedMode'==TRUE)
 //
-//   Priklady:
-//     *     - vsechna jmena
-//     *.*   - vsechna jmena
-//     *.exe - jmena s priponou "exe"
-//     *.t?? - jmena s priponou zacinajici znakem 't' a obsahujici jeste dva libovolne znaky
-//     *.r## - jmena s priponou zacinajici znakem 'r' a obsahujici jeste dve libovolne cislice
+//   Examples:
+//     *     - all names
+//     *.*   - all names
+//     *.exe - names with extension "exe"
+//     *.t?? - names with extension starting with 't' and containing two more arbitrary characters
+//     *.r## - names with extension starting with 'r' and containing two more arbitrary digits
 //
 class CSalamanderMaskGroup
 {
 public:
-    // nastavi retezec masek (masky jsou oddelene ';' (escape sekvence pro ';' je ";;"));
-    // 'masks' je retezec masek (max. delka vcetne nuly na konci je MAX_GROUPMASK)
-    // pokud je 'extendedMode' rovno TRUE, znak '#' odpovida libovolne cislici ('0'-'9')
-    // jako oddelovac lze pouzit znak '|'; nasledujici masky (uz zase oddelene ';')
-    // budou vyhodnocovany inverzne, tedy pokud jim bude odpovidat jmeno,
-    // AgreeMasks vrati FALSE; znak '|' muze stat na zacatku retezce
+    // set masks string (masks are separated by ';' (escape sequence for ';' is ";;"));
+    // 'masks' is the masks string (max. length including null terminator is MAX_GROUPMASK)
+    // if 'extendedMode' is TRUE, character '#' matches any digit ('0'-'9')
+    // character '|' can be used as separator; following masks (again separated by ';')
+    // will be evaluated inversely, meaning if they match a name,
+    // AgreeMasks will return FALSE; character '|' can be at the beginning of string
     //
-    //   Priklady:
-    //     *.txt;*.cpp - vsechna jmena s priponou txt nebo cpp
-    //     *.h*|*.html - vsechna jmena s priponou zacinajici znakem 'h', ale ne jmena s priponou "html"
-    //     |*.txt      - vsechna jmena s jinou priponou nez "txt"
+    //   Examples:
+    //     *.txt;*.cpp - all names with extension txt or cpp
+    //     *.h*|*.html - all names with extension starting with 'h', but not names with extension "html"
+    //     |*.txt      - all names with extension other than "txt"
     virtual void WINAPI SetMasksString(const char* masks, BOOL extendedMode) = 0;
 
-    // vraci retezec masek; 'buffer' je buffer o delce alespon MAX_GROUPMASK
+    // returns masks string; 'buffer' is buffer of at least MAX_GROUPMASK length
     virtual void WINAPI GetMasksString(char* buffer) = 0;
 
-    // vraci 'extendedMode' nastaveny v metode SetMasksString
+    // returns 'extendedMode' set in SetMasksString method
     virtual BOOL WINAPI GetExtendedMode() = 0;
 
-    // prace se souborovymi maskami: ('?' lib. znak, '*' lib. retezec - i prazdny, pokud
-    //  byl 'extendedMode' v metode SetMasksString TRUE, '#' lib. cislice - '0'..'9'):
-    // 1) prevedeme masky do jednodussiho formatu; 'errorPos' vraci pozici chyby v retezci masek;
-    //    vraci TRUE pokud nenastala chyba (vraci FALSE -> je nastaveno 'errorPos')
+    // working with file masks: ('?' any char, '*' any string - including empty, if
+    //  'extendedMode' in SetMasksString method was TRUE, '#' any digit - '0'..'9'):
+    // 1) convert masks to simpler format; 'errorPos' returns error position in masks string;
+    //    returns TRUE if no error occurred (returns FALSE -> 'errorPos' is set)
     virtual BOOL WINAPI PrepareMasks(int& errorPos) = 0;
-    // 2) muzeme pouzit prevedene masky na test, jestli nektere z nich odpovida soubor 'filename';
-    //    'fileExt' ukazuje bud na konec 'fileName' nebo na priponu (pokud existuje), 'fileExt'
-    //    muze byt NULL (pripona se dohledava podle std. pravidel); vraci TRUE pokud soubor
-    //    odpovida alespon jedne z masek
+    // 2) use converted masks to test if any of them matches file 'filename';
+    //    'fileExt' points either to end of 'fileName' or to extension (if exists), 'fileExt'
+    //    can be NULL (extension is found using standard rules); returns TRUE if file
+    //    matches at least one of the masks
     virtual BOOL WINAPI AgreeMasks(const char* fileName, const char* fileExt) = 0;
 };
 
-// interface objektu pro vypocet MD5
+// interface of object for MD5 calculation
 //
-// Zivotni cyklus objektu:
+// Object lifecycle:
 //
-//   1) Alokujeme metodou CSalamanderGeneralAbstract::AllocSalamanderMD5
-//   2) Postupne volame metodu Update() pro data, pro ktere chceme vypocitat MD5
-//   3) Zavolame metodu Finalize()
-//   4) Vyzvedneme vypocitanou MD5 pomoci metody GetDigest()
-//   5) Pokud chceme objekt znovu pouzit, zavolame metodu Init()
-//      (vola se automaticky v kroku (1)) a jdeme do kroku (2)
-//   6) Destrukce objektu metodou CSalamanderGeneralAbstract::FreeSalamanderMD5
+//   1) Allocate using CSalamanderGeneralAbstract::AllocSalamanderMD5 method
+//   2) Call Update() method repeatedly for data for which we want to calculate MD5
+//   3) Call Finalize() method
+//   4) Retrieve calculated MD5 using GetDigest() method
+//   5) If we want to reuse the object, call Init() method
+//      (called automatically in step (1)) and go to step (2)
+//   6) Destroy object using CSalamanderGeneralAbstract::FreeSalamanderMD5 method
 //
 class CSalamanderMD5
 {
 public:
-    // inicializace objektu, je automaticky zavolana v konstruktoru
-    // metoda je publikovana pro vicenasobne pouziti alokovaneho objektu
+    // object initialization, automatically called in constructor
+    // method is published for multiple use of allocated object
     virtual void WINAPI Init() = 0;
 
-    // aktualizuje vnitrni stav objektu na zaklade bloku dat urceneho promennou 'input',
-    // 'input_length' udava velikost bufferu v bajtech
+    // updates internal state of object based on data block specified by 'input' variable,
+    // 'input_length' specifies buffer size in bytes
     virtual void WINAPI Update(const void* input, DWORD input_length) = 0;
 
-    // pripravi MD5 pro vyzvednuti pomoci metody GetDigest
-    // po zavolani metody Finalize lze volat pouze metodu GetDigest() a Init()
+    // prepares MD5 for retrieval using GetDigest method
+    // after calling Finalize method, only GetDigest() and Init() can be called
     virtual void WINAPI Finalize() = 0;
 
-    // vyzvedne MD5, 'dest' musi ukazovat do bufferu o velikosti 16 bajtu
-    // metodu lze volat pouze po zavolani metody Finalize()
+    // retrieves MD5, 'dest' must point to a buffer of 16 bytes size
+    // method can only be called after calling Finalize() method
     virtual void WINAPI GetDigest(void* dest) = 0;
 };
 
-#define SALPNG_GETALPHA 0x00000002    // pri vytvareni DIB se nastavi take alpha kanal (jinak bude roven 0)
-#define SALPNG_PREMULTIPLE 0x00000004 // ma vyznam, pokud je nastaveno SALPNG_GETALPHA; prednasobi RGB slozky tak, aby bylo na bitmapu mozne zavolat AlphaBlend() s BLENDFUNCTION::AlphaFormat==AC_SRC_ALPHA
+#define SALPNG_GETALPHA 0x00000002    // when creating DIB, alpha channel is also set (otherwise it will be 0)
+#define SALPNG_PREMULTIPLE 0x00000004 // meaningful if SALPNG_GETALPHA is set; premultiplies RGB components so that AlphaBlend() can be called on the bitmap with BLENDFUNCTION::AlphaFormat==AC_SRC_ALPHA
 
 class CSalamanderPNGAbstract
 {
 public:
-    // vytvori bitmapu na zaklade PNG resource; 'hInstance' a 'lpBitmapName' specifikuji resource,
-    // 'flags' obsahuje 0 nebo bity z rodiny SALPNG_xxx
-    // v pripade uspechu vraci handle bitmapy, jinak NULL
-    // plugin je zodpovedny za destrukci bitmapy volanim DeleteObject()
-    // mozne volat z libovolneho threadu
+    // creates bitmap based on PNG resource; 'hInstance' and 'lpBitmapName' specify the resource,
+    // 'flags' contains 0 or bits from SALPNG_xxx family
+    // on success returns bitmap handle, otherwise NULL
+    // plugin is responsible for destroying bitmap by calling DeleteObject()
+    // can be called from any thread
     virtual HBITMAP WINAPI LoadPNGBitmap(HINSTANCE hInstance, LPCTSTR lpBitmapName, DWORD flags, COLORREF unused) = 0;
 
-    // vytvori bitmapu na zaklade PNG podaneho v pameti; 'rawPNG' je ukazatel na pamet obsahujici PNG
-    // (napriklad nactene ze souboru) a 'rawPNGSize' urcuje velikost pameti obsazene PNG v bajtech,
-    // 'flags' obsahuje 0 nebo bity z rodiny SALPNG_xxx
-    // v pripade uspechu vraci handle bitmapy, jinak NULL
-    // plugin je zodpovedny za destrukci bitmapy volanim DeleteObject()
-    // mozne volat z libovolneho threadu
+    // creates bitmap based on PNG provided in memory; 'rawPNG' is pointer to memory containing PNG
+    // (e.g. loaded from file) and 'rawPNGSize' specifies size of memory occupied by PNG in bytes,
+    // 'flags' contains 0 or bits from SALPNG_xxx family
+    // on success returns bitmap handle, otherwise NULL
+    // plugin is responsible for destroying bitmap by calling DeleteObject()
+    // can be called from any thread
     virtual HBITMAP WINAPI LoadRawPNGBitmap(const void* rawPNG, DWORD rawPNGSize, DWORD flags, COLORREF unused) = 0;
 
-    // poznamka 1: nacitane PNG je vhodne komprimovat pomoci PNGSlim, viz https://forum.altap.cz/viewtopic.php?f=15&t=3278
-    // poznamka 2: ukazka primeho pristupu k datum DIB viz Demoplugin, funkce AlphaBlend
-    // poznamka 3: podporeny jsou non-interlaced PNG typu Greyscale, Greyscale with alpha, Truecolour, Truecolour with alpha, Indexed-colour
-    //             podminkou je 8 bitu na jeden kanal
+    // note 1: loaded PNG should be compressed using PNGSlim, see https://forum.altap.cz/viewtopic.php?f=15&t=3278
+    // note 2: example of direct DIB data access see Demoplugin, AlphaBlend function
+    // note 3: supported are non-interlaced PNG types: Greyscale, Greyscale with alpha, Truecolour, Truecolour with alpha, Indexed-colour
+    //         condition is 8 bits per channel
 };
 
-// vsechny metody je mozne volat pouze z hlavniho threadu
+// all methods can only be called from the main thread
 class CSalamanderPasswordManagerAbstract
 {
 public:
-    // vrati TRUE, pokud uzivatel nastavil master password v konfiguraci Salamandera, jinak vrati FALSE
-    // (nesouvisi s tim, zda byl MP v teto session zadan)
+    // returns TRUE if user has set master password in Salamander configuration, otherwise returns FALSE
+    // (unrelated to whether MP was entered in this session)
     virtual BOOL WINAPI IsUsingMasterPassword() = 0;
 
-    // vrati TRUE, pokud uzivatel v ramci teto session Salamandera zadal korektni master password, jinak vrati FALSE
+    // returns TRUE if user has entered correct master password in this Salamander session, otherwise returns FALSE
     virtual BOOL WINAPI IsMasterPasswordSet() = 0;
 
-    // zobrazi okno s predkem 'hParent' ve kterem vyzve k zadani master password
-    // vraci TRUE, pokud byl spravny MP zadan, jinak vrati FALSE
-    // pta se i v pripade, ze jiz byl master password v teto session zadan, viz IsMasterPasswordSet()
-    // pokud uzivatel nepouziva master password, vraci FALSE, viz IsUsingMasterPassword()
+    // displays window with parent 'hParent' prompting for master password entry
+    // returns TRUE if correct MP was entered, otherwise returns FALSE
+    // asks even if master password was already entered in this session, see IsMasterPasswordSet()
+    // if user is not using master password, returns FALSE, see IsUsingMasterPassword()
     virtual BOOL WINAPI AskForMasterPassword(HWND hParent) = 0;
 
-    // precte 'plainPassword' zakonceny nulou a na zaklade promenne 'encrypt' jej bud zasifruje (pokud je TRUE) pomoci AES nebo
-    // pouze zascrambli (pokud je FALSE); alokovany vysledek ulozi do 'encryptedPassword' a jeho velikost vrati v promenne
-    // 'encryptedPasswordSize'; vraci TRUE v pripade uspechu, jinak FALSE
-    // pokud je 'encrypt'==TRUE, musi volajici pred volani funkce zajistit, ze je zadan master password, viz AskForMasterPassword()
-    // poznamka: vraceny 'encryptedPassword' je alokovany na heapu Salamandera; pokud plugin nepouziva salrtl, musi buffer uvolnit
-    // pomoci SalamanderGeneral->Free(), jinak staci volat free();
+    // reads 'plainPassword' terminated with null and based on 'encrypt' variable either encrypts it (if TRUE) using AES or
+    // only scrambles it (if FALSE); stores allocated result in 'encryptedPassword' and returns its size in variable
+    // 'encryptedPasswordSize'; returns TRUE on success, otherwise FALSE
+    // if 'encrypt'==TRUE, caller must ensure master password is entered before calling this function, see AskForMasterPassword()
+    // note: returned 'encryptedPassword' is allocated on Salamander heap; if plugin does not use salrtl, buffer must be freed
+    // using SalamanderGeneral->Free(), otherwise free() is sufficient;
     virtual BOOL WINAPI EncryptPassword(const char* plainPassword, BYTE** encryptedPassword, int* encryptedPasswordSize, BOOL encrypt) = 0;
 
-    // precte 'encryptedPassword' o velikosti 'encryptedPasswordSize' a prevede ho na otevrene heslo, ktere vrati
-    // v alokovanem bufferu 'plainPassword'; vrati TRUE v pripade uspechu, jinak FALSE
-    // poznamka: vraceny 'plainPassword' je alokovany na heapu Salamandera; pokud plugin nepouziva salrtl, musi buffer uvolnit
-    // pomoci SalamanderGeneral->Free(), jinak staci volat free();
+    // reads 'encryptedPassword' of size 'encryptedPasswordSize' and converts it to plain password, which is returned
+    // in allocated buffer 'plainPassword'; returns TRUE on success, otherwise FALSE
+    // note: returned 'plainPassword' is allocated on Salamander heap; if plugin does not use salrtl, buffer must be freed
+    // using SalamanderGeneral->Free(), otherwise free() is sufficient;
     virtual BOOL WINAPI DecryptPassword(const BYTE* encryptedPassword, int encryptedPasswordSize, char** plainPassword) = 0;
 
-    // vrati TRUE, pokud je 'encyptedPassword' o delce 'encyptedPasswordSize' sifrovano pomoci AES; jinak vrati FALSE
+    // returns TRUE if 'encyptedPassword' of length 'encyptedPasswordSize' is encrypted using AES; otherwise returns FALSE
     virtual BOOL WINAPI IsPasswordEncrypted(const BYTE* encyptedPassword, int encyptedPasswordSize) = 0;
 };
 
-// rezimy pro metodu CSalamanderGeneralAbstract::ExpandPluralFilesDirs
+// modes for CSalamanderGeneralAbstract::ExpandPluralFilesDirs method
 #define epfdmNormal 0   // XXX files and YYY directories
 #define epfdmSelected 1 // XXX selected files and YYY selected directories
 #define epfdmHidden 2   // XXX hidden files and YYY hidden directories
 
-// prikazy pro HTML help: viz metoda CSalamanderGeneralAbstract::OpenHtmlHelp
+// commands for HTML help: see CSalamanderGeneralAbstract::OpenHtmlHelp method
 enum CHtmlHelpCommand
 {
-    HHCDisplayTOC,     // viz HH_DISPLAY_TOC: dwData = 0 (zadny topic) nebo: pointer to a topic within a compiled help file
-    HHCDisplayIndex,   // viz HH_DISPLAY_INDEX: dwData = 0 (zadny keyword) nebo: keyword to select in the index (.hhk) file
-    HHCDisplaySearch,  // viz HH_DISPLAY_SEARCH: dwData = 0 (prazdne hledani) nebo: pointer to an HH_FTS_QUERY structure
-    HHCDisplayContext, // viz HH_HELP_CONTEXT: dwData = numeric ID of the topic to display
+    HHCDisplayTOC,     // see HH_DISPLAY_TOC: dwData = 0 (no topic) or: pointer to a topic within a compiled help file
+    HHCDisplayIndex,   // see HH_DISPLAY_INDEX: dwData = 0 (no keyword) or: keyword to select in the index (.hhk) file
+    HHCDisplaySearch,  // see HH_DISPLAY_SEARCH: dwData = 0 (empty search) or: pointer to an HH_FTS_QUERY structure
+    HHCDisplayContext, // see HH_HELP_CONTEXT: dwData = numeric ID of the topic to display
 };
 
-// slouzi jako parametr OpenHtmlHelpForSalamander pri command==HHCDisplayContext
-#define HTMLHELP_SALID_PWDMANAGER 1 // zobrazi napovedu pro Password Manager
+// serves as parameter for OpenHtmlHelpForSalamander when command==HHCDisplayContext
+#define HTMLHELP_SALID_PWDMANAGER 1 // displays help for Password Manager
 
 class CPluginFSInterfaceAbstract;
 
