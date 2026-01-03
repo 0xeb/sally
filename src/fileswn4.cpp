@@ -684,7 +684,7 @@ void CFilesWindow::DrawBriefDetailedItem(HDC hTgtDC, int itemIndex, RECT* itemRe
             }
 
             // Unicode filename display support
-            BOOL useWideDisplay = (f->NameW != NULL);
+            BOOL useWideDisplay = f->UseWideName();
             int nameLenW = 0;
             if (useWideDisplay)
             {
@@ -1629,7 +1629,7 @@ void CFilesWindow::DrawIconThumbnailItem(HDC hTgtDC, int itemIndex, RECT* itemRe
         int itemWidth = rect.right - rect.left; // item width
 
         // Check if we need wide string display for Unicode filenames
-        BOOL useWideDisplay = (f->NameW != NULL);
+        BOOL useWideDisplay = f->UseWideName();
         int nameLenW = 0;
         if (useWideDisplay)
             nameLenW = (int)wcslen(f->NameW);
@@ -2084,7 +2084,7 @@ void CFilesWindow::DrawTileItem(HDC hTgtDC, int itemIndex, RECT* itemRect, DWORD
         int itemWidth = rect.right - rect.left; // item width
 
         // Check if we need wide string display for Unicode filenames
-        BOOL useWideDisplay = (f->NameW != NULL);
+        BOOL useWideDisplay = f->UseWideName();
 
         // texts must not exceed this length in pixels
         int maxTextWidth = itemWidth - TILE_LEFT_MARGIN - IconSizes[iconSize] - TILE_LEFT_MARGIN - 4;

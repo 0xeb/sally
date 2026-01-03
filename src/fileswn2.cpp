@@ -266,7 +266,7 @@ void CFilesWindow::Execute(int index)
             HCURSOR oldCur = SetCursor(LoadCursor(NULL, IDC_WAIT));
             MainWindow->SetDefaultDirectories(); // to ensure the launching process inherits the correct current directories
             // Use wide version for Unicode filenames that can't be represented in ANSI
-            if (file->NameW != NULL)
+            if (file->UseWideName())
                 ExecuteAssociationW(GetListBoxHWND(), GetPath(), file->NameW);
             else
                 ExecuteAssociation(GetListBoxHWND(), GetPath(), fileName);

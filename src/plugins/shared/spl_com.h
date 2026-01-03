@@ -234,6 +234,10 @@ struct CFileData // destructor must not be added here!
     unsigned Dirty : 1;           // does this item need to be redrawn? (temporary validity only; message queue must not be pumped between setting the bit and redrawing the panel, otherwise icon redraw (icon reader) may reset the bit! consequently the item won't be redrawn)
     unsigned CutToClip : 1;       // is CUT to clipboard? (if 1, icon is 50% more transparent - ghosted)
     unsigned IconOverlayDone : 1; // only for icon-reader-thread needs: are we getting or have we already gotten icon-overlay? (0 - no, 1 - yes)
+
+    // Returns true if this file requires wide string APIs for correct display/operations
+    // (i.e., the filename contains characters that can't be represented in the current ANSI codepage)
+    bool UseWideName() const { return NameW != nullptr; }
 };
 
 // constants determining validity of data that is directly stored in CFileData (size, extension, etc.)
