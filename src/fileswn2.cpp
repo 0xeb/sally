@@ -265,7 +265,11 @@ void CFilesWindow::Execute(int index)
             // launch of the default context menu item (association)
             HCURSOR oldCur = SetCursor(LoadCursor(NULL, IDC_WAIT));
             MainWindow->SetDefaultDirectories(); // to ensure the launching process inherits the correct current directories
-            ExecuteAssociation(GetListBoxHWND(), GetPath(), fileName);
+            // Use wide version for Unicode filenames that can't be represented in ANSI
+            if (file->NameW != NULL)
+                ExecuteAssociationW(GetListBoxHWND(), GetPath(), file->NameW);
+            else
+                ExecuteAssociation(GetListBoxHWND(), GetPath(), fileName);
 
             // we add the file to history
             if (fullPath[0] != 0)

@@ -768,6 +768,7 @@ void SetClipCutCopyInfo(HWND hwnd, BOOL copy, BOOL salObject);
 void ShellAction(CFilesWindow* panel, CShellAction action, BOOL useSelection = TRUE,
                  BOOL posByMouse = TRUE, BOOL onlyPanelMenu = FALSE);
 void ExecuteAssociation(HWND hWindow, const char* path, const char* name);
+void ExecuteAssociationW(HWND hWindow, const char* path, const wchar_t* nameW);
 
 BOOL CanUseShellExecuteWndAsParent(const char* cmdName);
 

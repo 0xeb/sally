@@ -52,6 +52,13 @@ BOOL IsFilePlaceholder(WIN32_FIND_DATA const* findData)
            (findData->dwReserved0 == IO_REPARSE_TAG_FILE_PLACEHOLDER);
 }
 
+// Wide version for Unicode enumeration
+BOOL IsFilePlaceholderW(WIN32_FIND_DATAW const* findData)
+{
+    return (findData->dwFileAttributes & FILE_ATTRIBUTE_REPARSE_POINT) &&
+           (findData->dwReserved0 == IO_REPARSE_TAG_FILE_PLACEHOLDER);
+}
+
 BOOL CFilesWindow::ReadDirectory(HWND parent, BOOL isRefresh)
 {
     CALL_STACK_MESSAGE1("CFilesWindow::ReadDirectory()");
@@ -291,9 +298,11 @@ BOOL CFilesWindow::ReadDirectory(HWND parent, BOOL isRefresh)
                                            // so that there was a refresh of the directory)
 
         BOOL isUpDir = FALSE;
-        WIN32_FIND_DATA fileData;
+        WIN32_FIND_DATAW fileDataW;
+        char ansiFileName[MAX_PATH];       // ANSI conversion buffer for cFileName (also used as scratch)
+        BOOL nameConversionLossy = FALSE;  // TRUE if wide->ANSI conversion lost characters
         HANDLE search;
-        search = SalFindFirstFileH(fileName, &fileData);
+        search = SalLPFindFirstFile(fileName, &fileDataW);
         if (search == INVALID_HANDLE_VALUE)
         {
             DWORD err = GetLastError();
@@ -430,22 +439,31 @@ BOOL CFilesWindow::ReadDirectory(HWND parent, BOOL isRefresh)
                     lastEscCheckTime = GetTickCount();
                 }
 
-                st = fileData.cFileName;
+                // Convert wide filename to ANSI with lossy detection
+                // Note: Using manual conversion instead of SalAnsiName class to avoid
+                // constructor-skip issues with the goto ADD_ITEM statements below
+                {
+                    BOOL usedDefaultChar = FALSE;
+                    WideCharToMultiByte(CP_ACP, WC_NO_BEST_FIT_CHARS, fileDataW.cFileName, -1,
+                                        ansiFileName, MAX_PATH, NULL, &usedDefaultChar);
+                    nameConversionLossy = usedDefaultChar;
+                }
+                st = ansiFileName;
                 len = (int)strlen(st);
                 BOOL isDir;
-                isDir = (fileData.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY) != 0;
+                isDir = (fileDataW.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY) != 0;
                 isUpDir = (len == 2 && *st == '.' && *(st + 1) == '.');
                 //--- handling of "." and ".." and hidden/system files (file "." is not ignored, FLAME spyware uses these files, so let them be visible)
                 if (len == 0 || len == 1 && *st == '.' && isDir ||
                     ((isRootPath || !isDir ||
-                      CQuadWord(fileData.ftLastWriteTime.dwLowDateTime, // date on ".." is older or equal to 1.1.1980, we better read it later "properly"
-                                fileData.ftLastWriteTime.dwHighDateTime) <= CQuadWord(2148603904, 27846551)) &&
+                      CQuadWord(fileDataW.ftLastWriteTime.dwLowDateTime, // date on ".." is older or equal to 1.1.1980, we better read it later "properly"
+                                fileDataW.ftLastWriteTime.dwHighDateTime) <= CQuadWord(2148603904, 27846551)) &&
                      isUpDir))
                     continue;
 
                 if (Configuration.NotHiddenSystemFiles &&
-                    !IsFilePlaceholder(&fileData) && // placeholder is hidden, but Explorer shows it normally, so we will show it normally too
-                    (fileData.dwFileAttributes & (FILE_ATTRIBUTE_HIDDEN | FILE_ATTRIBUTE_SYSTEM)) &&
+                    !IsFilePlaceholderW(&fileDataW) && // placeholder is hidden, but Explorer shows it normally, so we will show it normally too
+                    (fileDataW.dwFileAttributes & (FILE_ATTRIBUTE_HIDDEN | FILE_ATTRIBUTE_SYSTEM)) &&
                     (len != 2 || *st != '.' || *(st + 1) != '.'))
                 { // skip hidden/system file/directory
                     if (isDir)
@@ -458,14 +476,14 @@ BOOL CFilesWindow::ReadDirectory(HWND parent, BOOL isRefresh)
                 //--- applying filter to files
                 if (FilterEnabled && !isDir)
                 {
-                    const char* ext = fileData.cFileName + len;
-                    while (--ext >= fileData.cFileName && *ext != '.')
+                    const char* ext = st + len;
+                    while (--ext >= st && *ext != '.')
                         ;
-                    if (ext < fileData.cFileName)
-                        ext = fileData.cFileName + len; // ".cvspass" in Windows is an extension ...
+                    if (ext < st)
+                        ext = st + len; // ".cvspass" in Windows is an extension ...
                     else
                         ext++;
-                    if (!Filter.AgreeMasks(fileData.cFileName, ext))
+                    if (!Filter.AgreeMasks(st, ext))
                     {
                         HiddenFilesCount++;
                         HiddenDirsFilesReason |= HIDDEN_REASON_FILTER;
@@ -474,7 +492,7 @@ BOOL CFilesWindow::ReadDirectory(HWND parent, BOOL isRefresh)
                 }
 
                 //--- if the name is occupied in the array HiddenNames, we will discard it
-                if (HiddenNames.Contains(isDir, fileData.cFileName))
+                if (HiddenNames.Contains(isDir, st))
                 {
                     if (isDir)
                         HiddenDirsCount++;
@@ -507,8 +525,23 @@ BOOL CFilesWindow::ReadDirectory(HWND parent, BOOL isRefresh)
                 }
                 memmove(file.Name, st, len + 1); // copy of text
                 file.NameLen = len;
+
+                //--- wide name (for Unicode filenames not representable in ANSI)
+                if (nameConversionLossy)
+                {
+                    int wideLen = (int)wcslen(fileDataW.cFileName);
+                    file.NameW = (wchar_t*)malloc((wideLen + 1) * sizeof(wchar_t));
+                    if (file.NameW != NULL)
+                        wcscpy(file.NameW, fileDataW.cFileName);
+                    // Note: if allocation fails, we continue with ANSI-only (graceful degradation)
+                }
+                else
+                {
+                    file.NameW = NULL;
+                }
+
                 //--- extension
-                if (!Configuration.SortDirsByExt && (fileData.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY)) // this is ptDisk
+                if (!Configuration.SortDirsByExt && (fileDataW.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY)) // this is ptDisk
                 {
                     file.Ext = file.Name + file.NameLen; // directories have no extension
                 }
@@ -524,11 +557,11 @@ BOOL CFilesWindow::ReadDirectory(HWND parent, BOOL isRefresh)
                         file.Ext = file.Name + file.NameLen;
                 }
                 //--- others
-                file.Size = CQuadWord(fileData.nFileSizeLow, fileData.nFileSizeHigh);
-                file.Attr = fileData.dwFileAttributes;
-                file.LastWrite = fileData.ftLastWriteTime;
+                file.Size = CQuadWord(fileDataW.nFileSizeLow, fileDataW.nFileSizeHigh);
+                file.Attr = fileDataW.dwFileAttributes;
+                file.LastWrite = fileDataW.ftLastWriteTime;
                 // placeholder is hidden, but Explorer shows it normally, so we will show it normally too (without ghosted icon)
-                file.Hidden = (file.Attr & FILE_ATTRIBUTE_HIDDEN) && !IsFilePlaceholder(&fileData) ? 1 : 0;
+                file.Hidden = (file.Attr & FILE_ATTRIBUTE_HIDDEN) && !IsFilePlaceholderW(&fileDataW) ? 1 : 0;
 
                 file.IsOffline = !isUpDir && (file.Attr & FILE_ATTRIBUTE_OFFLINE) ? 1 : 0;
                 if (testShares && (file.Attr & FILE_ATTRIBUTE_DIRECTORY)) // this is ptDisk
@@ -538,13 +571,18 @@ BOOL CFilesWindow::ReadDirectory(HWND parent, BOOL isRefresh)
                 else
                     file.Shared = 0;
 
-                if (fileData.cAlternateFileName[0] != 0)
+                if (fileDataW.cAlternateFileName[0] != 0)
                 {
-                    int l = (int)strlen(fileData.cAlternateFileName) + 1;
+                    // Convert wide alternate filename to ANSI
+                    char altNameAnsi[14];
+                    WideCharToMultiByte(CP_ACP, 0, fileDataW.cAlternateFileName, -1, altNameAnsi, sizeof(altNameAnsi), NULL, NULL);
+                    int l = (int)strlen(altNameAnsi) + 1;
                     file.DosName = (char*)malloc(l);
                     if (file.DosName == NULL)
                     {
                         free(file.Name);
+                        if (file.NameW != NULL)
+                            free(file.NameW);
                         if (search != NULL)
                         {
                             DestroySafeWaitWindow();
@@ -560,7 +598,7 @@ BOOL CFilesWindow::ReadDirectory(HWND parent, BOOL isRefresh)
                         //            TRACE_I("ReadDirectory: end");
                         return FALSE;
                     }
-                    memmove(file.DosName, fileData.cAlternateFileName, l);
+                    memmove(file.DosName, altNameAnsi, l);
                 }
                 else
                     file.DosName = NULL;
@@ -569,12 +607,12 @@ BOOL CFilesWindow::ReadDirectory(HWND parent, BOOL isRefresh)
                     file.Association = 0;
                     file.Archive = 0;
 #ifndef _WIN64
-                    file.IsLink = (isWin64RedirectedDir || (fileData.dwFileAttributes & FILE_ATTRIBUTE_REPARSE_POINT) || // CAUTION: pseudo-directory must have IsLink set, otherwise ContainsWin64RedirectedDir must be changed
+                    file.IsLink = (isWin64RedirectedDir || (fileDataW.dwFileAttributes & FILE_ATTRIBUTE_REPARSE_POINT) || // CAUTION: pseudo-directory must have IsLink set, otherwise ContainsWin64RedirectedDir must be changed
                                    isWindows64BitDir && file.NameLen == 8 && StrICmp(file.Name, "system32") == 0)
                                       ? 1
                                       : 0; // system32 directory in 32-bit Salamander is link to SysWOW64 + win64 redirected-dir + volume mount point or junction point = show directory with link overlay
 #else                                      // _WIN64
-                    file.IsLink = (fileData.dwFileAttributes & FILE_ATTRIBUTE_REPARSE_POINT) ? 1 : 0; // volume mount point or junction point = show directory with link overlay
+                    file.IsLink = (fileDataW.dwFileAttributes & FILE_ATTRIBUTE_REPARSE_POINT) ? 1 : 0; // volume mount point or junction point = show directory with link overlay
 #endif                                     // _WIN64
                     if (len == 2 && *st == '.' && *(st + 1) == '.')
                     { // handling ".."
@@ -586,6 +624,8 @@ BOOL CFilesWindow::ReadDirectory(HWND parent, BOOL isRefresh)
                                 free(file.Name);
                             if (file.DosName != NULL)
                                 free(file.DosName);
+                            if (file.NameW != NULL)
+                                free(file.NameW);
                         }
                         addtoIconCache = FALSE;
                     }
@@ -622,10 +662,10 @@ BOOL CFilesWindow::ReadDirectory(HWND parent, BOOL isRefresh)
                     {
                         while (*++s != 0)
                             *st++ = LowerCase[*s];
-                        *(DWORD*)st = 0;         // zeroes to the end
-                        st = fileData.cFileName; // lowercase extension
+                        *(DWORD*)st = 0;      // zeroes to the end
+                        st = ansiFileName;    // lowercase extension (reset to beginning of scratch buffer)
 
-                        if (fileData.dwFileAttributes & FILE_ATTRIBUTE_REPARSE_POINT)
+                        if (fileDataW.dwFileAttributes & FILE_ATTRIBUTE_REPARSE_POINT)
                             file.IsLink = 1; // if the file is reparse-point (maybe it's not possible at all) = show it with link overlay
                         else
                         {
@@ -655,13 +695,13 @@ BOOL CFilesWindow::ReadDirectory(HWND parent, BOOL isRefresh)
                             {
                                 if (*(DWORD*)st == *(DWORD*)"lnk") // icons via link
                                 {
-                                    strcpy(fileData.cFileName, file.Name);
-                                    char* ext2 = strrchr(fileData.cFileName, '.');
+                                    strcpy(ansiFileName, file.Name);
+                                    char* ext2 = strrchr(ansiFileName, '.');
                                     if (ext2 != NULL) // ".cvspass" in Windows is an extesion
-                                                      //                  if (ext2 != NULL && ext2 != fileData.cFileName)
+                                                      //                  if (ext2 != NULL && ext2 != ansiFileName)
                                     {
                                         *ext2 = 0;
-                                        if (PackerFormatConfig.PackIsArchive(fileData.cFileName)) // is it a link to archive which we can process?
+                                        if (PackerFormatConfig.PackIsArchive(ansiFileName)) // is it a link to archive which we can process?
                                         {
                                             file.Association = 1;
                                             file.Archive = 1;
@@ -677,7 +717,7 @@ BOOL CFilesWindow::ReadDirectory(HWND parent, BOOL isRefresh)
                     {
                         file.Association = 0;
                         file.Archive = 0;
-                        file.IsLink = (fileData.dwFileAttributes & FILE_ATTRIBUTE_REPARSE_POINT) ? 1 : 0; // if the file is reparse-point (maybe it's not possible at all) = show it with link overlay
+                        file.IsLink = (fileDataW.dwFileAttributes & FILE_ATTRIBUTE_REPARSE_POINT) ? 1 : 0; // if the file is reparse-point (maybe it's not possible at all) = show it with link overlay
                         addtoIconCache = FALSE;
                     }
 
@@ -844,7 +884,7 @@ BOOL CFilesWindow::ReadDirectory(HWND parent, BOOL isRefresh)
 #endif                     // _WIN64
                     break; // the second pass (adding ".." or win64 redirected-dir)
                 }
-            } while (SalLPFindNextFileA(search, &fileData));
+            } while (SalLPFindNextFile(search, &fileDataW));
             DWORD err = GetLastError();
 
             if (search != NULL) // the first pass
@@ -868,12 +908,12 @@ BOOL CFilesWindow::ReadDirectory(HWND parent, BOOL isRefresh)
             upDir = FALSE;
             *(fileNameEnd - 1) = 0; // it's not logical, but times ".." are from current directory
             if (!UNCRootUpDir)
-                search = HANDLES_Q(FindFirstFile(fileName, &fileData));
+                search = SalLPFindFirstFile(fileName, &fileDataW);
             else
                 search = INVALID_HANDLE_VALUE;
             if (search == INVALID_HANDLE_VALUE)
             {
-                fileData.dwFileAttributes = FILE_ATTRIBUTE_DIRECTORY; // this is ptDisk
+                fileDataW.dwFileAttributes = FILE_ATTRIBUTE_DIRECTORY; // this is ptDisk
                 SYSTEMTIME ltNone;
                 ltNone.wYear = 1602;
                 ltNone.wMonth = 1;
@@ -885,23 +925,25 @@ BOOL CFilesWindow::ReadDirectory(HWND parent, BOOL isRefresh)
                 ltNone.wMilliseconds = 0;
                 FILETIME ft;
                 SystemTimeToFileTime(&ltNone, &ft);
-                LocalFileTimeToFileTime(&ft, &fileData.ftCreationTime);
-                LocalFileTimeToFileTime(&ft, &fileData.ftLastAccessTime);
-                LocalFileTimeToFileTime(&ft, &fileData.ftLastWriteTime);
+                LocalFileTimeToFileTime(&ft, &fileDataW.ftCreationTime);
+                LocalFileTimeToFileTime(&ft, &fileDataW.ftLastAccessTime);
+                LocalFileTimeToFileTime(&ft, &fileDataW.ftLastWriteTime);
 
-                fileData.nFileSizeHigh = 0;
-                fileData.nFileSizeLow = 0;
-                fileData.dwReserved0 = fileData.dwReserved1 = 0;
+                fileDataW.nFileSizeHigh = 0;
+                fileDataW.nFileSizeLow = 0;
+                fileDataW.dwReserved0 = fileDataW.dwReserved1 = 0;
             }
             else
                 HANDLES(FindClose(search));
-            search = NULL;                                              // the second/third pass
-            fileData.dwFileAttributes |= FILE_ATTRIBUTE_DIRECTORY;      // this is ptDisk
-            fileData.dwFileAttributes &= ~FILE_ATTRIBUTE_REPARSE_POINT; // need to remove flag FILE_ATTRIBUTE_REPARSE_POINT, otherwise link overlay will be on ".."
-            strcpy(fileData.cFileName, "..");
-            fileData.cAlternateFileName[0] = 0;
-            st = fileData.cFileName;
-            len = (int)strlen(st);
+            search = NULL;                                               // the second/third pass
+            fileDataW.dwFileAttributes |= FILE_ATTRIBUTE_DIRECTORY;      // this is ptDisk
+            fileDataW.dwFileAttributes &= ~FILE_ATTRIBUTE_REPARSE_POINT; // need to remove flag FILE_ATTRIBUTE_REPARSE_POINT, otherwise link overlay will be on ".."
+            wcscpy(fileDataW.cFileName, L"..");
+            fileDataW.cAlternateFileName[0] = 0;
+            strcpy(ansiFileName, "..");
+            st = ansiFileName;
+            len = 2;
+            nameConversionLossy = FALSE;  // ".." is pure ASCII
             isUpDir = TRUE;
             goto ADD_ITEM;
         }
@@ -911,13 +953,14 @@ BOOL CFilesWindow::ReadDirectory(HWND parent, BOOL isRefresh)
     FIND_NEXT_WIN64_REDIRECTEDDIR:
 
         BOOL dirWithSameNameExists;
+        WIN32_FIND_DATA fileDataA;  // ANSI structure for AddWin64RedirectedDir (system dirs are ASCII)
         if (foundWin64RedirectedDirs < 10 &&
-            AddWin64RedirectedDir(GetPath(), Dirs, &fileData, &foundWin64RedirectedDirs, &dirWithSameNameExists))
+            AddWin64RedirectedDir(GetPath(), Dirs, &fileDataA, &foundWin64RedirectedDirs, &dirWithSameNameExists))
         {
             foundWin64RedirectedDirs++; // e.g. under system32 there can be 5, I've added some reserve to 10...
 
             if (Configuration.NotHiddenSystemFiles &&
-                (fileData.dwFileAttributes & (FILE_ATTRIBUTE_HIDDEN | FILE_ATTRIBUTE_SYSTEM)))
+                (fileDataA.dwFileAttributes & (FILE_ATTRIBUTE_HIDDEN | FILE_ATTRIBUTE_SYSTEM)))
             { // skip hidden directory
                 if (!dirWithSameNameExists)
                 {
@@ -928,7 +971,7 @@ BOOL CFilesWindow::ReadDirectory(HWND parent, BOOL isRefresh)
             }
 
             //--- if the name is occupied in the array HiddenNames, we will discard it
-            if (HiddenNames.Contains(TRUE, fileData.cFileName))
+            if (HiddenNames.Contains(TRUE, fileDataA.cFileName))
             {
                 if (!dirWithSameNameExists)
                 {
@@ -938,10 +981,24 @@ BOOL CFilesWindow::ReadDirectory(HWND parent, BOOL isRefresh)
                 goto FIND_NEXT_WIN64_REDIRECTEDDIR;
             }
 
+            // Convert ANSI fileDataA to wide fileDataW for ADD_ITEM
+            fileDataW.dwFileAttributes = fileDataA.dwFileAttributes;
+            fileDataW.ftCreationTime = fileDataA.ftCreationTime;
+            fileDataW.ftLastAccessTime = fileDataA.ftLastAccessTime;
+            fileDataW.ftLastWriteTime = fileDataA.ftLastWriteTime;
+            fileDataW.nFileSizeHigh = fileDataA.nFileSizeHigh;
+            fileDataW.nFileSizeLow = fileDataA.nFileSizeLow;
+            fileDataW.dwReserved0 = fileDataA.dwReserved0;
+            fileDataW.dwReserved1 = fileDataA.dwReserved1;
+            MultiByteToWideChar(CP_ACP, 0, fileDataA.cFileName, -1, fileDataW.cFileName, MAX_PATH);
+            MultiByteToWideChar(CP_ACP, 0, fileDataA.cAlternateFileName, -1, fileDataW.cAlternateFileName, 14);
+
             isWin64RedirectedDir = TRUE;
             search = NULL; // the second/third pass...
-            st = fileData.cFileName;
+            strcpy(ansiFileName, fileDataA.cFileName);
+            st = ansiFileName;
             len = (int)strlen(st);
+            nameConversionLossy = FALSE;  // System directory names are ASCII
             isUpDir = FALSE;
             goto ADD_ITEM;
         }

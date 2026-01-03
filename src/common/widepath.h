@@ -120,6 +120,63 @@ private:
 };
 
 //
+// SalAnsiName
+//
+// RAII wrapper for wide-to-ANSI filename conversion with lossy detection.
+// Used for converting WIN32_FIND_DATAW filenames to ANSI while tracking
+// whether any Unicode characters were lost in the conversion.
+//
+// Usage:
+//   SalAnsiName ansiName(findDataW.cFileName);
+//   if (ansiName.IsLossy())
+//       // Original wide name needed for proper display/operations
+//       file.NameW = ansiName.AllocWideName();  // caller owns the memory
+//   file.Name = ansiName.AllocAnsiName();  // caller owns the memory
+//
+class SalAnsiName
+{
+public:
+    // Constructs from wide filename, converts to ANSI and detects lossy conversion
+    explicit SalAnsiName(const wchar_t* wideName);
+
+    // Destructor frees internal buffers
+    ~SalAnsiName();
+
+    // Returns TRUE if conversion lost characters (i.e., wide name is needed)
+    BOOL IsLossy() const { return m_isLossy; }
+
+    // Returns the ANSI name (internal buffer, valid until object destroyed)
+    const char* GetAnsi() const { return m_ansiName; }
+
+    // Returns the wide name (internal buffer, valid until object destroyed)
+    const wchar_t* GetWide() const { return m_wideName; }
+
+    // Returns length of ANSI name
+    int GetAnsiLen() const { return m_ansiLen; }
+
+    // Returns length of wide name
+    int GetWideLen() const { return m_wideLen; }
+
+    // Allocates and returns a copy of the ANSI name (caller must free)
+    char* AllocAnsiName() const;
+
+    // Allocates and returns a copy of the wide name (caller must free)
+    // Only call if IsLossy() returns TRUE
+    wchar_t* AllocWideName() const;
+
+private:
+    char* m_ansiName;
+    wchar_t* m_wideName;
+    int m_ansiLen;
+    int m_wideLen;
+    BOOL m_isLossy;
+
+    // Disable copy
+    SalAnsiName(const SalAnsiName&);
+    SalAnsiName& operator=(const SalAnsiName&);
+};
+
+//
 // Helper functions for manual memory management (if RAII not suitable)
 //
 
@@ -170,6 +227,10 @@ BOOL SalLPCopyFile(const char* existingFileName, const char* newFileName, BOOL f
 // FindFirstFile wrapper that supports long paths
 // Note: Returns wide find data; caller must convert if needed
 HANDLE SalLPFindFirstFile(const char* fileName, WIN32_FIND_DATAW* findData);
+
+// FindNextFile wrapper that supports long paths
+// Note: Returns wide find data; caller must convert if needed
+BOOL SalLPFindNextFile(HANDLE hFindFile, WIN32_FIND_DATAW* findData);
 
 // FindFirstFile wrapper that supports long paths with ANSI find data
 // Converts result back to ANSI WIN32_FIND_DATA for compatibility

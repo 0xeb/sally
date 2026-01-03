@@ -461,8 +461,9 @@ void DrawFocusRect(HDC hDC, const RECT* r, BOOL selected, BOOL editMode)
 // CFilesMap::CreateMap()
 //
 
-char DrawItemBuff[1024]; // destination buffer for strings
-int DrawItemAlpDx[1024]; // for width calculations of columns with FixedWidth bit + elastic columns with smart mode
+char DrawItemBuff[1024];     // destination buffer for strings
+wchar_t DrawItemBuffW[1024]; // destination buffer for wide strings (Unicode filenames)
+int DrawItemAlpDx[1024];     // for width calculations of columns with FixedWidth bit + elastic columns with smart mode
 
 void CFilesWindow::DrawBriefDetailedItem(HDC hTgtDC, int itemIndex, RECT* itemRect, DWORD drawFlags)
 {
@@ -682,6 +683,16 @@ void CFilesWindow::DrawBriefDetailedItem(HDC hTgtDC, int itemIndex, RECT* itemRe
                 fileNameFormated = TRUE;
             }
 
+            // Unicode filename display support
+            BOOL useWideDisplay = (f->NameW != NULL);
+            int nameLenW = 0;
+            if (useWideDisplay)
+            {
+                nameLenW = (int)wcslen(f->NameW);
+                // For Unicode names, we don't apply AlterFileName transformation yet
+                // (TODO: add AlterFileNameW for proper uppercase/lowercase handling)
+            }
+
             CColumn* column = &Columns[0];
             SIZE fnSZ;
             int fitChars;
@@ -692,8 +703,12 @@ void CFilesWindow::DrawBriefDetailedItem(HDC hTgtDC, int itemIndex, RECT* itemRe
                 if (GetViewMode() == vmDetailed && (column->FixedWidth == 1 || NarrowedNameColumn))
                 {
                     textWidth = nameWidth - 1 - IconSizes[ICONSIZE_16] - 1 - 2 - SPACE_WIDTH;
-                    GetTextExtentExPoint(hDC, TransferBuffer, nameLen, textWidth,
-                                         &fitChars, DrawItemAlpDx, &fnSZ);
+                    if (useWideDisplay)
+                        GetTextExtentExPointW(hDC, f->NameW, nameLenW, textWidth,
+                                              &fitChars, DrawItemAlpDx, &fnSZ);
+                    else
+                        GetTextExtentExPoint(hDC, TransferBuffer, nameLen, textWidth,
+                                             &fitChars, DrawItemAlpDx, &fnSZ);
                     int newWidth = 1 + IconSizes[ICONSIZE_16] + 1 + 2 + fnSZ.cx + 3;
                     if (newWidth > nameWidth)
                         newWidth = nameWidth;
@@ -701,7 +716,10 @@ void CFilesWindow::DrawBriefDetailedItem(HDC hTgtDC, int itemIndex, RECT* itemRe
                 }
                 else
                 {
-                    GetTextExtentPoint32(hDC, TransferBuffer, nameLen, &fnSZ);
+                    if (useWideDisplay)
+                        GetTextExtentPoint32W(hDC, f->NameW, nameLenW, &fnSZ);
+                    else
+                        GetTextExtentPoint32(hDC, TransferBuffer, nameLen, &fnSZ);
                     adjR.right = r.right = rect.left + 1 + IconSizes[ICONSIZE_16] + 1 + 2 + fnSZ.cx + 3;
                 }
 
@@ -711,42 +729,70 @@ void CFilesWindow::DrawBriefDetailedItem(HDC hTgtDC, int itemIndex, RECT* itemRe
             }
             if (!isItemUpDir && GetViewMode() == vmDetailed && (column->FixedWidth == 1 || NarrowedNameColumn))
             {
+                int effectiveNameLen = useWideDisplay ? nameLenW : nameLen;
                 if (Configuration.FullRowSelect)
                 {
                     // no width measured yet - let's measure it now
                     // the string may be longer than the available space and must end with "..."
                     textWidth = nameWidth - 1 - IconSizes[ICONSIZE_16] - 1 - 2 - SPACE_WIDTH;
-                    GetTextExtentExPoint(hDC, TransferBuffer, nameLen, textWidth,
-                                         &fitChars, DrawItemAlpDx, &fnSZ);
+                    if (useWideDisplay)
+                        GetTextExtentExPointW(hDC, f->NameW, nameLenW, textWidth,
+                                              &fitChars, DrawItemAlpDx, &fnSZ);
+                    else
+                        GetTextExtentExPoint(hDC, TransferBuffer, nameLen, textWidth,
+                                             &fitChars, DrawItemAlpDx, &fnSZ);
                 }
-                if (fitChars < nameLen)
+                if (fitChars < effectiveNameLen)
                 {
                     // search from the end for the character after which we can copy "..." and it fits in the column
                     while (fitChars > 0 && DrawItemAlpDx[fitChars - 1] + TextEllipsisWidth > textWidth)
                         fitChars--;
                     // copy a part of the original string to another buffer
                     int totalCount;
-                    if (fitChars > 0)
+                    if (useWideDisplay)
                     {
-                        memmove(DrawItemBuff, TransferBuffer, fitChars);
-                        // and append "..."
-                        memmove(DrawItemBuff + fitChars, "...", 3);
-                        totalCount = fitChars + 3;
+                        if (fitChars > 0)
+                        {
+                            wmemmove(DrawItemBuffW, f->NameW, fitChars);
+                            // and append "..."
+                            wmemmove(DrawItemBuffW + fitChars, L"...", 3);
+                            totalCount = fitChars + 3;
+                        }
+                        else
+                        {
+                            DrawItemBuffW[0] = f->NameW[0];
+                            DrawItemBuffW[1] = L'.';
+                            totalCount = 2;
+                        }
+                        // DRAWFLAG_MASK: hack, under XP some stuff is added in font of the text in the mask while drawing short texts; not an issue if text is not drawn
+                        ExtTextOutW(hDC, r.left + 2, y, ETO_OPAQUE, &adjR, DrawItemBuffW, (drawFlags & DRAWFLAG_MASK) ? 0 : totalCount, NULL);
                     }
                     else
                     {
-                        DrawItemBuff[0] = TransferBuffer[0];
-                        DrawItemBuff[1] = '.';
-                        totalCount = 2;
+                        if (fitChars > 0)
+                        {
+                            memmove(DrawItemBuff, TransferBuffer, fitChars);
+                            // and append "..."
+                            memmove(DrawItemBuff + fitChars, "...", 3);
+                            totalCount = fitChars + 3;
+                        }
+                        else
+                        {
+                            DrawItemBuff[0] = TransferBuffer[0];
+                            DrawItemBuff[1] = '.';
+                            totalCount = 2;
+                        }
+                        // DRAWFLAG_MASK: hack, under XP some stuff is added in font of the text in the mask while drawing short texts; not an issue if text is not drawn
+                        ExtTextOut(hDC, r.left + 2, y, ETO_OPAQUE, &adjR, DrawItemBuff, (drawFlags & DRAWFLAG_MASK) ? 0 : totalCount, NULL);
                     }
-
-                    // DRAWFLAG_MASK: hack, under XP some stuff is added in font of the text in the mask while drawing short texts; not an issue if text is not drawn
-                    ExtTextOut(hDC, r.left + 2, y, ETO_OPAQUE, &adjR, DrawItemBuff, (drawFlags & DRAWFLAG_MASK) ? 0 : totalCount, NULL);
                     goto SKIP1;
                 }
             }
             // DRAWFLAG_MASK: hack, under XP some stuff is added in font of the text in the mask while drawing short texts; not an issue if text is not drawn
-            ExtTextOut(hDC, r.left + 2, y, ETO_OPAQUE, &adjR, TransferBuffer, (drawFlags & DRAWFLAG_MASK) ? 0 : nameLen, NULL);
+            if (useWideDisplay)
+                ExtTextOutW(hDC, r.left + 2, y, ETO_OPAQUE, &adjR, f->NameW, (drawFlags & DRAWFLAG_MASK) ? 0 : nameLenW, NULL);
+            else
+                ExtTextOut(hDC, r.left + 2, y, ETO_OPAQUE, &adjR, TransferBuffer, (drawFlags & DRAWFLAG_MASK) ? 0 : nameLen, NULL);
         SKIP1:
             if (!Configuration.FullRowSelect || GetViewMode() == vmBrief)
             {

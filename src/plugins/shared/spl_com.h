@@ -215,6 +215,9 @@ struct CFileData // destructor must not be added here!
     FILETIME LastWrite;            // last write time to file (UTC-based time)
     char* DosName;                 // allocated DOS 8.3 file name, NULL if not needed, must be
                                    // allocated on Salamander's heap (see CSalamanderGeneralAbstract::Alloc/Realloc/Free)
+    wchar_t* NameW;                // allocated wide (Unicode) file name, NULL if Name can represent the filename
+                                   // correctly (all chars fit in current ANSI codepage); must be allocated on
+                                   // Salamander's heap; use NameW when available for display and file operations
     DWORD_PTR PluginData;          // used by plugin through CPluginDataInterfaceAbstract, Salamander ignores it
     unsigned NameLen : 9;          // length of Name string (strlen(Name)) - WARNING: maximum name length is (MAX_PATH - 5)
     unsigned Hidden : 1;           // is hidden? (if 1, icon is 50% more transparent - ghosted)

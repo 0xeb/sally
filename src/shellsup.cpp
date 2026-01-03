@@ -2462,6 +2462,50 @@ void ExecuteAssociationAux3(IContextMenu2* menu)
 
 extern DWORD ExecuteAssociationTlsIndex; // dovoli jen jedno volani zaroven (zamezi rekurzi) v kazdem threadu
 
+// Wide version for Unicode filenames - uses ShellExecuteExW directly
+void ExecuteAssociationW(HWND hWindow, const char* path, const wchar_t* nameW)
+{
+    CALL_STACK_MESSAGE2("ExecuteAssociationW(, %s, <wide>)", path);
+
+    if (ExecuteAssociationTlsIndex == TLS_OUT_OF_INDEXES ||
+        TlsGetValue(ExecuteAssociationTlsIndex) == 0)
+    {
+        if (ExecuteAssociationTlsIndex != TLS_OUT_OF_INDEXES)
+            TlsSetValue(ExecuteAssociationTlsIndex, (void*)1);
+
+        // Build wide full path
+        wchar_t fullPathW[SAL_MAX_LONG_PATH];
+        wchar_t pathW[SAL_MAX_LONG_PATH];
+
+        // Convert ANSI path to wide
+        MultiByteToWideChar(CP_ACP, 0, path, -1, pathW, SAL_MAX_LONG_PATH);
+
+        // Build full path: path + nameW
+        wcscpy(fullPathW, pathW);
+        int len = (int)wcslen(fullPathW);
+        if (len > 0 && fullPathW[len - 1] != L'\\')
+        {
+            fullPathW[len] = L'\\';
+            fullPathW[len + 1] = L'\0';
+        }
+        wcscat(fullPathW, nameW);
+
+        // Use ShellExecuteExW for Unicode filenames
+        SHELLEXECUTEINFOW sei = {0};
+        sei.cbSize = sizeof(sei);
+        sei.fMask = SEE_MASK_FLAG_NO_UI;
+        sei.hwnd = hWindow;
+        sei.lpVerb = NULL; // default verb (open)
+        sei.lpFile = fullPathW;
+        sei.lpDirectory = pathW;
+        sei.nShow = SW_SHOWNORMAL;
+        ShellExecuteExW(&sei);
+
+        if (ExecuteAssociationTlsIndex != TLS_OUT_OF_INDEXES)
+            TlsSetValue(ExecuteAssociationTlsIndex, (void*)0);
+    }
+}
+
 void ExecuteAssociation(HWND hWindow, const char* path, const char* name)
 {
     CALL_STACK_MESSAGE3("ExecuteAssociation(, %s, %s)", path, name);

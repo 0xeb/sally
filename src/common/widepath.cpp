@@ -148,6 +148,106 @@ SalWidePath::~SalWidePath()
 }
 
 //
+// SalAnsiName class implementation
+//
+
+SalAnsiName::SalAnsiName(const wchar_t* wideName)
+    : m_ansiName(NULL)
+    , m_wideName(NULL)
+    , m_ansiLen(0)
+    , m_wideLen(0)
+    , m_isLossy(FALSE)
+{
+    if (wideName == NULL)
+        return;
+
+    // Get wide name length
+    m_wideLen = (int)wcslen(wideName);
+
+    // Allocate and copy wide name
+    m_wideName = (wchar_t*)malloc((m_wideLen + 1) * sizeof(wchar_t));
+    if (m_wideName == NULL)
+        return;
+    wcscpy(m_wideName, wideName);
+
+    // Convert wide to ANSI with lossy detection
+    // Use WC_NO_BEST_FIT_CHARS to ensure exact conversion detection
+    BOOL usedDefaultChar = FALSE;
+    int ansiSize = WideCharToMultiByte(CP_ACP, WC_NO_BEST_FIT_CHARS, wideName, -1,
+                                       NULL, 0, NULL, &usedDefaultChar);
+    if (ansiSize == 0)
+    {
+        // Conversion failed, try without the flag
+        ansiSize = WideCharToMultiByte(CP_ACP, 0, wideName, -1, NULL, 0, NULL, NULL);
+        if (ansiSize == 0)
+            return;
+        m_isLossy = TRUE; // Assume lossy if we couldn't check properly
+    }
+    else
+    {
+        m_isLossy = usedDefaultChar;
+    }
+
+    // Allocate ANSI buffer
+    m_ansiName = (char*)malloc(ansiSize);
+    if (m_ansiName == NULL)
+        return;
+
+    // Do the actual conversion
+    usedDefaultChar = FALSE;
+    int converted = WideCharToMultiByte(CP_ACP, WC_NO_BEST_FIT_CHARS, wideName, -1,
+                                        m_ansiName, ansiSize, NULL, &usedDefaultChar);
+    if (converted == 0)
+    {
+        // Try without the flag
+        converted = WideCharToMultiByte(CP_ACP, 0, wideName, -1, m_ansiName, ansiSize, NULL, NULL);
+        if (converted == 0)
+        {
+            free(m_ansiName);
+            m_ansiName = NULL;
+            return;
+        }
+        m_isLossy = TRUE;
+    }
+    else
+    {
+        m_isLossy = m_isLossy || usedDefaultChar;
+    }
+
+    m_ansiLen = (int)strlen(m_ansiName);
+}
+
+SalAnsiName::~SalAnsiName()
+{
+    if (m_ansiName != NULL)
+        free(m_ansiName);
+    if (m_wideName != NULL)
+        free(m_wideName);
+}
+
+char* SalAnsiName::AllocAnsiName() const
+{
+    if (m_ansiName == NULL)
+        return NULL;
+
+    char* copy = (char*)malloc(m_ansiLen + 1);
+    if (copy != NULL)
+        memcpy(copy, m_ansiName, m_ansiLen + 1);
+    return copy;
+}
+
+wchar_t* SalAnsiName::AllocWideName() const
+{
+    if (m_wideName == NULL)
+        return NULL;
+
+    wchar_t* copy = (wchar_t*)malloc((m_wideLen + 1) * sizeof(wchar_t));
+    if (copy != NULL)
+        memcpy(copy, m_wideName, (m_wideLen + 1) * sizeof(wchar_t));
+    return copy;
+}
+
+//
 // CPathBuffer class implementation
 //
 
@@ -306,6 +406,11 @@ HANDLE SalLPFindFirstFile(const char* fileName, WIN32_FIND_DATAW* findData)
     }
 
     return FindFirstFileW(widePath.Get(), findData);
+}
+
+BOOL SalLPFindNextFile(HANDLE hFindFile, WIN32_FIND_DATAW* findData)
+{
+    return FindNextFileW(hFindFile, findData);
 }
 
 HANDLE SalLPFindFirstFileA(const char* fileName, WIN32_FIND_DATAA* findData)
