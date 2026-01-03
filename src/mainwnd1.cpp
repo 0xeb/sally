@@ -24,6 +24,11 @@
 
 #include "versinfo.rh2"
 
+// Git version from CMake build (may not exist for Visual Studio builds)
+#if __has_include("git_version.h")
+#include "git_version.h"
+#endif
+
 const char* SALAMANDER_TEXT_VERSION = "Open Salamander " VERSINFO_VERSION;
 
 //****************************************************************************
@@ -1883,7 +1888,12 @@ void CMainWindow::SetWindowTitle(const char* text)
 
         // Open Salamander name + ver
         lstrcat(stdWndName, MAINWINDOW_NAME);
+#if defined(GIT_VERSION_AVAILABLE) && defined(GIT_VERSION)
+        // Use git version: x.y.z-hash (platform)
+        sprintf(stdWndName + lstrlen(stdWndName), " %s (%s)", GIT_VERSION, SAL_VER_PLATFORM);
+#else
         lstrcat(stdWndName, " " VERSINFO_VERSION);
+#endif
 
         if (RunningAsAdmin)
             sprintf(stdWndName + lstrlen(stdWndName), " (%s)", LoadStr(IDS_AS_ADMIN_TITLE));

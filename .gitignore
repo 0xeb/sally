@@ -19,3 +19,6 @@ Thumbs.db
 build*/
 .xwin-cache/
 xwin*/
+
+# CMake generated
+/src/git_version.h

@@ -2,6 +2,9 @@ cmake_minimum_required(VERSION 3.21)
 
 project(OpenSalamander LANGUAGES C CXX RC)
 
+# Generate git version header
+include(${CMAKE_CURRENT_SOURCE_DIR}/cmake/git_version.cmake)
+
 if(NOT WIN32)
   message(FATAL_ERROR "Open Salamander CMake build targets Windows only.")
 endif()
