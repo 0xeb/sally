@@ -55,6 +55,27 @@ function(sal_install_plugins)
   endforeach()
 endfunction()
 
+# Generate plugins.ver file for auto-discovery of new plugins
+# Format: first line is version, subsequent lines are "ver:path"
+function(sal_generate_plugins_ver)
+  sal_get_all_plugins(PLUGINS)
+
+  # Start with version 1
+  set(PLUGINS_VER_CONTENT "1\n")
+
+  foreach(PLUGIN_TARGET ${PLUGINS})
+    get_target_property(PLUGIN_OUTPUT_NAME ${PLUGIN_TARGET} OUTPUT_NAME)
+    # Use forward slashes in the file, Salamander handles both
+    string(APPEND PLUGINS_VER_CONTENT "1:plugins/${PLUGIN_OUTPUT_NAME}/${PLUGIN_OUTPUT_NAME}.spl\n")
+  endforeach()
+
+  # Write to build directory
+  file(WRITE "${CMAKE_BINARY_DIR}/plugins.ver" "${PLUGINS_VER_CONTENT}")
+
+  # Install to root
+  install(FILES "${CMAKE_BINARY_DIR}/plugins.ver" DESTINATION .)
+endfunction()
+
 # Install resource files (toolbars, convert tables, etc.)
 function(sal_install_resources)
   # Toolbars
