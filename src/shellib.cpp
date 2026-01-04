@@ -613,7 +613,7 @@ BOOL IsSimpleSelection(IDataObject* pDataObject, CDragDropOperData* namesList)
     return ret;
 }
 
-STDMETHODIMP CImpDropTarget::QueryInterface(REFIID refiid, void FAR* FAR* ppv)
+STDMETHODIMP CImpDropTarget::QueryInterface(REFIID refiid, void FAR * FAR * ppv)
 {
     if (refiid == IID_IUnknown || refiid == IID_IDropTarget)
     {
@@ -1288,7 +1288,7 @@ STDMETHODIMP CImpDropTarget::Drop(IDataObject* pDataObject, DWORD grfKeyState,
 // CImpIDropSource
 //
 
-STDMETHODIMP CImpIDropSource::QueryInterface(REFIID refiid, void FAR* FAR* ppv)
+STDMETHODIMP CImpIDropSource::QueryInterface(REFIID refiid, void FAR * FAR * ppv)
 {
     if (refiid == IID_IUnknown || refiid == IID_IDropSource)
     {

@@ -16,7 +16,7 @@
 #define CHATTRS_FILE_SIZE CQuadWord(500, 0)
 #define MAX_OP_FILESIZE 6500 // WARNING: highest allowed value in this group
 
-// 4/2012 - increased the buffer to ten times the old size; large files over the network now reach speeds 
+// 4/2012 - increased the buffer to ten times the old size; large files over the network now reach speeds
 // comparable to Total Commander and finish 2-3x faster than with the previous one-tenth buffer
 // verified on local disks and across the network; I see no downside to the larger buffer
 #define OPERATION_BUFFER (10 * 32768)          // 320KB buffer for Copy and Move
@@ -131,9 +131,9 @@ public:
     void BytesReceived(DWORD count, DWORD time, DWORD maxPacketSize);
 
     // tunes 'progressBufferLimit' according to current received packets data;
-    // 'lastFileBlockCount' is the limit we must not cross (we consider only continuous 
+    // 'lastFileBlockCount' is the limit we must not cross (we consider only continuous
     // copying of a single file; the counter 'lastFileBlockCount' is overflow-safe and
-    // values > 1000000 simply mean "a lot", the exact figure is irrelevant); 'lastFileStartTime' 
+    // values > 1000000 simply mean "a lot", the exact figure is irrelevant); 'lastFileStartTime'
     // is the GetTickCount() captured when the most recent file copy started
     void AdjustProgressBufferLimit(DWORD* progressBufferLimit, DWORD lastFileBlockCount,
                                    DWORD lastFileStartTime);
@@ -508,15 +508,15 @@ typedef struct
 // enumerates alternate data streams (ADS) of a file/directory ('isDir' is FALSE/TRUE)
 // 'fileName'; meaningful only on NTFS disks; if 'adsSize' is not NULL it returns the
 // sum of the sizes of all ADS; if 'streamNames' is not NULL it returns an allocated array
-// of Unicode names of all ADS (except the default ADS) - the elements of the array are allocated 
+// of Unicode names of all ADS (except the default ADS) - the elements of the array are allocated
 // the caller must dealocate them and the array itself; the array of names is returned only
-// if no error occurred (see 'lowMemory' and 'winError') and ADS were found (the function 
-// returns TRUE); if 'streamNamesCount' is not NULL it returns the number of elements 
-// in 'streamNames'; if 'lowMemory' is not NULL it returns TRUE when an out-of-memory 
-// error occurs (only possible when 'streamNames' is not NULL); if 'winError' is not NULL 
+// if no error occurred (see 'lowMemory' and 'winError') and ADS were found (the function
+// returns TRUE); if 'streamNamesCount' is not NULL it returns the number of elements
+// in 'streamNames'; if 'lowMemory' is not NULL it returns TRUE when an out-of-memory
+// error occurs (only possible when 'streamNames' is not NULL); if 'winError' is not NULL
 // it returns the Windows error code (NO_ERROR if none occurred - if a Windows error occurs,
-// the function always returns FALSE); the function returns TRUE if the file/directory 
-// contains ADS, otherwise FALSE; 'bytesPerCluster' is the cluster size 
+// the function always returns FALSE); the function returns TRUE if the file/directory
+// contains ADS, otherwise FALSE; 'bytesPerCluster' is the cluster size
 // used to compute disk space occupied by the ADS (0 = unknown size);
 // in 'adsOccupiedSpace' (if not NULL) it returns the disk space occupied by the ADS;
 // in 'onlyDiscardableStreams' (if not NULL) it returns TRUE if only ADS

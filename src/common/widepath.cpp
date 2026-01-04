@@ -1,4 +1,4 @@
-// SPDX-FileCopyrightText: 2023 Open Salamander Authors
+﻿// SPDX-FileCopyrightText: 2023 Open Salamander Authors
 // SPDX-License-Identifier: GPL-2.0-or-later
 
 //****************************************************************************
@@ -131,8 +131,7 @@ void SalFreeWidePath(wchar_t* widePath)
 //
 
 SalWidePath::SalWidePath(const char* ansiPath)
-    : m_widePath(NULL)
-    , m_hasPrefix(FALSE)
+    : m_widePath(NULL), m_hasPrefix(FALSE)
 {
     if (ansiPath != NULL)
     {
@@ -152,11 +151,7 @@ SalWidePath::~SalWidePath()
 //
 
 SalAnsiName::SalAnsiName(const wchar_t* wideName)
-    : m_ansiName(NULL)
-    , m_wideName(NULL)
-    , m_ansiLen(0)
-    , m_wideLen(0)
-    , m_isLossy(FALSE)
+    : m_ansiName(NULL), m_wideName(NULL), m_ansiLen(0), m_wideLen(0), m_isLossy(FALSE)
 {
     if (wideName == NULL)
         return;
@@ -485,8 +480,8 @@ HANDLE SalLPCreateFileTracked(
     int srcLine)
 {
     HANDLE h = SalLPCreateFile(fileName, dwDesiredAccess, dwShareMode,
-                             lpSecurityAttributes, dwCreationDisposition,
-                             dwFlagsAndAttributes, hTemplateFile);
+                               lpSecurityAttributes, dwCreationDisposition,
+                               dwFlagsAndAttributes, hTemplateFile);
 
     // Track the handle using Salamander's handle tracking system
     DWORD err = GetLastError();

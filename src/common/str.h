@@ -235,5 +235,3 @@ inline int SPrintFToEnd_s(char* _Dst, size_t _Size, const char* _Format, ...)
 #else // UNICODE
 #define STPrintFToEnd_s SPrintFToEnd_s
 #endif // UNICODE
-
-

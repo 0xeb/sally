@@ -1,4 +1,4 @@
-// SPDX-FileCopyrightText: 2023 Open Salamander Authors
+﻿// SPDX-FileCopyrightText: 2023 Open Salamander Authors
 // SPDX-License-Identifier: GPL-2.0-or-later
 
 //****************************************************************************
@@ -130,8 +130,7 @@ void SalFreeWidePath(wchar_t* widePath)
 //
 
 SalWidePath::SalWidePath(const char* ansiPath)
-    : m_widePath(NULL)
-    , m_hasPrefix(FALSE)
+    : m_widePath(NULL), m_hasPrefix(FALSE)
 {
     if (ansiPath != NULL)
     {

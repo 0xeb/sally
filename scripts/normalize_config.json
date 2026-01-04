@@ -7,7 +7,8 @@
     ],
     "excludes": [
       "./.git/*",
-	  "*/src/plugins/automation/generated/*"
+      "./build*",
+      "*/src/plugins/automation/generated/*"
     ]
   },
   "textfiles": {
@@ -53,6 +54,7 @@
     ],
     "excludes": [
       "./.git/*",
+      "./build*",
       "./src/common/dep/*",
       "./src/sfx7zip/7zip/*",
       "./src/sfx7zip/branch/*",

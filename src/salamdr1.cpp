@@ -4780,4 +4780,3 @@ WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR cmdLine, int cmdShow
     }
 #endif // CALLSTK_DISABLE
 }
-

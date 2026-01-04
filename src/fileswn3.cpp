@@ -299,8 +299,8 @@ BOOL CFilesWindow::ReadDirectory(HWND parent, BOOL isRefresh)
 
         BOOL isUpDir = FALSE;
         WIN32_FIND_DATAW fileDataW;
-        char ansiFileName[MAX_PATH];       // ANSI conversion buffer for cFileName (also used as scratch)
-        BOOL nameConversionLossy = FALSE;  // TRUE if wide->ANSI conversion lost characters
+        char ansiFileName[MAX_PATH];      // ANSI conversion buffer for cFileName (also used as scratch)
+        BOOL nameConversionLossy = FALSE; // TRUE if wide->ANSI conversion lost characters
         HANDLE search;
         search = SalLPFindFirstFile(fileName, &fileDataW);
         if (search == INVALID_HANDLE_VALUE)
@@ -648,8 +648,8 @@ BOOL CFilesWindow::ReadDirectory(HWND parent, BOOL isRefresh)
                     {
                         while (*++s != 0)
                             *st++ = LowerCase[*s];
-                        *(DWORD*)st = 0;      // zeroes to the end
-                        st = ansiFileName;    // lowercase extension (reset to beginning of scratch buffer)
+                        *(DWORD*)st = 0;   // zeroes to the end
+                        st = ansiFileName; // lowercase extension (reset to beginning of scratch buffer)
 
                         if (fileDataW.dwFileAttributes & FILE_ATTRIBUTE_REPARSE_POINT)
                             file.IsLink = 1; // if the file is reparse-point (maybe it's not possible at all) = show it with link overlay
@@ -929,7 +929,7 @@ BOOL CFilesWindow::ReadDirectory(HWND parent, BOOL isRefresh)
             strcpy(ansiFileName, "..");
             st = ansiFileName;
             len = 2;
-            nameConversionLossy = FALSE;  // ".." is pure ASCII
+            nameConversionLossy = FALSE; // ".." is pure ASCII
             isUpDir = TRUE;
             goto ADD_ITEM;
         }
@@ -939,7 +939,7 @@ BOOL CFilesWindow::ReadDirectory(HWND parent, BOOL isRefresh)
     FIND_NEXT_WIN64_REDIRECTEDDIR:
 
         BOOL dirWithSameNameExists;
-        WIN32_FIND_DATA fileDataA;  // ANSI structure for AddWin64RedirectedDir (system dirs are ASCII)
+        WIN32_FIND_DATA fileDataA; // ANSI structure for AddWin64RedirectedDir (system dirs are ASCII)
         if (foundWin64RedirectedDirs < 10 &&
             AddWin64RedirectedDir(GetPath(), Dirs, &fileDataA, &foundWin64RedirectedDirs, &dirWithSameNameExists))
         {
@@ -984,7 +984,7 @@ BOOL CFilesWindow::ReadDirectory(HWND parent, BOOL isRefresh)
             strcpy(ansiFileName, fileDataA.cFileName);
             st = ansiFileName;
             len = (int)strlen(st);
-            nameConversionLossy = FALSE;  // System directory names are ASCII
+            nameConversionLossy = FALSE; // System directory names are ASCII
             isUpDir = FALSE;
             goto ADD_ITEM;
         }

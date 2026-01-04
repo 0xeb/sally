@@ -1655,8 +1655,8 @@ DWORD CompressFile(char* fileName, DWORD attrs)
         SetFileAttributes(fileNameCrFile, attrs & ~FILE_ATTRIBUTE_READONLY);
     }
     HANDLE file = SalCreateFileH(fileNameCrFile, FILE_READ_DATA | FILE_WRITE_DATA,
-                                  FILE_SHARE_READ | FILE_SHARE_WRITE, NULL,
-                                  OPEN_EXISTING, FILE_FLAG_BACKUP_SEMANTICS, NULL);
+                                 FILE_SHARE_READ | FILE_SHARE_WRITE, NULL,
+                                 OPEN_EXISTING, FILE_FLAG_BACKUP_SEMANTICS, NULL);
     if (file == INVALID_HANDLE_VALUE)
         ret = GetLastError();
     else
@@ -1693,8 +1693,8 @@ DWORD UncompressFile(char* fileName, DWORD attrs)
     }
 
     HANDLE file = SalCreateFileH(fileNameCrFile, FILE_READ_DATA | FILE_WRITE_DATA,
-                                  FILE_SHARE_READ | FILE_SHARE_WRITE,
-                                  NULL, OPEN_EXISTING, FILE_FLAG_BACKUP_SEMANTICS, NULL);
+                                 FILE_SHARE_READ | FILE_SHARE_WRITE,
+                                 NULL, OPEN_EXISTING, FILE_FLAG_BACKUP_SEMANTICS, NULL);
     if (file == INVALID_HANDLE_VALUE)
         ret = GetLastError();
     else
@@ -1896,8 +1896,8 @@ BOOL CheckFileOrDirADS(const char* fileName, BOOL isDir, CQuadWord* adsSize, wch
         MakeCopyWithBackslashIfNeeded(fileNameCrFile, fileNameCrFileCopy);
 
         HANDLE file = SalCreateFileH(fileNameCrFile, 0, FILE_SHARE_READ | FILE_SHARE_WRITE,
-                                      NULL, OPEN_EXISTING,
-                                      isDir ? FILE_FLAG_BACKUP_SEMANTICS : 0, NULL);
+                                     NULL, OPEN_EXISTING,
+                                     isDir ? FILE_FLAG_BACKUP_SEMANTICS : 0, NULL);
         if (file == INVALID_HANDLE_VALUE)
         {
             if (winError != NULL)
@@ -2924,7 +2924,7 @@ HANDLE SalCreateFileEx(const char* fileName, DWORD desiredAccess,
                        DWORD shareMode, DWORD flagsAndAttributes, BOOL* encryptionNotSupported)
 {
     HANDLE out = SalLPCreateFile(fileName, desiredAccess, shareMode, NULL,
-                                  CREATE_NEW, flagsAndAttributes, NULL);
+                                 CREATE_NEW, flagsAndAttributes, NULL);
     if (out == INVALID_HANDLE_VALUE)
     {
         DWORD err = GetLastError();
@@ -3806,7 +3806,7 @@ void CCopy_Context::CancelOpPhase2(int errBlkIndex)
 
     // when deleting the target file, set the file pointer to the end of the written portion;
     // the caller will truncate it with SetEndOfFile before deletion (otherwise zeroes might be written
-    // from the end of the written part to the end of the pre-allocated file - pre-allocation is 
+    // from the end of the written part to the end of the pre-allocated file - pre-allocation is
     // used to prevent fragmentation)
     if (*Out != NULL) // only if the target file was not closed meanwhile
     {
@@ -4162,7 +4162,7 @@ void DoCopyFileLoopAsync(CAsyncCopyParams* asyncPar, HANDLE& in, HANDLE& out, vo
                             ctx.AutoRetryAttemptsSNAP = 0;
                             if (!res) // EOF at the beginning of the block (for cbsReading only: EOF can also be before this block and will be handled later in a block with a lower offset)
                             {
-                                // when GetOverlappedResult() returns FALSE it does not have to return bytes==0 
+                                // when GetOverlappedResult() returns FALSE it does not have to return bytes==0
                                 // (TRACE_C existed for that and crashes happened), so zero the bytes explicitly
                                 bytes = 0;
                                 if (testingEOF)
@@ -5348,7 +5348,7 @@ COPY_AGAIN:
                                         // (deletion works, but direct overwrite does not (cannot open for writing) - workaround:
                                         //  delete and recreate the file)
                                         // (Samba can allow deleting read-only files, which enables deleting them,
-                                        //  otherwise Windows cannot delete a read-only file and we cannot drop 
+                                        //  otherwise Windows cannot delete a read-only file and we cannot drop
                                         //  the "read-only" attribute because the current user is not the owner)
                                         if (chAttr)
                                             SetFileAttributes(op->TargetName, attr);
@@ -6987,7 +6987,7 @@ BOOL DoDeleteDirLinkAux(const char* nameDelLink, DWORD* err)
     if (attr != INVALID_FILE_ATTRIBUTES && (attr & FILE_ATTRIBUTE_REPARSE_POINT))
     {
         HANDLE dir = SalCreateFileH(nameDelLink, GENERIC_WRITE /* | GENERIC_READ */, 0, 0, OPEN_EXISTING,
-                                     FILE_FLAG_BACKUP_SEMANTICS | FILE_FLAG_OPEN_REPARSE_POINT, NULL);
+                                    FILE_FLAG_BACKUP_SEMANTICS | FILE_FLAG_OPEN_REPARSE_POINT, NULL);
         if (dir != INVALID_HANDLE_VALUE)
         {
             DWORD dummy;

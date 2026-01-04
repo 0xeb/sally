@@ -477,8 +477,8 @@ public:
 class CFilesWindowAncestor : public CWindow // the real object core - everything private ;-)
 {
 private:
-    char Path[SAL_MAX_LONG_PATH];      // path for a ptDisk panel - normal ("c:\path") or UNC ("\\server\share\path")
-    BOOL SuppressAutoRefresh; // TRUE if the user canceled directory listing during reading and chose temporary auto-refresh suppression
+    char Path[SAL_MAX_LONG_PATH]; // path for a ptDisk panel - normal ("c:\path") or UNC ("\\server\share\path")
+    BOOL SuppressAutoRefresh;     // TRUE if the user canceled directory listing during reading and chose temporary auto-refresh suppression
 
     CPanelType PanelType; // type of panel (disk, archive, plugin FS)
 
@@ -486,11 +486,11 @@ private:
     UINT DriveType;      // disk+archive: drive type of Path (see MyGetDriveType())
 
     // when we are inside an archive:
-    CSalamanderDirectory* ArchiveDir; // content of the open archive; basic data - array of CFileData
-    char ZIPArchive[SAL_MAX_LONG_PATH];        // path to the open archive
-    char ZIPPath[SAL_MAX_LONG_PATH];           // path inside the open archive
-    FILETIME ZIPArchiveDate;          // archive date (used for the ".." date and during refresh)
-    CQuadWord ZIPArchiveSize;         // archive size - used to detect archive changes
+    CSalamanderDirectory* ArchiveDir;   // content of the open archive; basic data - array of CFileData
+    char ZIPArchive[SAL_MAX_LONG_PATH]; // path to the open archive
+    char ZIPPath[SAL_MAX_LONG_PATH];    // path inside the open archive
+    FILETIME ZIPArchiveDate;            // archive date (used for the ".." date and during refresh)
+    CQuadWord ZIPArchiveSize;           // archive size - used to detect archive changes
 
     // when browsing a plugin file system:
     CPluginFSInterfaceEncapsulation PluginFS; // pointer to the open FS
@@ -1640,7 +1640,7 @@ struct CPanelTmpEnumData
     CSalamanderDirectory* EnumLastDir;
     int EnumLastIndex;
     char EnumLastPath[SAL_MAX_LONG_PATH];
-    char EnumTmpFileName[MAX_PATH];  // filename only, not full path
+    char EnumTmpFileName[MAX_PATH]; // filename only, not full path
 
     // for disk enumeration, enumFiles > 0
     char WorkPath[SAL_MAX_LONG_PATH];        // path where Files and Dirs reside, used only when browsing disk (not archives)

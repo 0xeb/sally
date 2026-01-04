@@ -547,7 +547,7 @@ function Get-MatchingFiles {
 
     if (-not $Includes -or $Includes.Count -eq 0) { return @() }
 
-    $basePath = [System.IO.Path]::GetFullPath($PSScriptRoot)
+    $basePath = [System.IO.Path]::GetFullPath($script:RepoRoot)
 
     # Compile include globs once so each file match only performs quick
     # WildcardPattern checks instead of re-parsing the patterns.
@@ -659,7 +659,7 @@ function Invoke-ClangFormat {
     }
     if ($files.Count -eq 0) { return @() }
 
-    $rootPath = $PSScriptRoot
+    $rootPath = $script:RepoRoot
 
     # Snapshot file hashes upfront so normal runs can later determine which files clang-format truly rewrote.
     $preHashWarnings = @()
@@ -984,7 +984,7 @@ function Invoke-TextNormalization {
     # Process up to 200 files per worker; keeps memory use contained for huge repos.
     $batches = Get-FileBatches -Files $files -BatchSize 200
     $logQueue = [System.Collections.Concurrent.ConcurrentQueue[pscustomobject]]::new()
-    $rootPath = $PSScriptRoot
+    $rootPath = $script:RepoRoot
 
     # Define the per-batch work for text files; each worker will run this block with its slice of paths.
     $processTextBatch = {
@@ -1278,7 +1278,9 @@ if ($Help) {
 $script:LogStopwatch = [Diagnostics.Stopwatch]::StartNew() # Shared timer produces consistent timestamps across threads.
 $ErrorActionPreference = 'Stop'
 # Normalization should operate relative to the repo root even when invoked through symlinks or different cwd.
-Set-Location -Path $PSScriptRoot
+# When the script lives in a subdirectory (e.g., scripts/), we need to find the repo root.
+$script:RepoRoot = [System.IO.Path]::GetFullPath((Join-Path -Path $PSScriptRoot -ChildPath '..'))
+Set-Location -Path $script:RepoRoot
 [Console]::ResetColor()
 
 $exitCode = $SuccessExitCode
@@ -1293,7 +1295,7 @@ try {
         $logFullPath = if ([System.IO.Path]::IsPathRooted($LogPath)) {
             [System.IO.Path]::GetFullPath($LogPath)
         } else {
-            [System.IO.Path]::GetFullPath((Join-Path -Path $PSScriptRoot -ChildPath $LogPath))
+            [System.IO.Path]::GetFullPath((Join-Path -Path $script:RepoRoot -ChildPath $LogPath))
         }
 
         $logDirectory = [System.IO.Path]::GetDirectoryName($logFullPath)
@@ -1317,7 +1319,7 @@ try {
     # Staged mode works on disposable copies so the user's index stays unchanged.
     if ($Staged) {
         $DryRun = $true # Never mutate staged content directly; report-only so users can accept changes.
-        $stagedSession = Enter-StagedMode -Config $config -StagedFileInfix $StagedFileInfix -ScriptRoot $PSScriptRoot
+        $stagedSession = Enter-StagedMode -Config $config -StagedFileInfix $StagedFileInfix -ScriptRoot $script:RepoRoot
         $config = $stagedSession.Config
         $stagedFiles = $stagedSession.TempFiles
         $stagedDirs = $stagedSession.TempDirs

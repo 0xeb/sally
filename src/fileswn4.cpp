@@ -2092,7 +2092,7 @@ void CFilesWindow::DrawTileItem(HDC hTgtDC, int itemIndex, RECT* itemRect, DWORD
 
         char* out0 = TransferBuffer;
         int out0Len;
-        wchar_t* out0W = DrawItemBuffW;  // Wide buffer for Unicode filename
+        wchar_t* out0W = DrawItemBuffW; // Wide buffer for Unicode filename
         int out0LenW = 0;
         char* out1 = DrawItemBuff;
         int out1Len;

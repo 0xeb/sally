@@ -173,7 +173,7 @@ protected:
     // the methods open the file and store the file handle into that variable (when opening succeeds).
     // On the next call they do not open the file again and reuse the handle from that variable.
     // They also do not close the handle when exiting; the caller must handle that.
-    // This is an optimization for network drives where repeatedly opening/closing the file 
+    // This is an optimization for network drives where repeatedly opening/closing the file
     // slowed down searching terribly.
     BOOL LoadBefore(HANDLE* hFile);
     BOOL LoadBehind(HANDLE* hFile);
@@ -380,8 +380,8 @@ protected:
     DWORD RepeatCmdAfterRefresh; // command to repeat after refresh (-1 = no command)
 
     char* Caption;     // if not NULL, contains the proposed viewer window caption
-    BOOL WholeCaption; // meaningful if Caption != NULL. TRUE -> only 
-                       // Caption is displayed in the viewer title; FALSE -> append 
+    BOOL WholeCaption; // meaningful if Caption != NULL. TRUE -> only
+                       // Caption is displayed in the viewer title; FALSE -> append
                        // the standard " - Viewer" to Caption.
 
     BOOL CanSwitchToHex,           // TRUE if switching to hex is possible when there are more than 10000 characters per line

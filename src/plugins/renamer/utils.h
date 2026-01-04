@@ -69,8 +69,7 @@ struct CVarStrHelpMenuItem
 {
     int MenuItemStringID;
     const char* VariableName;
-    BOOL(*FParameterGetValue)
-    (HWND parent, char* buffer);
+    BOOL (*FParameterGetValue)(HWND parent, char* buffer);
     CVarStrHelpMenuItem* SubMenu;
 };
 

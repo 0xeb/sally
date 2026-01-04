@@ -1,4 +1,4 @@
-// SPDX-FileCopyrightText: 2023 Open Salamander Authors
+﻿// SPDX-FileCopyrightText: 2023 Open Salamander Authors
 // SPDX-License-Identifier: GPL-2.0-or-later
 
 //
@@ -17,15 +17,19 @@ static int g_passed = 0;
 static int g_failed = 0;
 
 #define TEST_ASSERT(cond, msg) \
-    do { \
-        if (cond) { \
+    do \
+    { \
+        if (cond) \
+        { \
             printf("  [PASS] %s\n", msg); \
             g_passed++; \
-        } else { \
+        } \
+        else \
+        { \
             printf("  [FAIL] %s (error=%lu)\n", msg, GetLastError()); \
             g_failed++; \
         } \
-    } while(0)
+    } while (0)
 
 // Build a long path by repeating directory names
 void BuildLongPath(char* buffer, size_t bufSize, const char* basePath, int targetLen)

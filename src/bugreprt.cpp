@@ -791,7 +791,7 @@ void CCallStack::PrintBugReport(EXCEPTION_POINTERS* Exception, DWORD ThreadID, D
                 sprintf(buf, "FP  = 0x%p  LR  = 0x%p", (void*)ctxtRec->Fp, (void*)ctxtRec->Lr);
                 PrintLine(param, buf, TRUE);
             }
-#else // x64
+#else  // x64
             if (ctxtRec->ContextFlags & CONTEXT_INTEGER)
             {
                 sprintf(buf, "RAX = 0x%p  RBX = 0x%p", (void*)ctxtRec->Rax, (void*)ctxtRec->Rbx);
@@ -2163,10 +2163,10 @@ void CCallStack::PrintBugReport(EXCEPTION_POINTERS* Exception, DWORD ThreadID, D
                             if (threadWithException)
                                 memcpy(&ctx, Exception->ContextRecord, sizeof(ctx));
                             else
-    #ifdef _M_ARM64
-                            ctx.ContextFlags = CONTEXT_INTEGER | CONTEXT_CONTROL;
+#ifdef _M_ARM64
+                                ctx.ContextFlags = CONTEXT_INTEGER | CONTEXT_CONTROL;
 #else
-                            ctx.ContextFlags = CONTEXT_SEGMENTS | CONTEXT_INTEGER | CONTEXT_CONTROL;
+                                ctx.ContextFlags = CONTEXT_SEGMENTS | CONTEXT_INTEGER | CONTEXT_CONTROL;
 #endif
                             if (threadWithException || GetThreadContext(hThread, &ctx))
                             {
