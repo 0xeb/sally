@@ -189,4 +189,18 @@ sal_add_plugin(NAME unole
   DEF "${SAL_PLUGINS}/unole/unole.def"
 )
 
+# -----------------------------------------------------------------------------
+# uncab - Windows Cabinet (.cab) archive extractor
+# -----------------------------------------------------------------------------
+sal_add_plugin(NAME uncab
+  SOURCES
+    "${SAL_PLUGINS}/uncab/dialogs.cpp"
+    "${SAL_PLUGINS}/uncab/precomp.cpp"
+    "${SAL_PLUGINS}/uncab/uncab.cpp"
+  RC "${SAL_PLUGINS}/uncab/uncab.rc"
+  DEF "${SAL_PLUGINS}/uncab/uncab.def"
+  INCLUDES "${SAL_SHARED}/lukas"
+  LIBS cabinet
+)
+
 message(STATUS "Configured plugins with PCH support")
