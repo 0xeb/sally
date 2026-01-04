@@ -99,9 +99,10 @@ if(MSVC AND SAL_PLATFORM STREQUAL "x86")
   add_compile_options(/arch:SSE2)
 endif()
 
-# Release optimizations (match VS *_release.props: WholeProgramOptimization + LinkTimeCodeGeneration)
+# Release optimizations (match VS *_release.props)
 if(MSVC)
   add_compile_options($<$<CONFIG:Release>:/GL>)  # Whole program optimization
+  add_compile_options($<$<CONFIG:Release>:/Gy>)  # Function-level linking
   add_link_options($<$<CONFIG:Release>:/LTCG>)   # Link-time code generation
 endif()
 
