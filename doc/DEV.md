@@ -41,4 +41,4 @@ A few Altap Salamander 4.0 plugins are either not included or cannot be compiled
 
 ## Code Style
 
-All source code uses UTF-8-BOM encoding and is formatted with `clang-format`. Refer to the `\scripts\normalize.ps1` script for more information.
+All source code uses UTF-8-BOM encoding and is formatted with `clang-format`. Refer to the `\tools\normalize.ps1` script for more information.
