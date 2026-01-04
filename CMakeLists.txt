@@ -102,7 +102,7 @@ set_target_properties(salamander PROPERTIES OUTPUT_NAME "salamand")
 
 # Resource file settings
 set_source_files_properties(${SALAMANDER_RC} PROPERTIES
-  COMPILE_DEFINITIONS "WINVER=0x0601"
+  COMPILE_DEFINITIONS "WINVER=0x0601;$<$<CONFIG:Debug>:_DEBUG>;$<$<CONFIG:Release>:NDEBUG>;$<$<EQUAL:${CMAKE_SIZEOF_VOID_P},8>:_WIN64>"
 )
 
 # bzip2 C sources need BZ_NO_STDIO
@@ -151,7 +151,7 @@ set_target_properties(salamander PROPERTIES
 
 # RC files need defines set via source properties, not target_compile_definitions
 set_source_files_properties("${SAL_SRC}/lang/lang.rc" PROPERTIES
-  COMPILE_DEFINITIONS "_LANG;_LANG_SALAMANDER;WINVER=0x0601"
+  COMPILE_DEFINITIONS "_LANG;_LANG_SALAMANDER;WINVER=0x0601;$<$<CONFIG:Debug>:_DEBUG>;$<$<CONFIG:Release>:NDEBUG>;$<$<EQUAL:${CMAKE_SIZEOF_VOID_P},8>:_WIN64>"
 )
 
 add_library(sal_lang_english SHARED "${SAL_SRC}/lang/lang.rc")
