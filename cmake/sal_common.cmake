@@ -99,5 +99,11 @@ if(MSVC AND SAL_PLATFORM STREQUAL "x86")
   add_compile_options(/arch:SSE2)
 endif()
 
+# Release optimizations (match VS *_release.props: WholeProgramOptimization + LinkTimeCodeGeneration)
+if(MSVC)
+  add_compile_options($<$<CONFIG:Release>:/GL>)  # Whole program optimization
+  add_link_options($<$<CONFIG:Release>:/LTCG>)   # Link-time code generation
+endif()
+
 message(STATUS "Salamander root: ${SAL_ROOT}")
 message(STATUS "Salamander output: ${SAL_OUTPUT_BASE}")
