@@ -96,6 +96,9 @@ elseif(MINGW)
   )
 endif()
 
+# Match VS output name (salamand.exe instead of salamander.exe)
+set_target_properties(salamander PROPERTIES OUTPUT_NAME "salamand")
+
 # Resource file settings
 set_source_files_properties(${SALAMANDER_RC} PROPERTIES
   COMPILE_DEFINITIONS "WINVER=0x0601"
