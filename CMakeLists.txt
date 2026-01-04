@@ -88,6 +88,7 @@ if(MSVC)
   target_link_options(salamander PRIVATE
     /SUBSYSTEM:WINDOWS
     /STACK:3145728
+    /MANIFEST:NO
   )
 elseif(MINGW)
   target_link_options(salamander PRIVATE
@@ -161,7 +162,7 @@ target_include_directories(sal_lang_english PRIVATE
 )
 
 if(MSVC)
-  target_link_options(sal_lang_english PRIVATE /NOENTRY)
+  target_link_options(sal_lang_english PRIVATE /NOENTRY /MANIFEST:NO)
 elseif(MINGW)
   # Resource-only DLL: use minimal entry stub
   target_sources(sal_lang_english PRIVATE "${SAL_SRC}/common/dllstub.c")
@@ -227,7 +228,7 @@ target_link_libraries(salmon PRIVATE
 )
 
 if(MSVC)
-  target_link_options(salmon PRIVATE /SUBSYSTEM:WINDOWS)
+  target_link_options(salmon PRIVATE /SUBSYSTEM:WINDOWS /MANIFEST:NO)
 elseif(MINGW)
   target_link_options(salmon PRIVATE -Wl,--subsystem,windows)
 endif()
