@@ -76,7 +76,7 @@ target_compile_definitions(salamander PRIVATE
 )
 
 target_link_libraries(salamander PRIVATE
-  htmlhelp comctl32 mpr wsock32 netapi32 msimg32 shlwapi
+  htmlhelp comctl32 mpr ws2_32 netapi32 msimg32 shlwapi
   ${SAL_COMMON_LIBS}
 )
 
@@ -220,7 +220,7 @@ target_compile_definitions(salmon PRIVATE
 )
 
 target_link_libraries(salmon PRIVATE
-  comctl32 shlwapi wininet dbghelp wsock32
+  comctl32 shlwapi wininet ws2_32
 )
 
 if(MSVC)
