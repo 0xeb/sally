@@ -2,6 +2,8 @@ name: Release Build
 
 on:
   push:
+    branches:
+      - main
     tags:
       - 'v*'
   workflow_dispatch:
@@ -39,7 +41,7 @@ jobs:
       - name: Create zip archive
         run: |
           $version = "${{ github.ref_name }}"
-          if (-not $version.StartsWith("v")) { $version = "dev" }
+          if (-not $version.StartsWith("v")) { $version = "latest" }
           $zipName = "OpenSalamander-$version-${{ matrix.arch }}.zip"
           Compress-Archive -Path "build/out/salamander/RelWithDebInfo_${{ matrix.arch }}/*" -DestinationPath $zipName
           Write-Host "Created: $zipName"
@@ -72,3 +74,34 @@ jobs:
           generate_release_notes: true
           draft: false
           prerelease: false
+
+  latest:
+    name: Update Latest Release
+    needs: build
+    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/main'
+
+    steps:
+      - name: Download all artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+
+      - name: List artifacts
+        run: find artifacts -type f -name "*.zip"
+
+      - name: Update Latest Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: latest
+          name: Latest Build
+          body: |
+            Automated build from the latest commit on main branch.
+
+            **Commit:** ${{ github.sha }}
+            **Date:** ${{ github.event.head_commit.timestamp }}
+
+            ⚠️ This is a development build and may be unstable.
+          files: artifacts/**/*.zip
+          prerelease: true
+          make_latest: false
