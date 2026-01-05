@@ -397,6 +397,121 @@ set_target_properties(fcremote PROPERTIES
 install(TARGETS fcremote RUNTIME DESTINATION "plugins/filecomp")
 
 # -----------------------------------------------------------------------------
+# tar - TAR/GZIP/BZIP2/LZH/RPM/DEB archive extractor
+# -----------------------------------------------------------------------------
+sal_add_plugin(NAME tar
+  SOURCES
+    # Shared sources (tar only uses dbg.cpp)
+    "${SAL_SHARED}/dbg.cpp"
+    # bzip2 sources (C files, no PCH)
+    "${SAL_PLUGINS}/tar/bzip/bunzip.cpp"
+    "${SAL_PLUGINS}/tar/bzip/bzlib.c"
+    "${SAL_PLUGINS}/tar/bzip/crctable.c"
+    "${SAL_PLUGINS}/tar/bzip/decompress.c"
+    "${SAL_PLUGINS}/tar/bzip/huffman.c"
+    "${SAL_PLUGINS}/tar/bzip/randtable.c"
+    # Plugin sources
+    "${SAL_PLUGINS}/tar/compress/uncompress.cpp"
+    "${SAL_PLUGINS}/tar/deb/deb.cpp"
+    "${SAL_PLUGINS}/tar/fileio.cpp"
+    "${SAL_PLUGINS}/tar/gzip/gunzip.cpp"
+    "${SAL_PLUGINS}/tar/lzh/lzh.cpp"
+    "${SAL_PLUGINS}/tar/names.cpp"
+    "${SAL_PLUGINS}/tar/precomp.cpp"
+    "${SAL_PLUGINS}/tar/rpm/rpm.cpp"
+    "${SAL_PLUGINS}/tar/rpm/rpmview.cpp"
+    "${SAL_PLUGINS}/tar/tardll.cpp"
+    "${SAL_PLUGINS}/tar/untar.cpp"
+  RC "${SAL_PLUGINS}/tar/tar.rc"
+  DEF "${SAL_PLUGINS}/tar/tar.def"
+  INCLUDES "${SAL_PLUGINS}/tar"
+  DEFINES BZ_NO_STDIO
+  NO_SHARED
+)
+
+# Exclude bzip2 C files from precompiled headers
+set_source_files_properties(
+  "${SAL_PLUGINS}/tar/bzip/bzlib.c"
+  "${SAL_PLUGINS}/tar/bzip/crctable.c"
+  "${SAL_PLUGINS}/tar/bzip/decompress.c"
+  "${SAL_PLUGINS}/tar/bzip/huffman.c"
+  "${SAL_PLUGINS}/tar/bzip/randtable.c"
+  PROPERTIES SKIP_PRECOMPILE_HEADERS ON
+)
+
+# -----------------------------------------------------------------------------
+# uniso - ISO/NRG/DMG/UDF disc image extractor
+# -----------------------------------------------------------------------------
+sal_add_plugin(NAME uniso
+  SOURCES
+    "${SAL_PLUGINS}/uniso/audio.cpp"
+    "${SAL_PLUGINS}/uniso/blockedfile.cpp"
+    "${SAL_PLUGINS}/uniso/dialogs.cpp"
+    "${SAL_PLUGINS}/uniso/dmg.cpp"
+    "${SAL_PLUGINS}/uniso/eltorito.cpp"
+    "${SAL_PLUGINS}/uniso/file.cpp"
+    "${SAL_PLUGINS}/uniso/hfs.cpp"
+    "${SAL_PLUGINS}/uniso/img.cpp"
+    "${SAL_PLUGINS}/uniso/iso9660.cpp"
+    "${SAL_PLUGINS}/uniso/isoimage.cpp"
+    "${SAL_PLUGINS}/uniso/isz.cpp"
+    "${SAL_PLUGINS}/uniso/nrg.cpp"
+    "${SAL_PLUGINS}/uniso/precomp.cpp"
+    "${SAL_PLUGINS}/uniso/rawfs.cpp"
+    "${SAL_PLUGINS}/uniso/udf.cpp"
+    "${SAL_PLUGINS}/uniso/udfiso.cpp"
+    "${SAL_PLUGINS}/uniso/uniso.cpp"
+    "${SAL_PLUGINS}/uniso/viewer.cpp"
+    "${SAL_PLUGINS}/uniso/xdvdfs.cpp"
+  RC "${SAL_PLUGINS}/uniso/uniso.rc"
+  DEF "${SAL_PLUGINS}/uniso/uniso.def"
+)
+
+# -----------------------------------------------------------------------------
+# pak - PAK/PK3/WAD game archive extractor
+# -----------------------------------------------------------------------------
+sal_add_plugin(NAME pak
+  SOURCES
+    # Shared sources (pak only uses dbg.cpp)
+    "${SAL_SHARED}/dbg.cpp"
+    # Plugin sources
+    "${SAL_PLUGINS}/pak/dll/add_del.cpp"
+    "${SAL_PLUGINS}/pak/dll/pak_dll.cpp"
+    "${SAL_PLUGINS}/pak/spl/pak.cpp"
+    "${SAL_PLUGINS}/pak/spl/pak2.cpp"
+    "${SAL_PLUGINS}/pak/spl/precomp.cpp"
+  RC "${SAL_PLUGINS}/pak/spl/pak.rc"
+  DEF "${SAL_PLUGINS}/pak/pak.def"
+  INCLUDES
+    "${SAL_PLUGINS}/pak/spl"
+    "${SAL_SHARED}/plugcore"
+  NO_SHARED
+  NO_LANG
+)
+
+# pak lang file is in spl/lang/ instead of lang/
+set_source_files_properties("${SAL_PLUGINS}/pak/spl/lang/lang.rc" PROPERTIES
+  COMPILE_DEFINITIONS "_LANG;WINVER=0x0601"
+)
+add_library(plugin_pak_lang SHARED "${SAL_PLUGINS}/pak/spl/lang/lang.rc")
+target_include_directories(plugin_pak_lang PRIVATE
+  "${SAL_PLUGINS}/pak/spl"
+  "${SAL_SHARED}"
+)
+if(MSVC)
+  target_link_options(plugin_pak_lang PRIVATE /NOENTRY /MANIFEST:NO)
+elseif(MINGW)
+  target_sources(plugin_pak_lang PRIVATE "${SAL_SRC}/common/dllstub.c")
+endif()
+set_target_properties(plugin_pak_lang PROPERTIES
+  OUTPUT_NAME english
+  SUFFIX .slg
+  RUNTIME_OUTPUT_DIRECTORY "${SAL_OUTPUT_BASE}/$<CONFIG>_${SAL_PLATFORM}/plugins/pak/lang"
+  LIBRARY_OUTPUT_DIRECTORY "${SAL_OUTPUT_BASE}/$<CONFIG>_${SAL_PLATFORM}/plugins/pak/lang"
+)
+set_property(GLOBAL APPEND PROPERTY SAL_PLUGIN_LANGS_LIST plugin_pak_lang)
+
+# -----------------------------------------------------------------------------
 # zip - ZIP archive handler (create, extract, modify)
 # -----------------------------------------------------------------------------
 sal_add_plugin(NAME zip
