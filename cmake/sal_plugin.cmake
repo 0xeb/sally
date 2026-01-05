@@ -71,10 +71,11 @@ endfunction()
 #   [PCH <precomp_header>]  # Precompiled header (default: precomp.h)
 #   [NO_SHARED]  # Don't include shared plugin sources
 #   [NO_PCH]     # Disable precompiled headers
+#   [NO_LANG]    # Don't auto-generate language target (for custom lang paths)
 # )
 function(sal_add_plugin)
   cmake_parse_arguments(PARSE_ARGV 0 PLUGIN
-    "NO_SHARED;NO_PCH"
+    "NO_SHARED;NO_PCH;NO_LANG"
     "NAME;RC;DEF;PCH"
     "SOURCES;INCLUDES;DEFINES;LIBS"
   )
@@ -180,8 +181,10 @@ function(sal_add_plugin)
   # Add to global list of plugins
   set_property(GLOBAL APPEND PROPERTY SAL_PLUGINS_LIST ${TARGET_NAME})
 
-  # Build language file if it exists
-  sal_add_plugin_lang(NAME ${PLUGIN_NAME})
+  # Build language file if it exists (unless NO_LANG is specified)
+  if(NOT PLUGIN_NO_LANG)
+    sal_add_plugin_lang(NAME ${PLUGIN_NAME})
+  endif()
 
   message(STATUS "Added plugin: ${PLUGIN_NAME}")
 endfunction()

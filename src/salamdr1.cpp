@@ -191,14 +191,14 @@ const char* CommonFileTypeName2 = NULL;
 
 char WindowsDirectory[MAX_PATH] = "";
 
-// pro zajisteni uniku z odstranenych drivu na fixed drive (po vysunuti device - USB flash disk, atd.)
-BOOL ChangeLeftPanelToFixedWhenIdleInProgress = FALSE; // TRUE = prave se meni cesta, nastaveni ChangeLeftPanelToFixedWhenIdle na TRUE je zbytecne
+// to ensure escape from removed drives to fixed drive (after device ejection - USB flash disk, etc.)
+BOOL ChangeLeftPanelToFixedWhenIdleInProgress = FALSE; // TRUE = path is currently being changed, setting ChangeLeftPanelToFixedWhenIdle to TRUE is unnecessary
 BOOL ChangeLeftPanelToFixedWhenIdle = FALSE;
-BOOL ChangeRightPanelToFixedWhenIdleInProgress = FALSE; // TRUE = prave se meni cesta, nastaveni ChangeRightPanelToFixedWhenIdle na TRUE je zbytecne
+BOOL ChangeRightPanelToFixedWhenIdleInProgress = FALSE; // TRUE = path is currently being changed, setting ChangeRightPanelToFixedWhenIdle to TRUE is unnecessary
 BOOL ChangeRightPanelToFixedWhenIdle = FALSE;
-BOOL OpenCfgToChangeIfPathIsInaccessibleGoTo = FALSE; // TRUE = v idle otevre konfiguraci na Drives a focusne "If path in panel is inaccessible, go to:"
+BOOL OpenCfgToChangeIfPathIsInaccessibleGoTo = FALSE; // TRUE = in idle opens configuration to Drives and focuses "If path in panel is inaccessible, go to:"
 
-char IsSLGIncomplete[ISSLGINCOMPLETE_SIZE]; // pokud je retezec prazdny, SLG je kompletne prelozene; jinak obsahuje URL na forum do sekce daneho jazyka
+char IsSLGIncomplete[ISSLGINCOMPLETE_SIZE]; // if the string is empty, SLG is completely translated; otherwise contains URL to forum section for the given language
 
 UINT TaskbarBtnCreatedMsg = 0;
 
@@ -219,7 +219,7 @@ const char* CMAINWINDOW_CLASSNAME = "SalamanderMainWindowVer25";
 const char* SAVEBITS_CLASSNAME = "SalamanderSaveBits";
 const char* SHELLEXECUTE_CLASSNAME = "SalamanderShellExecute";
 
-CAssociations Associations; // asociace nactene z registry
+CAssociations Associations; // associations loaded from registry
 CShares Shares;
 
 char DefaultDir['Z' - 'A' + 1][SAL_MAX_LONG_PATH];
@@ -227,15 +227,15 @@ char DefaultDir['Z' - 'A' + 1][SAL_MAX_LONG_PATH];
 HACCEL AccelTable1 = NULL;
 HACCEL AccelTable2 = NULL;
 
-HINSTANCE NtDLL = NULL;             // handle k ntdll.dll
-HINSTANCE Shell32DLL = NULL;        // handle k shell32.dll (ikonky)
-HINSTANCE ImageResDLL = NULL;       // handle k imageres.dll (ikonky - Vista)
-HINSTANCE User32DLL = NULL;         // handle k user32.dll (DisableProcessWindowsGhosting)
-HINSTANCE HLanguage = NULL;         // handle k jazykove zavislym resourcum (.SPL souboru)
-char CurrentHelpDir[MAX_PATH] = ""; // po prvnim pouziti helpu je zde cesta do adresare helpu (umisteni vsech .chm souboru)
-WORD LanguageID = 0;                // language-id .SPL souboru
+HINSTANCE NtDLL = NULL;             // handle to ntdll.dll
+HINSTANCE Shell32DLL = NULL;        // handle to shell32.dll (icons)
+HINSTANCE ImageResDLL = NULL;       // handle to imageres.dll (icons - Vista)
+HINSTANCE User32DLL = NULL;         // handle to user32.dll (DisableProcessWindowsGhosting)
+HINSTANCE HLanguage = NULL;         // handle to language-dependent resources (.SPL file)
+char CurrentHelpDir[MAX_PATH] = ""; // after first use of help, this contains path to help directory (location of all .chm files)
+WORD LanguageID = 0;                // language-id of .SPL file
 
-char OpenReadmeInNotepad[MAX_PATH]; // pouziva se jen pri spusteni z instalaku: jmeno souboru, ktere mame v IDLE otevrit v notepadu (spustit notepad)
+char OpenReadmeInNotepad[MAX_PATH]; // used only when launched from installer: filename to open in notepad during IDLE (start notepad)
 
 BOOL UseCustomPanelFont = FALSE;
 HFONT Font = NULL;
@@ -307,7 +307,7 @@ HICON HShortcutOverlays[] = {0};
 HICON HSlowFileOverlays[] = {0};
 CIconList* SimpleIconLists[] = {0};
 CIconList* ThrobberFrames = NULL;
-CIconList* LockFrames = NULL; // pro jednoduchost deklaruji a nacitam jako throbber
+CIconList* LockFrames = NULL; // for simplicity declared and loaded as throbber
 
 HICON HGroupIcon = NULL;
 HICON HFavoritIcon = NULL;
@@ -317,9 +317,9 @@ RGBQUAD ColorTable[256] = {0};
 
 DWORD MouseHoverTime = 0;
 
-SYSTEMTIME SalamanderStartSystemTime = {0}; // cas startu Salamandera (GetSystemTime)
+SYSTEMTIME SalamanderStartSystemTime = {0}; // Salamander start time (GetSystemTime)
 
-BOOL WaitForESCReleaseBeforeTestingESC = FALSE; // ma se cekat na pusteni ESC pred zacatkem listovani cesty v panelu?
+BOOL WaitForESCReleaseBeforeTestingESC = FALSE; // should we wait for ESC release before starting path browsing in panel?
 
 int SPACE_WIDTH = 10;
 
@@ -342,40 +342,40 @@ BOOL CriticalShutdown = FALSE;
 HANDLE SalOpenFileMapping = NULL;
 void* SalOpenSharedMem = NULL;
 
-// mutex pro synchronizaci load/save do Registry (dva procesy najednou nemuzou, ma to neblahe vysledky)
+// mutex for synchronizing load/save to Registry (two processes cannot do it at once, it has unpleasant consequences)
 CLoadSaveToRegistryMutex LoadSaveToRegistryMutex;
 
-BOOL IsNotAlphaNorNum[256]; // pole TRUE/FALSE pro znaky (TRUE = neni pismeno ani cislice)
-BOOL IsAlpha[256];          // pole TRUE/FALSE pro znaky (TRUE = pismeno)
+BOOL IsNotAlphaNorNum[256]; // TRUE/FALSE array for characters (TRUE = not a letter or digit)
+BOOL IsAlpha[256];          // TRUE/FALSE array for characters (TRUE = letter)
 
-// defaultni useruv charset pro fonty; pod W2K+ uz by stacilo DEFAULT_CHARSET
+// default user's charset for fonts; under W2K+ DEFAULT_CHARSET would suffice
 //
-// Pod WinXP lze v regionalnim nastaveni zvolit jako default napriklad cestinu,
-// ale na zalozce Advanced nenainstalovat ceske fotny. Potom pri konstrukci
-// fontu s kodovanim UserCharset operacni system vrati font s uplne
-// jinym nazvem (face name), hlavne aby mel pozadovane kodovani. Proto je DULEZITE pri
-// specifikaci parametru fontu spravne zvolit promennou lfPitchAndFamily,
-// kde si lze volit mezi FF_SWISS a FF_ROMAN fonty (bezpatkove/patkove).
+// Under WinXP you can choose Czech as the default in regional settings,
+// but not install Czech fonts on the Advanced tab. Then when constructing
+// a font with UserCharset encoding, the operating system returns a font with
+// a completely different name (face name), mainly to have the required encoding. Therefore it is IMPORTANT
+// when specifying font parameters to correctly choose the lfPitchAndFamily variable,
+// where you can choose between FF_SWISS and FF_ROMAN fonts (sans-serif/serif).
 int UserCharset = DEFAULT_CHARSET;
 
-DWORD AllocationGranularity = 1; // granularita alokaci (potreba pro pouzivani souboru mapovanych do pameti)
+DWORD AllocationGranularity = 1; // allocation granularity (needed for using memory-mapped files)
 
 #ifdef USE_BETA_EXPIRATION_DATE
 
-// urcuje prvni den, kdy uz tato beta/PB verze nepobezi
-// beta/PB verze 4.0 beta 1 pojede pouze do 1. unora 2020
+// specifies the first day when this beta/PB version will no longer run
+// beta/PB version 4.0 beta 1 will run only until February 1, 2020
 //                                 YEAR  MONTH DAY
 SYSTEMTIME BETA_EXPIRATION_DATE = {2020, 2, 0, 1, 0, 0, 0, 0};
 #endif // USE_BETA_EXPIRATION_DATE
 
 //******************************************************************************
 //
-// Rizeni Idle processingu (CMainWindow::OnEnterIdle)
+// Idle processing control (CMainWindow::OnEnterIdle)
 //
 
-BOOL IdleRefreshStates = TRUE;  // na uvod nechame nastavit promenne
-BOOL IdleForceRefresh = FALSE;  // vyradi cache Enabler*
-BOOL IdleCheckClipboard = TRUE; // koukneme taky na clipboard
+BOOL IdleRefreshStates = TRUE;  // initially let the variables be set
+BOOL IdleForceRefresh = FALSE;  // invalidates Enabler* cache
+BOOL IdleCheckClipboard = TRUE; // we'll also check the clipboard
 
 DWORD EnablerUpDir = FALSE;
 DWORD EnablerRootDir = FALSE;
@@ -450,7 +450,7 @@ SALCOLOR ViewerColors[NUMBER_OF_VIEWERCOLORS] =
 
 COLORREF SalamanderColors[NUMBER_OF_COLORS] =
     {
-        // barvy pera pro ramecek kolem polozky
+        // pen colors for frame around item
         RGBF(0, 0, 0, SCF_DEFAULT),       // FOCUS_ACTIVE_NORMAL
         RGBF(0, 0, 0, SCF_DEFAULT),       // FOCUS_ACTIVE_SELECTED
         RGBF(128, 128, 128, 0),           // FOCUS_FG_INACTIVE_NORMAL
@@ -458,43 +458,43 @@ COLORREF SalamanderColors[NUMBER_OF_COLORS] =
         RGBF(255, 255, 255, SCF_DEFAULT), // FOCUS_BK_INACTIVE_NORMAL
         RGBF(255, 255, 255, SCF_DEFAULT), // FOCUS_BK_INACTIVE_SELECTED
 
-        // barvy textu polozek v panelu
+        // text colors of items in panel
         RGBF(0, 0, 0, SCF_DEFAULT), // ITEM_FG_NORMAL
         RGBF(255, 0, 0, 0),         // ITEM_FG_SELECTED
         RGBF(0, 0, 0, SCF_DEFAULT), // ITEM_FG_FOCUSED
         RGBF(255, 0, 0, 0),         // ITEM_FG_FOCSEL
         RGBF(0, 0, 0, SCF_DEFAULT), // ITEM_FG_HIGHLIGHT
 
-        // barvy pozadi polozek v panelu
+        // background colors of items in panel
         RGBF(255, 255, 255, SCF_DEFAULT), // ITEM_BK_NORMAL
         RGBF(255, 255, 255, SCF_DEFAULT), // ITEM_BK_SELECTED
         RGBF(232, 232, 232, 0),           // ITEM_BK_FOCUSED
         RGBF(232, 232, 232, 0),           // ITEM_BK_FOCSEL
         RGBF(0, 0, 0, SCF_DEFAULT),       // ITEM_BK_HIGHLIGHT
 
-        // barvy pro blend ikonek
+        // colors for icon blend
         RGBF(255, 128, 128, SCF_DEFAULT), // ICON_BLEND_SELECTED
         RGBF(128, 128, 128, 0),           // ICON_BLEND_FOCUSED
         RGBF(255, 0, 0, 0),               // ICON_BLEND_FOCSEL
 
-        // barvy progress bary
+        // progress bar colors
         RGBF(0, 0, 192, SCF_DEFAULT),     // PROGRESS_FG_NORMAL
         RGBF(255, 255, 255, SCF_DEFAULT), // PROGRESS_FG_SELECTED
         RGBF(255, 255, 255, SCF_DEFAULT), // PROGRESS_BK_NORMAL
         RGBF(0, 0, 192, SCF_DEFAULT),     // PROGRESS_BK_SELECTED
 
-        // barvy hot polozek
+        // hot item colors
         RGBF(0, 0, 255, SCF_DEFAULT),     // HOT_PANEL
         RGBF(128, 128, 128, SCF_DEFAULT), // HOT_ACTIVE
         RGBF(128, 128, 128, SCF_DEFAULT), // HOT_INACTIVE
 
-        // barvy titulku panelu
+        // panel caption colors
         RGBF(255, 255, 255, SCF_DEFAULT), // ACTIVE_CAPTION_FG
         RGBF(0, 0, 128, SCF_DEFAULT),     // ACTIVE_CAPTION_BK
         RGBF(255, 255, 255, SCF_DEFAULT), // INACTIVE_CAPTION_FG
         RGBF(128, 128, 128, SCF_DEFAULT), // INACTIVE_CAPTION_BK
 
-        // barvy pera pro ramecek kolem thumbnails
+        // pen colors for frame around thumbnails
         RGBF(192, 192, 192, 0), // THUMBNAIL_FRAME_NORMAL
         RGBF(0, 0, 0, 0),       // THUMBNAIL_FRAME_FOCUSED
         RGBF(255, 0, 0, 0),     // THUMBNAIL_FRAME_SELECTED
@@ -503,7 +503,7 @@ COLORREF SalamanderColors[NUMBER_OF_COLORS] =
 
 COLORREF ExplorerColors[NUMBER_OF_COLORS] =
     {
-        // barvy pera pro ramecek kolem polozky
+        // pen colors for frame around item
         RGBF(0, 0, 0, SCF_DEFAULT),       // FOCUS_ACTIVE_NORMAL
         RGBF(255, 255, 0, 0),             // FOCUS_ACTIVE_SELECTED
         RGBF(128, 128, 128, 0),           // FOCUS_FG_INACTIVE_NORMAL
@@ -511,43 +511,43 @@ COLORREF ExplorerColors[NUMBER_OF_COLORS] =
         RGBF(255, 255, 255, SCF_DEFAULT), // FOCUS_BK_INACTIVE_NORMAL
         RGBF(255, 255, 0, 0),             // FOCUS_BK_INACTIVE_SELECTED
 
-        // barvy textu polozek v panelu
+        // text colors of items in panel
         RGBF(0, 0, 0, SCF_DEFAULT), // ITEM_FG_NORMAL
         RGBF(255, 255, 255, 0),     // ITEM_FG_SELECTED
         RGBF(0, 0, 0, SCF_DEFAULT), // ITEM_FG_FOCUSED
         RGBF(255, 255, 255, 0),     // ITEM_FG_FOCSEL
         RGBF(0, 0, 0, SCF_DEFAULT), // ITEM_FG_HIGHLIGHT
 
-        // barvy pozadi polozek v panelu
+        // background colors of items in panel
         RGBF(255, 255, 255, SCF_DEFAULT), // ITEM_BK_NORMAL
         RGBF(0, 0, 128, 0),               // ITEM_BK_SELECTED
         RGBF(232, 232, 232, 0),           // ITEM_BK_FOCUSED
         RGBF(0, 0, 128, 0),               // ITEM_BK_FOCSEL
         RGBF(0, 0, 0, SCF_DEFAULT),       // ITEM_BK_HIGHLIGHT
 
-        // barvy pro blend ikonek
+        // colors for icon blend
         RGBF(0, 0, 128, SCF_DEFAULT), // ICON_BLEND_SELECTED
         RGBF(128, 128, 128, 0),       // ICON_BLEND_FOCUSED
         RGBF(0, 0, 128, 0),           // ICON_BLEND_FOCSEL
 
-        // barvy progress bary
+        // progress bar colors
         RGBF(0, 0, 192, SCF_DEFAULT),     // PROGRESS_FG_NORMAL
         RGBF(255, 255, 255, SCF_DEFAULT), // PROGRESS_FG_SELECTED
         RGBF(255, 255, 255, SCF_DEFAULT), // PROGRESS_BK_NORMAL
         RGBF(0, 0, 192, SCF_DEFAULT),     // PROGRESS_BK_SELECTED
 
-        // barvy hot polozek
+        // hot item colors
         RGBF(0, 0, 255, SCF_DEFAULT),     // HOT_PANEL
         RGBF(128, 128, 128, SCF_DEFAULT), // HOT_ACTIVE
         RGBF(128, 128, 128, SCF_DEFAULT), // HOT_INACTIVE
 
-        // barvy titulku panelu
+        // panel caption colors
         RGBF(255, 255, 255, SCF_DEFAULT), // ACTIVE_CAPTION_FG
         RGBF(0, 0, 128, SCF_DEFAULT),     // ACTIVE_CAPTION_BK
         RGBF(255, 255, 255, SCF_DEFAULT), // INACTIVE_CAPTION_FG
         RGBF(128, 128, 128, SCF_DEFAULT), // INACTIVE_CAPTION_BK
 
-        // barvy pera pro ramecek kolem thumbnails
+        // pen colors for frame around thumbnails
         RGBF(192, 192, 192, 0), // THUMBNAIL_FRAME_NORMAL
         RGBF(0, 0, 128, 0),     // THUMBNAIL_FRAME_FOCUSED
         RGBF(0, 0, 128, 0),     // THUMBNAIL_FRAME_SELECTED
@@ -556,7 +556,7 @@ COLORREF ExplorerColors[NUMBER_OF_COLORS] =
 
 COLORREF NortonColors[NUMBER_OF_COLORS] =
     {
-        // barvy pera pro ramecek kolem polozky
+        // pen colors for frame around item
         RGBF(0, 128, 128, 0), // FOCUS_ACTIVE_NORMAL
         RGBF(0, 128, 128, 0), // FOCUS_ACTIVE_SELECTED
         RGBF(0, 128, 128, 0), // FOCUS_FG_INACTIVE_NORMAL
@@ -564,43 +564,43 @@ COLORREF NortonColors[NUMBER_OF_COLORS] =
         RGBF(0, 0, 128, 0),   // FOCUS_BK_INACTIVE_NORMAL
         RGBF(0, 0, 128, 0),   // FOCUS_BK_INACTIVE_SELECTED
 
-        // barvy textu polozek v panelu
+        // text colors of items in panel
         RGBF(0, 255, 255, 0),       // ITEM_FG_NORMAL
         RGBF(255, 255, 0, 0),       // ITEM_FG_SELECTED
         RGBF(0, 0, 0, SCF_DEFAULT), // ITEM_FG_FOCUSED
         RGBF(255, 255, 0, 0),       // ITEM_FG_FOCSEL
         RGBF(0, 0, 0, SCF_DEFAULT), // ITEM_FG_HIGHLIGHT
 
-        // barvy pozadi polozek v panelu
+        // background colors of items in panel
         RGBF(0, 0, 128, 0),         // ITEM_BK_NORMAL
         RGBF(0, 0, 128, 0),         // ITEM_BK_SELECTED
         RGBF(0, 128, 128, 0),       // ITEM_BK_FOCUSED
         RGBF(0, 128, 128, 0),       // ITEM_BK_FOCSEL
         RGBF(0, 0, 0, SCF_DEFAULT), // ITEM_BK_HIGHLIGHT
 
-        // barvy pro blend ikonek
+        // colors for icon blend
         RGBF(255, 255, 0, SCF_DEFAULT), // ICON_BLEND_SELECTED
         RGBF(128, 128, 128, 0),         // ICON_BLEND_FOCUSED
         RGBF(255, 255, 0, 0),           // ICON_BLEND_FOCSEL
 
-        // barvy progress bary
+        // progress bar colors
         RGBF(0, 0, 192, SCF_DEFAULT),     // PROGRESS_FG_NORMAL
         RGBF(255, 255, 255, SCF_DEFAULT), // PROGRESS_FG_SELECTED
         RGBF(255, 255, 255, SCF_DEFAULT), // PROGRESS_BK_NORMAL
         RGBF(0, 0, 192, SCF_DEFAULT),     // PROGRESS_BK_SELECTED
 
-        // barvy hot polozek
+        // hot item colors
         RGBF(0, 0, 255, SCF_DEFAULT),     // HOT_PANEL
         RGBF(128, 128, 128, SCF_DEFAULT), // HOT_ACTIVE
         RGBF(128, 128, 128, SCF_DEFAULT), // HOT_INACTIVE
 
-        // barvy titulku panelu
+        // panel caption colors
         RGBF(255, 255, 255, SCF_DEFAULT), // ACTIVE_CAPTION_FG
         RGBF(0, 0, 128, SCF_DEFAULT),     // ACTIVE_CAPTION_BK
         RGBF(255, 255, 255, SCF_DEFAULT), // INACTIVE_CAPTION_FG
         RGBF(128, 128, 128, SCF_DEFAULT), // INACTIVE_CAPTION_BK
 
-        // barvy pera pro ramecek kolem thumbnails
+        // pen colors for frame around thumbnails
         RGBF(192, 192, 192, 0), // THUMBNAIL_FRAME_NORMAL
         RGBF(0, 128, 128, 0),   // THUMBNAIL_FRAME_FOCUSED
         RGBF(255, 255, 0, 0),   // THUMBNAIL_FRAME_SELECTED
@@ -609,7 +609,7 @@ COLORREF NortonColors[NUMBER_OF_COLORS] =
 
 COLORREF NavigatorColors[NUMBER_OF_COLORS] =
     {
-        // barvy pera pro ramecek kolem polozky
+        // pen colors for frame around item
         RGBF(0, 128, 128, 0), // FOCUS_ACTIVE_NORMAL
         RGBF(0, 128, 128, 0), // FOCUS_ACTIVE_SELECTED
         RGBF(0, 128, 128, 0), // FOCUS_FG_INACTIVE_NORMAL
@@ -617,43 +617,43 @@ COLORREF NavigatorColors[NUMBER_OF_COLORS] =
         RGBF(0, 0, 128, 0),   // FOCUS_BK_INACTIVE_NORMAL
         RGBF(0, 0, 128, 0),   // FOCUS_BK_INACTIVE_SELECTED
 
-        // barvy textu polozek v panelu
+        // text colors of items in panel
         RGBF(255, 255, 255, 0),     // ITEM_FG_NORMAL
         RGBF(255, 255, 0, 0),       // ITEM_FG_SELECTED
         RGBF(0, 0, 0, SCF_DEFAULT), // ITEM_FG_FOCUSED
         RGBF(255, 255, 0, 0),       // ITEM_FG_FOCSEL
         RGBF(0, 0, 0, SCF_DEFAULT), // ITEM_FG_HIGHLIGHT
 
-        // barvy pozadi polozek v panelu
+        // background colors of items in panel
         RGBF(80, 80, 80, 0),        // ITEM_BK_NORMAL
         RGBF(80, 80, 80, 0),        // ITEM_BK_SELECTED
         RGBF(0, 128, 128, 0),       // ITEM_BK_FOCUSED
         RGBF(0, 128, 128, 0),       // ITEM_BK_FOCSEL
         RGBF(0, 0, 0, SCF_DEFAULT), // ITEM_BK_HIGHLIGHT
 
-        // barvy pro blend ikonek
+        // colors for icon blend
         RGBF(255, 255, 0, SCF_DEFAULT), // ICON_BLEND_SELECTED
         RGBF(128, 128, 128, 0),         // ICON_BLEND_FOCUSED
         RGBF(255, 255, 0, 0),           // ICON_BLEND_FOCSEL
 
-        // barvy progress bary
+        // progress bar colors
         RGBF(0, 0, 192, SCF_DEFAULT),     // PROGRESS_FG_NORMAL
         RGBF(255, 255, 255, SCF_DEFAULT), // PROGRESS_FG_SELECTED
         RGBF(255, 255, 255, SCF_DEFAULT), // PROGRESS_BK_NORMAL
         RGBF(0, 0, 192, SCF_DEFAULT),     // PROGRESS_BK_SELECTED
 
-        // barvy hot polozek
+        // hot item colors
         RGBF(0, 0, 255, SCF_DEFAULT),     // HOT_PANEL
         RGBF(173, 182, 205, SCF_DEFAULT), // HOT_ACTIVE
         RGBF(212, 212, 212, SCF_DEFAULT), // HOT_INACTIVE
 
-        // barvy titulku panelu
+        // panel caption colors
         RGBF(255, 255, 255, SCF_DEFAULT), // ACTIVE_CAPTION_FG
         RGBF(0, 0, 128, SCF_DEFAULT),     // ACTIVE_CAPTION_BK
         RGBF(255, 255, 255, SCF_DEFAULT), // INACTIVE_CAPTION_FG
         RGBF(128, 128, 128, SCF_DEFAULT), // INACTIVE_CAPTION_BK
 
-        // barvy pera pro ramecek kolem thumbnails
+        // pen colors for frame around thumbnails
         RGBF(192, 192, 192, 0), // THUMBNAIL_FRAME_NORMAL
         RGBF(0, 128, 128, 0),   // THUMBNAIL_FRAME_FOCUSED
         RGBF(255, 255, 0, 0),   // THUMBNAIL_FRAME_SELECTED
@@ -738,11 +738,11 @@ DWORD UpdateCrc32(const void* buffer, DWORD count, DWORD crcVal)
             c = Crc32Tab[((int)c ^ (*p++)) & 0xff] ^ (c >> 8);
         } while (--count);
 
-    // Honza: meril jsem nasledujici optimalizace a nemaji zadny vyznam;
-    // jedina sance by bylo prepsani do ASM a cteni pameti po DWORDech,
-    // ze kterych by pak bylo mozne vyzobavat jednotlive bajty;
-    // pri soucasnem nastaveni release verze neni prekladac schopen tuto
-    // optimalizaci provest za nas.
+    // Honza: I measured the following optimizations and they have no significance;
+    // the only chance would be rewriting to ASM and reading memory by DWORDs,
+    // from which individual bytes could then be extracted;
+    // with the current release build settings, the compiler is not able to
+    // perform this optimization for us.
     /*
   int remain = count % 8;
   count -= remain;
@@ -798,17 +798,17 @@ BOOL IsRemoteSession(void)
 
 BOOL SalamanderIsNotBusy(DWORD* lastIdleTime)
 {
-    // k SalamanderBusy a k LastSalamanderIdleTime se chodi bez kritickych sekci, nevadi,
-    // protoze jsou to DWORDy a tudiz nemuzou byt "rozpracovane" pri switchnuti kontextu
-    // (vzdy je tam stara nebo nova hodnota, nic jineho nehrozi)
+    // SalamanderBusy and LastSalamanderIdleTime are accessed without critical sections, that's OK,
+    // because they are DWORDs and therefore cannot be "in progress" when context is switched
+    // (there is always either the old or new value, nothing else is possible)
     if (lastIdleTime != NULL)
         *lastIdleTime = LastSalamanderIdleTime;
     if (!SalamanderBusy)
         return TRUE;
     DWORD oldLastIdleTime = LastSalamanderIdleTime;
-    if (GetTickCount() - oldLastIdleTime <= 100)                                   // pokud neni SalamanderBusy uz prilis dlouho (napr. otevreny modalni dialog)
-        Sleep(100);                                                                // pockame jestli se SalamanderBusy nezmeni
-    return !SalamanderBusy || (int)(LastSalamanderIdleTime - oldLastIdleTime) > 0; // neni "busy" nebo aspon osciluje
+    if (GetTickCount() - oldLastIdleTime <= 100)                                   // if SalamanderBusy hasn't been set for too long (e.g., open modal dialog)
+        Sleep(100);                                                                // wait to see if SalamanderBusy changes
+    return !SalamanderBusy || (int)(LastSalamanderIdleTime - oldLastIdleTime) > 0; // not "busy" or at least oscillating
 }
 
 BOOL InitPreloadedStrings()
@@ -888,7 +888,7 @@ void InitLocales()
     else
     {
         DecimalSeparatorLen--;
-        DecimalSeparator[DecimalSeparatorLen] = 0; // posychrujeme nulu na konci
+        DecimalSeparator[DecimalSeparatorLen] = 0; // ensure null terminator at the end
     }
 
     if ((ThousandsSeparatorLen = GetLocaleInfo(LOCALE_USER_DEFAULT, LOCALE_STHOUSAND, ThousandsSeparator, 5)) == 0 ||
@@ -900,7 +900,7 @@ void InitLocales()
     else
     {
         ThousandsSeparatorLen--;
-        ThousandsSeparator[ThousandsSeparatorLen] = 0; // posychrujeme nulu na konci
+        ThousandsSeparator[ThousandsSeparatorLen] = 0; // ensure null terminator at the end
     }
 }
 
@@ -913,11 +913,11 @@ HICON GetFileOrPathIconAux(const char* path, BOOL large, BOOL isDir)
         SHFILEINFO shi;
         if (!GetFileIcon(path, FALSE, &shi.hIcon, large ? ICONSIZE_32 : ICONSIZE_16, TRUE, isDir))
             shi.hIcon = NULL;
-        //Presli jsme na vlastni implementaci (mensi pametova narocnost, fungujici XOR ikonky)
+        //We switched to our own implementation (lower memory requirements, working XOR icons)
         //shi.hIcon = NULL;
         //SHGetFileInfo(path, 0, &shi, sizeof(shi),
         //              SHGFI_ICON | SHGFI_SHELLICONSIZE | (large ? 0 : SHGFI_SMALLICON));
-        // pridame handle na 'shi.hIcon' do HANDLES
+        // add handle to 'shi.hIcon' to HANDLES
         if (shi.hIcon != NULL)
             HANDLES_ADD(__htIcon, __hoLoadImage, shi.hIcon);
         return shi.hIcon;
@@ -940,7 +940,7 @@ HICON GetDriveIcon(const char* root, UINT type, BOOL accessible, BOOL large)
         HICON i = GetFileOrPathIconAux(root, large, TRUE);
         if (i != NULL)
             return i;
-        id = 28; // 3 1/2 " mechanika
+        id = 28; // 3 1/2" floppy drive
         break;
     }
 
@@ -969,9 +969,9 @@ HICON GetDriveIcon(const char* root, UINT type, BOOL accessible, BOOL large)
     int iconSize = IconSizes[large ? ICONSIZE_32 : ICONSIZE_16];
     return SalLoadIcon(ImageResDLL, id, iconSize);
 
-    // JRYFIXME - prozkoumat jestli neni IconLRFlags na zruseni? (W7+)
+    // JRYFIXME - investigate whether IconLRFlags can be removed? (W7+)
 
-    /* JRYFIXME - grepnout plosne zdrojaky na LoadImage / IMAGE_ICON
+    /* JRYFIXME - grep all sources for LoadImage / IMAGE_ICON
   return (HICON)HANDLES(LoadImage(ImageResDLL, MAKEINTRESOURCE(id), IMAGE_ICON,
                                   large ? ICON32_CX : ICON16_CX,
                                   large ? ICON32_CX : ICON16_CX,
@@ -994,7 +994,7 @@ char* BuildName(char* path, char* name, char* dosName, BOOL* skip, BOOL* skipAll
 {
     if (skip != NULL)
         *skip = FALSE;
-    int l1 = (int)strlen(path); // je vzdy na stacku ...
+    int l1 = (int)strlen(path); // is always on stack ...
     int l2, len = l1;
     if (name != NULL)
     {
@@ -1029,9 +1029,9 @@ char* BuildName(char* path, char* name, char* dosName, BOOL* skip, BOOL* skipAll
                 params.Caption = LoadStr(IDS_ERRORTITLE);
                 params.Text = text;
                 char aliasBtnNames[200];
-                /* slouzi pro skript export_mnu.py, ktery generuje salmenu.mnu pro Translator
-   nechame pro tlacitka msgboxu resit kolize hotkeys tim, ze simulujeme, ze jde o menu
-MENU_TEMPLATE_ITEM MsgBoxButtons[] = 
+                /* serves for script export_mnu.py, which generates salmenu.mnu for Translator
+   we let msgbox buttons resolve hotkey collisions by simulating it's a menu
+MENU_TEMPLATE_ITEM MsgBoxButtons[] =
 {
   {MNTT_PB, 0
   {MNTT_IT, IDS_MSGBOXBTN_SKIP
@@ -1088,10 +1088,10 @@ BOOL HasTheSameRootPath(const char* path1, const char* path2)
     if (LowerCase[path1[0]] == LowerCase[path2[0]] && path1[1] == path2[1])
     {
         if (path1[1] == ':')
-            return TRUE; // stejny root normal ("c:\path") cesty
+            return TRUE; // same root for normal ("c:\path") path
         else
         {
-            if (path1[0] == '\\' && path1[1] == '\\') // oboji UNC
+            if (path1[0] == '\\' && path1[1] == '\\') // both UNC
             {
                 const char* s1 = path1 + 2;
                 const char* s2 = path2 + 2;
@@ -1103,9 +1103,9 @@ BOOL HasTheSameRootPath(const char* path1, const char* path2)
                         s2++;
                     }
                     else
-                        break; // ruzne masiny
+                        break; // different machines
                 }
-                if (*s1 != 0 && *s1++ == *s2++) // preskok '\\'
+                if (*s1 != 0 && *s1++ == *s2++) // skip '\\'
                 {
                     while (*s1 != 0 && *s1 != '\\')
                     {
@@ -1115,7 +1115,7 @@ BOOL HasTheSameRootPath(const char* path1, const char* path2)
                             s2++;
                         }
                         else
-                            break; // ruzne disky
+                            break; // different drives
                     }
                     return (*s1 == 0 && (*s2 == 0 || *s2 == '\\')) || *s1 == *s2 ||
                            (*s2 == 0 && (*s1 == 0 || *s1 == '\\'));
@@ -1144,44 +1144,44 @@ BOOL HasTheSameRootPathAndVolume(const char* p1, const char* p2)
         lstrcpyn(resPath, p1, MAX_PATH);
         ResolveSubsts(resPath);
         GetRootPath(root, resPath);
-        if (!IsUNCPath(root) && GetDriveType(root) == DRIVE_FIXED) // reparse pointy ma smysl hledat jen na fixed discich
+        if (!IsUNCPath(root) && GetDriveType(root) == DRIVE_FIXED) // it makes sense to look for reparse points only on fixed drives
         {
-            // pokud nejde o root cestu, zkusime jeste traverzovat po reparse pointech
+            // if it's not a root path, we'll try traversing through reparse points
             BOOL cutPathIsPossible = TRUE;
             char p1NetPath[MAX_PATH];
             p1NetPath[0] = 0;
             ResolveLocalPathWithReparsePoints(ourPath, p1, &cutPathIsPossible, NULL, NULL, NULL, NULL, p1NetPath);
 
-            if (p1NetPath[0] == 0) // ze sitove cesty volume ziskat nelze, nebudeme se ani snazit
+            if (p1NetPath[0] == 0) // cannot get volume from network path, won't even try
             {
                 while (!GetVolumeNameForVolumeMountPoint(ourPath, p1Volume, 100))
                 {
                     if (!cutPathIsPossible || !CutDirectory(ourPath))
                     {
-                        strcpy(p1Volume, "fail"); // ani root nevratil uspech, neocekavane (bohuzel se deje na substenych discich pod W2K - ladeno u Bachaalany - pri selhani na obou cestach vracime SHODU, protoze je pravdepodobnejsi)
+                        strcpy(p1Volume, "fail"); // even root didn't succeed, unexpected (unfortunately happens on substed drives under W2K - debugged at Bachaalany - on failure for both paths we return MATCH, because it's more likely)
                         break;
                     }
                     SalPathAddBackslash(ourPath, MAX_PATH);
                 }
             }
 
-            // pokud jsme pod W2K a nejde o root cestu, zkusime jeste traverzovat po reparse pointech
+            // if we're under W2K and it's not a root path, we'll try traversing through reparse points
             cutPathIsPossible = TRUE;
             char p2NetPath[MAX_PATH];
             p2NetPath[0] = 0;
             ResolveLocalPathWithReparsePoints(ourPath, p2, &cutPathIsPossible, NULL, NULL, NULL, NULL, p2NetPath);
 
-            if ((p1NetPath[0] == 0) != (p2NetPath[0] == 0) || // pokud je jen jedna z cest sitova nebo
+            if ((p1NetPath[0] == 0) != (p2NetPath[0] == 0) || // if only one of the paths is network or
                 p1NetPath[0] != 0 && !HasTheSameRootPath(p1NetPath, p2NetPath))
-                ret = FALSE; // nemaji stejny root, ohlasime ruzne volumy (na sitovych cestach nelze overit volumy)
+                ret = FALSE; // they don't have the same root, we report different volumes (cannot verify volumes on network paths)
 
-            if (p2NetPath[0] == 0 && ret) // ze sitove cesty volume ziskat nelze, nebudeme se ani snazit + pokud uz je rozhodnuto, tez se nebudeme snazit
+            if (p2NetPath[0] == 0 && ret) // cannot get volume from network path, won't even try + if already decided, also won't try
             {
                 while (!GetVolumeNameForVolumeMountPoint(ourPath, p2Volume, 100))
                 {
                     if (!cutPathIsPossible || !CutDirectory(ourPath))
                     {
-                        strcpy(p2Volume, "fail"); // ani root nevratil uspech, neocekavane (bohuzel se deje na substenych discich pod W2K - ladeno u Bachaalany - pri selhani na obou cestach vracime SHODU, protoze je pravdepodobnejsi)
+                        strcpy(p2Volume, "fail"); // even root didn't succeed, unexpected (unfortunately happens on substed drives under W2K - debugged at Bachaalany - on failure for both paths we return MATCH, because it's more likely)
                         break;
                     }
                     SalPathAddBackslash(ourPath, MAX_PATH);
@@ -1213,30 +1213,30 @@ BOOL PathsAreOnTheSameVolume(const char* path1, const char* path2, BOOL* resIsOn
     BOOL trySimpleTest = TRUE;
     if (resIsOnlyEstimation != NULL)
         *resIsOnlyEstimation = TRUE;
-    if (!IsUNCPath(path1) && !IsUNCPath(path2)) // svazky na UNC cestach nema smysl resit
+    if (!IsUNCPath(path1) && !IsUNCPath(path2)) // volumes on UNC paths don't make sense to resolve
     {
         char p1Volume[100] = "1";
         char p2Volume[100] = "2";
         UINT drvType1 = GetDriveType(root1);
         UINT drvType2 = GetDriveType(root2);
-        if (drvType1 != DRIVE_REMOTE && drvType2 != DRIVE_REMOTE) // krome site je sance zjistit "volume name"
+        if (drvType1 != DRIVE_REMOTE && drvType2 != DRIVE_REMOTE) // except for network there's a chance to get volume name
         {
             BOOL cutPathIsPossible = TRUE;
-            path1NetPath[0] = 0;         // sitova cesta, na kterou vede aktualni (posledni) lokalni symlink v ceste
-            if (drvType1 == DRIVE_FIXED) // reparse pointy ma smysl hledat jen na fixed discich
+            path1NetPath[0] = 0;         // network path that the current (last) local symlink in the path leads to
+            if (drvType1 == DRIVE_FIXED) // reparse points only make sense to look for on fixed disks
             {
-                // pokud jsme pod W2K a nejde o root cestu, zkusime jeste traverzovat po reparse pointech
+                // if we're on W2K and it's not a root path, we'll try to traverse through reparse points
                 ResolveLocalPathWithReparsePoints(ourPath, path1, &cutPathIsPossible, NULL, NULL, NULL, NULL, path1NetPath);
             }
             else
                 lstrcpyn(ourPath, root1, MAX_PATH);
             int numOfGetVolNamesFailed = 0;
-            if (path1NetPath[0] == 0) // ze sitove cesty "volume name" ziskat nelze, nebudeme se ani snazit
+            if (path1NetPath[0] == 0) // cannot get volume name from network path, won't even try
             {
                 while (!GetVolumeNameForVolumeMountPoint(ourPath, p1Volume, 100))
                 {
                     if (!cutPathIsPossible || !CutDirectory(ourPath))
-                    { // ani root nevratil uspech, neocekavane (bohuzel se deje na substenych discich pod W2K - ladeno u Bachaalany - pri selhani na obou cestach se stejnymi rooty vracime SHODU, protoze je pravdepodobnejsi)
+                    { // even root didn't return success, unexpected (unfortunately happens on substed drives under W2K - debugged at Bachaalany's - on failure for both paths with same roots we return MATCH, because it's more probable)
                         numOfGetVolNamesFailed++;
                         break;
                     }
@@ -1245,22 +1245,22 @@ BOOL PathsAreOnTheSameVolume(const char* path1, const char* path2, BOOL* resIsOn
             }
 
             cutPathIsPossible = TRUE;
-            path2NetPath[0] = 0;         // sitova cesta, na kterou vede aktualni (posledni) lokalni symlink v ceste
-            if (drvType2 == DRIVE_FIXED) // reparse pointy ma smysl hledat jen na fixed discich
+            path2NetPath[0] = 0;         // network path that the current (last) local symlink in the path leads to
+            if (drvType2 == DRIVE_FIXED) // reparse points only make sense to look for on fixed disks
             {
-                // pokud jsme pod W2K a nejde o root cestu, zkusime jeste traverzovat po reparse pointech
+                // if we're on W2K and it's not a root path, we'll try to traverse through reparse points
                 ResolveLocalPathWithReparsePoints(ourPath, path2, &cutPathIsPossible, NULL, NULL, NULL, NULL, path2NetPath);
             }
             else
                 lstrcpyn(ourPath, root2, MAX_PATH);
-            if (path2NetPath[0] == 0) // ze sitove cesty "volume name" ziskat nelze, nebudeme se ani snazit
+            if (path2NetPath[0] == 0) // cannot get volume name from network path, won't even try
             {
                 if (path1NetPath[0] == 0)
                 {
                     while (!GetVolumeNameForVolumeMountPoint(ourPath, p2Volume, 100))
                     {
                         if (!cutPathIsPossible || !CutDirectory(ourPath))
-                        { // ani root nevratil uspech, neocekavane (bohuzel se deje na substenych discich pod W2K - ladeno u Bachaalany - pri selhani na obou cestach se stejnymi rooty vracime SHODU, protoze je pravdepodobnejsi)
+                        { // even root didn't return success, unexpected (unfortunately happens on substed drives under W2K - debugged at Bachaalany's - on failure for both paths with same roots we return MATCH, because it's more probable)
                             numOfGetVolNamesFailed++;
                             break;
                         }
@@ -1269,13 +1269,13 @@ BOOL PathsAreOnTheSameVolume(const char* path1, const char* path2, BOOL* resIsOn
                     if (numOfGetVolNamesFailed != 2)
                     {
                         if (numOfGetVolNamesFailed == 0 && resIsOnlyEstimation != NULL)
-                            *resIsOnlyEstimation = FALSE; // jediny pripad, kdy jsme si jisty vysledkem je, kdyz se podarilo ziskat "volume name" z obou cest (zaroven tak nemohly byt sitove)
+                            *resIsOnlyEstimation = FALSE; // the only case when we're sure about the result is when we succeeded getting volume name from both paths (they also couldn't be network paths)
                         if (numOfGetVolNamesFailed == 1 || strcmp(p1Volume, p2Volume) != 0)
-                            ret = FALSE; // povedl se ziskat jen jeden "volume name", takze nejde o stejne svazky (a pokud ano, nejsme schopny to zjistit - mozna pokud slo o selhani kvuli SUBSTu, dalo by se to resit resolvnutim cilove cesty ze SUBSTu)
+                            ret = FALSE; // only one volume name was obtained, so they're not the same volumes (and if they are, we can't determine it - maybe if failure was due to SUBST, it could be resolved by resolving the target path from SUBST)
                         trySimpleTest = FALSE;
                     }
                 }
-                else // sitova je jen jedna cesta, nejde o stejne svazky (a pokud ano, nejsme schopny to zjistit)
+                else // only one path is network, so they're not the same volumes (and if they are, we can't determine it)
                 {
                     ret = FALSE;
                     trySimpleTest = FALSE;
@@ -1283,12 +1283,12 @@ BOOL PathsAreOnTheSameVolume(const char* path1, const char* path2, BOOL* resIsOn
             }
             else
             {
-                if (path1NetPath[0] != 0) // srovname rooty sitovych cest
+                if (path1NetPath[0] != 0) // compare roots of network paths
                 {
                     GetRootPath(root1, path1NetPath);
                     GetRootPath(root2, path2NetPath);
                 }
-                else // sitova je jen jedna cesta, nejde o stejne svazky (a pokud ano, nejsme schopny to zjistit)
+                else // only one path is network, so they're not the same volumes (and if they are, we can't determine it)
                 {
                     ret = FALSE;
                     trySimpleTest = FALSE;
@@ -1297,7 +1297,7 @@ BOOL PathsAreOnTheSameVolume(const char* path1, const char* path2, BOOL* resIsOn
         }
     }
 
-    if (trySimpleTest) // zkusime jen jestli se shoduji root-cesty (sitove cesty + vse na NT)
+    if (trySimpleTest) // let's just try if root paths match (network paths + everything on NT)
     {
         ret = _stricmp(root1, root2) == 0;
 
@@ -1308,7 +1308,7 @@ BOOL PathsAreOnTheSameVolume(const char* path1, const char* path2, BOOL* resIsOn
             if (ResolveSubsts(path1NetPath) && ResolveSubsts(path2NetPath))
             {
                 if (IsTheSamePath(path1NetPath, path2NetPath))
-                    *resIsOnlyEstimation = FALSE; // stejne cesty = urcite i stejne svazky
+                    *resIsOnlyEstimation = FALSE; // same paths = definitely same volumes
             }
         }
     }
@@ -1361,17 +1361,17 @@ int CommonPrefixLength(const char* path1, const char* path2)
     if (*s1 == 0 && *s2 == '\\' || *s1 == '\\' && *s2 == 0 ||
         *s1 == 0 && *s2 == 0 && *(s1 - 1) != '\\')
     {
-        lastBackslash = s1; // tento terminator nebude v lastBackslash
+        lastBackslash = s1; // this terminator won't be in lastBackslash
         backslashCount++;
     }
 
     if (path1[1] == ':')
     {
-        // klasicka cesta
+        // classic path
         if (path1[2] != '\\')
             return 0;
 
-        // osetrim specialni pripad: u root cesty musime vratit delku i s posledni zpetnym lomitkem
+        // handle special case: for root path we must return length including the last backslash
         if (lastBackslash - path1 < 3)
             return 3;
 
@@ -1379,10 +1379,10 @@ int CommonPrefixLength(const char* path1, const char* path2)
     }
     else
     {
-        // UNC cesta
+        // UNC path
         if (path1[0] != '\\' || path1[1] != '\\')
             return 0;
-        if (backslashCount < 4) // cesta musi mit tvar "\\masina\share"
+        if (backslashCount < 4) // path must have form "\\machine\share"
             return 0;
 
         return (int)(lastBackslash - path1);
@@ -1401,8 +1401,8 @@ BOOL SalPathIsPrefix(const char* prefix, const char* path)
     if (prefixLen < 3)
         return FALSE;
 
-    // CommonPrefixLength nam vratila delku bez posledniho zpetneho lomitka (pokud neslo o root path)
-    // pokud nas prefix ma koncove zpetne lomitko, musim ho zahodit
+    // CommonPrefixLength returned length without the last backslash (unless it was a root path)
+    // if our prefix has trailing backslash, we must discard it
     if (prefixLen > 3 && prefix[prefixLen - 1] == '\\')
         prefixLen--;
 
@@ -1420,8 +1420,8 @@ BOOL IsDirError(DWORD err)
            err == ERROR_BAD_PATHNAME ||
            err == ERROR_FILE_NOT_FOUND ||
            err == ERROR_PATH_NOT_FOUND ||
-           err == ERROR_INVALID_NAME ||   // je-li hacek v ceste na anglickych Windows, hlasi se tato chyba misto ERROR_PATH_NOT_FOUND
-           err == ERROR_INVALID_FUNCTION; // hlasilo jednomu chlapikovi na WinXP na sitovem disku Y: v okamziku, kdy Salam pristupoval na cestu, ktera jiz neexistovala (nedoslo tak ke zkraceni a chlapik byl dobre v riti ;-) Shift+F7 na Y:\ to vyresila)
+           err == ERROR_INVALID_NAME ||   // if there's a diacritic in path on English Windows, this error is reported instead of ERROR_PATH_NOT_FOUND
+           err == ERROR_INVALID_FUNCTION; // reported for one guy on WinXP on network drive Y: when Salam was accessing a path that no longer existed (no shortening occurred and the guy was in deep trouble ;-) Shift+F7 on Y:\ solved it)
 }
 
 // ****************************************************************************
@@ -1447,7 +1447,7 @@ BOOL CutDirectory(char* path, char** cutDir)
         if (cutDir != NULL)
         {
             if (*(path + l - 1) == '\\')
-                *(path + --l) = 0; // zruseni '\\' na konci
+                *(path + --l) = 0; // remove trailing '\\'
             memmove(lastBackslash + 2, lastBackslash + 1, l - (lastBackslash - path));
             *cutDir = lastBackslash + 2; // "somedir" or "seconddir"
         }
@@ -1456,13 +1456,13 @@ BOOL CutDirectory(char* path, char** cutDir)
     else // "c:\firstdir\seconddir" or "c:\firstdir\seconddir\"
     {    // UNC: "\\server\share\path"
         if (path[0] == '\\' && path[1] == '\\' && nextBackslash <= path + 2)
-        { // "\\server\share" - neda se zkratit
+        { // "\\server\share" - cannot be shortened
             if (cutDir != NULL)
                 *cutDir = path + l;
             return FALSE;
         }
         *lastBackslash = 0;
-        if (cutDir != NULL) // odriznuti '\' na konci
+        if (cutDir != NULL) // cut off trailing '\'
         {
             if (*(path + l - 1) == '\\')
                 *(path + l - 1) = 0;
@@ -1475,7 +1475,7 @@ BOOL CutDirectory(char* path, char** cutDir)
 // ****************************************************************************
 
 int GetRootPath(char* root, const char* path)
-{                                           // POZOR: netypicke pouziti z GetShellFolder(): pro "\\\\" vraci "\\\\\\", pro "\\\\server" vraci "\\\\server\\"
+{                                           // WARNING: unusual usage from GetShellFolder(): for "\\\\" returns "\\\\\\", for "\\\\server" returns "\\\\server\\"
     if (path[0] == '\\' && path[1] == '\\') // UNC
     {
         const char* s = path + 2;
@@ -1487,7 +1487,7 @@ int GetRootPath(char* root, const char* path)
             s++;
         int len = (int)(s - path);
         if (len > MAX_PATH - 2)
-            len = MAX_PATH - 2; // aby se to veslo i s '\\' do MAX_PATH bufferu (ocekavana velikost), orez neva, 100% je to beztak chyba
+            len = MAX_PATH - 2; // to fit with '\\' into MAX_PATH buffer (expected size), truncation doesn't matter, 100% it's an error anyway
         memcpy(root, path, len);
         root[len] = '\\';
         root[len + 1] = 0;
@@ -1505,8 +1505,8 @@ int GetRootPath(char* root, const char* path)
 
 // ****************************************************************************
 
-// projede vsechny barvy z konfigurace a pokud maji nastavenu default hodnotu,
-// nastavi jim prislusne barevne hodnoty
+// goes through all colors from configuration and if they have default value set,
+// sets them to appropriate color values
 
 COLORREF GetHilightColor(COLORREF clr1, COLORREF clr2)
 {
@@ -1561,15 +1561,15 @@ COLORREF GetHilightColor(COLORREF clr1, COLORREF clr2)
     return res;
 }
 
-COLORREF GetFullRowHighlight(COLORREF bkHighlightColor) // vraci "heuristicky" highlight pro full row mode
+COLORREF GetFullRowHighlight(COLORREF bkHighlightColor) // returns "heuristic" highlight for full row mode
 {
-    // trochu heuristiky: zsvetle pozadi budeme "trochu" ztmavovat a tmave pozadi "trochu" zesvetlovat
+    // some heuristics: light background will be "slightly" darkened and dark background "slightly" lightened
     WORD h, l, s;
     ColorRGBToHLS(bkHighlightColor, &h, &l, &s);
 
-    if (l < 121) // [TMAVA]  0-120 -> zesvetlime Luminance progresivne 0..120 -> +40..+20
+    if (l < 121) // [DARK]  0-120 -> lighten Luminance progressively 0..120 -> +40..+20
         l += 20 + 20 * (120 - l) / 120;
-    else // [SVETLA] 121-240 -> ztmavime Luminance o konstatnich 20
+    else // [LIGHT] 121-240 -> darken Luminance by constant 20
         l -= 20;
 
     return ColorHLSToRGB(h, l, s);
@@ -1581,7 +1581,7 @@ void UpdateDefaultColors(SALCOLOR* colors, CHighlightMasks* highlightMasks, BOOL
     {
         int bitsPerPixel = GetCurrentBPP();
 
-        // barvy pera pro ramecek kolem polozky prebereme ze systemove barvy textu okna
+        // pen colors for frame around item - we take from system window text color
         if (GetFValue(colors[FOCUS_ACTIVE_NORMAL]) & SCF_DEFAULT)
             SetRGBPart(&colors[FOCUS_ACTIVE_NORMAL], GetSysColor(COLOR_WINDOWTEXT));
         if (GetFValue(colors[FOCUS_ACTIVE_SELECTED]) & SCF_DEFAULT)
@@ -1591,23 +1591,23 @@ void UpdateDefaultColors(SALCOLOR* colors, CHighlightMasks* highlightMasks, BOOL
         if (GetFValue(colors[FOCUS_BK_INACTIVE_SELECTED]) & SCF_DEFAULT)
             SetRGBPart(&colors[FOCUS_BK_INACTIVE_SELECTED], GetSysColor(COLOR_WINDOW));
 
-        // texty polozek v panelu prebereme ze systemove barvy textu okna
+        // panel item text colors - we take from system window text color
         if (GetFValue(colors[ITEM_FG_NORMAL]) & SCF_DEFAULT)
             SetRGBPart(&colors[ITEM_FG_NORMAL], GetSysColor(COLOR_WINDOWTEXT));
         if (GetFValue(colors[ITEM_FG_FOCUSED]) & SCF_DEFAULT)
             SetRGBPart(&colors[ITEM_FG_FOCUSED], GetSysColor(COLOR_WINDOWTEXT));
-        if (GetFValue(colors[ITEM_FG_HIGHLIGHT]) & SCF_DEFAULT) // FULL ROW HIGHLIGHT vychazi z _NORMAL
+        if (GetFValue(colors[ITEM_FG_HIGHLIGHT]) & SCF_DEFAULT) // FULL ROW HIGHLIGHT based on _NORMAL
             SetRGBPart(&colors[ITEM_FG_HIGHLIGHT], GetCOLORREF(colors[ITEM_FG_NORMAL]));
 
-        // pozadi polozek v panelu prebereme ze systemove barvy pozadi okna
+        // panel item background colors - we take from system window background color
         if (GetFValue(colors[ITEM_BK_NORMAL]) & SCF_DEFAULT)
             SetRGBPart(&colors[ITEM_BK_NORMAL], GetSysColor(COLOR_WINDOW));
         if (GetFValue(colors[ITEM_BK_SELECTED]) & SCF_DEFAULT)
             SetRGBPart(&colors[ITEM_BK_SELECTED], GetSysColor(COLOR_WINDOW));
-        if (GetFValue(colors[ITEM_BK_HIGHLIGHT]) & SCF_DEFAULT) // HIGHLIGHT kopirujeme z NORMAL (aby fungovaly i custom/norton mody)
+        if (GetFValue(colors[ITEM_BK_HIGHLIGHT]) & SCF_DEFAULT) // HIGHLIGHT copied from NORMAL (to work with custom/norton modes too)
             SetRGBPart(&colors[ITEM_BK_HIGHLIGHT], GetFullRowHighlight(GetCOLORREF(colors[ITEM_BK_NORMAL])));
 
-        // barvy progress bary
+        // progress bar colors
         if (GetFValue(colors[PROGRESS_FG_NORMAL]) & SCF_DEFAULT)
             SetRGBPart(&colors[PROGRESS_FG_NORMAL], GetSysColor(COLOR_WINDOWTEXT));
         if (GetFValue(colors[PROGRESS_FG_SELECTED]) & SCF_DEFAULT)
@@ -1617,35 +1617,35 @@ void UpdateDefaultColors(SALCOLOR* colors, CHighlightMasks* highlightMasks, BOOL
         if (GetFValue(colors[PROGRESS_BK_SELECTED]) & SCF_DEFAULT)
             SetRGBPart(&colors[PROGRESS_BK_SELECTED], GetSysColor(COLOR_HIGHLIGHT));
 
-        // barva selected odstinu ikonky
+        // selected icon blend color
         if (GetFValue(colors[ICON_BLEND_SELECTED]) & SCF_DEFAULT)
         {
-            // normalne kopirujeme do selected barvu z focused+selected
+            // normally we copy color from focused+selected to selected
             SetRGBPart(&colors[ICON_BLEND_SELECTED], GetCOLORREF(colors[ICON_BLEND_FOCSEL]));
-            // pokud jde o cervenou (salamandrovskej profil a muzeme si to diky barevne hloubce
-            // dovolit) pouzijeme pro selected svetlejsi odstin
+            // if it's red (salamander profile and we can afford it thanks to color depth)
+            // we use a lighter shade for selected
             if (bitsPerPixel > 8 && GetCOLORREF(colors[ICON_BLEND_FOCSEL]) == RGB(255, 0, 0))
                 SetRGBPart(&colors[ICON_BLEND_SELECTED], RGB(255, 128, 128));
         }
 
 #define COLOR_HOTLIGHT 26 // winuser.h
 
-        // titulky panelu (aktivni/neaktivni)
+        // panel titles (active/inactive)
 
-        // aktivni titulek panelu: POZADI
+        // active panel title: BACKGROUND
         if (GetFValue(colors[ACTIVE_CAPTION_BK]) & SCF_DEFAULT)
             SetRGBPart(&colors[ACTIVE_CAPTION_BK], GetSysColor(COLOR_ACTIVECAPTION));
-        // aktivni titulek panelu: TEXT
+        // active panel title: TEXT
         if (GetFValue(colors[ACTIVE_CAPTION_FG]) & SCF_DEFAULT)
             SetRGBPart(&colors[ACTIVE_CAPTION_FG], GetSysColor(COLOR_CAPTIONTEXT));
-        // neaktivni titulek panelu: POZADI
+        // inactive panel title: BACKGROUND
         if (GetFValue(colors[INACTIVE_CAPTION_BK]) & SCF_DEFAULT)
             SetRGBPart(&colors[INACTIVE_CAPTION_BK], GetSysColor(COLOR_INACTIVECAPTION));
-        // neaktivni titulek panelu: TEXT
+        // inactive panel title: TEXT
         if (GetFValue(colors[INACTIVE_CAPTION_FG]) & SCF_DEFAULT)
         {
-            // preferujeme stejnou barvu textu jako pro aktivni titulek, ale nekdy je tato barva priliz
-            // blizka barve pozadi, potom zkusime barvu pro textu pro neaktivni titulek
+            // we prefer the same text color as for active title, but sometimes this color is too
+            // close to background color, then we try the inactive title text color
             COLORREF clrBk = GetCOLORREF(colors[INACTIVE_CAPTION_BK]);
             COLORREF clrFgAc = GetSysColor(COLOR_CAPTIONTEXT);
             COLORREF clrFgIn = GetSysColor(COLOR_INACTIVECAPTIONTEXT);
@@ -1655,7 +1655,7 @@ void UpdateDefaultColors(SALCOLOR* colors, CHighlightMasks* highlightMasks, BOOL
             SetRGBPart(&colors[INACTIVE_CAPTION_FG], (abs(grayFgAc - grayBk) >= abs(grayFgIn - grayBk)) ? clrFgAc : clrFgIn);
         }
 
-        // barvy hot polozek
+        // hot item colors
         COLORREF hotColor = GetSysColor(COLOR_HOTLIGHT);
         if (GetFValue(colors[HOT_PANEL]) & SCF_DEFAULT)
             SetRGBPart(&colors[HOT_PANEL], hotColor);
@@ -1680,7 +1680,7 @@ void UpdateDefaultColors(SALCOLOR* colors, CHighlightMasks* highlightMasks, BOOL
 
     if (processMasks)
     {
-        // barvy zavisle na jmenu+atributech souboru
+        // colors dependent on file name+attributes
         int i;
         for (i = 0; i < highlightMasks->Count; i++)
         {
@@ -1703,7 +1703,7 @@ void UpdateDefaultColors(SALCOLOR* colors, CHighlightMasks* highlightMasks, BOOL
                 SetRGBPart(&item->FocSelBk, GetCOLORREF(colors[ITEM_BK_FOCSEL]));
             if (GetFValue(item->HighlightFg) & SCF_DEFAULT)
                 SetRGBPart(&item->HighlightFg, GetCOLORREF(item->NormalFg));
-            if (GetFValue(item->HighlightBk) & SCF_DEFAULT) // FULL ROW HIGHLIGHT vychazi z _NORMAL
+            if (GetFValue(item->HighlightBk) & SCF_DEFAULT) // FULL ROW HIGHLIGHT based on _NORMAL
                 SetRGBPart(&item->HighlightBk, GetFullRowHighlight(GetCOLORREF(item->NormalBk)));
         }
     }
@@ -1711,20 +1711,20 @@ void UpdateDefaultColors(SALCOLOR* colors, CHighlightMasks* highlightMasks, BOOL
 
 //****************************************************************************
 //
-// Na zaklade barevne hloubky displeje urci, jestli pouzivat 256 barevne
-// nebo 16 barevne bitmapy.
+// Based on display color depth, determines whether to use 256-color
+// or 16-color bitmaps.
 //
 
 BOOL Use256ColorsBitmap()
 {
     int bitsPerPixel = GetCurrentBPP();
-    return (bitsPerPixel > 8); // vice nez 256 barev
+    return (bitsPerPixel > 8); // more than 256 colors
 }
 
 DWORD GetImageListColorFlags()
 {
-    // pokud ma image list 16bitu barevnou hloubku, zlobi alfa kanal novych ikonek pod WinXP 32-bit barevny display (32-bitova hloubka slape)
-    // pokud ma image list 32bitu barevnou hloubku, zlobi blend pri kresleni selectene polozky pod Win2K 32-bit barevny display (16-bitova hloubka slape)
+    // if image list has 16-bit color depth, alpha channel of new icons misbehaves under WinXP 32-bit color display (32-bit depth works)
+    // if image list has 32-bit color depth, blend misbehaves when drawing selected item under Win2K 32-bit color display (16-bit depth works)
     return ILC_COLOR32;
 }
 
@@ -1761,9 +1761,9 @@ int LoadColorTable(int id, RGBQUAD* rgb, int rgbCount)
 
 BOOL InitializeConstGraphics()
 {
-    // zajistime si hladky graficky vystup
-    // 20 volani GDI API by melo bohate stacit
-    // je to implicitni hodnota z NT 4.0 WS
+    // ensure smooth graphics output
+    // 20 GDI API calls should be plenty
+    // it's the default value from NT 4.0 WS
     if (GdiGetBatchLimit() < 20)
     {
         TRACE_I("Increasing GdiBatchLimit");
@@ -1779,7 +1779,7 @@ BOOL InitializeConstGraphics()
     if (SystemParametersInfo(SPI_GETDRAGFULLWINDOWS, 0, &DragFullWindows, FALSE) == 0)
         DragFullWindows = TRUE;
 
-    // inicializace LogFont struktury
+    // LogFont structure initialization
     NONCLIENTMETRICS ncm;
     ncm.cbSize = sizeof(ncm);
     SystemParametersInfo(SPI_GETNONCLIENTMETRICS, ncm.cbSize, &ncm, 0);
@@ -1801,7 +1801,7 @@ BOOL InitializeConstGraphics()
   strcpy(LogFont.lfFaceName, "MS Shell Dlg 2");
   */
 
-    // tyto brushe jsou alokovane systemem a automaticky se meni pri zmene barev
+    // these brushes are allocated by the system and automatically change when colors change
     HDialogBrush = GetSysColorBrush(COLOR_BTNFACE);
     HButtonTextBrush = GetSysColorBrush(COLOR_BTNTEXT);
     HMenuSelectedBkBrush = GetSysColorBrush(COLOR_HIGHLIGHT);
@@ -1815,18 +1815,18 @@ BOOL InitializeConstGraphics()
         TRACE_E("Unable to create brush.");
         return FALSE;
     }
-    ItemBitmap.CreateBmp(NULL, 1, 1); // zajisteni existence bitmapy
+    ItemBitmap.CreateBmp(NULL, 1, 1); // ensure bitmap exists
 
-    // bitmapu nacitame pouze jednou (neoprasujeme ji pri zmene rozliseni)
-    // a pokud by user prepnul barvy z 256 vejs, pri LoadBitmap (tedy bitmape
-    // kompatibilni s display DC) by bitmapa zustala v degradovanych barvach;
-    // proto ji nacteme jako DIB
+    // we load the bitmap only once (we don't refresh it when resolution changes)
+    // and if user would switch colors from 256 up, with LoadBitmap (i.e. bitmap
+    // compatible with display DC) the bitmap would remain in degraded colors;
+    // that's why we load it as DIB
     // HWorkerBitmap = HANDLES(LoadBitmap(HInstance, MAKEINTRESOURCE(IDB_WORKER)));
     //HWorkerBitmap = (HBITMAP)HANDLES(LoadImage(HInstance, MAKEINTRESOURCE(IDB_WORKER), IMAGE_BITMAP, 0, 0, LR_CREATEDIBSECTION));
     //if (HWorkerBitmap == NULL)
     //  return FALSE;
 
-    // pri zmene fontu se volaji explicitne CreatePanelFont a CreateEnvFont, prvni inicializaci provedeme zde
+    // when font changes, CreatePanelFont and CreateEnvFont are called explicitly, we do first initialization here
     CreatePanelFont();
     CreateEnvFonts();
 
@@ -1909,8 +1909,8 @@ BOOL AuxAllocateImageLists()
     return TRUE;
 }
 
-// pomoci TweakUI si mohou uzivatele menit ikonku shortcuty (default, custom, zadna)
-// pokusime se ji ctit
+// users can change shortcut icon via TweakUI (default, custom, none)
+// we'll try to honor it
 BOOL GetShortcutOverlay()
 {
     int i;
@@ -1926,8 +1926,8 @@ BOOL GetShortcutOverlay()
     /*  
   //#include <CommonControls.h>
 
-  // cteni ikon overlayu ze systemoveho image-listu, zbytecne pomale, nacteme je primo z imageres.dll
-  // tenhle kod tu nechavam jen pro pripad, ze bysme zase potrebovali zjistit kde ty ikony jsou
+  // reading overlay icons from system image-list, unnecessarily slow, we load them directly from imageres.dll
+  // I'm leaving this code here just in case we need to find out where those icons are again
   typedef DECLSPEC_IMPORT HRESULT (WINAPI *F__SHGetImageList)(int iImageList, REFIID riid, void **ppvObj);
 
   F__SHGetImageList MySHGetImageList = (F__SHGetImageList)GetProcAddress(Shell32DLL, "SHGetImageList"); // Min: XP
@@ -1986,7 +1986,7 @@ BOOL GetShortcutOverlay()
         SalRegQueryValueEx(hKey, "29", NULL, NULL, (LPBYTE)buff, &buffLen);
         if (buff[0] != 0)
         {
-            char* num = strrchr(buff, ','); // cislo ikony je za posledni carkou
+            char* num = strrchr(buff, ','); // icon number is after the last comma
             if (num != NULL)
             {
                 int index = atoi(num + 1);
@@ -2117,7 +2117,7 @@ int GetIconSizeForSystemDPI(CIconSizeEnum iconSize)
 
     int scale = GetScaleForSystemDPI();
 
-    int baseIconSize[ICONSIZE_COUNT] = {16, 32, 48}; // musi odpovidat CIconSizeEnum
+    int baseIconSize[ICONSIZE_COUNT] = {16, 32, 48}; // must match CIconSizeEnum
 
     return (baseIconSize[iconSize] * scale) / 100;
 }
@@ -2140,14 +2140,14 @@ void GetSystemDPI(HDC hDC)
 
 BOOL InitializeGraphics(BOOL colorsOnly)
 {
-    // 48x48 az od XP
-    // ve skutecnosti jsou velke ikonky podporeny uz davno, lze je nahodit
-    // Desktop/Properties/???/Large Icons; pozor, nebude pak existovat system image list
-    // pro ikonky 32x32; navic bychom meli ze systemu vytahnout realne velikosti ikonek
-    // zatim na to kasleme a 48x48 povolime az od XP, kde jsou bezne dostupne
+    // 48x48 only from XP
+    // actually large icons are supported for a long time, can be enabled via
+    // Desktop/Properties/???/Large Icons; note that system image list for 32x32 icons
+    // won't exist then; also we should get real icon sizes from system, for now we
+    // don't bother and enable 48x48 only from XP, where they're commonly available
 
     //
-    // Vytahneme z Registry pozadovanou barevnou hloubku ikonek
+    // Get required icon color depth from Registry
     //
     int iconColorsCount = 0;
     HDC hDesktopDC = GetDC(NULL);
@@ -2162,7 +2162,7 @@ BOOL InitializeGraphics(BOOL colorsOnly)
     HKEY hKey;
     if (OpenKeyAux(NULL, HKEY_CURRENT_USER, "Control Panel\\Desktop\\WindowMetrics", hKey))
     {
-        // dalsi zajimave hodnoty: "Shell Icon Size", "Shell Small Icon Size"
+        // other interesting values: "Shell Icon Size", "Shell Small Icon Size"
         char buff[100];
         if (GetValueAux(NULL, hKey, "Shell Icon Bpp", REG_SZ, buff, 100))
         {
@@ -2172,8 +2172,8 @@ BOOL InitializeGraphics(BOOL colorsOnly)
         {
             if (WindowsVistaAndLater)
             {
-                // ve viste tento klic proste neni a zatim netusim, cim je nahrazen,
-                // takze se budeme tvarit, ze ikonky jedou v plnych barvach (jinak jsme zobrazovali 16 barevne hnusy)
+                // in Vista this key simply doesn't exist and I don't know yet what replaced it,
+                // so we'll pretend icons run in full colors (otherwise we were displaying 16-color ugliness)
                 iconColorsCount = 32;
             }
         }
@@ -2273,8 +2273,8 @@ BOOL InitializeGraphics(BOOL colorsOnly)
             return FALSE;
         }
 
-        // prekladac hlasil chybu: error C2712: Cannot use __try in functions that require object unwinding
-        // obchazim to vlozenim alokace do funkce
+        // compiler reported error: error C2712: Cannot use __try in functions that require object unwinding
+        // working around it by moving allocation to a function
         //    SymbolsIconList = new CIconList();
         //    LargeSymbolsIconList = new CIconList();
         if (!AuxAllocateImageLists())
@@ -2308,8 +2308,8 @@ BOOL InitializeGraphics(BOOL colorsOnly)
             TRACE_E("Unable to create image list.");
             return FALSE;
         }
-        ImageList_SetImageCount(HFindSymbolsImageList, 2); // inicializace
-                                                           //    ImageList_SetBkColor(HFindSymbolsImageList, GetSysColor(COLOR_WINDOW)); // aby pod XP chodily pruhledne ikonky
+        ImageList_SetImageCount(HFindSymbolsImageList, 2); // initialization
+                                                           //    ImageList_SetBkColor(HFindSymbolsImageList, GetSysColor(COLOR_WINDOW)); // for transparent icons to work under XP
 
         int iconSize = IconSizes[ICONSIZE_16];
         HBITMAP hTmpMaskBitmap;
@@ -2358,7 +2358,7 @@ BOOL InitializeGraphics(BOOL colorsOnly)
             return FALSE;
         }
 
-        // vytahnu z shell 32 ikony:
+        // extract icons from shell32:
         int indexes[] = {symbolsExecutable, symbolsDirectory, symbolsNonAssociated, symbolsAssociated, -1};
         int resID[] = {3, 4, 1, 2, -1};
         int vistaResID[] = {15, 4, 2, 90, -1};
@@ -2391,7 +2391,7 @@ BOOL InitializeGraphics(BOOL colorsOnly)
         int sizeIndex;
         for (sizeIndex = ICONSIZE_16; sizeIndex < ICONSIZE_COUNT; sizeIndex++)
         {
-            // ikonka adresare
+            // directory icon
             hIcon = NULL;
             __try
             {
@@ -2403,20 +2403,20 @@ BOOL InitializeGraphics(BOOL colorsOnly)
                 FGIExceptionHasOccured++;
                 hIcon = NULL;
             }
-            if (hIcon != NULL) // pokud ikonku neziskame, je tam porad jeste 4-rka z shell32.dll
+            if (hIcon != NULL) // if we can't get the icon, there's still the 4th one from shell32.dll
             {
                 SimpleIconLists[sizeIndex]->ReplaceIcon(symbolsDirectory, hIcon);
                 NOHANDLES(DestroyIcon(hIcon));
             }
 
-            // ikonka ".."
+            // ".." icon
             hIcon = (HICON)HANDLES(LoadImage(HInstance, MAKEINTRESOURCE(IDI_UPPERDIR),
                                              IMAGE_ICON, IconSizes[sizeIndex], IconSizes[sizeIndex],
                                              IconLRFlags));
             SimpleIconLists[sizeIndex]->ReplaceIcon(symbolsUpDir, hIcon);
             HANDLES(DestroyIcon(hIcon));
 
-            // ikonka archiv
+            // archive icon
             hIcon = LoadArchiveIcon(IconSizes[sizeIndex], IconSizes[sizeIndex], IconLRFlags);
             SimpleIconLists[sizeIndex]->ReplaceIcon(symbolsArchive, hIcon);
             HANDLES(DestroyIcon(hIcon));
@@ -2523,17 +2523,17 @@ BOOL InitializeGraphics(BOOL colorsOnly)
         return FALSE;
     }
 
-    clrMap[0].from = RGB(128, 128, 128); // seda -> COLOR_BTNSHADOW
+    clrMap[0].from = RGB(128, 128, 128); // gray -> COLOR_BTNSHADOW
     clrMap[0].to = GetSysColor(COLOR_BTNSHADOW);
-    clrMap[1].from = RGB(0, 0, 0); // cerna -> COLOR_BTNTEXT
+    clrMap[1].from = RGB(0, 0, 0); // black -> COLOR_BTNTEXT
     clrMap[1].to = GetSysColor(COLOR_BTNTEXT);
-    clrMap[2].from = RGB(255, 255, 255); // bila -> pruhledna
+    clrMap[2].from = RGB(255, 255, 255); // white -> transparent
     clrMap[2].to = RGB(255, 0, 255);
     HBITMAP hBottomTB = HANDLES(CreateMappedBitmap(HInstance, IDB_BOTTOMTOOLBAR, 0, clrMap, 3));
     BOOL remapWhite = FALSE;
     if (GetCurrentBPP() > 8)
     {
-        clrMap[2].from = RGB(255, 255, 255); // bila -> svetle sedivou (at to tak nerve)
+        clrMap[2].from = RGB(255, 255, 255); // white -> light gray (so it doesn't stand out so much)
         clrMap[2].to = RGB(235, 235, 235);
         remapWhite = TRUE;
     }
@@ -2839,12 +2839,12 @@ BOOL PointToLocalDecimalSeparator(char* buffer, int bufferSize)
 
 // ****************************************************************************
 //
-// GetCmdLine - ziskani parametru z prikazove radky
+// GetCmdLine - get parameters from command line
 //
-// buf + size - buffer pro parametry
-// argv - pole ukazatelu, ktere se naplni parametry
-// argCount - na vstupu je to pocet prvku v argv, na vystupu obsahuje pocet parametru
-// cmdLine - parametry prikazove radky (bez jmena .exe souboru - z WinMain)
+// buf + size - buffer for parameters
+// argv - array of pointers that will be filled with parameters
+// argCount - on input is the number of elements in argv, on output contains number of parameters
+// cmdLine - command line parameters (without .exe file name - from WinMain)
 
 BOOL GetCmdLine(char* buf, int size, char* argv[], int& argCount, char* cmdLine)
 {
@@ -2869,13 +2869,13 @@ BOOL GetCmdLine(char* buf, int size, char* argv[], int& argCount, char* cmdLine)
         if (argCount < space && c < end)
             argv[argCount++] = c;
         else
-            return c < end; // chyba jen pokud je maly buffer
+            return c < end; // error only if buffer is too small
 
         while (1)
         {
             if (*s == term || *s == 0)
             {
-                if (*s == 0 || term != '"' || *++s != '"') // neni-li to nahrada "" -> "
+                if (*s == 0 || term != '"' || *++s != '"') // unless it's replacement "" -> "
                 {
                     if (*s != 0)
                         s++;
@@ -3003,8 +3003,8 @@ BOOL PackErrorHandler(HWND parent, const WORD err, ...)
 void ColorsChanged(BOOL refresh, BOOL colorsOnly, BOOL reloadUMIcons)
 {
     CALL_STACK_MESSAGE2("ColorsChanged(%d)", refresh);
-    // POZOR! fonts musi byt FALSE, aby nedoslo k zmene handlu fontu, o ktere
-    // se museji dozvedet toolbary, ktere jej pouzivaji
+    // WARNING! fonts must be FALSE, to prevent font handle change, which
+    // the toolbars using it must be notified about
     ReleaseGraphics(colorsOnly);
     InitializeGraphics(colorsOnly);
     ItemBitmap.ReCreateForScreenDC();
@@ -3022,10 +3022,10 @@ void ColorsChanged(BOOL refresh, BOOL colorsOnly, BOOL reloadUMIcons)
         MainWindow->OnColorsChanged(reloadUMIcons);
     }
 
-    // dame vedet findum o zmene barev
+    // notify find dialogs about color change
     FindDialogQueue.BroadcastMessage(WM_USER_COLORCHANGEFIND, 0, 0);
 
-    // rozesleme tuto novinku i mezi plug-iny
+    // broadcast this news to plugins too
     Plugins.Event(PLUGINEVENT_COLORSCHANGED, 0);
 
     if (MainWindow != NULL && MainWindow->HTopRebar != NULL)
@@ -3035,7 +3035,7 @@ void ColorsChanged(BOOL refresh, BOOL colorsOnly, BOOL reloadUMIcons)
     {
         InvalidateRect(MainWindow->HWindow, NULL, TRUE);
     }
-    // Internal Viewer a Find:  obnova vsech oken
+    // Internal Viewer and Find: refresh all windows
     BroadcastConfigChanged();
 }
 
@@ -3137,7 +3137,7 @@ CMessagesKeeper MessagesKeeper;
 
 typedef VOID(WINAPI* FDisableProcessWindowsGhosting)(VOID);
 
-void TurnOFFWindowGhosting() // kdyz se "ghosting" nevypne, schovavaji se safe-wait-okenka po peti sekundach "not responding" stavu aplikace (kdyz aplikace nezpracovava zpravy)
+void TurnOFFWindowGhosting() // when "ghosting" is not turned off, safe-wait windows hide after five seconds of "not responding" app state (when app doesn't process messages)
 {
     if (User32DLL != NULL)
     {
@@ -3183,7 +3183,7 @@ void CleanUID(char* uid)
 
 //#ifdef MSVC_RUNTIME_CHECKS
 char RTCErrorDescription[RTC_ERROR_DESCRIPTION_SIZE] = {0};
-// custom reporting funkce opsana z MSDN - http://msdn.microsoft.com/en-us/library/cb00sk7k(v=VS.90).aspx
+// custom reporting function copied from MSDN - http://msdn.microsoft.com/en-us/library/cb00sk7k(v=VS.90).aspx
 #pragma runtime_checks("", off)
 int MyRTCErrorFunc(int errType, const wchar_t* file, int line,
                    const wchar_t* module, const wchar_t* format, ...)
@@ -3218,7 +3218,7 @@ int MyRTCErrorFunc(int errType, const wchar_t* file, int line,
     bufA[RTC_ERROR_DESCRIPTION_SIZE - 1] = 0;
     lstrcpyn(RTCErrorDescription, bufA, RTC_ERROR_DESCRIPTION_SIZE);
 
-    // radeji to tady zalomime s exception, bude snad jasnejsi callstack - pokud by nebyl, muzeme tady tu exception odstranit
+    // better to break here with exception, hopefully clearer callstack - if not, we can remove this exception here
     // viz popis chovani _CrtDbgReportW - http://msdn.microsoft.com/en-us/library/8hyw4sy7(v=VS.90).aspx
     RaiseException(OPENSAL_EXCEPTION_RTC, 0, 0, NULL); // nase vlastni "rtc" exception
 
@@ -3308,20 +3308,20 @@ void StartNotepad(const char* file)
 
 BOOL RunningInCompatibilityMode()
 {
-    // Pokud bezime pod XP nebo nasledujicim OS, hrozi ze snazivy uzivatel zapnul
-    // Compatibility Mode. Pokud tomu tak je, zobrazime varovani.
-    // POZOR: Application Verifier nastavuje verzi Windows na novejsi nez skutecne je,
-    // dela to pri testovani aplikace pri ziskavani "Windows 7 Software Logo".
+    // If running under XP or later OS, there's a risk that an eager user enabled
+    // Compatibility Mode. If so, we'll show a warning.
+    // WARNING: Application Verifier sets Windows version higher than it really is,
+    // it does this when testing app for "Windows 7 Software Logo".
     WORD kernel32major, kernel32minor;
     if (GetModuleVersion(GetModuleHandle("kernel32.dll"), &kernel32major, &kernel32minor))
     {
         TRACE_I("kernel32.dll: " << kernel32major << ":" << kernel32minor);
-        // musime zavolat GetVersionEx, protoze vraci hodnoty podle nastaveneho Compatibility Mode
-        // (SalIsWindowsVersionOrGreater nastaveny Compatibility Mode ignoruje)
+        // we must call GetVersionEx, because it returns values according to the set Compatibility Mode
+        // (SalIsWindowsVersionOrGreater ignores the set Compatibility Mode)
         OSVERSIONINFO os;
         os.dwOSVersionInfoSize = sizeof(OSVERSIONINFO);
 
-        // jen se vyhybame deprecated warningu, GetVersionEx snad bude vzdy a vsude
+        // just avoiding deprecated warning, GetVersionEx should be available always and everywhere
         typedef BOOL(WINAPI * FDynGetVersionExA)(LPOSVERSIONINFOA lpVersionInformation);
         FDynGetVersionExA DynGetVersionExA = (FDynGetVersionExA)GetProcAddress(GetModuleHandle("kernel32.dll"),
                                                                                "GetVersionExA");
@@ -3334,16 +3334,16 @@ BOOL RunningInCompatibilityMode()
         DynGetVersionExA(&os);
         TRACE_I("GetVersionEx(): " << os.dwMajorVersion << ":" << os.dwMinorVersion);
 
-        // aktualni verze Salamandera je manifestovana pro Windows 10
+        // current version of Salamander is manifested for Windows 10
         const DWORD SAL_MANIFESTED_FOR_MAJOR = 10;
         const DWORD SAL_MANIFESTED_FOR_MINOR = 0;
 
-        // GetVersionEx nikdy nevrati vic nez os.dwMajorVersion == SAL_MANIFESTED_FOR_MAJOR
-        // a os.dwMinorVersion == SAL_MANIFESTED_FOR_MINOR, je-li tedy kernel32.dll vyssi
-        // verze, nejsme schopni 100% detekovat Compatibility Mode, je potreba mafinestovat
-        // Salamandera pro nove Windows a posunout konstanty SAL_MANIFESTED_FOR_MAJOR a
-        // SAL_MANIFESTED_FOR_MINOR, detekujeme aspon nastaveni Compatibility Mode na
-        // starsi Windows, nez pro ktera je Salamander manifestovan
+        // GetVersionEx will never return more than os.dwMajorVersion == SAL_MANIFESTED_FOR_MAJOR
+        // and os.dwMinorVersion == SAL_MANIFESTED_FOR_MINOR, so if kernel32.dll is higher
+        // version, we can't 100% detect Compatibility Mode, need to manifest Salamander for
+        // new Windows and update SAL_MANIFESTED_FOR_MAJOR and SAL_MANIFESTED_FOR_MINOR
+        // constants, we detect at least Compatibility Mode set to older Windows than
+        // Salamander is manifested for
         if (kernel32major > SAL_MANIFESTED_FOR_MAJOR ||
             kernel32major == SAL_MANIFESTED_FOR_MAJOR && kernel32minor > SAL_MANIFESTED_FOR_MINOR)
         {
@@ -3362,21 +3362,21 @@ void GetCommandLineParamExpandEnvVars(const char* argv, char* target, DWORD targ
     char curDir[MAX_PATH];
     if (hotpathForJumplist)
     {
-        BOOL ret = ExpandHotPath(NULL, argv, target, targetSize, FALSE); // pokud neni syntax cesty OK, vyskoci TRACE_E, coz nas netrapi
+        BOOL ret = ExpandHotPath(NULL, argv, target, targetSize, FALSE); // if path syntax is not OK, TRACE_E will fire, which doesn't bother us
         if (!ret)
         {
             TRACE_E("ExpandHotPath failed.");
-            // pokud expanze selze, pouzijeme retezec bez expanze
+            // if expansion fails, we use the string without expansion
             lstrcpyn(target, argv, targetSize);
         }
     }
     else
     {
-        DWORD auxRes = ExpandEnvironmentStrings(argv, target, targetSize); // uzivatele si prali moznost predavat jako parametr env promenne
+        DWORD auxRes = ExpandEnvironmentStrings(argv, target, targetSize); // users wanted the ability to pass env variables as parameters
         if (auxRes == 0 || auxRes > targetSize)
         {
             TRACE_E("ExpandEnvironmentStrings failed.");
-            // pokud expanze selze, pouzijeme retezec bez expanze
+            // if expansion fails, we use the string without expansion
             lstrcpyn(target, argv, targetSize);
         }
     }
@@ -3386,15 +3386,15 @@ void GetCommandLineParamExpandEnvVars(const char* argv, char* target, DWORD targ
     }
 }
 
-// pokud jsou parametry OK, vraci TRUE, jinak vraci FALSE
+// if parameters are OK, returns TRUE, otherwise returns FALSE
 BOOL ParseCommandLineParameters(LPSTR cmdLine, CCommandLineParams* cmdLineParams)
 {
-    // nechceme menit cesty, menit ikonu, menit prefix -- vse je potreba vynulovat
+    // we don't want to change paths, change icon, change prefix -- everything needs to be zeroed
     ZeroMemory(cmdLineParams, sizeof(CCommandLineParams));
 
     char buf[4096];
     char* argv[20];
-    int p = 20; // pocet prvku pole argv
+    int p = 20; // number of elements in argv array
 
     char curDir[MAX_PATH];
     GetModuleFileName(HInstance, ConfigurationName, MAX_PATH);
@@ -3403,7 +3403,7 @@ BOOL ParseCommandLineParameters(LPSTR cmdLine, CCommandLineParams* cmdLineParams
     strcat(ConfigurationName, configReg);
     if (!FileExists(ConfigurationName) && GetOurPathInRoamingAPPDATA(curDir) &&
         SalPathAppend(curDir, configReg, MAX_PATH) && FileExists(curDir))
-    { // pokud neexistuje soubor config.reg u .exe, hledame ho jeste v APPDATA
+    { // if config.reg file doesn't exist next to .exe, we also look for it in APPDATA
         lstrcpyn(ConfigurationName, curDir, MAX_PATH);
         ConfigurationNameIgnoreIfNotExists = FALSE;
     }
@@ -3443,7 +3443,7 @@ BOOL ParseCommandLineParameters(LPSTR cmdLine, CCommandLineParams* cmdLineParams
                 }
             }
 
-            if (StrICmp(argv[i], "-aj") == 0) // active panel path (hot paths syntax for jumplist) - interni, nedokumentovane
+            if (StrICmp(argv[i], "-aj") == 0) // active panel path (hot paths syntax for jumplist) - internal, undocumented
             {
                 if (i + 1 < p)
                 {
@@ -3460,17 +3460,17 @@ BOOL ParseCommandLineParameters(LPSTR cmdLine, CCommandLineParams* cmdLineParams
                     char* s = argv[i + 1];
                     if (*s == '\\' && *(s + 1) == '\\' || // UNC full path
                         *s != 0 && *(s + 1) == ':')       // "c:\" full path
-                    {                                     // plne jmeno
+                    {                                     // full path
                         lstrcpyn(ConfigurationName, argv[i + 1], MAX_PATH);
                     }
-                    else // relativni jmeno
+                    else // relative path
                     {
                         GetModuleFileName(HInstance, ConfigurationName, MAX_PATH);
                         *(strrchr(ConfigurationName, '\\') + 1) = 0;
                         SalPathAppend(ConfigurationName, s, MAX_PATH);
                         if (!FileExists(ConfigurationName) && GetOurPathInRoamingAPPDATA(curDir) &&
                             SalPathAppend(curDir, s, MAX_PATH) && FileExists(curDir))
-                        { // pokud neexistuje relativne zadany soubor za -C u .exe, hledame ho jeste v APPDATA
+                        { // if relatively specified file after -C doesn't exist next to .exe, we also look for it in APPDATA
                             lstrcpyn(ConfigurationName, curDir, MAX_PATH);
                         }
                     }

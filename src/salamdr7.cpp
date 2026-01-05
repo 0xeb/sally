@@ -36,7 +36,7 @@
 // RegenerateUserEnvironment() (trva 4ms, takze neni problem) a opet vytahnout env. promenne.
 // Zjistit diference. Dostaneme seznam promennych, ktere zmizely nebo pribyly nebou se zmenily.
 
-BOOL EnvVariablesDifferencesFound = FALSE; // obrana proti predcasne regeneraci dokud nemame zjistene rozdily
+BOOL EnvVariablesDifferencesFound = FALSE; // protection against premature regeneration until we have found differences
 
 typedef WINSHELLAPI BOOL(WINAPI* FT_RegenerateUserEnvironment)(
     void** prevEnv,
@@ -46,7 +46,7 @@ BOOL RegenerateUserEnvironment()
 {
     CALL_STACK_MESSAGE1("RegenerateUserEnvironment()");
 
-    // nedokumentovane API, nalezeno krokovanim NT4
+    // undocumented API, found by stepping through NT4
     FT_RegenerateUserEnvironment proc = (FT_RegenerateUserEnvironment)GetProcAddress(Shell32DLL, "RegenerateUserEnvironment"); // undocumented
     if (proc == NULL)
     {
@@ -65,13 +65,13 @@ BOOL RegenerateUserEnvironment()
 }
 
 #define ENVVARTYPE_NONE 0
-#define ENVVARTYPE_ADD 1 // pokud po reloadu promenna v poli neexistuje, doplnime ji
-#define ENVVARTYPE_DEL 2 // pokud po reloadu promenna v poli existuje, odebereme ji
+#define ENVVARTYPE_ADD 1 // if variable does not exist in array after reload, we add it
+#define ENVVARTYPE_DEL 2 // if variable exists in array after reload, we remove it
 
 struct CEnvVariable
 {
-    char* Name;        // alokovana promenna, puvodne NAME=VAL\0 prepsana na NAME\0VAL\0
-    const char* Value; // nealokovana promenna, pouze ukazatel do Name bufferu na hodnotu VAL (za puvodni rovnitko)
+    char* Name;        // allocated variable, originally NAME=VAL\0 rewritten to NAME\0VAL\0
+    const char* Value; // non-allocated variable, just a pointer into Name buffer to value VAL (after original equals sign)
     DWORD Type;        // 0
 };
 
@@ -92,14 +92,14 @@ public:
         Clean();
     }
 
-    // naplni pole na zaklade dat vracenych z GetEnvironmentStrings() API
+    // fills array based on data returned from GetEnvironmentStrings() API
     void LoadFromProcess();
 
-    // naplni pole na zaklade 'oldVars' a 'newVars'
+    // fills array based on 'oldVars' and 'newVars'
     void FindDifferences(CEnvVariables* oldVars, CEnvVariables* newVars);
 
-    // na nas proces aplikuje difference 'diffVars' (prida / odebere polozky)
-    // POZOR: nemeni pole objektu, pouze ho pouziva jako aktualni obraz, proti kteremu porovna diference
+    // applies differences 'diffVars' to our process (adds / removes items)
+    // WARNING: does not modify the object's array, only uses it as current snapshot to compare differences against
     void ApplyDifferencesToCurrentProcess(CEnvVariables* diffVars);
 
 protected:
@@ -111,14 +111,14 @@ protected:
         Sorted = FALSE;
     }
 
-    // seradi pole case insensitive podle jmena
+    // sorts array case insensitive by name
     void QuickSort(int left, int right);
 
-    // pokud v poli nalezne polozku 'name', vrati jeji index; jinak vrati -1;
-    // predpoklada, ze je pole abecedne serazene, pouziva puleni intervalu
+    // if item 'name' is found in array, returns its index; otherwise returns -1;
+    // assumes array is alphabetically sorted, uses binary search
     int FindItemIndex(const char* name);
 
-    // prida do pole kopii polozky, nastavi Type
+    // adds copy of item to array, sets Type
     void AddVarCopy(const CEnvVariable* var, DWORD type);
 };
 
@@ -192,7 +192,7 @@ void CEnvVariables::LoadFromProcess()
 {
     CALL_STACK_MESSAGE1("CEnvVariables::LoadFromProcess()");
 
-    // zahodime soucasne prvky v poli
+    // discard current elements in array
     Clean();
 
     char* vars = GetEnvironmentStrings();
@@ -202,8 +202,8 @@ void CEnvVariables::LoadFromProcess()
         char* begin = p;
         while (*p != 0)
             p++;
-        // pokud se nejedena o current dir pro disky, ulozime nalezenou polozku do pole
-        // Ignorujeme:
+        // if this is not current dir for drives, save found item to array
+        // We ignore:
         // =::=::\
     // =C:=C:\Program Files (x86)\Microsoft Visual Studio 9.0\Common7\IDE
         // =E:=E:\Source\salamand\vcproj
@@ -228,8 +228,8 @@ void CEnvVariables::LoadFromProcess()
 
     FreeEnvironmentStrings(vars);
 
-    // pozor, pole vracene z GetEnvironmentStrings() vypada jako serazene, ale pri setovani env. promennych se nove promenne pridavaji na konec,
-    // takze seradime, abychom mohli porovnavat a vyhledavat
+    // note: array returned from GetEnvironmentStrings() looks sorted, but when setting env. variables new variables are added to the end,
+    // so we sort to be able to compare and search
     if (Variables.Count > 1)
         QuickSort(0, Variables.Count - 1);
 
@@ -247,10 +247,10 @@ void CEnvVariables::FindDifferences(CEnvVariables* oldVars, CEnvVariables* newVa
         return;
     }
 
-    // zahodime soucasne prvky v poli
+    // discard current elements in array
     Clean();
 
-    //  porovname pole oldVars a newVars a diference ulozime
+    //  compare arrays oldVars and newVars and store differences
     int oldIndex = 0;
     int newIndex = 0;
     while (oldIndex < oldVars->Variables.Count || newIndex < newVars->Variables.Count)
@@ -269,13 +269,13 @@ void CEnvVariables::FindDifferences(CEnvVariables* oldVars, CEnvVariables* newVa
         {
             if (cmp > 0)
             {
-                //        AddVarCopy(newVar, ENVVARTYPE_DEL);  // dospeli jsme k rozhodnuti, ze lepe nic nemazat... Petr+Honza
+                //        AddVarCopy(newVar, ENVVARTYPE_DEL);  // we came to the decision that it's better not to delete anything... Petr+Honza
                 //        TRACE_I("DEL: "<<newVar->Name<<" = "<<newVar->Value);
                 newIndex++;
             }
             else
             {
-                // diference zatim ignorujeme, napriklad v PATH, atd
+                // we ignore differences for now, for example in PATH, etc
                 //        if (strcmp(oldVar->Value, newVar->Value) != 0)
                 //          TRACE_I("DIFF: " << oldVar->Name << " = "<<oldVar->Value<<" : "<<newVar->Value);
                 //        else
@@ -296,8 +296,8 @@ void CEnvVariables::ApplyDifferencesToCurrentProcess(CEnvVariables* diffVars)
             SetEnvironmentVariable(var->Name, var->Type == ENVVARTYPE_ADD ? var->Value : NULL);
     }
 #ifndef _WIN64
-    // HACK: obchazime chybu, kterou MS sekli a zatim neopravili (podle nejakeho vyjadreni na webu)
-    // nastava u x86 procesu bezicich na x64 Windows, kde reload chybne nastavi hodnotu na AMD64
+    // HACK: working around a bug that MS made and haven't fixed yet (according to some statement on the web)
+    // occurs with x86 processes running on x64 Windows, where reload incorrectly sets the value to AMD64
     SetEnvironmentVariable("PROCESSOR_ARCHITECTURE", "x86");
 #endif // _WIN64
 }
@@ -308,21 +308,21 @@ void InitEnvironmentVariablesDifferences()
 {
     CALL_STACK_MESSAGE1("InitEnvironmentVariablesDifferences()");
 
-    // ulozime uvodni stav env. promennych
+    // save initial state of env. variables
     CEnvVariables oldVars;
     oldVars.LoadFromProcess();
 
-    // pozadame system o reload, ktery nektere promenne zahodi
+    // ask system for reload, which discards some variables
     RegenerateUserEnvironment();
 
-    // vytahneme aktualni stav promennych
+    // extract current state of variables
     CEnvVariables newVars;
     newVars.LoadFromProcess();
 
-    // porovname starou a novou verzi promennych a vysledny DIFF ulozime do EnvVariablesDiff
+    // compare old and new version of variables and save resulting DIFF to EnvVariablesDiff
     EnvVariablesDiff.FindDifferences(&oldVars, &newVars);
 
-    // na zaklade noveho stavu a diferenci zmenime promenne naseho procesu
+    // based on new state and differences, change our process's variables
     newVars.ApplyDifferencesToCurrentProcess(&EnvVariablesDiff);
 
     EnvVariablesDifferencesFound = TRUE;
@@ -338,14 +338,14 @@ void RegenEnvironmentVariables()
         return;
     }
 
-    // pozadame system o reload env. promennych
+    // ask system to reload env. variables
     RegenerateUserEnvironment();
 
-    // vytahneme jejich aktualni stav
+    // extract their current state
     CEnvVariables newVars;
     newVars.LoadFromProcess();
 
-    // na jeho zaklade pomoci diferenci sejmutych pri startu Salamandera 'opatchujeme' nas proces
+    // based on it, using differences captured at Salamander startup, we 'patch' our process
     newVars.ApplyDifferencesToCurrentProcess(&EnvVariablesDiff);
 }
 
@@ -353,11 +353,11 @@ void RegenEnvironmentVariables()
 //
 // IsPathOnSSD
 //
-// Inspirace: http://stackoverflow.com/questions/23363115/detecting-ssd-in-windows/33359142#33359142
-//            http://nyaruru.hatenablog.com/entry/2012/09/29/063829
+// Inspiration: http://stackoverflow.com/questions/23363115/detecting-ssd-in-windows/33359142#33359142
+//              http://nyaruru.hatenablog.com/entry/2012/09/29/063829
 //
 
-// nepotrebuje prava administratora
+// does not require administrator rights
 BOOL QueryVolumeTRIM(const char* volume, BOOL* trim)
 {
     BOOL ret = FALSE;
@@ -387,7 +387,7 @@ BOOL QueryVolumeTRIM(const char* volume, BOOL* trim)
     return ret;
 }
 
-// nepotrebuje prava administratora
+// does not require administrator rights
 BOOL QueryVolumeSeekPenalty(const char* volume, BOOL* seekPenalty)
 {
     BOOL ret = FALSE;
@@ -417,8 +417,8 @@ BOOL QueryVolumeSeekPenalty(const char* volume, BOOL* seekPenalty)
     return ret;
 }
 
-// pro beh potrebuje admin prava
-// pro SSD by mel vracet hodnotu *rpm == 1
+// requires admin rights to run
+// for SSD should return value *rpm == 1
 BOOL QueryVolumeATARPM(const char* volume, WORD* rpm)
 {
     BOOL ret = FALSE;
@@ -481,7 +481,7 @@ BOOL IsPathOnSSD(const char* path)
     guidPath[0] = 0;
     if (GetResolvedPathMountPointAndGUID(path, NULL, guidPath))
     {
-        SalPathRemoveBackslash(guidPath); // nasledujicim CreateFile vadilo zpetne lomitko za volumem
+        SalPathRemoveBackslash(guidPath); // the following CreateFile was bothered by the backslash after volume
         BOOL trim = FALSE;
         if (QueryVolumeTRIM(guidPath, &trim))
             TRACE_I("QueryVolumeTRIM: " << trim);
@@ -507,7 +507,7 @@ BOOL GetResolvedPathMountPointAndGUID(const char* path, char* mountPoint, char* 
     char rootPath[MAX_PATH];
     GetRootPath(rootPath, resolvedPath);
     BOOL remotePath = TRUE;
-    if (!IsUNCPath(rootPath) && GetDriveType(rootPath) == DRIVE_FIXED) // reparse pointy ma smysl hledat jen na fixed discich
+    if (!IsUNCPath(rootPath) && GetDriveType(rootPath) == DRIVE_FIXED) // reparse points make sense to look for only on fixed disks
     {
         BOOL cutPathIsPossible = TRUE;
         char netPath[MAX_PATH];
@@ -515,7 +515,7 @@ BOOL GetResolvedPathMountPointAndGUID(const char* path, char* mountPoint, char* 
         ResolveLocalPathWithReparsePoints(resolvedPath, path, &cutPathIsPossible, NULL, NULL, NULL, NULL, netPath);
         remotePath = netPath[0] != 0;
 
-        // pro GetVolumeNameForVolumeMountPoint potrebujeme root
+        // for GetVolumeNameForVolumeMountPoint we need root
         if (cutPathIsPossible)
         {
             GetRootPath(rootPath, resolvedPath);
@@ -523,12 +523,12 @@ BOOL GetResolvedPathMountPointAndGUID(const char* path, char* mountPoint, char* 
         }
     }
     else
-        strcpy(resolvedPath, rootPath); // pro non-DRIVE_FIXED disky bereme root cestu, GetVolumeNameForVolumeMountPoint potrebuje mount point a hledat ho postupne zkracovanim cesty mi zatim pripada casove prilis narocne (aspon u sitovych cest + u karet snad mount pointy v podadresarich nehrozi, ne?)
-    // ziskat GUID lze i pro non-DRIVE_FIXED disky, napriklad ctecky karet
-    // podle https://msdn.microsoft.com/en-us/library/windows/desktop/aa364996%28v=vs.85%29.aspx zatim neni podpora pro DRIVE_REMOTE,
-    // ale i to asi muze potencialne prijit
+        strcpy(resolvedPath, rootPath); // for non-DRIVE_FIXED disks we take root path, GetVolumeNameForVolumeMountPoint needs mount point and searching for it by gradually shortening the path seems too time-consuming for now (at least for network paths + for cards there shouldn't be mount points in subdirectories, right?)
+    // GUID can be obtained even for non-DRIVE_FIXED disks, for example card readers
+    // according to https://msdn.microsoft.com/en-us/library/windows/desktop/aa364996%28v=vs.85%29.aspx there is no support for DRIVE_REMOTE yet,
+    // but that could potentially come too
     char guidP[MAX_PATH];
-    SalPathAddBackslash(resolvedPath, MAX_PATH); // GetVolumeNameForVolumeMountPoint vyzaduje na konci backslash
+    SalPathAddBackslash(resolvedPath, MAX_PATH); // GetVolumeNameForVolumeMountPoint requires backslash at the end
     if (GetVolumeNameForVolumeMountPoint(resolvedPath, guidP, sizeof(guidP)))
     {
         if (mountPoint != NULL)
@@ -542,7 +542,7 @@ BOOL GetResolvedPathMountPointAndGUID(const char* path, char* mountPoint, char* 
     }
     else
     {
-        if (!remotePath) // pro sitove cesty to zatim vraci chyby bezne = nebudeme to hlasit, nebudeme prudit
+        if (!remotePath) // for network paths it currently returns errors normally = we won't report it, we won't annoy users
         {
             DWORD err = GetLastError();
             TRACE_E("GetResolvedPathMountPointAndGUID(): GetVolumeNameForVolumeMountPoint() failed: " << GetErrorText(err));

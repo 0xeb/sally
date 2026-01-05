@@ -241,10 +241,85 @@ set_target_properties(salmon PROPERTIES
 )
 
 # ==============================================================================
+# Helper Utilities: salspawn.exe, salopen.exe (minimal, no CRT)
+# ==============================================================================
+
+# salspawn - Process spawning helper (console)
+add_executable(salspawn
+  "${SAL_SRC}/common/lstrfix.cpp"
+  "${SAL_SRC}/salspawn/salspawn.cpp"
+  "${SAL_SRC}/salspawn/salspawn.rc"
+)
+
+target_include_directories(salspawn PRIVATE
+  "${SAL_SRC}/salspawn"
+  "${SAL_SRC}/common"
+)
+
+target_compile_definitions(salspawn PRIVATE
+  WIN32 _CONSOLE
+  WINVER=0x0601 _WIN32_WINNT=0x0601 _WIN32_IE=0x0800
+  LSTRFIX_WITHOUT_RTL NDEBUG
+)
+
+if(MSVC)
+  # Disable /GL (whole program optimization) - conflicts with no CRT
+  target_compile_options(salspawn PRIVATE /MP /W3 /MT /GS- /GL-)
+  target_link_options(salspawn PRIVATE
+    /SUBSYSTEM:CONSOLE
+    /MANIFEST:NO
+    /NODEFAULTLIB
+    /ENTRY:mainCRTStartup
+  )
+  target_link_libraries(salspawn PRIVATE kernel32 user32 shell32)
+endif()
+
+set_target_properties(salspawn PROPERTIES
+  RUNTIME_OUTPUT_DIRECTORY "${SAL_OUTPUT_BASE}/$<CONFIG>_${SAL_PLATFORM}/utils"
+)
+
+# salopen - Open files helper (windows)
+add_executable(salopen
+  "${SAL_SRC}/common/lstrfix.cpp"
+  "${SAL_SRC}/salopen/salopen.cpp"
+  "${SAL_SRC}/salopen/salopen.rc"
+)
+
+target_include_directories(salopen PRIVATE
+  "${SAL_SRC}/salopen"
+  "${SAL_SRC}/common"
+)
+
+target_compile_definitions(salopen PRIVATE
+  WIN32 _CONSOLE
+  WINVER=0x0601 _WIN32_WINNT=0x0601 _WIN32_IE=0x0800
+  LSTRFIX_WITHOUT_RTL NDEBUG
+)
+
+if(MSVC)
+  # Disable /GL (whole program optimization) - conflicts with no CRT
+  target_compile_options(salopen PRIVATE /MP /W3 /MT /GS- /GL-)
+  target_link_options(salopen PRIVATE
+    /SUBSYSTEM:WINDOWS
+    /MANIFEST:NO
+    /NODEFAULTLIB
+    /ENTRY:WinMainCRTStartup
+  )
+  target_link_libraries(salopen PRIVATE kernel32 user32 shell32)
+endif()
+
+set_target_properties(salopen PROPERTIES
+  RUNTIME_OUTPUT_DIRECTORY "${SAL_OUTPUT_BASE}/$<CONFIG>_${SAL_PLATFORM}/utils"
+)
+
+# ==============================================================================
 # Plugins
 # ==============================================================================
 
 include(${CMAKE_CURRENT_SOURCE_DIR}/cmake/targets/plugins.cmake)
+
+# 7-Zip plugin with dependencies (7za.dll, 7zwrapper.dll)
+include(${CMAKE_CURRENT_SOURCE_DIR}/cmake/targets/7zip.cmake)
 
 # ==============================================================================
 # Installation Rules
@@ -256,8 +331,8 @@ include(GNUInstallDirs)
 # Main executable
 sal_install_main(salamander)
 
-# Bug reporter goes in utils/
-install(TARGETS salmon RUNTIME DESTINATION utils)
+# Utils go in utils/
+install(TARGETS salmon salspawn salopen RUNTIME DESTINATION utils)
 
 # MSVC runtime
 sal_install_runtime()
@@ -284,7 +359,7 @@ sal_install_resources()
 sal_create_populate_target()
 
 # Ensure populate depends on main targets
-add_dependencies(populate salamander salmon sal_lang_english)
+add_dependencies(populate salamander salmon salspawn salopen sal_lang_english)
 
 # ==============================================================================
 # Tests
