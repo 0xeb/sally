@@ -133,6 +133,7 @@
 // 102 = 4.00b1 (DB177) only to transfer plug-in configuration from version 4.00b1 (DB171)
 // 103 = 4.00           only to transfer plug-in configuration from version 4.00b1 (DB177)
 // 104 = 5.00           only to transfer plug-in configuration from version 4.00, first Open Salamander release
+// 105 = 5.04           force plugin auto-install after config import from 4.00
 //
 // When increasing configuration version, add one to THIS_CONFIG_VERSION
 //
@@ -140,7 +141,7 @@
 // so that new plug-ins are auto-installed and the plugins.ver counter resets.
 //
 
-const DWORD THIS_CONFIG_VERSION = 104;
+const DWORD THIS_CONFIG_VERSION = 105;
 
 // Configuration roots for individual Open Salamander versions.
 // The root of the current (youngest) configuration is at index 0.
