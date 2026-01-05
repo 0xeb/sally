@@ -40,8 +40,10 @@ target_link_libraries(7za PRIVATE
 if(MSVC)
   target_compile_options(7za PRIVATE
     /MP
+    /wd4005  # Macro redefinition
     /wd4456 /wd4457 /wd4458  # Shadowing warnings
     /wd4267  # Size conversion
+    /wd5043  # Exception specification mismatch (third-party code)
     /Gz  # __stdcall
   )
   target_link_options(7za PRIVATE
