@@ -10,6 +10,14 @@ CCS DialogStackCS;
 // TODO: use it!
 BOOL MinBeepWhenDone;
 
+// Last used Counter dialog settings (persisted to registry)
+int LastCounterStart = 0;
+double LastCounterStep = 1.0;
+int LastCounterBase = 'd';
+int LastCounterMinWidth = 0;
+int LastCounterFill = ' ';
+BOOL LastCounterLeft = FALSE;
+
 HICON
 GetSH32DirIcon()
 {
@@ -632,9 +640,13 @@ void CAddCounterDialog::Validate(CTransferInfo& ti)
 void CAddCounterDialog::Transfer(CTransferInfo& ti)
 {
     CALL_STACK_MESSAGE1("CAddCounterDialog::Transfer()");
-    int start = 0, base = 'd', minwidth = 0, fill = ' ';
-    double step = 1;
-    BOOL left = FALSE;
+    // Use last-used values (persisted to registry) instead of hardcoded defaults
+    int start = LastCounterStart;
+    int base = LastCounterBase;
+    int minwidth = LastCounterMinWidth;
+    int fill = LastCounterFill;
+    double step = LastCounterStep;
+    BOOL left = LastCounterLeft;
     char stepStr[100];
 
     ti.EditLine(IDE_START, start);
@@ -668,6 +680,14 @@ void CAddCounterDialog::Transfer(CTransferInfo& ti)
         SG->MultiMonCenterWindow(HWindow, Parent, FALSE);
     else
     {
+        // Save current values for next dialog open
+        LastCounterStart = start;
+        LastCounterStep = step;
+        LastCounterBase = base;
+        LastCounterMinWidth = minwidth;
+        LastCounterFill = fill;
+        LastCounterLeft = left;
+
         int i = 0;
         if (start > 0 || step != 1 || base != 'd' || minwidth > 0)
             i += sprintf(Buffer, "%d", start);

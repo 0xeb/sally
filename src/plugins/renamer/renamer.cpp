@@ -326,6 +326,18 @@ void CPluginInterface::LoadConfiguration(HWND parent, HKEY regKey, CSalamanderRe
             registry->CloseKey(subKey);
         }
 
+        // Counter dialog settings
+        if (registry->OpenKey(regKey, "Counter", subKey))
+        {
+            registry->GetValue(subKey, "Start", REG_DWORD, &LastCounterStart, sizeof(int));
+            registry->GetValue(subKey, "Step", REG_BINARY, &LastCounterStep, sizeof(double));
+            registry->GetValue(subKey, "Base", REG_DWORD, &LastCounterBase, sizeof(int));
+            registry->GetValue(subKey, "MinWidth", REG_DWORD, &LastCounterMinWidth, sizeof(int));
+            registry->GetValue(subKey, "Fill", REG_DWORD, &LastCounterFill, sizeof(int));
+            registry->GetValue(subKey, "Left", REG_DWORD, &LastCounterLeft, sizeof(BOOL));
+            registry->CloseKey(subKey);
+        }
+
         registry->GetValue(regKey, CONFIG_COMMAND, REG_SZ, Command, MAX_PATH);
         registry->GetValue(regKey, CONFIG_ARGUMENTS, REG_SZ, Arguments, MAX_PATH);
         registry->GetValue(regKey, CONFIG_INITDIR, REG_SZ, InitDir, MAX_PATH);
@@ -404,6 +416,17 @@ void CPluginInterface::SaveConfiguration(HWND parent, HKEY regKey, CSalamanderRe
         registry->SetValue(subKey, CONFIG_LASTSUBDIRS, REG_DWORD, &LastSubdirs, sizeof(BOOL));
         registry->SetValue(subKey, CONFIG_LASTREMOVESOURCE, REG_DWORD,
                            &LastRemoveSourcePath, sizeof(BOOL));
+        registry->CloseKey(subKey);
+    }
+    // Counter dialog settings
+    if (registry->CreateKey(regKey, "Counter", subKey))
+    {
+        registry->SetValue(subKey, "Start", REG_DWORD, &LastCounterStart, sizeof(int));
+        registry->SetValue(subKey, "Step", REG_BINARY, &LastCounterStep, sizeof(double));
+        registry->SetValue(subKey, "Base", REG_DWORD, &LastCounterBase, sizeof(int));
+        registry->SetValue(subKey, "MinWidth", REG_DWORD, &LastCounterMinWidth, sizeof(int));
+        registry->SetValue(subKey, "Fill", REG_DWORD, &LastCounterFill, sizeof(int));
+        registry->SetValue(subKey, "Left", REG_DWORD, &LastCounterLeft, sizeof(BOOL));
         registry->CloseKey(subKey);
     }
     registry->SetValue(regKey, CONFIG_COMMAND, REG_SZ, Command, -1);
