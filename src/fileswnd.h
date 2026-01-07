@@ -1312,13 +1312,14 @@ public:
                         DWORD sourceDirAttr, CChangeCaseData* chCaseData, BOOL firstLevelDir,
                         BOOL onlySize, BOOL fastDirectoryMove, CCriteriaData* filterCriteria,
                         BOOL* canDelUpperDirAfterMove, FILETIME* sourceDirTime,
-                        DWORD srcAndTgtPathsFlags);
+                        DWORD srcAndTgtPathsFlags, wchar_t* dirNameW = NULL);
     BOOL BuildScriptFile(COperations* script, CActionType type, char* sourcePath,
                          BOOL sourcePathSupADS, char* targetPath, CTargetPathState targetPathState,
                          BOOL targetPathSupADS, BOOL targetPathIsFAT32, char* mask, char* fileName,
                          char* fileDOSName, const CQuadWord& fileSize, CAttrsData* attrsData,
                          char* mapName, DWORD sourceFileAttr, CChangeCaseData* chCaseData,
-                         BOOL onlySize, FILETIME* fileLastWriteTime, DWORD srcAndTgtPathsFlags);
+                         BOOL onlySize, FILETIME* fileLastWriteTime, DWORD srcAndTgtPathsFlags,
+                         wchar_t* fileNameW = NULL);
     BOOL BuildScriptMain2(COperations* script, BOOL copy, char* targetDir,
                           CCopyMoveData* data);
 

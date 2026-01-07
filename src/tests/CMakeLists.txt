@@ -28,3 +28,26 @@ add_test(NAME longpath_test COMMAND test_longpath)
 set_target_properties(test_longpath PROPERTIES
     RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/tests"
 )
+
+# Operations test - tests COperation container behavior with std::vector
+add_executable(test_operations
+    test_operations.cpp
+)
+
+target_compile_definitions(test_operations PRIVATE
+    WIN32
+    _WINDOWS
+    _CRT_SECURE_NO_WARNINGS
+)
+
+target_link_libraries(test_operations PRIVATE
+    kernel32
+)
+
+# Register with CTest
+add_test(NAME operations_test COMMAND test_operations)
+
+# Output to tests directory
+set_target_properties(test_operations PROPERTIES
+    RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/tests"
+)

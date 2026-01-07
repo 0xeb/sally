@@ -181,16 +181,20 @@ public:
 // zaznam pouzity v datech pro copy a move callback
 struct CCopyMoveRecord
 {
-    char* FileName;
+    char* FileName;     // ANSI filename (may have lossy conversion for Unicode names)
     char* MapName;
+    wchar_t* FileNameW; // Wide filename (preserved for Unicode support, NULL if not needed)
 
     CCopyMoveRecord(const char* fileName, const char* mapName);
     CCopyMoveRecord(const wchar_t* fileName, const char* mapName);
     CCopyMoveRecord(const char* fileName, const wchar_t* mapName);
     CCopyMoveRecord(const wchar_t* fileName, const wchar_t* mapName);
+    ~CCopyMoveRecord();
 
     char* AllocChars(const char* name);
     char* AllocChars(const wchar_t* name);
+    wchar_t* AllocWideChars(const wchar_t* name);
+    bool HasWideFileName() const { return FileNameW != NULL; }
 };
 
 // data pro copy a move callback

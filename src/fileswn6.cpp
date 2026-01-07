@@ -640,6 +640,17 @@ BOOL CFilesWindow::BuildScriptMain2(COperations* script, BOOL copy, char* target
     {
         char* fileName = data->At(i)->FileName;
         char* mapName = data->At(i)->MapName;
+        wchar_t* fileNameW = data->At(i)->FileNameW;  // Wide filename for Unicode support
+
+        // Extract just the filename part from the wide path (if available)
+        wchar_t* wideNameOnly = NULL;
+        if (fileNameW != NULL)
+        {
+            wchar_t* sw = fileNameW + lstrlenW(fileNameW);
+            while (--sw >= fileNameW && *sw != L'\\')
+                ;
+            wideNameOnly = sw + 1;  // Points to just the filename
+        }
 
         DWORD attrs = SalGetFileAttributes(fileName);
         if (attrs != 0xFFFFFFFF)
@@ -913,7 +924,8 @@ BOOL CFilesWindow::BuildScriptMain2(COperations* script, BOOL copy, char* target
                     if (!BuildScriptDir(script, type, sourcePath, sourceSupADS, targetPath,
                                         targetPathState, targetSupADS, targetIsFAT32, NULL,
                                         s + 1, NULL, NULL, mapName, attrs, NULL, TRUE, TRUE,
-                                        fastDirectoryMove, NULL, NULL, NULL, srcAndTgtPathsFlags))
+                                        fastDirectoryMove, NULL, NULL, NULL, srcAndTgtPathsFlags,
+                                        wideNameOnly))
                     {
                         SetCurrentDirectoryToSystem();
                         if (usedNames != NULL)
@@ -938,7 +950,7 @@ BOOL CFilesWindow::BuildScriptMain2(COperations* script, BOOL copy, char* target
                             if (!BuildScriptFile(script, type, sourcePath, sourceSupADS, targetPath,
                                                  targetPathState, targetSupADS, targetIsFAT32, NULL,
                                                  s + 1, NULL, size, NULL, mapName, attrs, NULL, TRUE,
-                                                 NULL, srcAndTgtPathsFlags))
+                                                 NULL, srcAndTgtPathsFlags, wideNameOnly))
                             {
                                 SetCurrentDirectoryToSystem();
                                 if (usedNames != NULL)
@@ -1343,12 +1355,14 @@ BOOL CFilesWindow::BuildScriptMain(COperations* script, CActionType type,
                     {
                         oldTotalSize = script->TotalSize;
                     }
+                    // Pass wide name if available for Unicode filename support
+                    wchar_t* useNameW = oneFile->NameW.empty() ? NULL : const_cast<wchar_t*>(oneFile->NameW.c_str());
                     if (!BuildScriptDir(script, type, sourcePath, sourceSupADS, targetPath,
                                         targetPathState, targetSupADS, targetIsFAT32, mask,
                                         useName, useDOSName, attrsData, NULL, oneFile->Attr,
                                         chCaseData, TRUE, onlySize, fastDirectoryMove,
                                         filterCriteria, NULL, &oneFile->LastWrite,
-                                        srcAndTgtPathsFlags))
+                                        srcAndTgtPathsFlags, useNameW))
                     {
                         SetCurrentDirectoryToSystem();
                         return FALSE;
@@ -1383,6 +1397,7 @@ BOOL CFilesWindow::BuildScriptMain(COperations* script, CActionType type,
                             if ((op.TargetName = BuildName(sourcePath, oneFile->Name)) == NULL) // too long name already handled by previous condition
                             {
                                 free(op.SourceName);
+                                op.SourceName = NULL;
                                 SetCurrentDirectoryToSystem();
                                 return FALSE;
                             }
@@ -1395,7 +1410,9 @@ BOOL CFilesWindow::BuildScriptMain(COperations* script, CActionType type,
                             if (sameName || !script->IsGood())
                             {
                                 free(op.SourceName);
+                                op.SourceName = NULL;
                                 free(op.TargetName);
+                                op.TargetName = NULL;
                                 if (!sameName)
                                 {
                                     script->ResetState();
@@ -1411,11 +1428,13 @@ BOOL CFilesWindow::BuildScriptMain(COperations* script, CActionType type,
             {
                 if (filterCriteria == NULL || filterCriteria->AgreeMasksAndAdvanced(oneFile))
                 {
+                    // Pass wide name if available for Unicode filename support
+                    wchar_t* useNameW = oneFile->NameW.empty() ? NULL : const_cast<wchar_t*>(oneFile->NameW.c_str());
                     if (!BuildScriptFile(script, type, sourcePath, sourceSupADS, targetPath,
                                          targetPathState, targetSupADS, targetIsFAT32, mask,
                                          useName, useDOSName, oneFile->Size, attrsData, NULL,
                                          oneFile->Attr, chCaseData, onlySize, NULL,
-                                         srcAndTgtPathsFlags))
+                                         srcAndTgtPathsFlags, useNameW))
                     {
                         SetCurrentDirectoryToSystem();
                         return FALSE;
@@ -1507,7 +1526,7 @@ BOOL CFilesWindow::BuildScriptDir(COperations* script, CActionType type, char* s
                                   DWORD sourceDirAttr, CChangeCaseData* chCaseData, BOOL firstLevelDir,
                                   BOOL onlySize, BOOL fastDirectoryMove, CCriteriaData* filterCriteria,
                                   BOOL* canDelUpperDirAfterMove, FILETIME* sourceDirTime,
-                                  DWORD srcAndTgtPathsFlags)
+                                  DWORD srcAndTgtPathsFlags, wchar_t* dirNameW)
 {
     SLOW_CALL_STACK_MESSAGE16("CFilesWindow::BuildScriptDir(, %d, %s, %d, %s, %d, %d, %d, %s, %s, , , %s, 0x%X, , %d, %d, %d, , , , 0x%X)",
                               type, sourcePath, sourcePathSupADS, targetPath,
@@ -1530,8 +1549,9 @@ BOOL CFilesWindow::BuildScriptDir(COperations* script, CActionType type, char* s
     }
     else
         st = sourceEnd;
-    if (st - sourcePath + strlen(dirName) >= MAX_PATH - 2) // -2 determined experimentally (longer paths cannot be listed)
-    {                                                      // data are on disk, which doesn't mean they can't exceed MAX_PATH
+    // With wide path support (\\?\), we can handle paths up to SAL_MAX_LONG_PATH (32767)
+    if (st - sourcePath + strlen(dirName) >= SAL_MAX_LONG_PATH - 2)
+    {
         *sourceEnd = 0;                                    // restoring original sourcePath
         _snprintf_s(text, _TRUNCATE, LoadStr(IDS_NAMEISTOOLONG), dirName, sourcePath);
         BOOL skip = TRUE;
@@ -1598,7 +1618,8 @@ MENU_TEMPLATE_ITEM MsgBoxButtons[] =
         }
         else
             s2 = mapName;
-        if (strlen(s2) + targetLen >= PATH_MAX_PATH)
+        // With wide path support (\\?\), we can handle paths up to SAL_MAX_LONG_PATH (32767)
+        if (strlen(s2) + targetLen >= SAL_MAX_LONG_PATH)
         {
             *sourceEnd = 0; // restoring sourcePath
             *targetEnd = 0; // restoring targetPath
@@ -1661,6 +1682,7 @@ MENU_TEMPLATE_ITEM MsgBoxButtons[] =
         {
             script->ResetState();
             free(op.SourceName);
+            op.SourceName = NULL;
             return FALSE;
         }
         else
@@ -1730,6 +1752,7 @@ MENU_TEMPLATE_ITEM MsgBoxButtons[] =
                 if ((op.TargetName = BuildName(targetPath, NULL)) == NULL)
                 {
                     free(op.SourceName);
+                    op.SourceName = NULL;
                     goto _ERROR;
                 }
                 *sourceEnd = 0; // restoring sourcePath
@@ -1739,7 +1762,9 @@ MENU_TEMPLATE_ITEM MsgBoxButtons[] =
                 {
                     script->ResetState();
                     free(op.SourceName);
+                    op.SourceName = NULL;
                     free(op.TargetName);
+                    op.TargetName = NULL;
                     return FALSE;
                 }
                 else
@@ -1800,13 +1825,16 @@ MENU_TEMPLATE_ITEM MsgBoxButtons[] =
                         if ((op.TargetName = BuildName(targetPath, NULL)) == NULL)
                         {
                             free(op.SourceName);
+                            op.SourceName = NULL;
                             goto _ERROR;
                         }
                         createDirIndex = script->Add(op);
                         if (!script->IsGood())
                         {
                             free(op.SourceName);
+                            op.SourceName = NULL;
                             free(op.TargetName);
+                            op.TargetName = NULL;
                             script->ResetState();
                             goto _ERROR;
                         }
@@ -1965,6 +1993,7 @@ MENU_TEMPLATE_ITEM MsgBoxButtons[] =
             if ((op.TargetName = BuildName(targetPath, NULL)) == NULL)
             {
                 free(op.SourceName);
+                op.SourceName = NULL;
                 goto _ERROR;
             }
             createDirIndex = script->Add(op);
@@ -1972,7 +2001,9 @@ MENU_TEMPLATE_ITEM MsgBoxButtons[] =
             {
                 script->ResetState();
                 free(op.SourceName);
+                op.SourceName = NULL;
                 free(op.TargetName);
+                op.TargetName = NULL;
                 goto _ERROR;
             }
         }
@@ -1990,11 +2021,13 @@ MENU_TEMPLATE_ITEM MsgBoxButtons[] =
             return FALSE;
         }
         op.TargetName = (char*)(DWORD_PTR)((sourceDirAttr & attrsData->AttrAnd) | attrsData->AttrOr);
+        op.OwnsTargetName = false;  // TargetName stores attributes, not a pointer
         script->Add(op);
         if (!script->IsGood())
         {
             script->ResetState();
             free(op.SourceName);
+            op.SourceName = NULL;
             *sourceEnd = 0; // restoring sourcePath
             return FALSE;
         }
@@ -2296,6 +2329,7 @@ MENU_TEMPLATE_ITEM MsgBoxButtons[] =
         if ((op.TargetName = BuildName(sourcePath, dirName)) == NULL) // overly long name not a concern here, previous condition would handle it
         {
             free(op.SourceName);
+            op.SourceName = NULL;
             return FALSE;
         }
         int offset = (int)strlen(op.SourceName) - (int)strlen(dirName);
@@ -2307,7 +2341,9 @@ MENU_TEMPLATE_ITEM MsgBoxButtons[] =
         if (sameName || !script->IsGood())
         {
             free(op.SourceName);
+            op.SourceName = NULL;
             free(op.TargetName);
+            op.TargetName = NULL;
             if (!sameName)
             {
                 script->ResetState();
@@ -2347,6 +2383,7 @@ MENU_TEMPLATE_ITEM MsgBoxButtons[] =
             op.OpFlags = 0;
             op.Size = CHATTRS_FILE_SIZE;
             op.SourceName = sourceDirTime != NULL ? (char*)(DWORD_PTR)sourceDirTime->dwLowDateTime : NULL;
+            op.OwnsSourceName = false;  // SourceName stores timestamp, not a pointer
             op.TargetName = DupStr(script->At(createDirIndex).TargetName);
             if (op.TargetName == NULL)
                 return FALSE;
@@ -2389,6 +2426,7 @@ MENU_TEMPLATE_ITEM MsgBoxButtons[] =
                 {
                     script->ResetState();
                     free(op.SourceName);
+                    op.SourceName = NULL;
                     return FALSE;
                 }
             }
@@ -2403,6 +2441,8 @@ MENU_TEMPLATE_ITEM MsgBoxButtons[] =
             CQuadWord dirSize = script->TotalFileSize - dirStartTotalFileSize;
             op.SourceName = (char*)(DWORD_PTR)dirSize.LoDWord;
             op.TargetName = (char*)(DWORD_PTR)dirSize.HiDWord;
+            op.OwnsSourceName = false;  // SourceName stores size LoDWord, not a pointer
+            op.OwnsTargetName = false;  // TargetName stores size HiDWord, not a pointer
             op.Attr = createDirIndex;
 
             script->Add(op);
@@ -2472,7 +2512,8 @@ BOOL CFilesWindow::BuildScriptFile(COperations* script, CActionType type, char* 
                                    char* fileDOSName, const CQuadWord& fileSize,
                                    CAttrsData* attrsData, char* mapName, DWORD sourceFileAttr,
                                    CChangeCaseData* chCaseData, BOOL onlySize,
-                                   FILETIME* fileLastWriteTime, DWORD srcAndTgtPathsFlags)
+                                   FILETIME* fileLastWriteTime, DWORD srcAndTgtPathsFlags,
+                                   wchar_t* fileNameW)
 {
     SLOW_CALL_STACK_MESSAGE14("CFilesWindow::BuildScriptFile(, %d, %s, %d, %s, %d, %d, %d, %s, %s, , , , %s, 0x%X, , %d, , 0x%X)",
                               type, sourcePath, sourcePathSupADS, targetPath, targetPathState, targetPathSupADS,
@@ -2540,6 +2581,7 @@ MENU_TEMPLATE_ITEM MsgBoxButtons[] =
                     ErrTooBigFileFAT32SkipAll = TRUE;
             }
             free(op.SourceName);
+            op.SourceName = NULL;
             return (msgRes == DIALOG_YES /* Skip */ || msgRes == DIALOG_NO /* Skip All */);
         }
         char finalName[2 * MAX_PATH + 200]; // +200 is a reserve (Windows creates paths longer than MAX_PATH)
@@ -2554,6 +2596,7 @@ MENU_TEMPLATE_ITEM MsgBoxButtons[] =
                                            NULL, &skip, &ErrTooLongTgtNameSkipAll, sourcePath)) == NULL)
             {
                 free(op.SourceName);
+                op.SourceName = NULL;
                 return skip;
             }
         }
@@ -2563,14 +2606,27 @@ MENU_TEMPLATE_ITEM MsgBoxButtons[] =
                                            &ErrTooLongTgtNameSkipAll, sourcePath)) == NULL)
             {
                 free(op.SourceName);
+                op.SourceName = NULL;
                 return skip;
             }
         }
+
+        // Set wide paths early (before ADS handling) if Unicode filename is provided
+        if (fileNameW != NULL)
+        {
+            op.SetSourceNameW(sourcePath, fileNameW);
+            // For target, use the same wide filename if mask is NULL or "*.*"
+            if (mapName == NULL && (mask == NULL || strcmp(mask, "*.*") == 0))
+                op.SetTargetNameW(targetPath, fileNameW);
+        }
+
         if (type == atMove && strcmp(op.SourceName, op.TargetName) == 0 ||
             type == atCopy && StrICmp(op.SourceName, op.TargetName) == 0)
         {
             free(op.SourceName);
+            op.SourceName = NULL;
             free(op.TargetName);
+            op.TargetName = NULL;
             if (type == atMove) // moving where it already is ...
             {
                 SalMessageBox(MainWindow->HWindow, LoadStr(IDS_CANNOTMOVEFILETOITSELF),
@@ -2624,7 +2680,9 @@ MENU_TEMPLATE_ITEM MsgBoxButtons[] =
                             if (CompareFileTime(&roundedInTime, &dataOut.ftLastWriteTime) <= 0) // source file is not newer than the target one - skip the copy operation
                             {
                                 free(op.SourceName);
+                                op.SourceName = NULL;
                                 free(op.TargetName);
+                                op.TargetName = NULL;
                                 return TRUE;
                             }
                             op.OpFlags |= OPFL_OVERWROLDERALRTESTED;
@@ -2662,8 +2720,12 @@ MENU_TEMPLATE_ITEM MsgBoxButtons[] =
             else
                 op.Size = COPY_MIN_FILE_SIZE; // zero/small files take at least as long as files of size COPY_MIN_FILE_SIZE
 
-            if (sourcePathSupADS &&                       // if there's a chance that ADS will be found and
-                (targetPathSupADS || !ConfirmADSLossAll)) // if ADS should not be ignored
+            // Skip ADS check for Unicode filenames - the ANSI path has lossy conversion (e.g. "??" for Korean)
+            // and CheckFileOrDirADS uses ANSI APIs that won't find the file. ADS copying will be skipped.
+            // TODO: Add CheckFileOrDirADSW for wide path support in the future.
+            if (fileNameW == NULL &&                          // skip ADS for Unicode filenames (ANSI path is invalid)
+                sourcePathSupADS &&                           // if there's a chance that ADS will be found and
+                (targetPathSupADS || !ConfirmADSLossAll))     // if ADS should not be ignored
             {
                 CQuadWord adsSize;
                 CQuadWord adsOccupiedSpace;
@@ -2716,14 +2778,18 @@ MENU_TEMPLATE_ITEM MsgBoxButtons[] =
                         case IDB_SKIP:
                         {
                             free(op.SourceName);
+                            op.SourceName = NULL;
                             free(op.TargetName);
+                            op.TargetName = NULL;
                             return TRUE;
                         }
 
                         case IDCANCEL:
                         {
                             free(op.SourceName);
+                            op.SourceName = NULL;
                             free(op.TargetName);
+                            op.TargetName = NULL;
                             return FALSE;
                         }
                         }
@@ -2742,9 +2808,8 @@ MENU_TEMPLATE_ITEM MsgBoxButtons[] =
                         HANDLE in;
                         if (!invalidSrcName)
                         {
-                            in = HANDLES_Q(CreateFile(op.SourceName, GENERIC_READ,
-                                                      FILE_SHARE_READ | FILE_SHARE_WRITE, NULL,
-                                                      OPEN_EXISTING, FILE_FLAG_SEQUENTIAL_SCAN, NULL));
+                            // Use OpenSourceFile which handles wide paths (Unicode filenames)
+                            in = op.OpenSourceFile(FILE_FLAG_SEQUENTIAL_SCAN);
                         }
                         else
                         {
@@ -2774,7 +2839,9 @@ MENU_TEMPLATE_ITEM MsgBoxButtons[] =
                             case IDCANCEL:
                             {
                                 free(op.SourceName);
+                                op.SourceName = NULL;
                                 free(op.TargetName);
+                                op.TargetName = NULL;
                                 return FALSE;
                             }
                             }
@@ -2803,14 +2870,18 @@ MENU_TEMPLATE_ITEM MsgBoxButtons[] =
                             case IDB_SKIP:
                             {
                                 free(op.SourceName);
+                                op.SourceName = NULL;
                                 free(op.TargetName);
+                                op.TargetName = NULL;
                                 return TRUE;
                             }
 
                             case IDCANCEL:
                             {
                                 free(op.SourceName);
+                                op.SourceName = NULL;
                                 free(op.TargetName);
+                                op.TargetName = NULL;
                                 return FALSE;
                             }
                             }
@@ -2840,7 +2911,9 @@ MENU_TEMPLATE_ITEM MsgBoxButtons[] =
         {
             script->ResetState();
             free(op.SourceName);
+            op.SourceName = NULL;
             free(op.TargetName);
+            op.TargetName = NULL;
             return FALSE;
         }
         else
@@ -2865,6 +2938,7 @@ MENU_TEMPLATE_ITEM MsgBoxButtons[] =
         {
             script->ResetState();
             free(op.SourceName);
+            op.SourceName = NULL;
             return FALSE;
         }
         else
@@ -2969,6 +3043,7 @@ MENU_TEMPLATE_ITEM MsgBoxButtons[] =
         {
             script->ResetState();
             free(op.SourceName);
+            op.SourceName = NULL;
             return FALSE;
         }
         else
@@ -2989,11 +3064,13 @@ MENU_TEMPLATE_ITEM MsgBoxButtons[] =
             return skip;
         }
         op.TargetName = (char*)(DWORD_PTR)((SalGetFileAttributes(op.SourceName) & attrsData->AttrAnd) | attrsData->AttrOr);
+        op.OwnsTargetName = false;  // TargetName stores attributes, not a pointer
         script->Add(op);
         if (!script->IsGood())
         {
             script->ResetState();
             free(op.SourceName);
+            op.SourceName = NULL;
             return FALSE;
         }
         else
@@ -3016,6 +3093,7 @@ MENU_TEMPLATE_ITEM MsgBoxButtons[] =
         if ((op.TargetName = BuildName(sourcePath, fileName)) == NULL) // if the name is too long, it will manifest already at this earlier condition
         {
             free(op.SourceName);
+            op.SourceName = NULL;
             return FALSE;
         }
         int offset = (int)strlen(op.SourceName) - (int)strlen(fileName);
@@ -3027,7 +3105,9 @@ MENU_TEMPLATE_ITEM MsgBoxButtons[] =
         if (sameName || !script->IsGood())
         {
             free(op.SourceName);
+            op.SourceName = NULL;
             free(op.TargetName);
+            op.TargetName = NULL;
             if (!script->IsGood())
                 script->ResetState();
             return sameName;

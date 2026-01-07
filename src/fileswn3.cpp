@@ -529,6 +529,8 @@ BOOL CFilesWindow::ReadDirectory(HWND parent, BOOL isRefresh)
                 //--- wide name (for Unicode filenames not representable in ANSI)
                 if (nameConversionLossy)
                     file.NameW = fileDataW.cFileName;
+                else
+                    file.NameW.clear();  // Reset from previous iteration
 
                 //--- extension
                 if (!Configuration.SortDirsByExt && (fileDataW.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY)) // this is ptDisk

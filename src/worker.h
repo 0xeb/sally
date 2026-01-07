@@ -4,6 +4,9 @@
 
 #pragma once
 
+#include <vector>
+#include <string>
+
 #define CREATE_DIR_SIZE CQuadWord(4096, 0) // operation cost estimates (uncached measurements based on worker thread runtimes)
 #define MOVE_DIR_SIZE CQuadWord(5050, 0)
 #define DELETE_DIR_SIZE CQuadWord(2400, 0)
@@ -220,12 +223,191 @@ struct COperation
     CQuadWord FileSize; // file size, valid only for ocCopyFile and ocMoveFile
     char *SourceName,
         *TargetName;
+    std::wstring SourceNameW;  // Unicode source path (for long path and Unicode filename support)
+    std::wstring TargetNameW;  // Unicode target path (for long path and Unicode filename support)
     DWORD Attr;
     DWORD OpFlags; // combination of OPFL_xxx, see above
+
+    // Ownership flags: true = this struct owns the pointer and should free it
+    // Set to false for special opcodes that repurpose pointer fields for non-pointer data
+    // (ocCopyDirTime stores timestamp in SourceName, ocLabelForSkipOfCreateDir stores size in both,
+    // ocChangeAttrs stores attributes in TargetName)
+    bool OwnsSourceName = true;
+    bool OwnsTargetName = true;
+
+    // Default constructor - initializes pointers to NULL
+    COperation() : Opcode(ocCopyFile), Size(), FileSize(),
+                   SourceName(NULL), TargetName(NULL),
+                   Attr(0), OpFlags(0),
+                   OwnsSourceName(true), OwnsTargetName(true) {}
+
+    // Destructor - frees owned pointers
+    ~COperation()
+    {
+        if (OwnsSourceName && SourceName != NULL)
+            free(SourceName);
+        if (OwnsTargetName && TargetName != NULL)
+            free(TargetName);
+        // std::wstring members are automatically destructed
+    }
+
+    // Copy constructor - deep copy of owned pointers
+    COperation(const COperation& other)
+        : Opcode(other.Opcode), Size(other.Size), FileSize(other.FileSize),
+          SourceNameW(other.SourceNameW), TargetNameW(other.TargetNameW),
+          Attr(other.Attr), OpFlags(other.OpFlags),
+          OwnsSourceName(other.OwnsSourceName), OwnsTargetName(other.OwnsTargetName)
+    {
+        // Deep copy owned pointers, shallow copy non-owned (they store non-pointer data)
+        if (OwnsSourceName && other.SourceName != NULL)
+            SourceName = _strdup(other.SourceName);
+        else
+            SourceName = other.SourceName;
+
+        if (OwnsTargetName && other.TargetName != NULL)
+            TargetName = _strdup(other.TargetName);
+        else
+            TargetName = other.TargetName;
+    }
+
+    // Move constructor - transfer ownership
+    COperation(COperation&& other) noexcept
+        : Opcode(other.Opcode), Size(other.Size), FileSize(other.FileSize),
+          SourceName(other.SourceName), TargetName(other.TargetName),
+          SourceNameW(std::move(other.SourceNameW)), TargetNameW(std::move(other.TargetNameW)),
+          Attr(other.Attr), OpFlags(other.OpFlags),
+          OwnsSourceName(other.OwnsSourceName), OwnsTargetName(other.OwnsTargetName)
+    {
+        // Null out source to prevent double-free
+        other.SourceName = NULL;
+        other.TargetName = NULL;
+    }
+
+    // Copy assignment - deep copy with proper cleanup
+    COperation& operator=(const COperation& other)
+    {
+        if (this != &other)
+        {
+            // Free existing owned pointers
+            if (OwnsSourceName && SourceName != NULL)
+                free(SourceName);
+            if (OwnsTargetName && TargetName != NULL)
+                free(TargetName);
+
+            // Copy all members
+            Opcode = other.Opcode;
+            Size = other.Size;
+            FileSize = other.FileSize;
+            SourceNameW = other.SourceNameW;
+            TargetNameW = other.TargetNameW;
+            Attr = other.Attr;
+            OpFlags = other.OpFlags;
+            OwnsSourceName = other.OwnsSourceName;
+            OwnsTargetName = other.OwnsTargetName;
+
+            // Deep copy owned pointers
+            if (OwnsSourceName && other.SourceName != NULL)
+                SourceName = _strdup(other.SourceName);
+            else
+                SourceName = other.SourceName;
+
+            if (OwnsTargetName && other.TargetName != NULL)
+                TargetName = _strdup(other.TargetName);
+            else
+                TargetName = other.TargetName;
+        }
+        return *this;
+    }
+
+    // Move assignment - transfer ownership with proper cleanup
+    COperation& operator=(COperation&& other) noexcept
+    {
+        if (this != &other)
+        {
+            // Free existing owned pointers
+            if (OwnsSourceName && SourceName != NULL)
+                free(SourceName);
+            if (OwnsTargetName && TargetName != NULL)
+                free(TargetName);
+
+            // Move all members
+            Opcode = other.Opcode;
+            Size = other.Size;
+            FileSize = other.FileSize;
+            SourceName = other.SourceName;
+            TargetName = other.TargetName;
+            SourceNameW = std::move(other.SourceNameW);
+            TargetNameW = std::move(other.TargetNameW);
+            Attr = other.Attr;
+            OpFlags = other.OpFlags;
+            OwnsSourceName = other.OwnsSourceName;
+            OwnsTargetName = other.OwnsTargetName;
+
+            // Null out source to prevent double-free
+            other.SourceName = NULL;
+            other.TargetName = NULL;
+        }
+        return *this;
+    }
+
+    // Helper methods for Unicode path access
+    bool HasWideSource() const { return !SourceNameW.empty(); }
+    bool HasWideTarget() const { return !TargetNameW.empty(); }
+
+    // Populate wide paths from ANSI paths (for long path support)
+    // Note: This just widens the ANSI string. For proper Unicode filename support,
+    // the wide filename must be provided separately via SetSourceNameW/SetTargetNameW.
+    void PopulateWidePathsFromAnsi();
+
+    // Set wide paths with proper Unicode filename
+    // ansiPath: the directory path (ANSI)
+    // wideFileName: the actual Unicode filename (from CFileData::NameW), or empty to widen ANSI
+    void SetSourceNameW(const char* ansiPath, const std::wstring& wideFileName);
+    void SetTargetNameW(const char* ansiPath, const std::wstring& wideFileName);
+
+    // File operation helpers that automatically use wide paths when available
+    HANDLE OpenSourceFile(DWORD flags) const;
+    HANDLE OpenTargetFile(DWORD access, DWORD shareMode, DWORD disposition, DWORD flags) const;
+    HANDLE CreateTargetFileEx(DWORD desiredAccess, DWORD shareMode, DWORD flagsAndAttributes, BOOL* encryptionNotSupported) const;
+    BOOL DeleteTargetFile() const;
+    BOOL SetTargetAttributes(DWORD attrs) const;
+    DWORD GetTargetAttributes() const;
 };
 
-class COperations : public TDirectArray<COperation>
+class COperations
 {
+private:
+    std::vector<COperation> m_ops;  // Operation storage - std::vector handles non-POD types correctly
+
+public:
+    int Count;  // Number of operations (kept in sync with m_ops.size())
+
+    // TDirectArray compatibility methods
+    COperation& At(int index) { return m_ops[index]; }
+    const COperation& At(int index) const { return m_ops[index]; }
+
+    int Add(const COperation& op) {
+        m_ops.push_back(op);
+        // Automatically populate wide paths for long path support
+        m_ops.back().PopulateWidePathsFromAnsi();
+        Count = (int)m_ops.size();
+        return Count - 1;
+    }
+
+    BOOL IsGood() const { return TRUE; }  // std::vector doesn't have error states like TDirectArray
+
+    void ResetState() {}  // No-op: std::vector doesn't have error states
+
+    void Delete(int index) {
+        m_ops.erase(m_ops.begin() + index);
+        Count = (int)m_ops.size();
+    }
+
+    void DestroyMembers() {
+        m_ops.clear();
+        Count = 0;
+    }
+
 public:
     CQuadWord TotalSize;      // WARNING: not the byte size of the files (usable only for progress calculations)
     CQuadWord CompressedSize; // sum of file sizes after compression

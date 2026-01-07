@@ -32,24 +32,38 @@ CCopyMoveRecord::CCopyMoveRecord(const char* fileName, const char* mapName)
 {
     FileName = AllocChars(fileName);
     MapName = AllocChars(mapName);
+    FileNameW = NULL;  // No wide name needed for ANSI-only input
 }
 
 CCopyMoveRecord::CCopyMoveRecord(const wchar_t* fileName, const char* mapName)
 {
-    FileName = AllocChars(fileName);
+    FileName = AllocChars(fileName);  // Convert to ANSI (may be lossy)
     MapName = AllocChars(mapName);
+    FileNameW = AllocWideChars(fileName);  // Preserve wide name for Unicode support
 }
 
 CCopyMoveRecord::CCopyMoveRecord(const char* fileName, const wchar_t* mapName)
 {
     FileName = AllocChars(fileName);
     MapName = AllocChars(mapName);
+    FileNameW = NULL;  // No wide name needed for ANSI filename
 }
 
 CCopyMoveRecord::CCopyMoveRecord(const wchar_t* fileName, const wchar_t* mapName)
 {
-    FileName = AllocChars(fileName);
+    FileName = AllocChars(fileName);  // Convert to ANSI (may be lossy)
     MapName = AllocChars(mapName);
+    FileNameW = AllocWideChars(fileName);  // Preserve wide name for Unicode support
+}
+
+CCopyMoveRecord::~CCopyMoveRecord()
+{
+    if (FileName != NULL)
+        free(FileName);
+    if (MapName != NULL)
+        free(MapName);
+    if (FileNameW != NULL)
+        free(FileNameW);
 }
 
 char* CCopyMoveRecord::AllocChars(const char* name)
@@ -83,6 +97,20 @@ char* CCopyMoveRecord::AllocChars(const wchar_t* name)
     return newName;
 }
 
+wchar_t* CCopyMoveRecord::AllocWideChars(const wchar_t* name)
+{
+    if (name == NULL)
+        return NULL;
+
+    int l = lstrlenW(name);
+    wchar_t* newName = (wchar_t*)malloc((l + 1) * sizeof(wchar_t));
+    if (newName != NULL)
+        memcpy(newName, name, (l + 1) * sizeof(wchar_t));
+    else
+        TRACE_E(LOW_MEMORY);
+    return newName;
+}
+
 //*****************************************************************************
 //
 // DestroyCopyMoveData
@@ -99,6 +127,8 @@ void DestroyCopyMoveData(CCopyMoveData* data)
                 free(data->At(i)->FileName);
             if (data->At(i)->MapName != NULL)
                 free(data->At(i)->MapName);
+            if (data->At(i)->FileNameW != NULL)
+                free(data->At(i)->FileNameW);
         }
         delete data;
     }

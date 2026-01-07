@@ -1517,7 +1517,8 @@ BOOL ClearReadOnlyAttr(const char* name, DWORD attr)
         // only drop RO (for hardlinks it also changes attributes of other hardlinks to the same file, so keep it minimal)
         if ((attr & FILE_ATTRIBUTE_READONLY) != 0)
         {
-            if (!SetFileAttributes(name, attr & ~FILE_ATTRIBUTE_READONLY))
+            // Use SalLPSetFileAttributes for long path support
+            if (!SalLPSetFileAttributes(name, attr & ~FILE_ATTRIBUTE_READONLY))
                 TRACE_E("ClearReadOnlyAttr(): error setting attrs (0x" << std::hex << (attr & ~FILE_ATTRIBUTE_READONLY) << std::dec << "): " << name);
             return TRUE;
         }

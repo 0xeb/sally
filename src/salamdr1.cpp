@@ -1013,53 +1013,59 @@ char* BuildName(char* path, char* name, char* dosName, BOOL* skip, BOOL* skipAll
             }
         }
     }
-    if (len >= MAX_PATH)
+    // With wide path support (\\?\), we can handle paths up to SAL_MAX_LONG_PATH (32767)
+    // Only reject paths that exceed that limit
+    if (len >= SAL_MAX_LONG_PATH)
     {
-        char text[2 * MAX_PATH + 100];
-        _snprintf_s(text, _TRUNCATE, LoadStr(IDS_NAMEISTOOLONG), name, path);
-
-        if (skip != NULL)
+        char* text = (char*)malloc(len + 200);
+        if (text != NULL)
         {
-            if (skipAll == NULL || !*skipAll)
+            _snprintf_s(text, len + 200, _TRUNCATE, LoadStr(IDS_NAMEISTOOLONG), name, path);
+
+            if (skip != NULL)
             {
-                MSGBOXEX_PARAMS params;
-                memset(&params, 0, sizeof(params));
-                params.HParent = MainWindow->HWindow;
-                params.Flags = MSGBOXEX_YESNOOKCANCEL | MB_ICONEXCLAMATION | MSGBOXEX_DEFBUTTON3 | MSGBOXEX_SILENT;
-                params.Caption = LoadStr(IDS_ERRORTITLE);
-                params.Text = text;
-                char aliasBtnNames[200];
-                /* serves for script export_mnu.py, which generates salmenu.mnu for Translator
-   we let msgbox buttons resolve hotkey collisions by simulating it's a menu
-MENU_TEMPLATE_ITEM MsgBoxButtons[] =
-{
-  {MNTT_PB, 0
-  {MNTT_IT, IDS_MSGBOXBTN_SKIP
-  {MNTT_IT, IDS_MSGBOXBTN_SKIPALL
-  {MNTT_IT, IDS_MSGBOXBTN_FOCUS
-  {MNTT_PE, 0
-};
-*/
-                sprintf(aliasBtnNames, "%d\t%s\t%d\t%s\t%d\t%s",
-                        DIALOG_YES, LoadStr(IDS_MSGBOXBTN_SKIP),
-                        DIALOG_NO, LoadStr(IDS_MSGBOXBTN_SKIPALL),
-                        DIALOG_OK, LoadStr(IDS_MSGBOXBTN_FOCUS));
-                params.AliasBtnNames = aliasBtnNames;
-                int msgRes = SalMessageBoxEx(&params);
-                if (msgRes == DIALOG_YES /* Skip */ || msgRes == DIALOG_NO /* Skip All */)
+                if (skipAll == NULL || !*skipAll)
+                {
+                    MSGBOXEX_PARAMS params;
+                    memset(&params, 0, sizeof(params));
+                    params.HParent = MainWindow->HWindow;
+                    params.Flags = MSGBOXEX_YESNOOKCANCEL | MB_ICONEXCLAMATION | MSGBOXEX_DEFBUTTON3 | MSGBOXEX_SILENT;
+                    params.Caption = LoadStr(IDS_ERRORTITLE);
+                    params.Text = text;
+                    char aliasBtnNames[200];
+                    /* serves for script export_mnu.py, which generates salmenu.mnu for Translator
+       we let msgbox buttons resolve hotkey collisions by simulating it's a menu
+    MENU_TEMPLATE_ITEM MsgBoxButtons[] =
+    {
+      {MNTT_PB, 0
+      {MNTT_IT, IDS_MSGBOXBTN_SKIP
+      {MNTT_IT, IDS_MSGBOXBTN_SKIPALL
+      {MNTT_IT, IDS_MSGBOXBTN_FOCUS
+      {MNTT_PE, 0
+    };
+    */
+                    sprintf(aliasBtnNames, "%d\t%s\t%d\t%s\t%d\t%s",
+                            DIALOG_YES, LoadStr(IDS_MSGBOXBTN_SKIP),
+                            DIALOG_NO, LoadStr(IDS_MSGBOXBTN_SKIPALL),
+                            DIALOG_OK, LoadStr(IDS_MSGBOXBTN_FOCUS));
+                    params.AliasBtnNames = aliasBtnNames;
+                    int msgRes = SalMessageBoxEx(&params);
+                    if (msgRes == DIALOG_YES /* Skip */ || msgRes == DIALOG_NO /* Skip All */)
+                        *skip = TRUE;
+                    if (msgRes == DIALOG_NO /* Skip All */ && skipAll != NULL)
+                        *skipAll = TRUE;
+                    if (msgRes == DIALOG_OK /* Focus */)
+                        MainWindow->PostFocusNameInPanel(PANEL_SOURCE, sourcePath, name);
+                }
+                else
                     *skip = TRUE;
-                if (msgRes == DIALOG_NO /* Skip All */ && skipAll != NULL)
-                    *skipAll = TRUE;
-                if (msgRes == DIALOG_OK /* Focus */)
-                    MainWindow->PostFocusNameInPanel(PANEL_SOURCE, sourcePath, name);
             }
             else
-                *skip = TRUE;
-        }
-        else
-        {
-            SalMessageBox(MainWindow->HWindow, text, LoadStr(IDS_ERRORTITLE),
-                          MB_OK | MB_ICONEXCLAMATION);
+            {
+                SalMessageBox(MainWindow->HWindow, text, LoadStr(IDS_ERRORTITLE),
+                              MB_OK | MB_ICONEXCLAMATION);
+            }
+            free(text);
         }
         return NULL;
     }
