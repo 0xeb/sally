@@ -14,6 +14,7 @@
 #include "shellib.h"
 #include "toolbar.h"
 #include "shiconov.h"
+#include "common/widepath.h"
 
 CNBWNetAC3Thread NBWNetAC3Thread;
 
@@ -2745,7 +2746,7 @@ BOOL CDrivesList::OnContextMenu(BOOL posByMouse, int itemIndex, int panel, const
     RECT selectedIndexRect = {0};
     if (MenuPopup != NULL)
         MenuPopup->GetItemRect(selectedIndex, &selectedIndexRect);
-    char path[2 * MAX_PATH];
+    CPathBuffer path;
     CDriveTypeEnum dt = Drives->At(selectedIndex).DriveType;
     switch (dt)
     {
@@ -2763,7 +2764,7 @@ BOOL CDrivesList::OnContextMenu(BOOL posByMouse, int itemIndex, int panel, const
 
     case drvtHotPath:
     {
-        if (!MainWindow->GetExpandedHotPath(MainWindow->HWindow, Drives->At(selectedIndex).Param, path, 2 * MAX_PATH))
+        if (!MainWindow->GetExpandedHotPath(MainWindow->HWindow, Drives->At(selectedIndex).Param, path, path.Size()))
             return FALSE;
         if (LowerCase[path[0]] >= 'a' && LowerCase[path[0]] <= 'z' && path[1] == ':' && (path[2] == '\\' || path[2] == '/') ||
             (path[0] == '\\' || path[0] == '/') && (path[1] == '\\' || path[1] == '/'))
@@ -2773,7 +2774,7 @@ BOOL CDrivesList::OnContextMenu(BOOL posByMouse, int itemIndex, int panel, const
             BOOL isDir;
             char* secondPart;
             if (!SalParsePath(MainWindow->HWindow, path, type, isDir, secondPart, LoadStr(IDS_ERRORTITLE),
-                              NULL, FALSE, NULL, NULL, NULL, 2 * MAX_PATH) ||
+                              NULL, FALSE, NULL, NULL, NULL, path.Size()) ||
                 type != PATH_TYPE_WINDOWS || // not a windows path
                 !isDir || *secondPart != 0)  // the path to a file (not a directory) or a part of the path does not exist
             {

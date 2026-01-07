@@ -14,6 +14,7 @@
 #include "execute.h"
 #include "shellib.h"
 #include "menu.h"
+#include "common/widepath.h"
 
 CUserMenuIconBkgndReader UserMenuIconBkgndReader;
 
@@ -3778,7 +3779,7 @@ DWORD OnDirectoryKeyDown(DWORD keyCode, HWND hDialog, int editID, int editBufSiz
 
 void InvokeDirectoryMenuCommand(DWORD cmd, HWND hDialog, int editID, int editBufSize)
 {
-    char path[2 * MAX_PATH];
+    CPathBuffer path;
     BOOL setPathToEdit = FALSE;
     switch (cmd)
     {
@@ -3811,7 +3812,7 @@ void InvokeDirectoryMenuCommand(DWORD cmd, HWND hDialog, int editID, int editBuf
         CFilesWindow* panel = (cmd == DIRECTORY_COMMAND_LEFT) ? MainWindow->LeftPanel : MainWindow->RightPanel;
         if (panel != NULL)
         {
-            panel->GetGeneralPath(path, 2 * MAX_PATH, TRUE);
+            panel->GetGeneralPath(path, path.Size(), TRUE);
             setPathToEdit = TRUE;
         }
         break;
@@ -3822,7 +3823,7 @@ void InvokeDirectoryMenuCommand(DWORD cmd, HWND hDialog, int editID, int editBuf
         // hot path
         if (cmd >= DIRECTORY_COMMAND_HOTPATHF && cmd <= DIRECTORY_COMMAND_HOTPATHL)
         {
-            if (MainWindow->GetExpandedHotPath(hDialog, cmd - DIRECTORY_COMMAND_HOTPATHF, path, 2 * MAX_PATH))
+            if (MainWindow->GetExpandedHotPath(hDialog, cmd - DIRECTORY_COMMAND_HOTPATHF, path, path.Size()))
                 setPathToEdit = TRUE;
         }
         else

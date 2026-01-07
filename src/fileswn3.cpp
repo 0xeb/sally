@@ -2273,7 +2273,7 @@ CHANGE_AGAIN:
                         WIN32_FIND_DATA find;
                         HANDLE h;
                         if (!pathEndsWithSpaceOrDot)
-                            h = HANDLES_Q(FindFirstFile(copy, &find));
+                            h = SalFindFirstFileH(copy, &find);
                         else
                             h = INVALID_HANDLE_VALUE;
                         DWORD err;
@@ -2300,7 +2300,7 @@ CHANGE_AGAIN:
                                     }
                                     else
                                     {
-                                        h = HANDLES_Q(FindFirstFile(copy, &find));
+                                        h = SalFindFirstFileH(copy, &find);
                                         if (h != INVALID_HANDLE_VALUE)
                                             break; // we've found an accessible component, continuing...
                                         err = GetLastError();
@@ -2313,7 +2313,7 @@ CHANGE_AGAIN:
                                 {
                                     if ((int)strlen(copy) < copy.Size() - 10 && SalPathAppend(copy, "*.*", copy.Size()))
                                     {
-                                        h = HANDLES_Q(FindFirstFile(copy, &find));
+                                        h = SalFindFirstFileH(copy, &find);
                                         CutDirectory(copy);
                                         if (h != INVALID_HANDLE_VALUE) // the path can be listed
                                         {
