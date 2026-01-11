@@ -58,12 +58,30 @@ CCopyMoveRecord::CCopyMoveRecord(const wchar_t* fileName, const wchar_t* mapName
 
 CCopyMoveRecord::~CCopyMoveRecord()
 {
+    // Debug: Log before freeing to help track heap corruption
+    char dbg[512];
+    sprintf_s(dbg, "~CCopyMoveRecord: FileName=%p MapName=%p FileNameW=%p\n",
+              FileName, MapName, FileNameW);
+    OutputDebugStringA(dbg);
+
     if (FileName != NULL)
+    {
+        OutputDebugStringA("  Freeing FileName...\n");
         free(FileName);
+        OutputDebugStringA("  FileName freed OK\n");
+    }
     if (MapName != NULL)
+    {
+        OutputDebugStringA("  Freeing MapName...\n");
         free(MapName);
+        OutputDebugStringA("  MapName freed OK\n");
+    }
     if (FileNameW != NULL)
+    {
+        OutputDebugStringA("  Freeing FileNameW...\n");
         free(FileNameW);
+        OutputDebugStringA("  FileNameW freed OK\n");
+    }
 }
 
 char* CCopyMoveRecord::AllocChars(const char* name)
@@ -85,12 +103,18 @@ char* CCopyMoveRecord::AllocChars(const wchar_t* name)
     if (name == NULL)
         return NULL;
 
-    int l = lstrlenW(name);
-    char* newName = (char*)malloc(l + 1);
+    // Query required buffer size first (multi-byte codepages may need more bytes than wchars)
+    int requiredSize = WideCharToMultiByte(CP_ACP, 0, name, -1, NULL, 0, NULL, NULL);
+    if (requiredSize <= 0)
+    {
+        TRACE_E("WideCharToMultiByte failed to calculate size");
+        return NULL;
+    }
+
+    char* newName = (char*)malloc(requiredSize);
     if (newName != NULL)
     {
-        WideCharToMultiByte(CP_ACP, 0, name, l + 1, newName, l + 1, NULL, NULL);
-        newName[l] = 0;
+        WideCharToMultiByte(CP_ACP, 0, name, -1, newName, requiredSize, NULL, NULL);
     }
     else
         TRACE_E(LOW_MEMORY);
