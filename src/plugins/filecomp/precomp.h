@@ -20,6 +20,7 @@
 #include <vector>
 #include <algorithm>
 #include <map>
+#include <memory>
 #include <zmouse.h>
 
 #if defined(_DEBUG) && defined(_MSC_VER) // without passing file+line to 'new' operator, list of memory leaks shows only 'crtdbg.h(552)'

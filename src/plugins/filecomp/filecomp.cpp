@@ -695,18 +695,21 @@ CFilecompThread::Body()
     CCompareOptions options = DefCompareOptions;
 
     // Local buffers for dialog editing (dialog needs writable char and wchar_t buffers)
+    // Use heap allocation to avoid ~393KB stack usage which could cause stack overflow
     const int DIALOG_PATH_SIZE = 32767;
-    char dialogPath1[DIALOG_PATH_SIZE], dialogPath2[DIALOG_PATH_SIZE];
-    wchar_t dialogPath1W[DIALOG_PATH_SIZE], dialogPath2W[DIALOG_PATH_SIZE];
-    strcpy(dialogPath1, Path1.c_str());
-    strcpy(dialogPath2, Path2.c_str());
-    wcscpy(dialogPath1W, Path1W.c_str());
-    wcscpy(dialogPath2W, Path2W.c_str());
+    std::unique_ptr<char[]> dialogPath1(new char[DIALOG_PATH_SIZE]);
+    std::unique_ptr<char[]> dialogPath2(new char[DIALOG_PATH_SIZE]);
+    std::unique_ptr<wchar_t[]> dialogPath1W(new wchar_t[DIALOG_PATH_SIZE]);
+    std::unique_ptr<wchar_t[]> dialogPath2W(new wchar_t[DIALOG_PATH_SIZE]);
+    strcpy(dialogPath1.get(), Path1.c_str());
+    strcpy(dialogPath2.get(), Path2.c_str());
+    wcscpy(dialogPath1W.get(), Path1W.c_str());
+    wcscpy(dialogPath2W.get(), Path2W.c_str());
 
     if (Path1.empty() || Path2.empty() || !DontConfirmSelection && Configuration.ConfirmSelection)
     {
-        CCompareFilesDialog* dlg = new CCompareFilesDialog(0, dialogPath1, dialogPath2, succes, &options,
-                                                              dialogPath1W, dialogPath2W, DIALOG_PATH_SIZE);
+        CCompareFilesDialog* dlg = new CCompareFilesDialog(0, dialogPath1.get(), dialogPath2.get(), succes, &options,
+                                                              dialogPath1W.get(), dialogPath2W.get(), DIALOG_PATH_SIZE);
         if (!dlg)
         {
             Error(HWND(NULL), IDS_LOWMEM);
@@ -767,9 +770,9 @@ CFilecompThread::Body()
                    workRect.top - monitorRect.top);
 
         // if the main window is minimized, keep the File Comparator restored instead
-        CMainWindow* win = new CMainWindow(dialogPath1, dialogPath2, &options,
+        CMainWindow* win = new CMainWindow(dialogPath1.get(), dialogPath2.get(), &options,
                                            wp.showCmd == SW_SHOWMAXIMIZED ? SW_SHOWMAXIMIZED : SW_SHOW,
-                                           dialogPath1W, dialogPath2W);
+                                           dialogPath1W.get(), dialogPath2W.get());
         if (!win)
         {
             Error(HWND(NULL), IDS_LOWMEM);

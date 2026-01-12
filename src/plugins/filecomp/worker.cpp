@@ -147,27 +147,12 @@ CWorkerFileData::DetachHFile()
 
 CFilecompWorker::CFilecompWorker(HWND parent, HWND mainWindow, const char* name0, const char* name1, const CCompareOptions& options, const int& cancelFlag, HANDLE event, const wchar_t* name0W, const wchar_t* name1W) : CancelFlag(cancelFlag)
 {
-    Parent = Parent;
+    Parent = parent;
     MainWindow = mainWindow;
     Files[0].Name = name0 ? name0 : "";
     Files[1].Name = name1 ? name1 : "";
-    // Store wide paths for Unicode/long path filenames
-    if (name0W)
-        Files[0].NameW = name0W;
-    else if (name0)
-    {
-        wchar_t buf[32767];
-        MultiByteToWideChar(CP_ACP, 0, name0, -1, buf, 32767);
-        Files[0].NameW = buf;
-    }
-    if (name1W)
-        Files[1].NameW = name1W;
-    else if (name1)
-    {
-        wchar_t buf[32767];
-        MultiByteToWideChar(CP_ACP, 0, name1, -1, buf, 32767);
-        Files[1].NameW = buf;
-    }
+    Files[0].NameW = AnsiToWidePath(name0, name0W);
+    Files[1].NameW = AnsiToWidePath(name1, name1W);
     Options = options;
     Event = event;
 }
