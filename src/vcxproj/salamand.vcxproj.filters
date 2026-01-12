@@ -411,6 +411,9 @@
     <ClCompile Include="..\common\winlib.cpp">
       <Filter>common</Filter>
     </ClCompile>
+    <ClCompile Include="..\common\widepath.cpp">
+      <Filter>common</Filter>
+    </ClCompile>
     <ClCompile Include="..\common\dep\zlib\adler32.c">
       <Filter>zlib</Filter>
     </ClCompile>
@@ -720,6 +723,9 @@
       <Filter>common</Filter>
     </ClInclude>
     <ClInclude Include="..\common\winlib.h">
+      <Filter>common</Filter>
+    </ClInclude>
+    <ClInclude Include="..\common\widepath.h">
       <Filter>common</Filter>
     </ClInclude>
     <ClInclude Include="..\common\dep\bzip2\bzlib.h">

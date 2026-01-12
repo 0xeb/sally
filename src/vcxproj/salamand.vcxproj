@@ -269,6 +269,8 @@
     </ClCompile>
     <ClCompile Include="..\common\winlib.cpp">
     </ClCompile>
+    <ClCompile Include="..\common\widepath.cpp">
+    </ClCompile>
     <ClCompile Include="..\common\dep\crypt\aescrypt.c">
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
       </PrecompiledHeader>
@@ -718,6 +720,8 @@
     <ClInclude Include="..\common\trace.h">
     </ClInclude>
     <ClInclude Include="..\common\winlib.h">
+    </ClInclude>
+    <ClInclude Include="..\common\widepath.h">
     </ClInclude>
     <ClInclude Include="..\consts.h">
     </ClInclude>
