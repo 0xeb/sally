@@ -691,6 +691,7 @@ void CFilesWindow::DrawBriefDetailedItem(HDC hTgtDC, int itemIndex, RECT* itemRe
                 nameLenW = (int)f->NameW.length();
                 // For Unicode names, we don't apply AlterFileName transformation yet
                 // (TODO: add AlterFileNameW for proper uppercase/lowercase handling)
+
             }
 
             CColumn* column = &Columns[0];
@@ -704,8 +705,10 @@ void CFilesWindow::DrawBriefDetailedItem(HDC hTgtDC, int itemIndex, RECT* itemRe
                 {
                     textWidth = nameWidth - 1 - IconSizes[ICONSIZE_16] - 1 - 2 - SPACE_WIDTH;
                     if (useWideDisplay)
+                    {
                         GetTextExtentExPointW(hDC, f->NameW.c_str(), nameLenW, textWidth,
                                               &fitChars, DrawItemAlpDx, &fnSZ);
+                    }
                     else
                         GetTextExtentExPoint(hDC, TransferBuffer, nameLen, textWidth,
                                              &fitChars, DrawItemAlpDx, &fnSZ);
@@ -736,8 +739,10 @@ void CFilesWindow::DrawBriefDetailedItem(HDC hTgtDC, int itemIndex, RECT* itemRe
                     // the string may be longer than the available space and must end with "..."
                     textWidth = nameWidth - 1 - IconSizes[ICONSIZE_16] - 1 - 2 - SPACE_WIDTH;
                     if (useWideDisplay)
+                    {
                         GetTextExtentExPointW(hDC, f->NameW.c_str(), nameLenW, textWidth,
                                               &fitChars, DrawItemAlpDx, &fnSZ);
+                    }
                     else
                         GetTextExtentExPoint(hDC, TransferBuffer, nameLen, textWidth,
                                              &fitChars, DrawItemAlpDx, &fnSZ);
@@ -881,7 +886,9 @@ void CFilesWindow::DrawBriefDetailedItem(HDC hTgtDC, int itemIndex, RECT* itemRe
                     {
                         // extension is an exception - it always follows Name and we handle it explicitly
                         if (isDir && !Configuration.SortDirsByExt || f->Ext[0] == 0 || f->Ext <= f->Name + 1) // empty value in the Ext column (exception for names like ".htaccess", they appear in the Name column even though they are extensions)
+                        {
                             TransferLen = 0;
+                        }
                         else if (f->UseWideName())
                         {
                             // For Unicode filenames, find extension in NameW instead of using ANSI offset
@@ -902,7 +909,10 @@ void CFilesWindow::DrawBriefDetailedItem(HDC hTgtDC, int itemIndex, RECT* itemRe
                                 AlterFileName(TransferBuffer, f->Name, -1, Configuration.FileNameFormat, 0, isDir);
                             TransferLen = (int)(f->NameLen - (f->Ext - f->Name));
                             if (TransferLen > 0)
+                            {
                                 MoveMemory(TransferBuffer, TransferBuffer + (f->Ext - f->Name), TransferLen); // buffer overlap may occur
+                                TransferBuffer[TransferLen] = 0;
+                            }
                         }
                     }
 

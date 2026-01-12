@@ -35,7 +35,7 @@ BOOL SalPathAppend(char* path, const char* name, int pathSize)
     if (*name != 0)
     {
         int n = (int)strlen(name);
-        if (l + 1 + n < pathSize) // vejdeme se i s nulou na konci?
+        if (l + 1 + n < pathSize) // do we fit including the null terminator?
         {
             if (l != 0)
                 path[l] = '\\';
@@ -248,28 +248,28 @@ BOOL SalGetTempFileName(const char* path, const char* prefix, char* tmpName, BOO
     while (s < end && *prefix != 0)
         *s++ = *prefix++;
 
-    if ((s - tmpDir) + 8 < MAX_PATH) // dost mista pro pripojeni "XXXX.tmp"
+    if ((s - tmpDir) + 8 < MAX_PATH) // enough space to append "XXXX.tmp"
     {
         DWORD randNum = (GetTickCount() & 0xFFF);
         while (1)
         {
             sprintf(s, "%X.tmp", randNum++);
-            if (file) // soubor
+            if (file) // file
             {
                 HANDLE h = HANDLES_Q(CreateFile(tmpDir, GENERIC_WRITE, 0, NULL, CREATE_NEW,
                                                 FILE_ATTRIBUTE_NORMAL, NULL));
                 if (h != INVALID_HANDLE_VALUE)
                 {
                     HANDLES(CloseHandle(h));
-                    strcpy(tmpName, tmpDir); // nakopirujeme vysledek
+                    strcpy(tmpName, tmpDir); // copy the result
                     return TRUE;
                 }
             }
-            else // adresar
+            else // directory
             {
                 if (CreateDirectory(tmpDir, NULL))
                 {
-                    strcpy(tmpName, tmpDir); // nakopirujeme vysledek
+                    strcpy(tmpName, tmpDir); // copy the result
                     return TRUE;
                 }
             }
@@ -294,22 +294,22 @@ BOOL SalGetTempFileName(const char* path, const char* prefix, char* tmpName, BOO
 
 int HandleFileException(EXCEPTION_POINTERS* e, char* fileMem, DWORD fileMemSize)
 {
-    if (e->ExceptionRecord->ExceptionCode == EXCEPTION_IN_PAGE_ERROR) // in-page-error znamena urcite chybu souboru
+    if (e->ExceptionRecord->ExceptionCode == EXCEPTION_IN_PAGE_ERROR) // in-page-error definitely means a file error
     {
-        return EXCEPTION_EXECUTE_HANDLER; // spustime __except blok
+        return EXCEPTION_EXECUTE_HANDLER; // execute __except block
     }
     else
     {
-        if (e->ExceptionRecord->ExceptionCode == EXCEPTION_ACCESS_VIOLATION &&    // access violation znamena chybu souboru jen pokud adresa chyby odpovida souboru
-            (e->ExceptionRecord->NumberParameters >= 2 &&                         // mame co testovat
-             e->ExceptionRecord->ExceptionInformation[1] >= (ULONG_PTR)fileMem && // ptr chyby ve view souboru
+        if (e->ExceptionRecord->ExceptionCode == EXCEPTION_ACCESS_VIOLATION &&    // access violation means a file error only if the error address corresponds to the file
+            (e->ExceptionRecord->NumberParameters >= 2 &&                         // we have something to test
+             e->ExceptionRecord->ExceptionInformation[1] >= (ULONG_PTR)fileMem && // error ptr in file view
              e->ExceptionRecord->ExceptionInformation[1] < ((ULONG_PTR)fileMem) + fileMemSize))
         {
-            return EXCEPTION_EXECUTE_HANDLER; // spustime __except blok
+            return EXCEPTION_EXECUTE_HANDLER; // execute __except block
         }
         else
         {
-            return EXCEPTION_CONTINUE_SEARCH; // hodime vyjimku dale ... call-stacku
+            return EXCEPTION_CONTINUE_SEARCH; // throw exception further ... to call-stack
         }
     }
 }
@@ -318,21 +318,21 @@ int HandleFileException(EXCEPTION_POINTERS* e, char* fileMem, DWORD fileMemSize)
 
 BOOL SalRemovePointsFromPath(char* afterRoot)
 {
-    char* d = afterRoot; // ukazatel za root cestu
+    char* d = afterRoot; // pointer after root path
     while (*d != 0)
     {
         while (*d != 0 && *d != '.')
             d++;
         if (*d == '.')
         {
-            if (d == afterRoot || d > afterRoot && *(d - 1) == '\\') // '.' za root cestou nebo "\."
+            if (d == afterRoot || d > afterRoot && *(d - 1) == '\\') // '.' after root path or "\."
             {
                 if (*(d + 1) == '.' && (*(d + 2) == '\\' || *(d + 2) == 0)) // ".."
                 {
                     char* l = d - 1;
                     while (l > afterRoot && *(l - 1) != '\\')
                         l--;
-                    if (l >= afterRoot) // vypusteni adresare + ".."
+                    if (l >= afterRoot) // remove directory + ".."
                     {
                         if (*(d + 2) == 0)
                             *l = 0;
@@ -341,7 +341,7 @@ BOOL SalRemovePointsFromPath(char* afterRoot)
                         d = l;
                     }
                     else
-                        return FALSE; // ".." nelze vypustit
+                        return FALSE; // ".." cannot be removed
                 }
                 else
                 {
@@ -365,21 +365,21 @@ BOOL SalRemovePointsFromPath(char* afterRoot)
 
 BOOL SalRemovePointsFromPath(WCHAR* afterRoot)
 {
-    WCHAR* d = afterRoot; // ukazatel za root cestu
+    WCHAR* d = afterRoot; // pointer after root path
     while (*d != 0)
     {
         while (*d != 0 && *d != L'.')
             d++;
         if (*d == L'.')
         {
-            if (d == afterRoot || d > afterRoot && *(d - 1) == L'\\') // '.' za root cestou nebo "\."
+            if (d == afterRoot || d > afterRoot && *(d - 1) == L'\\') // '.' after root path or "\."
             {
                 if (*(d + 1) == L'.' && (*(d + 2) == L'\\' || *(d + 2) == 0)) // ".."
                 {
                     WCHAR* l = d - 1;
                     while (l > afterRoot && *(l - 1) != L'\\')
                         l--;
-                    if (l >= afterRoot) // vypusteni adresare + ".."
+                    if (l >= afterRoot) // remove directory + ".."
                     {
                         if (*(d + 2) == 0)
                             *l = 0;
@@ -388,7 +388,7 @@ BOOL SalRemovePointsFromPath(WCHAR* afterRoot)
                         d = l;
                     }
                     else
-                        return FALSE; // ".." nelze vypustit
+                        return FALSE; // ".." cannot be removed
                 }
                 else
                 {
@@ -416,12 +416,12 @@ BOOL SalGetFullName(char* name, int* errTextID, const char* curDir, char* nextFo
     CALL_STACK_MESSAGE5("SalGetFullName(%s, , %s, , , %d, %d)", name, curDir, nameBufSize, allowRelPathWithSpaces);
     int err = 0;
 
-    int rootOffset = 3; // offset zacatku adresarove casti cesty (3 pro "c:\path")
+    int rootOffset = 3; // offset of directory part start (3 for "c:\path")
     char* s = name;
     while (*s >= 1 && *s <= ' ')
         s++;
     if (*s == '\\' && *(s + 1) == '\\') // UNC (\\server\share\...)
-    {                                   // eliminace mezer na zacatku cesty
+    {                                   // eliminate spaces at the beginning of the path
         if (s != name)
             memmove(name, s, strlen(s) + 1);
         s = name + 2;
@@ -442,13 +442,13 @@ BOOL SalGetFullName(char* name, int* errTextID, const char* curDir, char* nextFo
                 if (*s == '\\')
                     s++;
                 if (s - name > MAX_PATH - 1)
-                    err = IDS_SERVERNAMEMISSING; // nalezeny text je moc dlouhy na to, aby to byl server
+                    err = IDS_SERVERNAMEMISSING; // found text is too long to be a server
                 else
                 {
                     if (*s == 0 || *s == '\\')
                     {
                         if (callNethood != NULL)
-                            *callNethood = *s == 0 && (*(s - 1) != '.' || *(s - 2) != '\\') && (*(s - 1) != '\\' || *(s - 2) != '.' || *(s - 3) != '\\'); // nejde o "\\." ani "\\.\" (zacatek cesty typu "\\.\C:\")
+                            *callNethood = *s == 0 && (*(s - 1) != '.' || *(s - 2) != '\\') && (*(s - 1) != '\\' || *(s - 2) != '.' || *(s - 3) != '\\'); // not "\\." or "\\.\" (beginning of path like "\\.\C:\")
                         err = IDS_SHARENAMEMISSING;
                     }
                     else
@@ -456,7 +456,7 @@ BOOL SalGetFullName(char* name, int* errTextID, const char* curDir, char* nextFo
                         while (*s != 0 && *s != '\\')
                             s++; // prejeti sharename
                         if ((s - name) + 1 > MAX_PATH - 1)
-                            err = IDS_SHARENAMEMISSING; // nalezeny text je moc dlouhy na to, aby to byl share (+1 za koncovy backslash)
+                            err = IDS_SHARENAMEMISSING; // found text is too long to be a share (+1 for trailing backslash)
                         if (*s == '\\')
                             s++;
                     }
@@ -464,20 +464,20 @@ BOOL SalGetFullName(char* name, int* errTextID, const char* curDir, char* nextFo
             }
         }
     }
-    else // cesta zadana pomoci disku (c:\...)
+    else // path specified using drive (c:\...)
     {
         if (*s != 0)
         {
             if (*(s + 1) == ':') // "c:..."
             {
                 if (*(s + 2) == '\\') // "c:\..."
-                {                     // eliminace mezer na zacatku cesty
+                {                     // eliminate spaces at the beginning of the path
                     if (s != name)
                         memmove(name, s, strlen(s) + 1);
                 }
                 else // "c:path..."
                 {
-                    int l1 = (int)strlen(s + 2); // delka zbytku ("path...")
+                    int l1 = (int)strlen(s + 2); // length of remainder ("path...")
                     if (LowerCase[*s] >= 'a' && LowerCase[*s] <= 'z')
                     {
                         const char* head;
@@ -487,10 +487,10 @@ BOOL SalGetFullName(char* name, int* errTextID, const char* curDir, char* nextFo
                             head = DefaultDir[LowerCase[*s] - 'a'];
                         int l2 = (int)strlen(head);
                         if (head[l2 - 1] != '\\')
-                            l2++; // misto pro '\\'
+                            l2++; // space for '\\'
                         if (l1 + l2 >= nameBufSize)
                             err = IDS_TOOLONGPATH;
-                        else // sestaveni full path
+                        else // construct full path
                         {
                             memmove(name + l2, s + 2, l1 + 1);
                             *(name + l2 - 1) = '\\';
@@ -505,9 +505,9 @@ BOOL SalGetFullName(char* name, int* errTextID, const char* curDir, char* nextFo
             {
                 if (curDir != NULL)
                 {
-                    // u relativnich cest bez '\\' na zacatku nebudeme pri zaplem 'allowRelPathWithSpaces' povazovat
-                    // mezery za omyl (jmeno adresare i souboru muze zacinat na mezeru, i kdyz wokna i dalsi softy
-                    // vcetne Salama se tomu snazi predejit)
+                    // for relative paths without '\\' at the beginning, with 'allowRelPathWithSpaces' enabled, we won't consider
+                    // spaces as an error (directory and file names can start with a space, even though Windows and other software
+                    // including Salam try to prevent it)
                     if (allowRelPathWithSpaces && *s != '\\')
                         s = name;
                     int l1 = (int)strlen(s);
@@ -523,7 +523,7 @@ BOOL SalGetFullName(char* name, int* errTextID, const char* curDir, char* nextFo
                                 root++;
                             if (l1 + (root - curDir) >= nameBufSize)
                                 err = IDS_TOOLONGPATH;
-                            else // sestaveni cesty z rootu akt. disku
+                            else // construct path from current disk root
                             {
                                 memmove(name + (root - curDir), s, l1 + 1);
                                 memmove(name, curDir, root - curDir);
@@ -578,47 +578,47 @@ BOOL SalGetFullName(char* name, int* errTextID, const char* curDir, char* nextFo
         }
     }
 
-    if (err == 0) // eliminace '.' a '..' v ceste
+    if (err == 0) // eliminate '.' and '..' in path
     {
         if (!SalRemovePointsFromPath(s))
             err = IDS_PATHISINVALID;
     }
 
-    if (err == 0) // vyhozeni pripadneho nezadouciho backslashe z konce retezce
+    if (err == 0) // remove any unwanted backslash from end of string
     {
         int l = (int)strlen(name);
-        if (l > 1 && name[1] == ':') // typ cesty "c:\path"
+        if (l > 1 && name[1] == ':') // path type "c:\path"
         {
-            if (l > 3) // neni root cesta
+            if (l > 3) // not a root path
             {
                 if (name[l - 1] == '\\')
-                    name[l - 1] = 0; // orez backslashe
+                    name[l - 1] = 0; // trim backslash
             }
             else
             {
-                name[2] = '\\'; // root cesta, backslash nutny ("c:\")
+                name[2] = '\\'; // root path, backslash required ("c:\")
                 name[3] = 0;
             }
         }
         else
         {
-            if (name[0] == '\\' && name[1] == '\\' && name[2] == '.' && name[3] == '\\' && name[4] != 0 && name[5] == ':') // cesta typu "\\.\C:\"
+            if (name[0] == '\\' && name[1] == '\\' && name[2] == '.' && name[3] == '\\' && name[4] != 0 && name[5] == ':') // path type "\\.\C:\"
             {
-                if (l > 7) // neni root cesta
+                if (l > 7) // not a root path
                 {
                     if (name[l - 1] == '\\')
-                        name[l - 1] = 0; // orez backslashe
+                        name[l - 1] = 0; // trim backslash
                 }
                 else
                 {
-                    name[6] = '\\'; // root cesta, backslash nutny ("\\.\C:\")
+                    name[6] = '\\'; // root path, backslash required ("\\.\C:\")
                     name[7] = 0;
                 }
             }
-            else // UNC cesta
+            else // UNC path
             {
                 if (l > 0 && name[l - 1] == '\\')
-                    name[l - 1] = 0; // orez backslashe
+                    name[l - 1] = 0; // trim backslash
             }
         }
     }
@@ -640,16 +640,16 @@ void AuxThreadBody(BOOL add, HANDLE thread, BOOL testIfFinished)
     CEnterCriticalSection enterCS(cs);
 
     static BOOL finished = FALSE;
-    if (!finished) // po volani TerminateAuxThreads() uz nic neprijimame
+    if (!finished) // after calling TerminateAuxThreads() we no longer accept anything
     {
         if (add)
         {
-            // vycistime pole od threadu, ktere jiz dobehly
+            // clean array from threads that have already finished
             for (int i = 0; i < AuxThreads.Count; i++)
             {
                 DWORD code;
                 if (!GetExitCodeThread(AuxThreads[i], &code) || code != STILL_ACTIVE)
-                { // thread uz dobehl
+                { // thread has already finished
                     HANDLES(CloseHandle(AuxThreads[i]));
                     AuxThreads.Delete(i);
                     i--;
@@ -660,12 +660,12 @@ void AuxThreadBody(BOOL add, HANDLE thread, BOOL testIfFinished)
             {
                 DWORD code;
                 if (!GetExitCodeThread(thread, &code) || code != STILL_ACTIVE)
-                { // thread uz dobehl
+                { // thread has already finished
                     HANDLES(CloseHandle(thread));
                     skipAdd = TRUE;
                 }
             }
-            // pridame novy thread
+            // add new thread
             if (!skipAdd)
                 AuxThreads.Add(thread);
         }
@@ -677,9 +677,9 @@ void AuxThreadBody(BOOL add, HANDLE thread, BOOL testIfFinished)
                 HANDLE t = AuxThreads[i];
                 DWORD code;
                 if (GetExitCodeThread(t, &code) && code == STILL_ACTIVE)
-                { // thread stale bezi, terminujeme ho
+                { // thread still running, terminating it
                     TerminateThread(t, 666);
-                    WaitForSingleObject(t, INFINITE); // pockame az thread skutecne skonci, nekdy mu to dost trva
+                    WaitForSingleObject(t, INFINITE); // wait until thread actually finishes, sometimes it takes a while
                 }
                 HANDLES(CloseHandle(t));
             }
@@ -708,14 +708,14 @@ void TerminateAuxThreads()
 class CStopRefreshStack
 {
   protected:
-    DWORD CallerCalledFromArr[STOPREFRESHSTACKSIZE];  // pole navratovych adres funkci, odkud se volal BeginStopRefresh()
-    DWORD CalledFromArr[STOPREFRESHSTACKSIZE];        // pole adres, odkud se volal BeginStopRefresh()
-    int Count;                                        // pocet prvku v predchozich dvou polich
-    int Ignored;                                      // pocet volani BeginStopRefresh(), ktere jsme museli ignorovat (prilis male STOPREFRESHSTACKSIZE -> pripadne zvetsit)
+    DWORD CallerCalledFromArr[STOPREFRESHSTACKSIZE];  // array of return addresses of functions from where BeginStopRefresh() was called
+    DWORD CalledFromArr[STOPREFRESHSTACKSIZE];        // array of addresses from where BeginStopRefresh() was called
+    int Count;                                        // number of elements in the previous two arrays
+    int Ignored;                                      // number of BeginStopRefresh() calls that had to be ignored (STOPREFRESHSTACKSIZE too small -> increase if needed)
 
   public:
     CStopRefreshStack() {Count = 0; Ignored = 0;}
-    ~CStopRefreshStack() {CheckIfEmpty(3);} // tri BeginStopRefresh() jsou OK: pro oba panely se vola BeginStopRefresh() a treti se vola z WM_USER_CLOSE_MAINWND (ten se vola jako prvni)
+    ~CStopRefreshStack() {CheckIfEmpty(3);} // three BeginStopRefresh() are OK: BeginStopRefresh() is called for both panels and third is called from WM_USER_CLOSE_MAINWND (which is called first)
 
     void Push(DWORD caller_called_from, DWORD called_from);
     void Pop(DWORD caller_called_from, DWORD called_from);
@@ -780,7 +780,7 @@ CStopRefreshStack StopRefreshStack;
 void BeginStopRefresh(BOOL debugSkipOneCaller, BOOL debugDoNotTestCaller)
 {
     /*
-#ifdef _DEBUG     // testujeme, jestli se BeginStopRefresh() a EndStopRefresh() volaji ze stejne funkce (podle navratove adresy volajici funkce -> takze nepozna "chybu" pri volani z ruznych funkci, ktere se obe volaji ze stejne funkce)
+#ifdef _DEBUG     // test if BeginStopRefresh() and EndStopRefresh() are called from the same function (based on return address of calling function -> so it won't recognize "error" when called from different functions that are both called from the same function)
   DWORD *register_ebp;
   __asm mov register_ebp, ebp
   DWORD called_from, caller_called_from;
@@ -810,7 +810,7 @@ pokud bude jeste nekdy potreba ozivit tenhle kod, vyuzit toho, ze lze nahradit (
 void EndStopRefresh(BOOL postRefresh, BOOL debugSkipOneCaller, BOOL debugDoNotTestCaller)
 {
     /*
-#ifdef _DEBUG     // testujeme, jestli se BeginStopRefresh() a EndStopRefresh() volaji ze stejne funkce (podle navratove adresy volajici funkce -> takze nepozna "chybu" pri volani z ruznych funkci, ktere se obe volaji ze stejne funkce)
+#ifdef _DEBUG     // test if BeginStopRefresh() and EndStopRefresh() are called from the same function (based on return address of calling function -> so it won't recognize "error" when called from different functions that are both called from the same function)
   DWORD *register_ebp;
   __asm mov register_ebp, ebp
   DWORD called_from, caller_called_from;
@@ -843,7 +843,7 @@ pokud bude jeste nekdy potreba ozivit tenhle kod, vyuzit toho, ze lze nahradit (
         if (--StopRefresh == 0)
         {
             //      TRACE_I("End stop refresh mode");
-            // pokud jsme vyblokovali nejaky refresh, dame mu prilezitost probehnout
+            // if we blocked any refresh, give it a chance to run
             if (postRefresh && MainWindow != NULL)
             {
                 if (MainWindow->LeftPanel != NULL)
@@ -857,11 +857,11 @@ pokud bude jeste nekdy potreba ozivit tenhle kod, vyuzit toho, ze lze nahradit (
             }
 
             if (MainWindow != NULL && MainWindow->NeedToResentDispachChangeNotif &&
-                !AlreadyInPlugin) // pokud je jeste v plug-inu, nema posilani zpravy smysl
+                !AlreadyInPlugin) // if still in plugin, sending message makes no sense
             {
                 MainWindow->NeedToResentDispachChangeNotif = FALSE;
 
-                // postneme zadost o rozeslani zprav o zmenach na cestach
+                // post request to dispatch change notification messages on paths
                 HANDLES(EnterCriticalSection(&TimeCounterSection));
                 int t1 = MyTimeCounter++;
                 HANDLES(LeaveCriticalSection(&TimeCounterSection));
@@ -1002,10 +1002,10 @@ void _RemoveTemporaryDir(const char* dir)
 void RemoveTemporaryDir(const char* dir)
 {
     CALL_STACK_MESSAGE2("RemoveTemporaryDir(%s)", dir);
-    SetCurrentDirectory(dir); // aby to lepe odsejpalo (system ma rad cur-dir)
+    SetCurrentDirectory(dir); // so it deletes better (system likes cur-dir)
     if (strlen(dir) < MAX_PATH)
         _RemoveTemporaryDir(dir);
-    SetCurrentDirectoryToSystem(); // musime z nej odejit, jinak nepujde smazat
+    SetCurrentDirectoryToSystem(); // must leave it, otherwise it won't be deletable
 
     ClearReadOnlyAttr(dir);
     RemoveDirectory(dir);
@@ -1047,10 +1047,10 @@ void _RemoveEmptyDirs(const char* dir)
 void RemoveEmptyDirs(const char* dir)
 {
     CALL_STACK_MESSAGE2("RemoveEmptyDirs(%s)", dir);
-    SetCurrentDirectory(dir); // aby to lepe odsejpalo (system ma rad cur-dir)
+    SetCurrentDirectory(dir); // so it deletes better (system likes cur-dir)
     if (strlen(dir) < MAX_PATH)
         _RemoveEmptyDirs(dir);
-    SetCurrentDirectoryToSystem(); // musime z nej odejit, jinak nepujde smazat
+    SetCurrentDirectoryToSystem(); // must leave it, otherwise it won't be deletable
 
     ClearReadOnlyAttr(dir);
     RemoveDirectory(dir);
@@ -1069,7 +1069,7 @@ AGAIN:
     if (newDir != NULL)
         newDir[0] = 0;
     int dirLen = (int)strlen(dir);
-    if (dirLen >= MAX_PATH) // too long name
+    if (dirLen >= SAL_MAX_LONG_PATH) // too long name (use extended path limit)
     {
         if (errBuf != NULL)
             strncpy_s(errBuf, errBufSize, LoadStr(IDS_TOOLONGNAME), _TRUNCATE);
@@ -1078,13 +1078,13 @@ AGAIN:
         return FALSE;
     }
     DWORD attrs = SalGetFileAttributes(dir);
-    char buf[MAX_PATH + 200];
-    char name[MAX_PATH];
-    if (attrs == 0xFFFFFFFF) // asi neexistuje, umoznime jej vytvorit
+    char buf[2 * MAX_PATH + 200]; // for error messages (truncation OK)
+    CPathBuffer name;
+    if (attrs == 0xFFFFFFFF) // probably doesn't exist, allow creating it
     {
         char root[MAX_PATH];
         GetRootPath(root, dir);
-        if (dirLen <= (int)strlen(root)) // dir je root adresar
+        if (dirLen <= (int)strlen(root)) // dir is root directory
         {
             sprintf(buf, LoadStr(IDS_CREATEDIRFAILED), dir);
             if (errBuf != NULL)
@@ -1096,7 +1096,7 @@ AGAIN:
         int msgBoxRet = IDCANCEL;
         if (!quiet)
         {
-            // pokud to user nepotlacil, zobrazime info o neexistenci adresare
+            // if user hasn't suppressed it, show info about directory non-existence
             if (Configuration.CnfrmCreateDir)
             {
                 char title[100];
@@ -1126,7 +1126,7 @@ AGAIN:
         {
             strcpy(name, dir);
             char* s;
-            while (1) // najdeme prvni existujici adresar
+            while (1) // find first existing directory
             {
                 s = strrchr(name, '\\');
                 if (s == NULL)
@@ -1143,16 +1143,16 @@ AGAIN:
                 else
                 {
                     strcpy(name, root);
-                    break; // uz jsme na root-adresari
+                    break; // we're already at root directory
                 }
                 attrs = SalGetFileAttributes(name);
-                if (attrs != 0xFFFFFFFF) // jmeno existuje
+                if (attrs != 0xFFFFFFFF) // name exists
                 {
                     if (attrs & FILE_ATTRIBUTE_DIRECTORY)
-                        break; // budeme stavet od tohoto adresare
-                    else       // je to soubor, to by neslo ...
+                        break; // we'll build from this directory
+                    else       // it's a file, that wouldn't work ...
                     {
-                        sprintf(buf, LoadStr(IDS_NAMEUSEDFORFILE), name);
+                        sprintf(buf, LoadStr(IDS_NAMEUSEDFORFILE), name.Get());
                         if (errBuf != NULL)
                             strncpy_s(errBuf, errBufSize, buf, _TRUNCATE);
                         else
@@ -1187,42 +1187,46 @@ AGAIN:
             BOOL first = TRUE;
             while (*st != 0)
             {
-                BOOL invalidName = manualCrDir && *st <= ' '; // mezery na zacatku jmena vytvareneho adresare jsou nezadouci jen pri rucnim vytvareni (Windows to umi, ale je to potencialne nebezpecne)
+                BOOL invalidName = manualCrDir && *st <= ' '; // spaces at the beginning of created directory name are undesirable only during manual creation (Windows can handle it, but it's potentially dangerous)
                 const char* slash = strchr(st, '\\');
                 if (slash == NULL)
                     slash = st + strlen(st);
                 memcpy(name + len, st, slash - st);
                 name[len += (int)(slash - st)] = 0;
                 if (name[len - 1] <= ' ' || name[len - 1] == '.')
-                    invalidName = TRUE; // mezery a tecky na konci jmena vytvareneho adresare jsou nezadouci
+                    invalidName = TRUE; // spaces and dots at the end of created directory name are undesirable
             AGAIN2:
-                if (invalidName || !CreateDirectory(name, NULL))
+                if (invalidName || !SalLPCreateDirectory(name, NULL))
                 {
                     DWORD lastErr = invalidName ? ERROR_INVALID_NAME : GetLastError();
-                    sprintf(buf, LoadStr(IDS_CREATEDIRFAILED), name);
-                    if (errBuf != NULL)
-                        strncpy_s(errBuf, errBufSize, buf, _TRUNCATE);
-                    else
+                    // ERROR_ALREADY_EXISTS is not a failure - the directory is there, which is what we want
+                    if (lastErr != ERROR_ALREADY_EXISTS)
                     {
-                        if (noRetryButton)
-                        {
-                            CFileErrorDlg dlg(parent, LoadStr(IDS_ERRORCREATINGDIR), dir, GetErrorText(lastErr), FALSE, IDD_ERROR3);
-                            dlg.Execute();
-                        }
+                        sprintf(buf, LoadStr(IDS_CREATEDIRFAILED), name.Get());
+                        if (errBuf != NULL)
+                            strncpy_s(errBuf, errBufSize, buf, _TRUNCATE);
                         else
                         {
-                            CFileErrorDlg dlg(parent, LoadStr(IDS_ERRORCREATINGDIR), dir, GetErrorText(lastErr), TRUE);
-                            if (dlg.Execute() == IDRETRY)
-                                goto AGAIN2;
-                            //              SalMessageBox(parent, buf, LoadStr(IDS_ERRORTITLE), MB_OK | MB_ICONEXCLAMATION);
+                            if (noRetryButton)
+                            {
+                                CFileErrorDlg dlg(parent, LoadStr(IDS_ERRORCREATINGDIR), dir, GetErrorText(lastErr), FALSE, IDD_ERROR3);
+                                dlg.Execute();
+                            }
+                            else
+                            {
+                                CFileErrorDlg dlg(parent, LoadStr(IDS_ERRORCREATINGDIR), dir, GetErrorText(lastErr), TRUE);
+                                if (dlg.Execute() == IDRETRY)
+                                    goto AGAIN2;
+                                //              SalMessageBox(parent, buf, LoadStr(IDS_ERRORTITLE), MB_OK | MB_ICONEXCLAMATION);
+                            }
                         }
+                        return FALSE;
                     }
-                    return FALSE;
                 }
                 else
                 {
                     if (first && newDir != NULL)
-                        strcpy(newDir, name);
+                        strcpy(newDir, name.Get());
                     first = FALSE;
                 }
                 name[len++] = '\\';
@@ -1236,7 +1240,7 @@ AGAIN:
     }
     if (attrs & FILE_ATTRIBUTE_DIRECTORY)
         return TRUE;
-    else // soubor, to by neslo ...
+    else // file, that wouldn't work ...
     {
         sprintf(buf, LoadStr(IDS_NAMEUSEDFORFILE), dir);
         if (errBuf != NULL)
@@ -1294,8 +1298,8 @@ CPathHistoryItem::CPathHistoryItem(int type, const char* pathOrArchiveOrFSName,
         char root[MAX_PATH];
         GetRootPath(root, pathOrArchiveOrFSName);
         const char* e = pathOrArchiveOrFSName + strlen(pathOrArchiveOrFSName);
-        if ((int)strlen(root) < e - pathOrArchiveOrFSName || // neni to root cesta
-            pathOrArchiveOrFSName[0] == '\\')                // je to UNC cesta
+        if ((int)strlen(root) < e - pathOrArchiveOrFSName || // it's not a root path
+            pathOrArchiveOrFSName[0] == '\\')                // it's a UNC path
         {
             if (*(e - 1) == '\\')
                 e--;
@@ -1306,7 +1310,7 @@ CPathHistoryItem::CPathHistoryItem(int type, const char* pathOrArchiveOrFSName,
                 PathOrArchiveOrFSName[e - pathOrArchiveOrFSName] = 0;
             }
         }
-        else // je to normal root cesta (c:\)
+        else // it's a normal root path (c:\)
         {
             PathOrArchiveOrFSName = DupStr(root);
         }
@@ -1322,7 +1326,7 @@ CPathHistoryItem::CPathHistoryItem(int type, const char* pathOrArchiveOrFSName,
     }
     else
     {
-        if (Type == 1 || Type == 2) // archiv nebo FS (jen kopie obou stringu)
+        if (Type == 1 || Type == 2) // archive or FS (just copy of both strings)
         {
             if (Type == 2)
                 PluginFS = pluginFS;
@@ -1363,7 +1367,7 @@ void CPathHistoryItem::ChangeData(int topIndex, const char* focusedName)
     if (FocusedName != NULL)
     {
         if (focusedName != NULL && strcmp(FocusedName, focusedName) == 0)
-            return; // neni zmena -> konec
+            return; // no change -> end
         free(FocusedName);
     }
     if (focusedName != NULL)
@@ -1387,14 +1391,14 @@ void CPathHistoryItem::GetPath(char* buffer, int bufferSize)
         l = bufferSize;
     memcpy(buffer, PathOrArchiveOrFSName, l - 1);
     buffer[l - 1] = 0;
-    if (Type == 1 || Type == 2) // archiv nebo FS
+    if (Type == 1 || Type == 2) // archive or FS
     {
         buffer += l - 1;
         bufferSize -= l - 1;
         char* s = ArchivePathOrFSUserPart;
         if (*s != 0 || Type == 2)
         {
-            if (bufferSize >= 2) // doplnime '\\' nebo ':'
+            if (bufferSize >= 2) // add '\\' or ':'
             {
                 *buffer++ = Type == 1 ? '\\' : ':';
                 *buffer = 0;
@@ -1408,7 +1412,7 @@ void CPathHistoryItem::GetPath(char* buffer, int bufferSize)
         }
     }
 
-    // musime zdvojit vsechny '&' jinak z nich budou podtrzeni
+    // must double all '&' otherwise they'll become underlines
     DuplicateAmpersands(origBuffer, bufferSize);
 }
 
@@ -1442,14 +1446,14 @@ BOOL DuplicateAmpersands(char* buffer, int bufferSize, BOOL skipFirstAmpersand)
             {
                 if (l + 1 < bufferSize)
                 {
-                    memmove(s + 1, s, l - (s - buffer) + 1); // zdvojime '&'
+                    memmove(s + 1, s, l - (s - buffer) + 1); // double '&'
                     l++;
                     s++;
                 }
-                else // nevejde se, orizneme buffer
+                else // doesn't fit, trim buffer
                 {
                     ret = FALSE;
-                    memmove(s + 1, s, l - (s - buffer)); // zdvojime '&', orizneme o znak
+                    memmove(s + 1, s, l - (s - buffer)); // double '&', trim by one character
                     buffer[l] = 0;
                     s++;
                 }
@@ -1481,7 +1485,7 @@ void RemoveAmpersands(char* text)
             else
             {
                 if (*(s + 1) == '&')
-                    *d++ = *s++; // dvojice "&&" -> nahradime '&'
+                    *d++ = *s++; // pair "&&" -> replace with '&'
                 s++;
             }
         }
@@ -1491,9 +1495,9 @@ void RemoveAmpersands(char* text)
 
 BOOL CPathHistoryItem::Execute(CFilesWindow* panel)
 {
-    BOOL ret = TRUE; // standardne vracime uspech
+    BOOL ret = TRUE; // normally return success
     char errBuf[MAX_PATH + 200];
-    if (PathOrArchiveOrFSName != NULL) // jsou platna data
+    if (PathOrArchiveOrFSName != NULL) // valid data
     {
         int failReason;
         BOOL clear = TRUE;
@@ -1504,14 +1508,14 @@ BOOL CPathHistoryItem::Execute(CFilesWindow* panel)
             {
                 if (failReason == CHPPFR_CANNOTCLOSEPATH)
                 {
-                    ret = FALSE;   // zustavame na miste
-                    clear = FALSE; // zadny skok, neni treba mazat top-indexy
+                    ret = FALSE;   // stay in place
+                    clear = FALSE; // no jump, no need to clear top-indexes
                 }
             }
         }
         else
         {
-            if (Type == 1) // archiv
+            if (Type == 1) // archive
             {
                 if (!panel->ChangePathToArchive(PathOrArchiveOrFSName, ArchivePathOrFSUserPart, TopIndex,
                                                 FocusedName, FALSE, NULL, TRUE, &failReason, FALSE, FALSE, TRUE))
@@ -1537,10 +1541,10 @@ BOOL CPathHistoryItem::Execute(CFilesWindow* panel)
                 if (Type == 2) // FS
                 {
                     BOOL done = FALSE;
-                    // pokud je znamy FS interface, ve kterem byla cesta naposledy otevrena, zkusime
-                    // ho najit mezi odpojenymi a pouzit
-                    if (MainWindow != NULL && PluginFS != NULL && // pokud je znamy FS interface
-                        (!panel->Is(ptPluginFS) ||                // a pokud neni prave v panelu
+                    // if FS interface is known in which the path was last opened, try to
+                    // find it among detached ones and use it
+                    if (MainWindow != NULL && PluginFS != NULL && // if FS interface is known
+                        (!panel->Is(ptPluginFS) ||                // and if it's not currently in panel
                          !panel->GetPluginFS()->Contains(PluginFS)))
                     {
                         CDetachedFSList* list = MainWindow->DetachedFSList;
@@ -1550,8 +1554,8 @@ BOOL CPathHistoryItem::Execute(CFilesWindow* panel)
                             if (list->At(i)->Contains(PluginFS))
                             {
                                 done = TRUE;
-                                // zkusime zmenu na pozadovanou cestu (posledne tam byla, nemusime testovat IsOurPath),
-                                // zaroven pripojime odpojene FS
+                                // try changing to requested path (it was there last time, don't need to test IsOurPath),
+                                // also reconnect detached FS
                                 if (!panel->ChangePathToDetachedFS(i, TopIndex, FocusedName, TRUE, &failReason,
                                                                    PathOrArchiveOrFSName, ArchivePathOrFSUserPart))
                                 {
@@ -1562,18 +1566,18 @@ BOOL CPathHistoryItem::Execute(CFilesWindow* panel)
                                     }
                                 }
 
-                                break; // konec, dalsi shoda s PluginFS uz nepripada v uvahu
+                                break; // end, another match with PluginFS is out of question
                             }
                         }
                     }
 
-                    // pokud predchozi cast neuspela a cestu nelze vylistovat ve FS interfacu v panelu,
-                    // zkusime najit odpojeny FS interface, ktery by cestu umel vylistovat (aby se
-                    // zbytecne neoteviral novy FS)
+                    // if previous part failed and path cannot be listed in FS interface in panel,
+                    // try to find detached FS interface that could list the path (to avoid
+                    // unnecessarily opening new FS)
                     int fsNameIndex;
                     BOOL convertPathToInternalDummy = FALSE;
                     if (!done && MainWindow != NULL &&
-                        (!panel->Is(ptPluginFS) || // FS interface v panelu cestu neumi vylistovat
+                        (!panel->Is(ptPluginFS) || // FS interface in panel cannot list the path
                          !panel->GetPluginFS()->Contains(PluginFS) &&
                              !panel->IsPathFromActiveFS(PathOrArchiveOrFSName, ArchivePathOrFSUserPart,
                                                         fsNameIndex, convertPathToInternalDummy)))
@@ -1585,12 +1589,12 @@ BOOL CPathHistoryItem::Execute(CFilesWindow* panel)
                             if (list->At(i)->IsPathFromThisFS(PathOrArchiveOrFSName, ArchivePathOrFSUserPart))
                             {
                                 done = TRUE;
-                                // zkusime zmenu na pozadovanou cestu, zaroven pripojime odpojene FS
+                                // try changing to requested path, also reconnect detached FS
                                 if (!panel->ChangePathToDetachedFS(i, TopIndex, FocusedName, TRUE, &failReason,
                                                                    PathOrArchiveOrFSName, ArchivePathOrFSUserPart))
                                 {
-                                    if (failReason == CHPPFR_SHORTERPATH) // temer uspech (cesta je jen zkracena) (CHPPFR_FILENAMEFOCUSED tu nehrozi)
-                                    {                                     // obnovime zaznam o FS interfacu
+                                    if (failReason == CHPPFR_SHORTERPATH) // almost success (path is just shortened) (CHPPFR_FILENAMEFOCUSED not a risk here)
+                                    {                                     // restore FS interface record
                                         if (panel->Is(ptPluginFS))
                                             PluginFS = panel->GetPluginFS()->GetInterface();
                                     }
@@ -1600,8 +1604,8 @@ BOOL CPathHistoryItem::Execute(CFilesWindow* panel)
                                         clear = FALSE; // zadny skok, neni treba mazat top-indexy
                                     }
                                 }
-                                else // uplny uspech
-                                {    // obnovime zaznam o FS interfacu
+                                else // complete success
+                                {    // restore FS interface record
                                     if (panel->Is(ptPluginFS))
                                         PluginFS = panel->GetPluginFS()->GetInterface();
                                 }
@@ -1611,15 +1615,15 @@ BOOL CPathHistoryItem::Execute(CFilesWindow* panel)
                         }
                     }
 
-                    // kdyz to nejde jinak, otevreme novy FS interface nebo jen zmenime cestu na aktivnim FS interfacu
+                    // when nothing else works, open new FS interface or just change path on active FS interface
                     if (!done)
                     {
                         if (!panel->ChangePathToPluginFS(PathOrArchiveOrFSName, ArchivePathOrFSUserPart, TopIndex,
                                                          FocusedName, FALSE, 2, NULL, TRUE, &failReason))
                         {
-                            if (failReason == CHPPFR_SHORTERPATH ||   // temer uspech (cesta je jen zkracena)
-                                failReason == CHPPFR_FILENAMEFOCUSED) // temer uspech (cesta se jen zmenila na soubor a ten byl vyfokusen)
-                            {                                         // obnovime zaznam o FS interfacu
+                            if (failReason == CHPPFR_SHORTERPATH ||   // almost success (path is just shortened)
+                                failReason == CHPPFR_FILENAMEFOCUSED) // almost success (path just changed to file and it was focused)
+                            {                                         // restore FS interface record
                                 if (panel->Is(ptPluginFS))
                                     PluginFS = panel->GetPluginFS()->GetInterface();
                             }
@@ -1629,8 +1633,8 @@ BOOL CPathHistoryItem::Execute(CFilesWindow* panel)
                                 clear = FALSE; // zadny skok, neni treba mazat top-indexy
                             }
                         }
-                        else // uplny uspech
-                        {    // obnovime zaznam o FS interfacu
+                        else // complete success
+                        {    // restore FS interface record
                             if (panel->Is(ptPluginFS))
                                 PluginFS = panel->GetPluginFS()->GetInterface();
                         }
@@ -1639,7 +1643,7 @@ BOOL CPathHistoryItem::Execute(CFilesWindow* panel)
             }
         }
         if (clear)
-            panel->TopIndexMem.Clear(); // dlouhy skok
+            panel->TopIndexMem.Clear(); // long jump
     }
     UpdateWindow(MainWindow->HWindow);
     return ret;
@@ -1660,10 +1664,10 @@ BOOL CPathHistoryItem::IsTheSamePath(CPathHistoryItem& item, CPluginFSInterfaceE
         }
         else
         {
-            if (Type == 1) // archiv
+            if (Type == 1) // archivee
             {
-                if (StrICmp(PathOrArchiveOrFSName, item.PathOrArchiveOrFSName) == 0 &&  // soubor archivu je "case-insensitive"
-                    strcmp(ArchivePathOrFSUserPart, item.ArchivePathOrFSUserPart) == 0) // cesta v archivu je "case-sensitive"
+                if (StrICmp(PathOrArchiveOrFSName, item.PathOrArchiveOrFSName) == 0 &&  // archive file is "case-insensitive"
+                    strcmp(ArchivePathOrFSUserPart, item.ArchivePathOrFSUserPart) == 0) // path in archive is "case-sensitive"
                 {
                     return TRUE;
                 }
@@ -1672,11 +1676,11 @@ BOOL CPathHistoryItem::IsTheSamePath(CPathHistoryItem& item, CPluginFSInterfaceE
             {
                 if (Type == 2) // FS
                 {
-                    if (StrICmp(PathOrArchiveOrFSName, item.PathOrArchiveOrFSName) == 0) // fs-name je "case-insensitive"
+                    if (StrICmp(PathOrArchiveOrFSName, item.PathOrArchiveOrFSName) == 0) // fs-name is "case-insensitive"
                     {
-                        if (strcmp(ArchivePathOrFSUserPart, item.ArchivePathOrFSUserPart) == 0) // fs-user-part je "case-sensitive"
+                        if (strcmp(ArchivePathOrFSUserPart, item.ArchivePathOrFSUserPart) == 0) // fs-user-part is "case-sensitive"
                             return TRUE;
-                        if (curPluginFS != NULL && // resime jeste pripad, kdy jsou obe fs-user-part shodne z duvodu, ze pro ne FS vrati TRUE z IsCurrentPath (obecne bysme museli zavest metodu pro porovnani dvou fs-user-part, coz se mi ale jen kvuli historiim nechce, treba casem...)
+                        if (curPluginFS != NULL && // also handle case when both fs-user-parts are identical because FS returns TRUE from IsCurrentPath for them (generally we would need to introduce method for comparing two fs-user-parts, but I don't want to do it just for histories, maybe later...)
                             StrICmp(PathOrArchiveOrFSName, curPluginFS->GetPluginFSName()) == 0)
                         {
                             int fsNameInd = curPluginFS->GetPluginFSNameIndex();
@@ -1823,7 +1827,7 @@ void CPathHistory::Execute(int index, BOOL forward, CFilesWindow* panel, BOOL al
     if (Lock)
         return;
 
-    CPathHistoryItem* item = NULL; // pokud mame cestu vyradit, ulozime si na ni ukazatel pro dohledani
+    CPathHistoryItem* item = NULL; // if we need to remove path, save pointer to it for lookup
 
     BOOL change = TRUE;
     if (forward)
@@ -1836,7 +1840,7 @@ void CPathHistory::Execute(int index, BOOL forward, CFilesWindow* panel, BOOL al
                 item = Paths[ForwardIndex + index - 1];
                 change = item->Execute(panel);
                 if (!change)
-                    item = NULL; // nepodarilo se zmenit cestu => nechame ji v historii
+                    item = NULL; // failed to change path => leave it in history
                 Lock = FALSE;
             }
             if (change && !DontChangeForwardIndex)
@@ -1847,11 +1851,11 @@ void CPathHistory::Execute(int index, BOOL forward, CFilesWindow* panel, BOOL al
     }
     else
     {
-        index--; // z duvodu pocatku cislovani od 2 v FillPopupMenu
+        index--; // because numbering starts from 2 in FillPopupMenu
         if (HasBackward() || allItems && HasPaths())
         {
             int count = ((ForwardIndex == -1) ? Paths.Count : ForwardIndex) - 1;
-            if (count - index >= 0) // mame kam jit (neni to posledni polozka)
+            if (count - index >= 0) // have where to go (it's not the last item)
             {
                 if (count - index < Paths.Count)
                 {
@@ -1859,7 +1863,7 @@ void CPathHistory::Execute(int index, BOOL forward, CFilesWindow* panel, BOOL al
                     item = Paths[count - index];
                     change = item->Execute(panel);
                     if (!change)
-                        item = NULL; // nepodarilo se zmenit cestu => nechame ji v historii
+                        item = NULL; // failed to change path => leave it in history
                     Lock = FALSE;
                 }
                 if (change && !DontChangeForwardIndex)
@@ -1867,13 +1871,13 @@ void CPathHistory::Execute(int index, BOOL forward, CFilesWindow* panel, BOOL al
             }
         }
     }
-    IdleRefreshStates = TRUE; // pri pristim Idle vynutime kontrolu stavovych promennych
+    IdleRefreshStates = TRUE; // force check of status variables on next Idle
 
     if (NewItem != NULL)
     {
         AddPathUnique(NewItem->Type, NewItem->PathOrArchiveOrFSName, NewItem->ArchivePathOrFSUserPart,
                       NewItem->HIcon, NewItem->PluginFS, NULL);
-        NewItem->HIcon = NULL; // zodpovednost za destrukci ikony si prebrala metoda AddPathUnique
+        NewItem->HIcon = NULL; // AddPathUnique method took over responsibility for icon destruction
         delete NewItem;
         NewItem = NULL;
     }
@@ -1881,7 +1885,7 @@ void CPathHistory::Execute(int index, BOOL forward, CFilesWindow* panel, BOOL al
     {
         if (DontChangeForwardIndex)
         {
-            // vyradime execlou polozku ze seznamu
+            // remove executed item from list
             Lock = TRUE;
             int i;
             for (i = 0; i < Paths.Count; i++)
@@ -1921,7 +1925,7 @@ void CPathHistory::ChangeActualPathData(int type, const char* pathOrArchiveOrFSN
         else
             n2 = Paths[Paths.Count - 1];
 
-        if (n2 != NULL && n.IsTheSamePath(*n2, curPluginFS)) // stejne cesty -> zmenime data
+        if (n2 != NULL && n.IsTheSamePath(*n2, curPluginFS)) // same paths -> change data
             n2->ChangeData(topIndex, focusedName);
     }
 }
@@ -1939,7 +1943,7 @@ void CPathHistory::RemoveActualPath(int type, const char* pathOrArchiveOrFSName,
         {
             CPathHistoryItem n(type, pathOrArchiveOrFSName, archivePathOrFSUserPart, NULL, pluginFS);
             CPathHistoryItem* n2 = Paths[Paths.Count - 1];
-            if (n.IsTheSamePath(*n2, curPluginFS)) // stejne cesty -> smazeme zaznam
+            if (n.IsTheSamePath(*n2, curPluginFS)) // same paths -> delete record
                 Paths.Delete(Paths.Count - 1);
         }
         else
@@ -1976,11 +1980,11 @@ void CPathHistory::AddPath(int type, const char* pathOrArchiveOrFSName, const ch
         if (n2 != NULL && n->IsTheSamePath(*n2, curPluginFS))
         {
             delete n;
-            return; // stejne cesty -> neni co delat
+            return; // same paths -> nothing to do
         }
     }
 
-    // cestu je opravdu potreba pridat ...
+    // path really needs to be added ...
     if (ForwardIndex != -1)
     {
         while (Paths.IsGood() && ForwardIndex < Paths.Count)
@@ -2053,7 +2057,7 @@ void CPathHistory::AddPathUnique(int type, const char* pathOrArchiveOrFSName, co
         }
     }
 
-    // cestu je opravdu potreba pridat ...
+    // path really needs to be added ...
     if (ForwardIndex != -1)
     {
         while (Paths.IsGood() && ForwardIndex < Paths.Count)
@@ -2081,7 +2085,7 @@ void CPathHistory::SaveToRegistry(HKEY hKey, const char* name, BOOL onlyClear)
     {
         ClearKey(historyKey);
 
-        if (!onlyClear) // pokud se nema jen vycistit klic, ulozime hodnoty z historie
+        if (!onlyClear) // if key should not just be cleared, save values from history
         {
             int index = 0;
             char buf[10];
@@ -2098,8 +2102,8 @@ void CPathHistory::SaveToRegistry(HKEY hKey, const char* name, BOOL onlyClear)
                     break;
                 }
 
-                // archive & FS: pouzijeme znak ':' jako oddelovac dvou casti cesty
-                // behem loadu podle tohoto znaku urcime, o jaky typ cesty se jedna
+                // archive & FS: use ':' character as separator of two path parts
+                // during load we'll determine path type based on this character
                 case 1: // archive
                 case 2: // FS
                 {
@@ -2144,14 +2148,14 @@ void CPathHistory::LoadFromRegistry(HKEY hKey, const char* name)
             {
                 if (strlen(path) >= 2)
                 {
-                    // cesta muze byt typu
-                    // 0 (disk): "C:\???" nebo "\\server\???"
-                    // 1 (archive): "C:\???:" nebo "\\server\???:"
+                    // path can be of type
+                    // 0 (disk): "C:\???" or "\\server\???"
+                    // 1 (archive): "C:\???:" or "\\server\???:"
                     // 2 (FS): "XY:???"
-                    type = -1; // nepridavat
+                    type = -1; // don't add
                     if ((path[0] == '\\' && path[1] == '\\') || path[1] == ':')
                     {
-                        // jde o type==0 (disk) nebo type==1 (archive)
+                        // it's type==0 (disk) or type==1 (archive)
                         pathOrArchiveOrFSName = path;
                         char* separator = strchr(path + 2, ':');
                         if (separator == NULL)
@@ -2168,7 +2172,7 @@ void CPathHistory::LoadFromRegistry(HKEY hKey, const char* name)
                     }
                     else
                     {
-                        // kandidat na FS path
+                        // candidate for FS path
                         if (IsPluginFSPath(path, fsName, &archivePathOrFSUserPart))
                         {
                             pathOrArchiveOrFSName = fsName;
@@ -2234,8 +2238,8 @@ CUserMenuIconDataArr::GiveIconForUMI(const char* fileName, DWORD iconIndex, cons
             strcmp(item->FileName, fileName) == 0 &&
             strcmp(item->UMCommand, umCommand) == 0)
         {
-            HICON icon = item->LoadedIcon; // LoadedIcon vyNULLujem, jinak by se dealokovalo (pres DestroyIcon())
-            item->Clear();                 // nechceme sesouvat pole (pri mazani) - pomale+zbytecne, tak aspon vycistime polozku, aby se rychleji preskocila pri hledani
+            HICON icon = item->LoadedIcon; // NULL LoadedIcon, otherwise it would be deallocated (via DestroyIcon())
+            item->Clear();                 // don't want to shift array (during deletion) - slow+unnecessary, so just clear item so it's skipped faster during search
             return icon;
         }
     }
@@ -2288,7 +2292,7 @@ unsigned BkgndReadingIconsThreadBody(void* param)
         CUserMenuIconData* item = bkgndReaderData->At(i);
         HICON umIcon;
         if (item->FileName[0] != 0 &&
-            SalGetFileAttributes(item->FileName) != INVALID_FILE_ATTRIBUTES && // test pristupnosti (misto CheckPath)
+            SalGetFileAttributes(item->FileName) != INVALID_FILE_ATTRIBUTES && // accessibility test (instead of CheckPath)
             ExtractIconEx(item->FileName, item->IconIndex, NULL, &umIcon, 1) == 1)
         {
             HANDLES_ADD(__htIcon, __hoLoadImage, umIcon); // pridame handle na 'umIcon' do HANDLES
@@ -2297,16 +2301,16 @@ unsigned BkgndReadingIconsThreadBody(void* param)
         {
             umIcon = NULL;
             if (item->UMCommand[0] != 0)
-            { // pro pripad, ze by minula metoda selhala - zkusim ziskat ikonku od systemu
+            { // in case previous method failed - try to get icon from system
                 DWORD attrs = SalGetFileAttributes(item->UMCommand);
-                if (attrs != INVALID_FILE_ATTRIBUTES) // test pristupnosti (misto CheckPath)
+                if (attrs != INVALID_FILE_ATTRIBUTES) // accessibility test (instead of CheckPath)
                 {
                     umIcon = GetFileOrPathIconAux(item->UMCommand, FALSE,
                                                   (attrs != INVALID_FILE_ATTRIBUTES && (attrs & FILE_ATTRIBUTE_DIRECTORY)));
                 }
             }
         }
-        item->LoadedIcon = umIcon; // ulozime vysledek: nactenou ikonu nebo NULL pri chybe
+        item->LoadedIcon = umIcon; // save result: loaded icon or NULL on error
     }
 
     UserMenuIconBkgndReader.ReadingFinished(threadID, bkgndReaderData);
@@ -2355,14 +2359,14 @@ void CUserMenuIconBkgndReader::StartBkgndReadingIcons(CUserMenuIconDataArr* bkgn
         thread = HANDLES(CreateThread(NULL, 0, BkgndReadingIconsThread, bkgndReaderData, 0, NULL));
         if (thread != NULL)
         {
-            // hlavni thread jede na vyssi priorite, jestli se maji ikony cist stejne rychle
-            // jako pred zavedenim cteni ve vedlejsim threadu, musime mu tez zvysit prioritu
+            // main thread runs at higher priority, if icons should be read as fast
+            // as before introducing reading in separate thread, we must also increase its priority
             SetThreadPriority(thread, THREAD_PRIORITY_ABOVE_NORMAL);
 
-            bkgndReaderData = NULL; // jsou predana v threadu, nebudeme je uvolnovat zde
+            bkgndReaderData = NULL; // passed to thread, won't free them here
             CurIRThreadIDIsValid = TRUE;
             CurIRThreadID = newThreadID;
-            AddAuxThread(thread); // pokud by thread nestihl dobehnout, vykillujeme ho pred uzavrenim softu
+            AddAuxThread(thread); // if thread doesn't finish in time, kill it before closing software
         }
         else
             TRACE_E("CUserMenuIconBkgndReader::StartBkgndReadingIcons(): unable to start thread for reading user menu icons.");
@@ -2371,11 +2375,11 @@ void CUserMenuIconBkgndReader::StartBkgndReadingIcons(CUserMenuIconDataArr* bkgn
         delete bkgndReaderData;
     HANDLES(LeaveCriticalSection(&CS));
 
-    // na kratkou chvilku se pozastavime, pokud se ikony prectou rychle, tak se vubec neukazou "simple"
-    // varianty (mene blikani) + nekteri uzivatele hlasili, ze se diky soucasnemu nacitani ikon do panelu
-    // dost hrube zpomalilo cteni ikon do usermenu a diky tomu se jim ikony na usermenu toolbare ukazuji
-    // s velkym zpozdenim, coz je osklive, toto by tomu melo predejit (bude to proste resit jen pomale
-    // nacitani usermenu ikon, coz je cilem cele tehle taskarice)
+    // pause for a short moment, if icons are read quickly, "simple"
+    // variants won't show at all (less blinking) + some users reported that due to concurrent icon loading into panel
+    // icon reading into usermenu slowed down quite roughly and because of that icons on usermenu toolbar show
+    // with big delay, which is ugly, this should prevent it (it will simply handle just slow
+    // usermenu icon loading, which is the goal of this whole task)
     if (thread != NULL)
     {
         //    TRACE_I("Waiting for finishing of thread for reading user menu icons...");
@@ -2419,7 +2423,7 @@ void CUserMenuIconBkgndReader::ReadingFinished(DWORD threadID, CUserMenuIconData
     HWND mainWnd = ok ? MainWindow->HWindow : NULL;
     HANDLES(LeaveCriticalSection(&CS));
 
-    if (ok) // na tyto ikony stale jeste ceka User Menu
+    if (ok) // User Menu is still waiting for these icons
         PostMessage(mainWnd, WM_USER_USERMENUICONS_READY, (WPARAM)bkgndReaderData, (LPARAM)threadID);
     else
         delete bkgndReaderData;
@@ -2445,13 +2449,13 @@ void CUserMenuIconBkgndReader::EndUserMenuIconsInUse()
     {
         UserMenuIconsInUse--;
         if (UserMenuIconsInUse == 0 && UserMenuIIU_BkgndReaderData != NULL)
-        { // posledni zamek, pokud mame ulozena data ke zpracovani, posleme je
+        { // last lock, if we have saved data to process, send it
             if (CurIRThreadIDIsValid && CurIRThreadID == UserMenuIIU_ThreadID)
             {
                 PostMessage(MainWindow->HWindow, WM_USER_USERMENUICONS_READY,
                             (WPARAM)UserMenuIIU_BkgndReaderData, (LPARAM)UserMenuIIU_ThreadID);
             }
-            else // o data uz nikdo nestoji, jen je uvolnime
+            else // nobody wants the data anymore, just free it
                 delete UserMenuIIU_BkgndReaderData;
             UserMenuIIU_BkgndReaderData = NULL;
             UserMenuIIU_ThreadID = 0;
@@ -2469,11 +2473,11 @@ BOOL CUserMenuIconBkgndReader::EnterCSIfCanUpdateUMIcons(CUserMenuIconDataArr** 
     {
         if (UserMenuIconsInUse > 0)
         {
-            if (UserMenuIIU_BkgndReaderData != NULL) // pokud jsou uz nejake ulozene, uvolnime je (vlezu do cfg behem nacitani, pak zmena barev a prijde to sem podruhe)
+            if (UserMenuIIU_BkgndReaderData != NULL) // if some are already saved, free them (enter cfg during loading, then color change and it comes here second time)
                 delete UserMenuIIU_BkgndReaderData;
             UserMenuIIU_BkgndReaderData = *bkgndReaderData;
             UserMenuIIU_ThreadID = threadID;
-            *bkgndReaderData = NULL; // volajici nam timto data predal, uvolnime je casem sami
+            *bkgndReaderData = NULL; // caller passed us data this way, we'll free them ourselves later
         }
         else
         {
@@ -2488,7 +2492,7 @@ BOOL CUserMenuIconBkgndReader::EnterCSIfCanUpdateUMIcons(CUserMenuIconDataArr** 
 
 void CUserMenuIconBkgndReader::LeaveCSAfterUMIconsUpdate()
 {
-    CurIRThreadIDIsValid = FALSE; // timto jsou ikony predane do usermenu (IsReadingIcons() musi vracet FALSE)
+    CurIRThreadIDIsValid = FALSE; // by this icons are passed to usermenu (IsReadingIcons() must return FALSE)
     HANDLES(LeaveCriticalSection(&CS));
 }
 
@@ -2540,10 +2544,10 @@ CUserMenuItem::CUserMenuItem(CUserMenuItem& item, CUserMenuIconDataArr* bkgndRea
     Set(item.ItemName, item.UMCommand, item.Arguments, item.InitDir, item.Icon);
     if (Type == umitItem)
     {
-        if (bkgndReaderData == NULL) // tady jde o kopii do cfg dialogu, tam nove nactene ikony nepropagujeme (pockame az na konec dialogu)
+        if (bkgndReaderData == NULL) // here it's a copy to cfg dialog, we don't propagate newly loaded icons there (wait until dialog end)
         {
-            UMIcon = DuplicateIcon(NULL, item.UMIcon); // GetIconHandle(); zbytecne brzdilo
-            if (UMIcon != NULL)                        // pridame handle na 'UMIcon' do HANDLES
+            UMIcon = DuplicateIcon(NULL, item.UMIcon); // GetIconHandle(); unnecessarily slow
+            if (UMIcon != NULL)                        // add 'UMIcon' handle to HANDLES
                 HANDLES_ADD(__htIcon, __hoLoadImage, UMIcon);
         }
         else
@@ -2559,7 +2563,7 @@ CUserMenuItem::CUserMenuItem(CUserMenuItem& item, CUserMenuIconDataArr* bkgndRea
 
 CUserMenuItem::~CUserMenuItem()
 {
-    // umitSubmenuBegin sdili jednu ikonu
+    // umitSubmenuBegin shares one icon
     if (UMIcon != NULL && Type != umitSubmenuBegin)
         HANDLES(DestroyIcon(UMIcon));
     if (ItemName != NULL)
@@ -2619,7 +2623,7 @@ void CUserMenuItem::SetType(CUserMenuItemType type)
     {
         if (type == umitSubmenuBegin)
         {
-            // prechazime na sdilenou ikonu, smazneme alokovanou
+            // switching to shared icon, delete allocated one
             if (UMIcon != NULL)
             {
                 HANDLES(DestroyIcon(UMIcon));
@@ -2627,7 +2631,7 @@ void CUserMenuItem::SetType(CUserMenuItemType type)
             }
         }
         if (Type == umitSubmenuBegin)
-            UMIcon = NULL; // odchazime ze sdilene ikony
+            UMIcon = NULL; // leaving shared icon
     }
     Type = type;
 }
@@ -2646,17 +2650,17 @@ BOOL CUserMenuItem::GetIconHandle(CUserMenuIconDataArr* bkgndReaderData, BOOL ge
         UMIcon = NULL;
     }
 
-    if (Type == umitSeparator) // separator nema ikonku
+    if (Type == umitSeparator) // separator has no icon
         return TRUE;
 
-    // pokusim se vytahnout ikonu ze specifikovaneho souboru
+    // try to extract icon from specified file
     char fileName[MAX_PATH];
     fileName[0] = 0;
     DWORD iconIndex = -1;
     if (MainWindow != NULL && Icon != NULL && Icon[0] != 0)
     {
-        // Icon je ve formatu "nazev souboru,resID"
-        // provedu rozklad
+        // Icon is in format "filename,resID"
+        // perform decomposition
         char* iterator = Icon + strlen(Icon) - 1;
         while (iterator > Icon && *iterator != ',')
             iterator--;
@@ -2669,16 +2673,16 @@ BOOL CUserMenuItem::GetIconHandle(CUserMenuIconDataArr* bkgndReaderData, BOOL ge
         }
     }
 
-    if (bkgndReaderData == NULL && fileName[0] != 0 && // mame cist ikony hned tady
+    if (bkgndReaderData == NULL && fileName[0] != 0 && // read icons right here
         MainWindow->GetActivePanel() != NULL &&
         MainWindow->GetActivePanel()->CheckPath(FALSE, fileName) == ERROR_SUCCESS &&
         ExtractIconEx(fileName, iconIndex, NULL, &UMIcon, 1) == 1)
     {
-        HANDLES_ADD(__htIcon, __hoLoadImage, UMIcon); // pridame handle na 'UMIcon' do HANDLES
+        HANDLES_ADD(__htIcon, __hoLoadImage, UMIcon); // add 'UMIcon' handle to HANDLES
         return TRUE;
     }
 
-    // pro pripad, ze by minula metoda selhala - zkusim ziskat ikonku od systemu
+    // in case previous method failed - try to get icon from system
     char umCommand[MAX_PATH];
     if (MainWindow != NULL && UMCommand != NULL && UMCommand[0] != 0 &&
         ExpandCommand(MainWindow->HWindow, UMCommand, umCommand, MAX_PATH, TRUE))
@@ -2689,7 +2693,7 @@ BOOL CUserMenuItem::GetIconHandle(CUserMenuIconDataArr* bkgndReaderData, BOOL ge
     else
         umCommand[0] = 0;
 
-    if (bkgndReaderData == NULL && umCommand[0] != 0 && // mame cist ikony hned tady
+    if (bkgndReaderData == NULL && umCommand[0] != 0 && // read icons right here
         MainWindow->GetActivePanel() != NULL &&
         MainWindow->GetActivePanel()->CheckPath(FALSE, umCommand) == ERROR_SUCCESS)
     {
@@ -2702,17 +2706,17 @@ BOOL CUserMenuItem::GetIconHandle(CUserMenuIconDataArr* bkgndReaderData, BOOL ge
 
     if (bkgndReaderData != NULL)
     {
-        if (getIconsFromReader) // ikoy uz jsou nactene, jen prevezmeme tu spravnou
+        if (getIconsFromReader) // icons are already loaded, just take the right one
         {
             UMIcon = bkgndReaderData->GiveIconForUMI(fileName, iconIndex, umCommand);
             if (UMIcon != NULL)
                 return TRUE;
         }
-        else // zadame nacteni potrebne ikony
+        else // request loading of needed icon
             bkgndReaderData->Add(new CUserMenuIconData(fileName, iconIndex, umCommand));
     }
 
-    // vytahnu implicitni ikonu z shell32.dll
+    // extract default icon from shell32.dll
     UMIcon = SalLoadImage(2, 1, IconSizes[ICONSIZE_16], IconSizes[ICONSIZE_16], IconLRFlags);
     return TRUE;
 }
@@ -2751,7 +2755,7 @@ BOOL CUserMenuItems::LoadUMI(CUserMenuItems& source, BOOL readNewIconsOnBkgnd)
         Add(item);
     }
     if (readNewIconsOnBkgnd)
-        UserMenuIconBkgndReader.StartBkgndReadingIcons(bkgndReaderData); // POZOR: uvolni 'bkgndReaderData'
+        UserMenuIconBkgndReader.StartBkgndReadingIcons(bkgndReaderData); // WARNING: frees 'bkgndReaderData'
     return TRUE;
 }
 
@@ -2859,7 +2863,7 @@ UINT GetMouseWheelScrollChars()
 
 BOOL PostMouseWheelMessage(MSG* pMSG)
 {
-    // nechame najit okno pod kurzorem mysi
+    // let find window under mouse cursor
     HWND hWindow = WindowFromPoint(pMSG->pt);
     if (hWindow != NULL)
     {
@@ -2867,9 +2871,9 @@ BOOL PostMouseWheelMessage(MSG* pMSG)
         className[0] = 0;
         if (GetClassName(hWindow, className, 100) != 0)
         {
-            // nektere verze synaptics touchpad (napriklad na HP noteboocich) zobrazi pod kurzorem sve okno se symbolem
-            // scrolovani; v takovem pripade se nebudeme snazit o routeni do "spravneho" okna pod kurzorem, protoze
-            // se o to postara sam touchpad
+            // some versions of synaptics touchpad (for example on HP notebooks) show their window with scrolling symbol under cursor
+            // in such case we won't try to route to "correct" window under cursor, because
+            // touchpad will handle it itself
             // https://forum.altap.cz/viewtopic.php?f=24&t=6039
             if (strcmp(className, "SynTrackCursorWindowClass") == 0 || strcmp(className, "Syn Visual Class") == 0)
             {
@@ -2880,7 +2884,7 @@ BOOL PostMouseWheelMessage(MSG* pMSG)
             {
                 DWORD winProcessId = 0;
                 GetWindowThreadProcessId(hWindow, &winProcessId);
-                if (winProcessId != GetCurrentProcessId()) // WM_USER_* nema smysl posilat mimo nas proces
+                if (winProcessId != GetCurrentProcessId()) // no point sending WM_USER_* outside our process
                     hWindow = pMSG->hwnd;
             }
         }
@@ -2889,9 +2893,9 @@ BOOL PostMouseWheelMessage(MSG* pMSG)
             TRACE_E("GetClassName() failed!");
             hWindow = pMSG->hwnd;
         }
-        // pokud jde o ScrollBar, ktery ma parenta, postneme zpravu do parenta.
-        // Scrollbars v panelech nejsou subclassnute, takze je to momentalne jediny zpusob,
-        // jak se muze panel dozvedet o toceni koleckem pokud kurzor stoji nad rolovatkem.
+        // if it's a ScrollBar with a parent, post message to parent.
+        // Scrollbars in panels aren't subclassed, so this is currently the only way
+        // panel can learn about wheel rotation when cursor is over scrollbar.
         className[0] = 0;
         if (GetClassName(hWindow, className, 100) == 0 || StrICmp(className, "scrollbar") == 0)
         {
@@ -2916,31 +2920,31 @@ LRESULT CALLBACK MenuWheelHookProc(int nCode, WPARAM wParam, LPARAM lParam)
         return retValue;
 
     MSG* pMSG = (MSG*)lParam;
-    MessagesKeeper.Add(pMSG); // pokud se slozi Salam, budeme mit historii zprav
+    MessagesKeeper.Add(pMSG); // if Salam crashes, we'll have message history
 
-    // zajima nas pouze WM_MOUSEWHEEL a WM_MOUSEHWHEEL
+    // we're only interested in WM_MOUSEWHEEL and WM_MOUSEHWHEEL
     //
-    // 7.10.2009 - AS253_B1_IB34: Manison nam hlasil, ze mu pod Windows Vista nefunguje horizontalni scroll.
-    // Me fungoval (touto cestou). Po nainstalovani Intellipoint ovladacu v7 (predtime jsem na Vista x64
-    // nemel zadne spesl ovladace) prestaly WM_MOUSEHWHEEL zpravy prochazet tudy a natejkaly primo do
-    // panelu Salamandera. Takze tuto cestu zakazuji a zpravy budeme chytat pouze v panelu.
-    // poznamka: asi bychom stejnym zpusobem mohli odriznou i handling WM_MOUSEWHEEL, ale nebudu riskovat,
-    // ze neco podelam na starsich OS (muzeme to zkusit s prechodem na W2K a dal)
-    // poznamka2: pokud by se ukazalo, ze musime chytat WM_MOUSEHWHEEL i skrz tento hook, chtelo by to
-    // provest runtime detekci, ze tudy zpravy WM_MOUSEHWHEEL natekaji a nasledne zakazat jejich zpracovani
-    // v panelech a commandline.
+    // 7.10.2009 - AS253_B1_IB34: Manison reported that horizontal scroll doesn't work for him under Windows Vista.
+    // It worked for me (this way). After installing Intellipoint drivers v7 (previously I didn't have any special drivers on Vista x64)
+    // WM_MOUSEHWHEEL messages stopped going through here and went directly to
+    // Salamander panel. So I'm disabling this path and messages will be caught only in panel.
+    // note: we could probably cut off WM_MOUSEWHEEL handling the same way, but I won't risk
+    // breaking something on older OS (we can try it with transition to W2K and later)
+    // note2: if it turns out we need to catch WM_MOUSEHWHEEL through this hook too, we should
+    // perform runtime detection that WM_MOUSEHWHEEL messages flow through here and subsequently disable their processing
+    // in panels and commandline.
 
-    // 30.11.2012 - na foru se objevil clovek, kteremu WM_MOUSEHWEEL nechodi skrz message hook (stejna jako drive
-    // u Manisona v pripade WM_MOUSEHWHEEL): https://forum.altap.cz/viewtopic.php?f=24&t=6039
-    // takze nove budeme zpravu chytat take v jednotlivych oknech, kam muze potencialne chodit (dle focusu)
-    // a nasledne ji routit tak, aby se dorucila do okna pod kurzorem, jak jsme to vzdy delali
+    // 30.11.2012 - someone appeared on forum for whom WM_MOUSEHWEEL doesn't go through message hook (same as before
+    // with Manison in case of WM_MOUSEHWHEEL): https://forum.altap.cz/viewtopic.php?f=24&t=6039
+    // so now we'll also catch message in individual windows where it can potentially go (according to focus)
+    // and subsequently route it so it's delivered to window under cursor, as we've always done
 
-    // aktualne tedy budeme jak WM_MOUSEWHEEL tak WM_MOUSEHWHEEL poustet a uvidime, co na to beta testeri
+    // currently we'll let both WM_MOUSEWHEEL and WM_MOUSEHWHEEL through and see what beta testers say
 
     if ((pMSG->message != WM_MOUSEWHEEL && pMSG->message != WM_MOUSEHWHEEL) || (wParam == PM_NOREMOVE))
         return retValue;
 
-    // pokud zprava prisla "nedavno" druhym kanalem, budeme tento kanal ignorovat
+    // if message arrived "recently" through second channel, ignore this channel
     if (!MouseWheelMSGThroughHook && MouseWheelMSGTime != 0 && (GetTickCount() - MouseWheelMSGTime < MOUSEWHEELMSG_VALID))
         return retValue;
     MouseWheelMSGThroughHook = TRUE;
@@ -2955,7 +2959,7 @@ BOOL InitializeMenuWheelHook()
 {
     // setup hook for mouse messages
     DWORD threadID = GetCurrentThreadId();
-    HOldMouseWheelHookProc = SetWindowsHookEx(WH_GETMESSAGE, // HANDLES neumi!
+    HOldMouseWheelHookProc = SetWindowsHookEx(WH_GETMESSAGE, // HANDLES can't handle!
                                               MenuWheelHookProc,
                                               NULL, threadID);
     return (HOldMouseWheelHookProc != NULL);
@@ -2966,7 +2970,7 @@ BOOL ReleaseMenuWheelHook()
     // unhook mouse messages
     if (HOldMouseWheelHookProc != NULL)
     {
-        UnhookWindowsHookEx(HOldMouseWheelHookProc); // HANDLES neumi!
+        UnhookWindowsHookEx(HOldMouseWheelHookProc); // HANDLES can't handle!
         HOldMouseWheelHookProc = NULL;
     }
     return TRUE;
@@ -3005,14 +3009,14 @@ BOOL CFileTimeStampsItem::Set(const char* zipRoot, const char* sourcePath, const
     if (*zipRoot == '\\')
         zipRoot++;
     ZIPRoot = DupStr(zipRoot);
-    if (ZIPRoot != NULL) // zip-root nema '\\' ani na zacatku, ani na konci
+    if (ZIPRoot != NULL) // zip-root has no '\\' at beginning or end
     {
         int l = (int)strlen(ZIPRoot);
         if (l > 0 && ZIPRoot[l - 1] == '\\')
             ZIPRoot[l - 1] = 0;
     }
     SourcePath = DupStr(sourcePath);
-    if (SourcePath != NULL) // source-path nema '\\' na konci
+    if (SourcePath != NULL) // source-path has no '\\' at end
     {
         int l = (int)strlen(SourcePath);
         if (l > 0 && SourcePath[l - 1] == '\\')
@@ -3058,7 +3062,7 @@ BOOL CFileTimeStamps::AddFile(const char* zipFile, const char* zipRoot, const ch
         return FALSE;
     }
 
-    // test jestli uz zde neni (neni pred konstrukci item kvuli uprave stringu - '\\')
+    // test if it's not already here (not before item construction due to string modification - '\\')
     int i;
     for (i = 0; i < List.Count; i++)
     {
@@ -3067,7 +3071,7 @@ BOOL CFileTimeStamps::AddFile(const char* zipFile, const char* zipRoot, const ch
             StrICmp(item->SourcePath, item2->SourcePath) == 0)
         {
             delete item;
-            return FALSE; // je uz zde, nepridavat dalsi ...
+            return FALSE; // already here, don't add another ...
         }
     }
 
@@ -3090,7 +3094,7 @@ struct CFileTimeStampsEnum2Info
 const char* WINAPI FileTimeStampsEnum2(HWND parent, int enumFiles, const char** dosName, BOOL* isDir,
                                        CQuadWord* size, DWORD* attr, FILETIME* lastWrite, void* param,
                                        int* errorOccured)
-{ // enumerujeme jen soubory, enumFiles lze tedy uplne vynechat
+{ // we enumerate only files, so enumFiles can be completely omitted
     if (errorOccured != NULL)
         *errorOccured = SALENUM_SUCCESS;
     CFileTimeStampsEnum2Info* data = (CFileTimeStampsEnum2Info*)param;
@@ -3147,8 +3151,8 @@ void CFileTimeStamps::Remove(int* indexes, int count)
     int i;
     for (i = 0; i < count; i++)
     {
-        int index = indexes[count - i - 1];   // mazeme zezadu - mene sesouvani + neposouvaji se indexy
-        if (index < List.Count && index >= 0) // jen tak pro sychr
+        int index = indexes[count - i - 1];   // delete from back - less shifting + indexes don't shift
+        if (index < List.Count && index >= 0) // just for safety
         {
             List.Delete(index);
         }
@@ -3203,7 +3207,7 @@ void CFileTimeStamps::CopyFilesTo(HWND parent, int* indexes, int count, const ch
         for (i = 0; i < count; i++)
         {
             int index = indexes[i];
-            if (index < List.Count && index >= 0) // jen tak pro sychr
+            if (index < List.Count && index >= 0) // just for safety
             {
                 CFileTimeStampsItem* item = List[index];
                 char name[MAX_PATH];
@@ -3217,8 +3221,8 @@ void CFileTimeStamps::CopyFilesTo(HWND parent, int* indexes, int count, const ch
                 ok &= toStr.Add(name, (int)strlen(name) + 1);
             }
         }
-        fromStr.Add("\0", 2); // pro jistotu dame na konec dalsi dve nuly (zadne Add, taky o.k.)
-        toStr.Add("\0", 2);   // pro jistotu dame na konec dalsi dve nuly (zadne Add, taky o.k.)
+        fromStr.Add("\0", 2); // for safety add two more nulls at the end (no Add, also ok)
+        toStr.Add("\0", 2);   // for safety add two more nulls at the end (no Add, also ok)
 
         if (ok && !tooLongName)
         {
@@ -3232,9 +3236,9 @@ void CFileTimeStamps::CopyFilesTo(HWND parent, int* indexes, int count, const ch
             fo.fAnyOperationsAborted = FALSE;
             fo.hNameMappings = NULL;
             char title[100];
-            lstrcpyn(title, LoadStr(IDS_BROWSEARCUPDATE), 100); // radsi backupneme, LoadStr pouzivaji i ostatni thready
+            lstrcpyn(title, LoadStr(IDS_BROWSEARCUPDATE), 100); // better to backup, LoadStr is used by other threads too
             fo.lpszProgressTitle = title;
-            // provedeme samotne nakopirovani - uzasne snadne, bohuzel jim sem tam pada ;-)
+            // perform the actual copying - amazingly easy, unfortunately it crashes sometimes ;-)
             CALL_STACK_MESSAGE1("CFileTimeStamps::CopyFilesTo::SHFileOperation");
             SHFileOperation(&fo);
         }
@@ -3251,7 +3255,7 @@ void CFileTimeStamps::CopyFilesTo(HWND parent, int* indexes, int count, const ch
 void CFileTimeStamps::CheckAndPackAndClear(HWND parent, BOOL* someFilesChanged, BOOL* archMaybeUpdated)
 {
     CALL_STACK_MESSAGE1("CFileTimeStamps::CheckAndPackAndClear()");
-    //---  vyhodime ze seznamu soubory, ktere nebyly zmeneny
+    //---  remove files from list that weren't changed
     BeginStopRefresh();
     if (someFilesChanged != NULL)
         *someFilesChanged = FALSE;
@@ -3269,10 +3273,10 @@ void CFileTimeStamps::CheckAndPackAndClear(HWND parent, BOOL* someFilesChanged, 
         if (find != INVALID_HANDLE_VALUE)
         {
             HANDLES(FindClose(find));
-            if (CompareFileTime(&data.ftLastWriteTime, &item->LastWrite) != 0 ||    // lisi se casy
-                CQuadWord(data.nFileSizeLow, data.nFileSizeHigh) != item->FileSize) // lisi se velikosti
+            if (CompareFileTime(&data.ftLastWriteTime, &item->LastWrite) != 0 ||    // times differ
+                CQuadWord(data.nFileSizeLow, data.nFileSizeHigh) != item->FileSize) // sizes differ
             {
-                item->FileSize = CQuadWord(data.nFileSizeLow, data.nFileSizeHigh); // bereme novou velikost
+                item->FileSize = CQuadWord(data.nFileSizeLow, data.nFileSizeHigh); // take new size
                 item->LastWrite = data.ftLastWriteTime;
                 item->Attr = data.dwFileAttributes;
                 kill = FALSE;
@@ -3288,9 +3292,9 @@ void CFileTimeStamps::CheckAndPackAndClear(HWND parent, BOOL* someFilesChanged, 
     {
         if (someFilesChanged != NULL)
             *someFilesChanged = TRUE;
-        // pri critical shutdown se tvarime, ze updatle soubory neexistuji, zabalit zpet do archivu je
-        // nestihneme, ale smazat je nesmime, po startu musi zustat uzivateli sance updatle soubory
-        // rucne do archivu zabalit
+        // during critical shutdown we pretend updated files don't exist, we won't manage to pack them back to archive
+        // but we mustn't delete them, after startup user must have a chance to pack updated files
+        // manually into archive
         if (!CriticalShutdown)
         {
             CArchiveUpdateDlg dlg(parent, this, Panel);
@@ -3302,8 +3306,8 @@ void CFileTimeStamps::CheckAndPackAndClear(HWND parent, BOOL* someFilesChanged, 
                 {
                     if (archMaybeUpdated != NULL)
                         *archMaybeUpdated = TRUE;
-                    //--- zapakujeme zmenene soubory, po skupinach se stejnym zip-root a source-path
-                    TIndirectArray<CFileTimeStampsItem> packList(10, 5); // seznam vsech se stejnym zip-root a source-path
+                    //--- pack changed files, in groups with same zip-root and source-path
+                    TIndirectArray<CFileTimeStampsItem> packList(10, 5); // list of all with same zip-root and source-path
                     SetThreadPriority(GetCurrentThread(), THREAD_PRIORITY_NORMAL);
                     while (!showDlg && List.Count > 0)
                     {
@@ -3316,20 +3320,20 @@ void CFileTimeStamps::CheckAndPackAndClear(HWND parent, BOOL* someFilesChanged, 
                             packList.Add(item1);
                             List.Detach(0);
                         }
-                        for (i = List.Count - 1; i >= 0; i--) // kvadraticka slozitost zde snad nebude na obtiz
-                        {                                     // jedeme odzadu, protoze Detach je tak "jednodusi"
+                        for (i = List.Count - 1; i >= 0; i--) // quadratic complexity hopefully won't be a problem here
+                        {                                     // going from back, because Detach is "simpler" that way
                             CFileTimeStampsItem* item2 = List[i];
                             char* r2 = item2->ZIPRoot;
                             char* s2 = item2->SourcePath;
-                            if (strcmp(r1, r2) == 0 && // shodny zip-root (case-sensitive porovnani nutne - update test\A.txt a Test\b.txt nesmi probehnout zaroven)
-                                StrICmp(s1, s2) == 0)  // shodny source-path
+                            if (strcmp(r1, r2) == 0 && // matching zip-root (case-sensitive comparison necessary - update test\A.txt and Test\b.txt must not happen at once)
+                                StrICmp(s1, s2) == 0)  // matching source-path
                             {
                                 packList.Add(item2);
                                 List.Detach(i);
                             }
                         }
 
-                        // volani pack pro packList
+                        // call pack for packList
                         BOOL loop = TRUE;
                         while (loop)
                         {
@@ -3344,11 +3348,11 @@ void CFileTimeStamps::CheckAndPackAndClear(HWND parent, BOOL* someFilesChanged, 
                             {
                                 loop = SalMessageBox(parent, LoadStr(IDS_UPDATEFAILED),
                                                      LoadStr(IDS_QUESTION), MB_YESNO | MB_ICONQUESTION) == IDYES;
-                                if (!loop) // "cancel", odpojime soubory z disk-cache, jinak je odmaze
+                                if (!loop) // "cancel", detach files from disk-cache, otherwise it deletes them
                                 {
                                     List.Add(packList.GetData(), packList.Count);
                                     packList.DetachMembers();
-                                    showDlg = TRUE; // zobrazime znovu Archive Update dialog (se zbylymi soubory)
+                                    showDlg = TRUE; // show Archive Update dialog again (with remaining files)
                                 }
                             }
                             SetCurrentDirectoryToSystem();
@@ -3374,7 +3378,7 @@ void CFileTimeStamps::CheckAndPackAndClear(HWND parent, BOOL* someFilesChanged, 
 
 void CTopIndexMem::Push(const char* path, int topIndex)
 {
-    // zjistime, jestli path navazuje na Path (path==Path+"\\jmeno")
+    // check if path follows Path (path==Path+"\\name")
     const char* s = path + strlen(path);
     if (s > path && *(s - 1) == '\\')
         s--;
@@ -3394,9 +3398,9 @@ void CTopIndexMem::Push(const char* path, int topIndex)
         ok = s - path == l && StrNICmp(path, Path, l) == 0;
     }
 
-    if (ok) // navazuje -> zapamatujeme si dalsi top-index
+    if (ok) // follows -> remember next top-index
     {
-        if (TopIndexesCount == TOP_INDEX_MEM_SIZE) // je potreba vyhodit z pameti prvni top-index
+        if (TopIndexesCount == TOP_INDEX_MEM_SIZE) // need to remove first top-index from memory
         {
             int i;
             for (i = 0; i < TOP_INDEX_MEM_SIZE - 1; i++)
@@ -3406,7 +3410,7 @@ void CTopIndexMem::Push(const char* path, int topIndex)
         strcpy(Path, path);
         TopIndexes[TopIndexesCount++] = topIndex;
     }
-    else // nenavazuje -> prvni top-index v rade
+    else // doesn't follow -> first top-index in sequence
     {
         strcpy(Path, path);
         TopIndexesCount = 1;
@@ -3416,7 +3420,7 @@ void CTopIndexMem::Push(const char* path, int topIndex)
 
 BOOL CTopIndexMem::FindAndPop(const char* path, int& topIndex)
 {
-    // zjistime, jestli path odpovida Path (path==Path)
+    // check if path matches Path (path==Path)
     int l1 = (int)strlen(path);
     if (l1 > 0 && path[l1 - 1] == '\\')
         l1--;
@@ -3438,13 +3442,13 @@ BOOL CTopIndexMem::FindAndPop(const char* path, int& topIndex)
             topIndex = TopIndexes[--TopIndexesCount];
             return TRUE;
         }
-        else // tuto hodnotu jiz nemame (nebyla ulozena nebo mala pamet->byla vyhozena)
+        else // we don't have this value anymore (wasn't saved or small memory->was discarded)
         {
             Clear();
             return FALSE;
         }
     }
-    else // dotaz na jinou cestu -> vycistime pamet, doslo k dlouhemu skoku
+    else // query for different path -> clear memory, long jump occurred
     {
         Clear();
         return FALSE;
@@ -3467,19 +3471,19 @@ BOOL CFileHistory::AddFile(CFileHistoryItemTypeEnum type, DWORD handlerID, const
 {
     CALL_STACK_MESSAGE4("CFileHistory::AddFile(%d, %u, %s)", type, handlerID, fileName);
 
-    // prohledame stavajici polozky, jestli uz se pridavana polozka nevyskytuje
+    // search existing items to see if item being added already exists
     int i;
     for (i = 0; i < Files.Count; i++)
     {
         CFileHistoryItem* item = Files[i];
         if (item->Equal(type, handlerID, fileName))
         {
-            // pokud ano, pouze ji vytahneme na vrchni pozici
+            // if yes, just pull it to top position
             if (i > 0)
             {
                 Files.Detach(i);
                 if (!Files.IsGood())
-                    Files.ResetState(); // nemuze se nepovest, hlasi jedine nedostatek pameti pro zmenseni pole
+                    Files.ResetState(); // can't fail, only reports lack of memory for array shrinking
                 Files.Insert(0, item);
                 if (!Files.IsGood())
                 {
@@ -3492,7 +3496,7 @@ BOOL CFileHistory::AddFile(CFileHistoryItemTypeEnum type, DWORD handlerID, const
         }
     }
 
-    // polozka neexistuje - vlozime ji na horni pozici
+    // item doesn't exist - insert it at top position
     CFileHistoryItem* item = new CFileHistoryItem(type, handlerID, fileName);
     if (item == NULL)
     {
@@ -3511,7 +3515,7 @@ BOOL CFileHistory::AddFile(CFileHistoryItemTypeEnum type, DWORD handlerID, const
         delete item;
         return FALSE;
     }
-    // zarizneme na 30 polozek
+    // cut to 30 items
     if (Files.Count > 30)
         Files.Delete(30);
 
@@ -3522,7 +3526,7 @@ BOOL CFileHistory::FillPopupMenu(CMenuPopup* popup)
 {
     CALL_STACK_MESSAGE1("CFileHistory::FillPopupMenu()");
 
-    // nalejeme polozky
+    // fill items
     char name[2 * MAX_PATH];
     MENU_ITEM_INFO mii;
     mii.Mask = MENU_MASK_TYPE | MENU_MASK_ID | MENU_MASK_ICON | MENU_MASK_STRING;
@@ -3533,7 +3537,7 @@ BOOL CFileHistory::FillPopupMenu(CMenuPopup* popup)
     {
         CFileHistoryItem* item = Files[i];
 
-        // jmeno oddelime od cesty znakem '\t' - tim bude ve zvlastnim sloupci
+        // separate name from path with '\t' character - it will be in separate column
         lstrcpy(name, item->FileName);
         char* ptr = strrchr(name, '\\');
         if (ptr == NULL)
@@ -3541,7 +3545,7 @@ BOOL CFileHistory::FillPopupMenu(CMenuPopup* popup)
         memmove(ptr + 1, ptr, lstrlen(ptr) + 1);
         *(ptr + 1) = '\t';
         const char* text = "";
-        // zdvojime '&', aby se nezobrazovalo jako podtrzeni
+        // double '&' so it doesn't display as underline
         DuplicateAmpersands(name, 2 * MAX_PATH);
 
         mii.HIcon = item->HIcon;
@@ -3559,13 +3563,13 @@ BOOL CFileHistory::FillPopupMenu(CMenuPopup* popup)
         default:
             TRACE_E("Unknown Type=" << item->Type);
         }
-        sprintf(name + lstrlen(name), "\t(%s)", text); // pripojime zpusob, jakym je soubor oteviran
+        sprintf(name + lstrlen(name), "\t(%s)", text); // append way file is opened
         mii.ID = i + 1;
         popup->InsertItem(-1, TRUE, &mii);
     }
     if (i > 0)
     {
-        popup->SetStyle(MENU_POPUP_THREECOLUMNS); // prvni dva sloupce jsou zarovnane doleva
+        popup->SetStyle(MENU_POPUP_THREECOLUMNS); // first two columns are left-aligned
         popup->AssignHotKeys();
     }
     return TRUE;
@@ -3594,10 +3598,10 @@ BOOL CFileHistory::HasItem()
 //
 
 #define DIRECTORY_COMMAND_BROWSE 1    // browse directory
-#define DIRECTORY_COMMAND_LEFT 3      // cesta z leveho panelu
-#define DIRECTORY_COMMAND_RIGHT 4     // cesta z praveho panelu
-#define DIRECTORY_COMMAND_HOTPATHF 5  // prvni hot path
-#define DIRECTORY_COMMAND_HOTPATHL 35 // posledni hot path
+#define DIRECTORY_COMMAND_LEFT 3      // path from left panel
+#define DIRECTORY_COMMAND_RIGHT 4     // path from right panel
+#define DIRECTORY_COMMAND_HOTPATHF 5  // first hot path
+#define DIRECTORY_COMMAND_HOTPATHL 35 // last hot path
 
 BOOL SetEditOrComboText(HWND hWnd, const char* text)
 {
@@ -3644,8 +3648,8 @@ DWORD TrackDirectoryMenu(HWND hDialog, int buttonID, BOOL selectMenuItem)
     miiSep.Mask = MENU_MASK_TYPE;
     miiSep.Type = MENU_TYPE_SEPARATOR;
 
-    /* slouzi pro skript export_mnu.py, ktery generuje salmenu.mnu pro Translator
-   udrzovat synchronizovane s volanim InsertItem() dole...
+    /* used by export_mnu.py script which generates salmenu.mnu for Translator
+   keep synchronized with InsertItem() calls below...
 MENU_TEMPLATE_ITEM CopyMoveBrowseMenu[] = 
 {
   {MNTT_PB, 0
@@ -3674,7 +3678,7 @@ MENU_TEMPLATE_ITEM CopyMoveBrowseMenu[] =
     mii.String = LoadStr(IDS_PATHMENU_RIGHT);
     popup.InsertItem(0xFFFFFFFF, TRUE, &mii);
 
-    // pripojime hotpaths, existuji-li
+    // attach hotpaths if they exist
     DWORD firstID = DIRECTORY_COMMAND_HOTPATHF;
     MainWindow->HotPaths.FillHotPathsMenu(&popup, firstID, FALSE, FALSE, FALSE, TRUE);
 
@@ -3689,7 +3693,7 @@ MENU_TEMPLATE_ITEM CopyMoveBrowseMenu[] =
 
 DWORD OnKeyDownHandleSelectAll(DWORD keyCode, HWND hDialog, int editID)
 {
-    // od Windows Vista uz SelectAll standardne funguje, takze tam nechame select all na nich
+    // from Windows Vista SelectAll works natively, so leave select all to them
     if (WindowsVistaAndLater)
         return FALSE;
 
@@ -3793,7 +3797,7 @@ void InvokeDirectoryMenuCommand(DWORD cmd, HWND hDialog, int editID, int editBuf
         // browse
         GetDlgItemText(hDialog, editID, path, MAX_PATH);
         char caption[100];
-        GetWindowText(hDialog, caption, 100); // bude mit stejny caption jako dialog
+        GetWindowText(hDialog, caption, 100); // will have same caption as dialog
         if (GetTargetDirectory(hDialog, hDialog, caption, LoadStr(IDS_BROWSETARGETDIRECTORY), path, FALSE, path))
             setPathToEdit = TRUE;
         break;
@@ -3849,9 +3853,9 @@ void InvokeDirectoryMenuCommand(DWORD cmd, HWND hDialog, int editID, int editBuf
 class CKeyForwarder : public CWindow
 {
 protected:
-    BOOL SkipCharacter; // zamezuje pipnuti pro zpracovane klavesy
-    HWND HDialog;       // dialog, kam budeme zasilat WM_USER_KEYDOWN
-    int CtrlID;         // pro WM_USER_KEYDOWN
+    BOOL SkipCharacter; // prevents beeping for processed keys
+    HWND HDialog;       // dialog where we'll send WM_USER_KEYDOWN
+    int CtrlID;         // for WM_USER_KEYDOWN
 
 public:
     CKeyForwarder(HWND hDialog, int ctrlID, CObjectOrigin origin = ooAllocated);
@@ -3887,7 +3891,7 @@ CKeyForwarder::WindowProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
     case WM_SYSKEYDOWN:
     case WM_KEYDOWN:
     {
-        SkipCharacter = TRUE; // zamezime pipani
+        SkipCharacter = TRUE; // prevent beeping
         BOOL ret = (BOOL)SendMessage(HDialog, WM_USER_KEYDOWN, MAKELPARAM(CtrlID, 0), wParam);
         if (ret)
             return 0;
@@ -3898,7 +3902,7 @@ CKeyForwarder::WindowProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
     case WM_SYSKEYUP:
     case WM_KEYUP:
     {
-        SkipCharacter = FALSE; // pro jistotu
+        SkipCharacter = FALSE; // just in case
         break;
     }
     }
@@ -3912,7 +3916,7 @@ BOOL CreateKeyForwarder(HWND hDialog, int ctrlID)
     className[0] = 0;
     if (GetClassName(hWindow, className, 30) == 0 || StrICmp(className, "edit") != 0)
     {
-        // mohlo by jit o combobox, zkusime sahnout pro vnitrni edit
+        // it might be a combobox, try to reach for inner edit
         hWindow = GetWindow(hWindow, GW_CHILD);
         if (hWindow == NULL || GetClassName(hWindow, className, 30) == 0 || StrICmp(className, "edit") != 0)
         {

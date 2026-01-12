@@ -52,7 +52,12 @@ extern const char* MAINWINDOW_CLASSNAME;
 class CMainWindow : public CWindow
 {
 protected:
-    char *Path1,
+    std::string Path1Str,
+        Path2Str;  // Owned copies of path strings
+    std::wstring Path1WStr,
+        Path2WStr; // Wide paths for Unicode/long path filenames
+    // Convenience pointers for compatibility
+    const char *Path1,
         *Path2;
     DWORD HeaderHeight;
     CFileHeaderWindow* LeftHeader;
@@ -99,7 +104,8 @@ protected:
     UINT ShowCmd;
 
 public:
-    CMainWindow(char* path1, char* path2, CCompareOptions* options, UINT showCmd);
+    CMainWindow(const char* path1, const char* path2, CCompareOptions* options, UINT showCmd,
+                const wchar_t* path1W = NULL, const wchar_t* path2W = NULL);
     virtual ~CMainWindow();
     BOOL Init();
     void EnableInput(BOOL enable);
@@ -117,7 +123,8 @@ public:
     void RestoreRebarLayout();
     //void UpdateSelection();
     void SpawnWorker(const char* path1, const char* path2, BOOL recompare,
-                     const CCompareOptions& options);
+                     const CCompareOptions& options,
+                     const wchar_t* path1W = NULL, const wchar_t* path2W = NULL);
     void SetActiveFileView(CFileViewID id) { Active = id; }
     void SetWait(BOOL wait);
     int GetChangeFirstLine(int line)

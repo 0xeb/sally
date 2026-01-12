@@ -73,22 +73,43 @@ public:
 
 // ****************************************************************************
 //
+// AnsiToWidePath - Convert ANSI path to wide string, with optional provided wide path
+// If widePathProvided is non-null, returns it directly; otherwise converts ansiPath
+//
+inline std::wstring AnsiToWidePath(const char* ansiPath, const wchar_t* widePathProvided = NULL)
+{
+    if (widePathProvided)
+        return widePathProvided;
+    if (!ansiPath || !*ansiPath)
+        return L"";
+    wchar_t buf[32767];
+    MultiByteToWideChar(CP_ACP, 0, ansiPath, -1, buf, 32767);
+    return buf;
+}
+
+// ****************************************************************************
+//
 // CFileCompThread
 //
 
 class CFilecompThread : public CThread
 {
 public:
-    char Path1[MAX_PATH];
-    char Path2[MAX_PATH];
+    std::string Path1;
+    std::string Path2;
+    std::wstring Path1W; // Wide path for Unicode/long path filenames
+    std::wstring Path2W; // Wide path for Unicode/long path filenames
     BOOL DontConfirmSelection;
     char ReleaseEvent[20];
 
     CFilecompThread(const char* file1, const char* file2, BOOL dontConfirmSelection,
-                    const char* releaseEvent) : CThread("Filecomp Thread")
+                    const char* releaseEvent,
+                    const wchar_t* file1W = NULL, const wchar_t* file2W = NULL) : CThread("Filecomp Thread")
     {
-        strcpy(Path1, file1);
-        strcpy(Path2, file2);
+        Path1 = file1 ? file1 : "";
+        Path2 = file2 ? file2 : "";
+        Path1W = AnsiToWidePath(file1, file1W);
+        Path2W = AnsiToWidePath(file2, file2W);
         DontConfirmSelection = dontConfirmSelection;
         strcpy(ReleaseEvent, releaseEvent);
     }

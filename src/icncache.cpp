@@ -330,7 +330,7 @@ void CIconCache::Destroy()
 void CIconCache::ColorsChanged()
 {
     CALL_STACK_MESSAGE1("CIconCache::ColorsChanged()");
-    // tato funkce je volana pri zmene barev nebo barevne hloubky obrazovky
+    // this function is called when colors or screen color depth change
     // the second case is not handled -- would need to reconstruct bitmaps
     // in image lists for current color depth
     COLORREF bkColor = GetCOLORREF(CurrentColors[ITEM_BK_NORMAL]);
@@ -348,7 +348,7 @@ void CIconCache::ColorsChanged()
     {
         CIconData* icon = &At(i);
         if (icon->GetFlag() == 5 /* o.k. thumbnail */)
-            icon->SetFlag(6 /* stara verze thumbnailu */);
+            icon->SetFlag(6 /* old thumbnail version */);
     }
 }
 
@@ -490,7 +490,7 @@ void CIconCache::GetIconsAndThumbsFrom(CIconCache* icons, CPluginDataInterfaceEn
             }
         }
         else
-            return; // neni co spojovat
+            return; // nothing to merge
 
         if (index2 < icons->Count)
         {
@@ -504,12 +504,12 @@ void CIconCache::GetIconsAndThumbsFrom(CIconCache* icons, CPluginDataInterfaceEn
             }
         }
         else
-            return; // neni co spojovat
+            return; // nothing to merge
         int res;
         while (1)
         {
             res = dataIface->CompareFilesFromFS(file1, file2);
-            if (res == 0) // shodne -> provedeme kopii (ikony a masky)
+            if (res == 0) // match -> perform copy (icon and mask)
             {
                 CIconList* srcIconList;
                 int srcIconListIndex;
@@ -519,13 +519,13 @@ void CIconCache::GetIconsAndThumbsFrom(CIconCache* icons, CPluginDataInterfaceEn
 
                 DWORD flag = icons->At(index2).GetFlag();
 
-                if ((flag == 1 || flag == 2) &&  // platna nebo stara ikona
-                    At(index1).GetFlag() == 0 && // zajima nas ikona (pokud doslo k prepnuti na thumbnail, starou ikonu nepotrebujeme)
+                if ((flag == 1 || flag == 2) &&  // valid or old icon
+                    At(index1).GetFlag() == 0 && // we need an icon (if switched to thumbnail, we don't need the old icon)
                     GetIcon(At(index1).GetIndex(), &dstIconList, &dstIconListIndex) &&
                     icons->GetIcon(icons->At(index2).GetIndex(), &srcIconList, &srcIconListIndex))
                 {
                     dstIconList->Copy(dstIconListIndex, srcIconList, srcIconListIndex);
-                    At(index1).SetFlag((flag == 1 && transferIconsAndThumbnailsAsNew) ? 1 : 2); // ted uz je to stara (nebo platna/nova) verze ikony
+                    At(index1).SetFlag((flag == 1 && transferIconsAndThumbnailsAsNew) ? 1 : 2); // now it's an old (or valid/new) icon version
                 }
             }
 
@@ -543,7 +543,7 @@ void CIconCache::GetIconsAndThumbsFrom(CIconCache* icons, CPluginDataInterfaceEn
                     }
                 }
                 else
-                    break; // uz neni co spojovat
+                    break; // nothing more to merge
             }
 
             if (res == 0 || res > 0) // index2++
@@ -560,7 +560,7 @@ void CIconCache::GetIconsAndThumbsFrom(CIconCache* icons, CPluginDataInterfaceEn
                     }
                 }
                 else
-                    break; // uz neni co spojovat
+                    break; // nothing more to merge
             }
         }
     }
@@ -575,17 +575,17 @@ void CIconCache::GetIconsAndThumbsFrom(CIconCache* icons, CPluginDataInterfaceEn
             length = (int)strlen(name1);
         }
         else
-            return; // neni co spojovat
+            return; // nothing to merge
 
         if (index2 < icons->Count)
             name2 = icons->At(index2).NameAndData;
         else
-            return; // neni co spojovat
+            return; // nothing to merge
         int res;
         while (1)
         {
             res = CompareDWORDS(name1, name2, length);
-            if (res == 0) // shodne -> provedeme kopii (ikony a masky) || thumbnailu
+            if (res == 0) // match -> perform copy (icon and mask) || thumbnail
             {
                 CIconList* srcIconList;
                 int srcIconListIndex;
@@ -595,33 +595,33 @@ void CIconCache::GetIconsAndThumbsFrom(CIconCache* icons, CPluginDataInterfaceEn
 
                 DWORD flag = icons->At(index2).GetFlag();
 
-                if ((flag == 1 || flag == 2) &&  // platna nebo stara ikona
-                    At(index1).GetFlag() == 0 && // zajima nas ikona (pokud doslo k prepnuti na thumbnail, starou ikonu nepotrebujeme)
+                if ((flag == 1 || flag == 2) &&  // valid or old icon
+                    At(index1).GetFlag() == 0 && // we need an icon (if switched to thumbnail, we don't need the old icon)
                     GetIcon(At(index1).GetIndex(), &dstIconList, &dstIconListIndex) &&
                     icons->GetIcon(icons->At(index2).GetIndex(), &srcIconList, &srcIconListIndex))
                 {
                     dstIconList->Copy(dstIconListIndex, srcIconList, srcIconListIndex);
-                    At(index1).SetFlag((flag == 1 && transferIconsAndThumbnailsAsNew) ? 1 : 2); // ted uz je to stara (nebo platna/nova) verze ikony
+                    At(index1).SetFlag((flag == 1 && transferIconsAndThumbnailsAsNew) ? 1 : 2); // now it's an old (or valid/new) icon version
                 }
                 else
                 {
                     CThumbnailData* srcThumbnailData;
                     CThumbnailData* tgtThumbnailData;
 
-                    if ((flag == 5 || flag == 6) &&  // platny nebo stary thumbnail
-                        At(index1).GetFlag() == 4 && // zajima nas thumbnail (pokud doslo k prepnuti na ikonu, stary thumbnail nepotrebujeme)
+                    if ((flag == 5 || flag == 6) &&  // valid or old thumbnail
+                        At(index1).GetFlag() == 4 && // we need thumbnail (if switched to icon, we don't need the old thumbnail)
                         GetThumbnail(At(index1).GetIndex(), &tgtThumbnailData) &&
                         icons->GetThumbnail(icons->At(index2).GetIndex(), &srcThumbnailData))
                     {
-                        // stary thumbnail neni treba kopirovat -- staci predat jeho
-                        // geometrii a raw data do ciloveho thumbnailu
-                        *tgtThumbnailData = *srcThumbnailData; // predame stara data do nove cache
-                        srcThumbnailData->Bits = NULL;         // stara cache zanika a nesmi se dealokovat data
+                        // old thumbnail doesn't need to be copied -- just pass its
+                        // geometry and raw data to the target thumbnail
+                        *tgtThumbnailData = *srcThumbnailData; // pass old data to new cache
+                        srcThumbnailData->Bits = NULL;         // old cache is destroyed and data must not be deallocated
 
                         int newFlag = 6;
-                        // pokud kopirujeme platny thumbnail, zkontrolujeme znamku souboru (size+date), pripadne
-                        // zkopirovany thumbnail oznacime rovnou jako platny (hrozba zmeny souboru beze zmeny
-                        // size+date je miziva a rychlostni zisk je obrovsky)
+                        // if copying a valid thumbnail, we check the file stamp (size+date), possibly
+                        // mark the copied thumbnail as valid right away (threat of file change without change
+                        // in size+date is negligible and speed gain is huge)
                         if (flag == 5 && !forceReloadThumbnails)
                         {
                             if (transferIconsAndThumbnailsAsNew)
@@ -638,7 +638,7 @@ void CIconCache::GetIconsAndThumbsFrom(CIconCache* icons, CPluginDataInterfaceEn
                                 }
                             }
                         }
-                        At(index1).SetFlag(newFlag); // ted uz je to stara (nebo platna/nova) verze thumbnailu
+                        At(index1).SetFlag(newFlag); // now it's an old (or valid/new) thumbnail version
                     }
                 }
             }
@@ -651,7 +651,7 @@ void CIconCache::GetIconsAndThumbsFrom(CIconCache* icons, CPluginDataInterfaceEn
                     length = (int)strlen(name1);
                 }
                 else
-                    break; // uz neni co spojovat
+                    break; // nothing more to merge
             }
 
             if (res == 0 || res > 0) // index2++
@@ -659,7 +659,7 @@ void CIconCache::GetIconsAndThumbsFrom(CIconCache* icons, CPluginDataInterfaceEn
                 if (++index2 < icons->Count)
                     name2 = icons->At(index2).NameAndData;
                 else
-                    break; // uz neni co spojovat
+                    break; // nothing more to merge
             }
         }
     }
@@ -672,10 +672,10 @@ void CIconCache::SetIconSize(CIconSizeEnum iconSize)
         TRACE_E("CIconCache::SetIconSize() unexpected iconSize==ICONSIZE_COUNT");
         return;
     }
-    if (iconSize == IconSize) // pokud se nemeni velikost, neni co resit
+    if (iconSize == IconSize) // if size doesn't change, nothing to do
         return;
 
-    // zahodime soucasne ikonky
+    // discard current icons
     int i;
     for (i = 0; i < Count; i++)
     {
@@ -739,7 +739,7 @@ BOOL GetIconFromAssocAux(BOOL initFlagAndIndexes, HKEY root, const char* keyName
     {
         type[0] = 0;
 
-        // file-type retezec ziskame jako value "" podklice keyName
+        // file-type string obtained as value "" of subkey keyName
         if (HANDLES_Q(RegOpenKey(root, keyNameBuf, &openKey)) == ERROR_SUCCESS)
         {
             LONG typeSize = MAX_PATH;
@@ -768,7 +768,7 @@ BOOL GetIconFromAssocAux(BOOL initFlagAndIndexes, HKEY root, const char* keyName
     if (size - 1 + 21 <= MAX_PATH)
     {
         memmove(keyNameBuf + size - 1, "\\ShellEx\\IconHandler", 21);
-        // obsahuje-li "\\ShellEx\\IconHandler", musi se tahat ze souboru
+        // if contains "\\ShellEx\\IconHandler", must be extracted from file
         if (HANDLES_Q(RegOpenKey(root, keyNameBuf, &openKey)) == ERROR_SUCCESS)
         {
             found = TRUE;
@@ -784,7 +784,7 @@ BOOL GetIconFromAssocAux(BOOL initFlagAndIndexes, HKEY root, const char* keyName
         if (HANDLES_Q(RegOpenKey(root, keyNameBuf, &openKey)) == ERROR_SUCCESS)
         {
             char buf[MAX_PATH];
-            size = MAX_PATH; // ziskani cesty k ikone
+            size = MAX_PATH; // getting path to icon
             DWORD type2 = REG_SZ;
             DWORD err = SalRegQueryValueEx(openKey, "", 0, &type2,
                                            (LPBYTE)buf, (LPDWORD)&size);
@@ -804,7 +804,7 @@ BOOL GetIconFromAssocAux(BOOL initFlagAndIndexes, HKEY root, const char* keyName
                 else
                     strcpy(iconLocation, buf);
 
-                // odstranime uvozovky v pripade "\"jmeno_souboru\",cislo_ikony" (napr. "\"C:\\Program Files\\VideoLAN\\VLC\\vlc.exe\",0")
+                // remove quotes in case "\"filename\",icon_number" (e.g. "\"C:\\Program Files\\VideoLAN\\VLC\\vlc.exe\",0")
                 char* num = strrchr(iconLocation, ',');
                 if (num != NULL)
                 {
@@ -818,15 +818,15 @@ BOOL GetIconFromAssocAux(BOOL initFlagAndIndexes, HKEY root, const char* keyName
                     char* numBeg = numEnd + 1;
                     while (*++numEnd >= '0' && *numEnd <= '9')
                         ;
-                    if (numBeg < numEnd && *numEnd == 0 &&                                   // cislo ikony je za posledni carkou
-                        *iconLocation == '"' && num - 1 > iconLocation && *(num - 1) == '"') // na zacatku a pred carkou jsou uvozovky
-                    {                                                                        // odstranime uvozovky
+                    if (numBeg < numEnd && *numEnd == 0 &&                                   // icon number is after the last comma
+                        *iconLocation == '"' && num - 1 > iconLocation && *(num - 1) == '"') // quotes at the beginning and before the comma
+                    {                                                                        // remove quotes
                         memmove(iconLocation, iconLocation + 1, (num - 1) - (iconLocation + 1));
                         memmove(num - 2, num, numEnd - num + 1);
                     }
                 }
 
-                char* s = buf; // rozliseni typu "%1" od "...%promenna%..."
+                char* s = buf; // distinguish type "%1" from "...%variable%..."
                 while (*s != 0)
                 {
                     if (*s == '%')
@@ -836,7 +836,7 @@ BOOL GetIconFromAssocAux(BOOL initFlagAndIndexes, HKEY root, const char* keyName
                         {
                             while (*s != 0 && *s != ' ' && *s != '%')
                                 s++;
-                            if (*s != '%') // neni to env. promenna -> dynamicky typ
+                            if (*s != '%') // not an env. variable -> dynamic type
                             {
                                 data.SetIndexAll(-2);
                                 break;
@@ -892,7 +892,7 @@ void CAssociations::Destroy()
 void CAssociations::ColorsChanged()
 {
     CALL_STACK_MESSAGE1("CAssociations::ColorsChanged()");
-    // tato funkce je volana pri zmene barev nebo barevne hloubky obrazovky
+    // this function is called when colors or screen color depth change
     // the second case is not handled -- would need to reconstruct bitmaps
     // in image lists for current color depth
     COLORREF bkColor = GetCOLORREF(CurrentColors[ITEM_BK_NORMAL]);
@@ -907,7 +907,7 @@ void CAssociations::ColorsChanged()
                 il->SetBkColor(bkColor);
         }
     }
-    // FIXME: stacilo by nastavovat pozadi pouze pro patricny iconlist
+    // FIXME: it would be enough to set background only for the relevant iconlist
     int i;
     for (i = 0; i < ICONSIZE_COUNT; i++)
         SimpleIconLists[i]->SetBkColor(bkColor);
@@ -1100,13 +1100,13 @@ void CAssociations::InsertData(const char* /*origin*/, int index, BOOL overwrite
     //          ": type=" << (type == NULL ? "" : type));
 
     size = (LONG)(s - e) + 4;
-    size -= (size & 0x3); // size % 4  (zarovnani po ctyrech bytech)
+    size -= (size & 0x3); // size % 4  (alignment to four bytes)
     int iLen = (int)strlen(iconLocation) + 1;
     data.ExtensionAndData = (char*)malloc(size + iLen);
-    memcpy(data.ExtensionAndData, e, size);                   // pripona + zarovnani nul +
+    memcpy(data.ExtensionAndData, e, size);                   // extension + zero padding +
     memcpy(data.ExtensionAndData + size, iconLocation, iLen); // icon-location
     if (type[0] != 0)
-        data.Type = DupStr(type); // chyba -> jen se neukaze file-type
+        data.Type = DupStr(type); // error -> file-type just won't be shown
     else
         data.Type = NULL;
     if (overwriteItem)
@@ -1123,28 +1123,28 @@ void CAssociations::InsertData(const char* /*origin*/, int index, BOOL overwrite
 
 void CAssociations::ReadAssociations(BOOL showWaitWnd)
 {
-    //---  nahozeni dialogu cekani + hodin
+    //---  show wait dialog + hourglass
     HCURSOR oldCur;
     HWND parent = (MainWindow != NULL) ? MainWindow->HWindow : NULL;
-    // wait okenko zlobilo:
-    // pokud dam nad souborem Open With a zvolim napriklad NOTEPAD, ten se otevre
-    // potom se rozesle notifikace o zmene asociaci SHCNE_ASSOCCHANGED
-    // v dusledku se zavola tato fce, ktera zobrazi okenko a vytahne ho nahoru
-    // s nim vytahne celeho Salamandera, proto ho docasne zakazuji
+    // wait window was causing problems:
+    // if I do Open With over a file and choose for example NOTEPAD, it opens
+    // then a notification about association change SHCNE_ASSOCCHANGED is sent
+    // as a result this function is called, which displays the window and pulls it up
+    // with it pulls up all of Salamander, so I temporarily disable it
     CWaitWindow waitWnd(parent, IDS_READINGASSOCIATIONS, FALSE, ooStatic);
     BOOL closeDialog = FALSE;
     if (!ExistSplashScreen())
     {
         if (showWaitWnd)
-            waitWnd.Create(); //j.r. pro ladeni shortcuty z desktopu
+            waitWnd.Create(); //j.r. for debugging shortcuts from desktop
         oldCur = SetCursor(LoadCursor(NULL, IDC_WAIT));
         closeDialog = TRUE;
     }
     else
         IfExistSetSplashScreenText(LoadStr(IDS_STARTUP_ASSOCIATIONS));
-    //---  vycisteni pole + cache
+    //---  clear array + cache
     Release();
-    //---  projiti registry zaznamu o classech (extenzich)
+    //---  iterate through registry records about classes (extensions)
     char ext[MAX_PATH + 4];
     char extType[MAX_PATH];
     char *s, *e;
@@ -1163,8 +1163,8 @@ void CAssociations::ReadAssociations(BOOL showWaitWnd)
         systemFileAssoc = NULL;
     }
 
-    // Windows 2000 a novejsi maji jeste "Open With..." asociace ulozeny pro kazdeho usera zvlast
-    // v klici HKEY_CURRENT_USER\Software\Microsoft\Windows\CurrentVersion\Explorer\FileExts
+    // Windows 2000 and newer also have "Open With..." associations stored for each user separately
+    // in key HKEY_CURRENT_USER\Software\Microsoft\Windows\CurrentVersion\Explorer\FileExts
     HKEY explorerFileExts;
     if (HANDLES_Q(RegOpenKey(HKEY_CURRENT_USER, "Software\\Microsoft\\Windows\\CurrentVersion\\Explorer\\FileExts",
                              &explorerFileExts)) != ERROR_SUCCESS)
@@ -1176,13 +1176,13 @@ void CAssociations::ReadAssociations(BOOL showWaitWnd)
     LONG enumRet;
     FILETIME ft;
     while (1)
-    { // postupne enumnuti vsech pripon
+    { // sequentially enumerate all extensions
         DWORD extS = MAX_PATH;
         if ((enumRet = RegEnumKeyEx(HKEY_CLASSES_ROOT, i, ext, &extS, NULL, NULL, NULL, &ft)) == ERROR_SUCCESS)
-        { // otevreni klice pripony
+        { // open extension key
             if (ext[0] == '.' && HANDLES_Q(RegOpenKey(HKEY_CLASSES_ROOT, ext, &extKey)) == ERROR_SUCCESS)
             {
-                size = MAX_PATH; // ziskani typu asociace
+                size = MAX_PATH; // getting association type
                 iconLocation[0] = 0;
                 data.SetFlag(0);
                 data.SetIndexAll(-1);
@@ -1191,37 +1191,37 @@ void CAssociations::ReadAssociations(BOOL showWaitWnd)
                 BOOL addExt = (SalRegQueryValue(extKey, "", extType, &size) == ERROR_SUCCESS && size > 1);
                 if (addExt)
                 {
-                    // test na typ ikony (staticka/dynamicka viz .h)
+                    // test for icon type (static/dynamic see .h)
                     tryPerceivedType = !GetIconFromAssocAux(FALSE, HKEY_CLASSES_ROOT, extType, size, data, iconLocation, type);
                 }
                 else
                     tryPerceivedType = TRUE;
                 if (tryPerceivedType && systemFileAssoc != NULL)
                 {
-                    // nejdrive zkusime najit 'ext' pod klicem SystemFileAssociations
+                    // first try to find 'ext' under the SystemFileAssociations key
                     if (GetIconFromAssocAux(FALSE, systemFileAssoc, ext, (LONG)strlen(ext) + 1, data, iconLocation, NULL))
                         addExt = TRUE;
                     else
-                    { // zkusime jeste klic z hodnoty PerceivedType (je-li definovana)
+                    { // also try the key from the PerceivedType value (if defined)
                         size = MAX_PATH;
                         if (SalRegQueryValueEx(extKey, "PerceivedType", NULL, NULL, (BYTE*)extType, (DWORD*)&size) == ERROR_SUCCESS && size > 1)
                         {
-                            extType[MAX_PATH - 1] = 0; // pro jistotu (hodnota nemusi byt typu string, pak muze chybet null-terminator)
+                            extType[MAX_PATH - 1] = 0; // just to be sure (value may not be string type, then null-terminator may be missing)
                             if (GetIconFromAssocAux(FALSE, systemFileAssoc, extType, (LONG)strlen(extType) + 1, data, iconLocation, NULL))
                                 addExt = TRUE;
                         }
                     }
                 }
                 if (addExt)
-                {                // prevod ext. na mala pismena + pridani do pole
-                    e = ext + 1; // preskok '.'
+                {                // convert ext. to lowercase + add to array
+                    e = ext + 1; // skip '.'
                     s = e;
                     while (*s != 0)
                     {
                         *s = LowerCase[*s];
                         s++;
                     }
-                    *(DWORD*)s = 0; // nulovani konce stringu
+                    *(DWORD*)s = 0; // zero the end of string
 
                     InsertData("", Count, FALSE, e, s, data, size, iconLocation, type);
                 }
@@ -1232,41 +1232,41 @@ void CAssociations::ReadAssociations(BOOL showWaitWnd)
         {
             if (enumRet != ERROR_NO_MORE_ITEMS)
             {
-                // u jednoho usera (Bernard Vander Beken <Bernard.VanderBeken@deceuninck.com>) sem prijde
-                // jedna chyba ERROR_MORE_DATA, a pak spousta ERROR_OUTOFMEMORY, ma Microsoft Windows Server 2003,
-                // Standard Edition Service Pack 2 (Build 3790), zvetseni bufferu na 10000 nepomaha, nutne
-                // ukoncit enumeraci uz pri prvni chybe, jinak zacne cyklit a zarat pamet (zrejme jde
-                // o interni chybu Windowsu), nikdo dalsi to nehlasil, takze to dal neresime
+                // for one user (Bernard Vander Beken <Bernard.VanderBeken@deceuninck.com>) comes here
+                // one ERROR_MORE_DATA error, then a lot of ERROR_OUTOFMEMORY, has Microsoft Windows Server 2003,
+                // Standard Edition Service Pack 2 (Build 3790), increasing buffer to 10000 doesn't help, must
+                // terminate enumeration on first error, otherwise starts to cycle and eat memory (apparently
+                // an internal Windows error), nobody else reported it, so we don't deal with it further
                 _snprintf_s(errBuf, _TRUNCATE, LoadStr(IDS_UNABLETOGETASSOC), GetErrorText(enumRet));
                 SalMessageBox(parent, errBuf, LoadStr(IDS_UNABLETOGETASSOCTITLE), MB_OK | MB_ICONEXCLAMATION);
             }
-            break; // konec enumerace
+            break; // end of enumeration
         }
         i++;
     }
     if (Count > 1)
         SortArray(0, Count - 1);
 
-    // Windows XP maji asociace (viz PerceivedType) ulozeny jeste v klici HKEY_CLASSES_ROOT\SystemFileAssociations,
-    // nacteme dosud nezname pripony jeste z tohoto klice
+    // Windows XP has associations (see PerceivedType) also stored in key HKEY_CLASSES_ROOT\SystemFileAssociations,
+    // we load extensions not yet known from this key
     if (systemFileAssoc != NULL)
     {
         i = 0;
         while (1)
-        { // postupne enumnuti vsech pripon
+        { // sequentially enumerate all extensions
             DWORD extS = MAX_PATH;
             if ((enumRet = RegEnumKeyEx(systemFileAssoc, i, ext, &extS, NULL, NULL, NULL, &ft)) == ERROR_SUCCESS)
-            { // otevreni klice pripony
+            { // open extension key
                 if (ext[0] == '.')
                 {
-                    e = ext + 1; // preskok '.'
+                    e = ext + 1; // skip '.'
                     s = ext;
                     while (*++s != 0)
                         *s = LowerCase[*s];
-                    *(DWORD*)s = 0; // nulovani konce stringu
+                    *(DWORD*)s = 0; // zero the end of string
 
                     int index;
-                    if (!GetIndex(e, index)) // not found, ma smysl zkoumat + pripadne pridat
+                    if (!GetIndex(e, index)) // not found, makes sense to examine + possibly add
                     {
                         if (GetIconFromAssocAux(TRUE, systemFileAssoc, ext, (LONG)strlen(ext) + 1, data, iconLocation, NULL))
                         {
@@ -1279,15 +1279,15 @@ void CAssociations::ReadAssociations(BOOL showWaitWnd)
             {
                 if (enumRet != ERROR_NO_MORE_ITEMS)
                 {
-                    // u jednoho usera (Bernard Vander Beken <Bernard.VanderBeken@deceuninck.com>) sem prijde
-                    // jedna chyba ERROR_MORE_DATA, a pak spousta ERROR_OUTOFMEMORY, ma Microsoft Windows Server 2003,
-                    // Standard Edition Service Pack 2 (Build 3790), zvetseni bufferu na 10000 nepomaha, nutne
-                    // ukoncit enumeraci uz pri prvni chybe, jinak zacne cyklit a zrat pamet (zrejme jde
-                    // o interni chybu Windowsu), nikdo dalsi to nehlasil, takze to dal neresime
+                    // for one user (Bernard Vander Beken <Bernard.VanderBeken@deceuninck.com>) comes here
+                    // one ERROR_MORE_DATA error, then a lot of ERROR_OUTOFMEMORY, has Microsoft Windows Server 2003,
+                    // Standard Edition Service Pack 2 (Build 3790), increasing buffer to 10000 doesn't help, must
+                    // terminate enumeration on first error, otherwise starts to cycle and eat memory (apparently
+                    // an internal Windows error), nobody else reported it, so we don't deal with it further
                     _snprintf_s(errBuf, _TRUNCATE, LoadStr(IDS_UNABLETOGETASSOC), GetErrorText(enumRet));
                     SalMessageBox(parent, errBuf, LoadStr(IDS_UNABLETOGETASSOCTITLE), MB_OK | MB_ICONEXCLAMATION);
                 }
-                break; // konec enumerace
+                break; // end of enumeration
             }
             i++;
         }
@@ -1297,46 +1297,46 @@ void CAssociations::ReadAssociations(BOOL showWaitWnd)
     {
         i = 0;
         while (1)
-        { // postupne enumnuti vsech pripon
+        { // sequentially enumerate all extensions
             DWORD extS = MAX_PATH;
             if (RegEnumKeyEx(explorerFileExts, i, ext, &extS, NULL, NULL, NULL, &ft) == ERROR_SUCCESS)
-            { // otevreni klice pripony
+            { // open extension key
                 if (ext[0] == '.' && HANDLES_Q(RegOpenKey(explorerFileExts, ext, &extKey)) == ERROR_SUCCESS)
                 {
-                    e = ext + 1; // preskok '.'
+                    e = ext + 1; // skip '.'
                     s = ext;
                     while (*++s != 0)
                         *s = LowerCase[*s];
-                    *(DWORD*)s = 0; // nulovani konce stringu
+                    *(DWORD*)s = 0; // zero the end of string
 
                     int index;
                     BOOL found = GetIndex(e, index);
                     if (WindowsVistaAndLater && HANDLES_Q(RegOpenKey(extKey, "UserChoice", &openKey)) == ERROR_SUCCESS)
-                    {                    // zkusime, jestli neni asociovana pres klic UserChoice, pokud ano, je to neprioritnejsi zaznam, pripadne tedy prepiseme jiz existujici asociaci
-                        size = MAX_PATH; // ziskani typu asociace
+                    {                    // try if associated via UserChoice key, if so, it's the highest priority record, so we possibly overwrite the existing association
+                        size = MAX_PATH; // getting association type
                         if (SalRegQueryValueEx(openKey, "Progid", NULL, NULL, (BYTE*)extType, (DWORD*)&size) == ERROR_SUCCESS && size > 1)
                         {
-                            extType[MAX_PATH - 1] = 0; // pro jistotu (hodnota nemusi byt typu string, pak muze chybet null-terminator)
+                            extType[MAX_PATH - 1] = 0; // just to be sure (value may not be string type, then null-terminator may be missing)
 
                             if (GetIconFromAssocAux(TRUE, HKEY_CLASSES_ROOT, extType, (LONG)strlen(extType) + 1, data, iconLocation, type))
                             {
-                                InsertData("UserChoice: ", index, found, e, s, data, size, iconLocation, type); // found==TRUE znamena prepis jiz nalezene asociace tou z UserChoice
+                                InsertData("UserChoice: ", index, found, e, s, data, size, iconLocation, type); // found==TRUE means overwrite found association with the one from UserChoice
                                 found = TRUE;
                             }
                         }
                         HANDLES(RegCloseKey(openKey));
                     }
-                    if (!found) // zkusime jeste, jestli neni asociovana pres klic OpenWithProgids
+                    if (!found) // also try if associated via OpenWithProgids key
                     {
                         if (WindowsVistaAndLater && HANDLES_Q(RegOpenKey(extKey, "OpenWithProgids", &openKey)) == ERROR_SUCCESS)
                         {
                             DWORD j = 0;
-                            size = MAX_PATH; // ziskani typu asociace
+                            size = MAX_PATH; // getting association type
                             while (RegEnumValue(openKey, j++, extType, (DWORD*)&size, NULL, NULL, NULL, NULL) == ERROR_SUCCESS)
-                            { // postupne enumnuti vsech typu asociaci
+                            { // sequentially enumerate all association types
                                 if (extType[0] != 0)
                                 {
-                                    extType[MAX_PATH - 1] = 0; // pro jistotu (hodnota nemusi byt typu string, pak muze chybet null-terminator)
+                                    extType[MAX_PATH - 1] = 0; // just to be sure (value may not be string type, then null-terminator may be missing)
 
                                     if (GetIconFromAssocAux(TRUE, HKEY_CLASSES_ROOT, extType, (LONG)strlen(extType) + 1, data, iconLocation, type))
                                     {
@@ -1345,7 +1345,7 @@ void CAssociations::ReadAssociations(BOOL showWaitWnd)
                                         break;
                                     }
                                 }
-                                size = MAX_PATH; // ziskani typu asociace
+                                size = MAX_PATH; // getting association type
                             }
                             HANDLES(RegCloseKey(openKey));
                         }
@@ -1353,15 +1353,15 @@ void CAssociations::ReadAssociations(BOOL showWaitWnd)
 
                     if (SalRegQueryValueEx(extKey, "Application", NULL, NULL, NULL, NULL) == ERROR_SUCCESS)
                     {
-                        if (found) // found, nastavime, ze ma asociaci
+                        if (found) // found, set that it has association
                         {
                             CAssociationData* iconData = &(At(index));
-                            iconData->SetFlag(1); // soubory s touto priponou jdou otevirat
-                                                  // iconData->SetIndexAll(-1);  // prepnuti na statickou ikonu zlobi s CDR a CPT Corelackymi soubory s nahledy v ikonach, radsi nechame ikonu v nastaveni z HKEY_CLASSES_ROOT
+                            iconData->SetFlag(1); // files with this extension can be opened
+                                                  // iconData->SetIndexAll(-1);  // switching to static icon causes problems with CDR and CPT Corel files with previews in icons, better leave icon in settings from HKEY_CLASSES_ROOT
                         }
-                        else // not found, vlozime jako statickou ikonu
+                        else // not found, insert as static icon
                         {
-                            data.SetFlag(1); // soubory s touto priponou jdou otevirat
+                            data.SetFlag(1); // files with this extension can be opened
                             data.SetIndexAll(-1);
 
                             InsertData("FileExts: Application: ", index, FALSE, e, s, data, size, "", "");
@@ -1371,13 +1371,13 @@ void CAssociations::ReadAssociations(BOOL showWaitWnd)
                 }
             }
             else
-                break; // konec enumerace
+                break; // end of enumeration
             i++;
         }
         HANDLES(RegCloseKey(explorerFileExts));
     }
 
-    // pridani pevnych ikonek vsech velikosti do cache-bitmap CAssociations
+    // adding fixed icons of all sizes to cache-bitmap CAssociations
     int iconSize;
     for (iconSize = 0; iconSize < ICONSIZE_COUNT; iconSize++)
     {
@@ -1441,8 +1441,8 @@ BOOL CAssociations::IsAssociated(char* ext, BOOL& addtoIconCache, CIconSizeEnum 
     {
         int i = At(index).GetIndex(iconSize);
         if (i == -1)
-            At(index).SetIndex(-3, iconSize);  // nenactena -> nacitana
-        addtoIconCache = (i == -1 || i == -2); // dynamicka nebo nenactena/nenacitana staticka
+            At(index).SetIndex(-3, iconSize);  // not loaded -> loading
+        addtoIconCache = (i == -1 || i == -2); // dynamic or not loaded/loading static
         return At(index).GetFlag() != 0;
     }
     else
@@ -1460,8 +1460,8 @@ BOOL CAssociations::IsAssociatedStatic(char* ext, const char*& iconLocation, CIc
         int i = At(index).GetIndex(iconSize);
         if (i == -1)
         {
-            At(index).SetIndex(-3, iconSize);          // nenactena -> nacitana
-            iconLocation = At(index).ExtensionAndData; // nenactena/nenacitana staticka
+            At(index).SetIndex(-3, iconSize);          // not loaded -> loading
+            iconLocation = At(index).ExtensionAndData; // not loaded/loading static
         }
         else
             iconLocation = NULL;

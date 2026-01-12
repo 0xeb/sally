@@ -652,7 +652,8 @@ BOOL CFilesWindow::BuildScriptMain2(COperations* script, BOOL copy, char* target
             wideNameOnly = sw + 1;  // Points to just the filename
         }
 
-        DWORD attrs = SalGetFileAttributes(fileName);
+        // For Unicode files, use wide path to get attributes (ANSI path has ?? for non-convertible chars)
+        DWORD attrs = (fileNameW != NULL) ? GetFileAttributesW(fileNameW) : SalGetFileAttributes(fileName);
         if (attrs != 0xFFFFFFFF)
         {
             char* s = fileName + strlen(fileName);
@@ -935,9 +936,20 @@ BOOL CFilesWindow::BuildScriptMain2(COperations* script, BOOL copy, char* target
                 }
                 else
                 {
-                    HANDLE h = HANDLES_Q(CreateFile(fileName, GENERIC_READ, FILE_SHARE_READ | FILE_SHARE_WRITE,
-                                                    NULL, OPEN_EXISTING,
-                                                    FILE_ATTRIBUTE_NORMAL, NULL));
+                    HANDLE h;
+                    if (fileNameW != NULL)
+                    {
+                        // Use wide path for Unicode filenames (ANSI path has ?? for non-convertible chars)
+                        h = CreateFileW(fileNameW, GENERIC_READ, FILE_SHARE_READ | FILE_SHARE_WRITE,
+                                        NULL, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, NULL);
+                        DWORD err2 = GetLastError();
+                        HANDLES_ADD_EX(__otQuiet, h != INVALID_HANDLE_VALUE, __htFile, __hoCreateFile, h, err2, TRUE);
+                    }
+                    else
+                    {
+                        h = HANDLES_Q(CreateFile(fileName, GENERIC_READ, FILE_SHARE_READ | FILE_SHARE_WRITE,
+                                                 NULL, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, NULL));
+                    }
                     DWORD err = NO_ERROR;
                     if (h != INVALID_HANDLE_VALUE)
                     {

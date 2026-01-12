@@ -196,19 +196,19 @@ BOOL SalmonStartProcess(const char* fileMappingName) //Configuration.LoadedSLGNa
     // let's also try setting the current directory
     // if that doesn't work, we can try passing NULL instead of rtlDir to CreateProcess, then according to MSDN the current directory should be inherited from the launching process
     SetCurrentDirectory(rtlDir);
-    // EDIT 4/2014: udelal jsem nekolik testu s Support@bluesware.ch a chr.mue@gmail.com viz maily
-    // Vidim dve mozna reseni: zkusime rozsirit pro child proces PATH env promennou k SALRTL.
-    // Druha moznost je rozdelit SALMON.EXE na EXE bez RTL a DLL s implicitne linkovanym RTL. Pred loadem SALMON.DLL
-    // by jiz z beziciho SALMON.EXE bylo mozne nastavit current dir a SALMON.DLL naloadit runtime, coz by snad proslo.
+    // EDIT 4/2014: did several tests with Support@bluesware.ch and chr.mue@gmail.com see emails
+    // I see two possible solutions: try to extend PATH env variable for child process to SALRTL.
+    // Second option is to split SALMON.EXE into EXE without RTL and DLL with implicitly linked RTL. Before loading SALMON.DLL
+    // it would be possible to set current dir from running SALMON.EXE and load SALMON.DLL runtime, which should hopefully work.
     // ----
-    // Na mem pocitaci kazde ze tri pouzitych nastaveni cesty funguje samo o sobe (ENV PATH, SetCurrentDirectory a rtlDir parametr ve volani CreateProcess
-    if (NOHANDLES(CreateProcess(NULL, cmd, NULL, NULL, TRUE, //bInheritHandles==TRUE, potrebuje predat handly eventu!
+    // On my machine each of the three path settings works on its own (ENV PATH, SetCurrentDirectory and rtlDir parameter in CreateProcess call
+    if (NOHANDLES(CreateProcess(NULL, cmd, NULL, NULL, TRUE, //bInheritHandles==TRUE, needs to pass event handles!
                                 CREATE_DEFAULT_ERROR_MODE | HIGH_PRIORITY_CLASS, NULL,
                                 rtlDir, &si, &pi)))
     {
-        HSalmonProcess = pi.hProcess;                           // handle salmon procesu potrebujeme, abychom byli schopni detekovat, ze zije
-        AllowSetForegroundWindow(SalGetProcessId(pi.hProcess)); // pustime salmon nad nas
-        //NOHANDLES(CloseHandle(pi.hProcess)); // nechame je s klidem leaknout, stejne by slo o posledni uvolnovane handly pred koncem procesu
+        HSalmonProcess = pi.hProcess;                           // we need salmon process handle to be able to detect that it's alive
+        AllowSetForegroundWindow(SalGetProcessId(pi.hProcess)); // let salmon come to foreground above us
+        //NOHANDLES(CloseHandle(pi.hProcess)); // let them leak, they would be the last released handles before process end anyway
         //NOHANDLES(CloseHandle(pi.hThread));
         ret = TRUE;
     }
@@ -228,7 +228,7 @@ BOOL SalmonStartProcess(const char* fileMappingName) //Configuration.LoadedSLGNa
 //  return FALSE;
 //}
 
-// Chceme se dozvedet o SEH Exceptions i na x64 Windows 7 SP1 a dal
+// We want to learn about SEH Exceptions also on x64 Windows 7 SP1 and later
 // http://blog.paulbetts.org/index.php/2010/07/20/the-case-of-the-disappearing-onload-exception-user-mode-callback-exceptions-in-x64/
 // http://connect.microsoft.com/VisualStudio/feedback/details/550944/hardware-exceptions-on-x64-machines-are-silently-caught-in-wndproc-messages
 // http://support.microsoft.com/kb/976038
@@ -265,12 +265,12 @@ BOOL SalmonInit()
 
     SalmonSharedMemory = NULL;
     char salmonFileMappingName[SALMON_FILEMAPPIN_NAME_SIZE];
-    // alokace sdileneho mista v pagefile.sys
+    // allocation of shared space in pagefile.sys
     DWORD ti = (GetTickCount() >> 3) & 0xFFF;
-    while (TRUE) // hledame unikatni jmeno pro file-mapping
+    while (TRUE) // looking for a unique name for file-mapping
     {
         wsprintf(salmonFileMappingName, "Salmon%X", ti++);
-        SalmonFileMapping = NOHANDLES(CreateFileMapping(INVALID_HANDLE_VALUE, NULL, PAGE_READWRITE, 0, // FIXME_X64 nepredavame x86/x64 nekompatibilni data?
+        SalmonFileMapping = NOHANDLES(CreateFileMapping(INVALID_HANDLE_VALUE, NULL, PAGE_READWRITE, 0, // FIXME_X64 aren't we passing x86/x64 incompatible data?
                                                         sizeof(CSalmonSharedMemory), salmonFileMappingName));
         if (SalmonFileMapping == NULL || GetLastError() != ERROR_ALREADY_EXISTS)
             break;
@@ -278,7 +278,7 @@ BOOL SalmonInit()
     }
     if (SalmonFileMapping != NULL)
     {
-        SalmonSharedMemory = (CSalmonSharedMemory*)NOHANDLES(MapViewOfFile(SalmonFileMapping, FILE_MAP_WRITE, 0, 0, 0)); // FIXME_X64 nepredavame x86/x64 nekompatibilni data?
+        SalmonSharedMemory = (CSalmonSharedMemory*)NOHANDLES(MapViewOfFile(SalmonFileMapping, FILE_MAP_WRITE, 0, 0, 0)); // FIXME_X64 aren't we passing x86/x64 incompatible data?
         if (SalmonSharedMemory != NULL)
         {
             ZeroMemory(SalmonSharedMemory, sizeof(CSalmonSharedMemory));
@@ -286,17 +286,17 @@ BOOL SalmonInit()
             {
                 SalmonGetBugReportUID(&SalmonSharedMemory->UID);
 
-                // pokud se nezdari salmon spustit, stale vratime TRUE - problem bude oznamen pozdeji jiz po nacteni SLG
+                // if salmon fails to start, we still return TRUE - problem will be reported later after SLG is loaded
                 SalmonStartProcess(salmonFileMappingName);
                 return TRUE;
             }
         }
     }
-    // doslo k zavazne (a nepredpokladane) chybe, zablokujeme spusteni Salamander, hlaska bude anglicky (nemame slg)
+    // a serious (and unexpected) error occurred, we block Salamander startup, message will be in English (we don't have slg)
     return FALSE;
 }
 
-// info ze nebezi salmon staci zobrazit jednou
+// info that salmon is not running needs to be displayed only once
 static BOOL SalmonNotRunningReported = FALSE;
 
 void SalmonSetSLG(const char* slgName)
@@ -306,12 +306,12 @@ void SalmonSetSLG(const char* slgName)
     strcpy(SalmonSharedMemory->SLGName, slgName);
     SetEvent(SalmonSharedMemory->SetSLG);
 
-    // cekame na signal ze Salmon, ze zpracoval ukol (event Done) nebo na pripad, kdy nekdo Salmon sestrelil
+    // wait for signal from Salmon that it processed the task (event Done) or for the case when someone killed Salmon
     HANDLE arr[2];
     arr[0] = HSalmonProcess;
     arr[1] = SalmonSharedMemory->Done;
     DWORD waitRet = WaitForMultipleObjects(2, arr, FALSE, INFINITE);
-    if (waitRet != WAIT_OBJECT_0 + 1) // nekdo sestrelil salmon nebo se neco podelalo v komunikaci
+    if (waitRet != WAIT_OBJECT_0 + 1) // someone killed salmon or something went wrong in communication
     {
         if (!SalmonNotRunningReported && HLanguage != NULL)
         {
@@ -327,12 +327,12 @@ void SalmonCheckBugs()
     ResetEvent(SalmonSharedMemory->Done);
     SetEvent(SalmonSharedMemory->CheckBugs);
 
-    // cekame na signal ze Salmon, ze zpracoval ukol (event Done) nebo na pripad, kdy nekdo Salmon sestrelil
+    // wait for signal from Salmon that it processed the task (event Done) or for the case when someone killed Salmon
     HANDLE arr[2];
     arr[0] = HSalmonProcess;
     arr[1] = SalmonSharedMemory->Done;
     DWORD waitRet = WaitForMultipleObjects(2, arr, FALSE, INFINITE);
-    if (waitRet != WAIT_OBJECT_0 + 1) // nekdo sestrelil salmon nebo se neco podelalo v komunikaci
+    if (waitRet != WAIT_OBJECT_0 + 1) // someone killed salmon or something went wrong in communication
     {
         if (!SalmonNotRunningReported && HLanguage != NULL)
         {
@@ -350,7 +350,7 @@ BOOL SalmonFireAndWait(const EXCEPTION_POINTERS* e, char* bugReportPath)
     SalmonSharedMemory->ContextRecord = *e->ContextRecord;
     SetEvent(SalmonSharedMemory->Fire);
 
-    // cekame na signal ze Salmon, ze zpracoval ukol (event Done) nebo na pripad, kdy nekdo Salmon sestrelil
+    // wait for signal from Salmon that it processed the task (event Done) or for the case when someone killed Salmon
     HANDLE arr[2];
     arr[0] = HSalmonProcess;
     arr[1] = SalmonSharedMemory->Done;

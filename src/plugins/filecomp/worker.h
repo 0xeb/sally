@@ -259,7 +259,8 @@ protected:
 
 struct CWorkerFileData
 {
-    TCHAR Name[MAX_PATH];
+    std::string Name;
+    std::wstring NameW; // Wide path for Unicode/long path filenames
     HANDLE File;
     QWORD Size;
 
@@ -303,7 +304,8 @@ public:
     };
 
     CFilecompWorker(HWND parent, HWND mainWindow, const char* name0, const char* name1,
-                    const CCompareOptions& options, const int& cancelFlag, HANDLE event);
+                    const CCompareOptions& options, const int& cancelFlag, HANDLE event,
+                    const wchar_t* name0W = NULL, const wchar_t* name1W = NULL);
 
 protected:
     HWND Parent;

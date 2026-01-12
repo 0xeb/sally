@@ -9,34 +9,34 @@
 //
 //*****************************************************************************
 
-// od XPcek je v systemu StrCmpLogicalW, kterou pro toto porovnani pouziva Explorer
+// Since Windows XP, there is StrCmpLogicalW in the system, which Explorer uses for this comparison
 int StrCmpLogicalEx(const char* s1, int l1, const char* s2, int l2, BOOL* numericalyEqual, BOOL ignoreCase)
 {
-    const char* strEnd1 = s1 + l1; // konec retezce 's1'
-    const char* beg1 = s1;         // zacatek useku (textu nebo cisla)
-    const char* end1 = s1;         // konec useku (textu nebo cisla)
-    const char* strEnd2 = s2 + l2; // konec retezce 's2'
-    const char* beg2 = s2;         // zacatek useku (textu nebo cisla)
-    const char* end2 = s2;         // konec useku (textu nebo cisla)
-    int suggestion = 0;            // "doporuceni" vysledku (0 / -1 / 1 = nic / s1<s2 / s1>s2) - napr. "001" < "01"
+    const char* strEnd1 = s1 + l1; // end of string 's1'
+    const char* beg1 = s1;         // beginning of segment (text or number)
+    const char* end1 = s1;         // end of segment (text or number)
+    const char* strEnd2 = s2 + l2; // end of string 's2'
+    const char* beg2 = s2;         // beginning of segment (text or number)
+    const char* end2 = s2;         // end of segment (text or number)
+    int suggestion = 0;            // "suggestion" for result (0 / -1 / 1 = nothing / s1<s2 / s1>s2) - e.g. "001" < "01"
 
-    BOOL findDots = WindowsVistaAndLater && !SystemPolicies.GetNoDotBreakInLogicalCompare(); // TRUE = jmena se deli taky po teckach (nejen po cislech)
+    BOOL findDots = WindowsVistaAndLater && !SystemPolicies.GetNoDotBreakInLogicalCompare(); // TRUE = names are split also by dots (not only by numbers)
 
     while (1)
     {
-        const char* numBeg1 = NULL; // pozice prvni nenulovy cislice
+        const char* numBeg1 = NULL; // position of first non-zero digit
         BOOL isStr1 = (end1 >= strEnd1 || *end1 < '0' || *end1 > '9');
-        if (isStr1) // text (i prazdny) nebo tecka
+        if (isStr1) // text (even empty) or dot
         {
             if (findDots && end1 < strEnd1 && *end1 == '.')
-                end1++; // tecka: pokud je hledame, bereme jednu po druhe
-            else        // text (i prazdny)
+                end1++; // dot: if we are looking for them, take one at a time
+            else        // text (even empty)
             {
                 while (end1 < strEnd1 && (*end1 < '0' || *end1 > '9') && (!findDots || *end1 != '.'))
                     end1++;
             }
         }
-        else // cislo
+        else // number
         {
             while (end1 < strEnd1 && *end1 >= '0' && *end1 <= '9')
             {
@@ -45,19 +45,19 @@ int StrCmpLogicalEx(const char* s1, int l1, const char* s2, int l2, BOOL* numeri
                 end1++;
             }
         }
-        const char* numBeg2 = NULL; // pozice prvni nenulovy cislice
+        const char* numBeg2 = NULL; // position of first non-zero digit
         BOOL isStr2 = (end2 >= strEnd2 || *end2 < '0' || *end2 > '9');
-        if (isStr2) // text (i prazdny) nebo tecka
+        if (isStr2) // text (even empty) or dot
         {
             if (findDots && end2 < strEnd2 && *end2 == '.')
-                end2++; // tecka: pokud je hledame, bereme jednu po druhe
-            else        // text (i prazdny)
+                end2++; // dot: if we are looking for them, take one at a time
+            else        // text (even empty)
             {
                 while (end2 < strEnd2 && (*end2 < '0' || *end2 > '9') && (!findDots || *end2 != '.'))
                     end2++;
             }
         }
-        else // cislo
+        else // number
         {
             while (end2 < strEnd2 && *end2 >= '0' && *end2 <= '9')
             {
@@ -67,7 +67,7 @@ int StrCmpLogicalEx(const char* s1, int l1, const char* s2, int l2, BOOL* numeri
             }
         }
 
-        if (isStr1 || isStr2) // porovnani textu, tecek nebo kombinovane dvojice textu, tecky nebo cisla (vse krom dvou cisel se porovnava stringove)
+        if (isStr1 || isStr2) // comparison of text, dots or combined pairs of text, dots or numbers (everything except two numbers is compared as strings)
         {
             int ret;
             if (Configuration.SortUsesLocale)
@@ -90,13 +90,13 @@ int StrCmpLogicalEx(const char* s1, int l1, const char* s2, int l2, BOOL* numeri
                 return ret;
             }
         }
-        else // porovnani dvou cisel
+        else // comparison of two numbers
         {
             if (numBeg1 == NULL)
             {
-                if (numBeg2 == NULL) // obe cisla jsou nulova
+                if (numBeg2 == NULL) // both numbers are zero
                 {
-                    if (suggestion == 0) // zajima nas jen prvni "doporuceni" vysledku
+                    if (suggestion == 0) // we are only interested in the first "suggestion" for result
                     {
                         if (end1 - beg1 > end2 - beg2)
                             suggestion = -1; // "000" < "00"
@@ -104,7 +104,7 @@ int StrCmpLogicalEx(const char* s1, int l1, const char* s2, int l2, BOOL* numeri
                             suggestion = 1; // "00" > "000"
                     }
                 }
-                else // prvni cislo je nulove, druhe cislo neni nulove
+                else // first number is zero, second number is not zero
                 {
                     if (numericalyEqual != NULL)
                         *numericalyEqual = FALSE;
@@ -113,15 +113,15 @@ int StrCmpLogicalEx(const char* s1, int l1, const char* s2, int l2, BOOL* numeri
             }
             else
             {
-                if (numBeg2 == NULL) // prvni cislo neni nulove, druhe cislo je nulove
+                if (numBeg2 == NULL) // first number is not zero, second number is zero
                 {
                     if (numericalyEqual != NULL)
                         *numericalyEqual = FALSE;
                     return 1; // "1" > "00"
                 }
-                else // obe cisla jsou nenulova
+                else // both numbers are non-zero
                 {
-                    if (end1 - numBeg1 > end2 - numBeg2) // prvni cislo ma vic cislic nez druhe
+                    if (end1 - numBeg1 > end2 - numBeg2) // first number has more digits than second
                     {
                         if (numericalyEqual != NULL)
                             *numericalyEqual = FALSE;
@@ -129,24 +129,24 @@ int StrCmpLogicalEx(const char* s1, int l1, const char* s2, int l2, BOOL* numeri
                     }
                     else
                     {
-                        if (end1 - numBeg1 < end2 - numBeg2) // druhe cislo ma vic cislic nez prvni
+                        if (end1 - numBeg1 < end2 - numBeg2) // second number has more digits than first
                         {
                             if (numericalyEqual != NULL)
                                 *numericalyEqual = FALSE;
                             return -1; // "99" < "100"
                         }
-                        else // cisla maji stejny pocet cislic, porovname je podle hodnoty (ekvivalentni retezcovemu porovnani)
+                        else // numbers have the same number of digits, compare them by value (equivalent to string comparison)
                         {
                             int ret = StrCmpEx(numBeg1, (int)(end1 - numBeg1), numBeg2, (int)(end2 - numBeg2));
-                            if (ret != 0) // hodnoty nejsou shodne
+                            if (ret != 0) // values are not equal
                             {
                                 if (numericalyEqual != NULL)
                                     *numericalyEqual = FALSE;
                                 return ret;
                             }
-                            else // hodnoty cisel jsou stejne, pokud se lisi poctem nul v prefixu, prevezmeme to do "doporuceni" vysledku
+                            else // number values are the same, if they differ in the number of zeros in prefix, adopt this into "suggestion" for result
                             {
-                                if (suggestion == 0) // zajima nas jen prvni "doporuceni" vysledku
+                                if (suggestion == 0) // we are only interested in the first "suggestion" for result
                                 {
                                     if (end1 - beg1 > end2 - beg2)
                                         suggestion = -1; // "0001" < "001"
@@ -161,14 +161,14 @@ int StrCmpLogicalEx(const char* s1, int l1, const char* s2, int l2, BOOL* numeri
         }
 
         if (end1 >= strEnd1 && end2 >= strEnd2)
-            break; // konec porovnavani
+            break; // end of comparison
         beg1 = end1;
         beg2 = end2;
     }
 
     if (numericalyEqual != NULL)
-        *numericalyEqual = TRUE; // s1 a s2 jsou shodna nebo numericky shodna
-    return suggestion;           // pri shode nebo numericke shode vracime "doporuceny" vysledek
+        *numericalyEqual = TRUE; // s1 and s2 are equal or numerically equal
+    return suggestion;           // on equality or numerical equality we return the "suggested" result
 }
 
 //
@@ -260,66 +260,66 @@ int RegSetStrCmpEx(const char* s1, int l1, const char* s2, int l2, BOOL* numeric
 
 //
 //*****************************************************************************
-// QuickSort   1.klic Name, 2.klic Ext
+// QuickSort   1.key Name, 2.key Ext
 //
 
 int CmpNameExtIgnCase(const CFileData& f1, const CFileData& f2)
 {
     /*
-//--- nejprve podle Name
+//--- first by Name
   BOOL numericalyEqual1;
   int res1 = RegSetStrICmpEx(f1.Name, (*f1.Ext != 0) ? (f1.Ext - 1 - f1.Name) : f1.NameLen,
                              f2.Name, (*f2.Ext != 0) ? (f2.Ext - 1 - f2.Name) : f2.NameLen,
                              &numericalyEqual1);
-  if (!numericalyEqual1) return res1;   // jmena se lisi (nejsou shodne ani numericky shodne)
-//--- podle Name se rovnaji, rozhodne Ext
+  if (!numericalyEqual1) return res1;   // names differ (are not equal nor numerically equal)
+//--- by Name they are equal, Ext decides
   BOOL numericalyEqual2;
   int res2 = RegSetStrICmpEx(f1.Ext, f1.NameLen - (f1.Ext - f1.Name),
                              f2.Ext, f2.NameLen - (f2.Ext - f2.Name),
                              &numericalyEqual2);
-  if (numericalyEqual2 && res1 != 0) return res1; // pripony jsou shodne nebo numericky shodne a jmena jsou jen numericky shodna (porovnani jmen je prioritnejsi)
+  if (numericalyEqual2 && res1 != 0) return res1; // extensions are equal or numerically equal and names are only numerically equal (name comparison has priority)
   else return res2;
 */
-    //--- porovnavame cele Name (vcetne Ext), jako Explorer
+    //--- we compare the whole Name (including Ext), like Explorer
     return RegSetStrICmpEx(f1.Name, f1.NameLen, f2.Name, f2.NameLen, NULL);
 }
 
 int CmpNameExt(const CFileData& f1, const CFileData& f2)
 {
-    /*  // stara varianta: porovnavame oddelene jmeno a priponu
-//--- nejprve podle Name
+    /*  // old variant: we compare name and extension separately
+//--- first by Name
   BOOL numericalyEqual1;
   int res1 = RegSetStrICmpEx(f1.Name, (*f1.Ext != 0) ? (f1.Ext - 1 - f1.Name) : f1.NameLen,
                              f2.Name, (*f2.Ext != 0) ? (f2.Ext - 1 - f2.Name) : f2.NameLen,
                              &numericalyEqual1);
-  if (!numericalyEqual1) return res1;   // jmena se lisi (nejsou shodne ani numericky shodne)
-//--- podle Name se rovnaji, rozhodne Ext
+  if (!numericalyEqual1) return res1;   // names differ (are not equal nor numerically equal)
+//--- by Name they are equal, Ext decides
   BOOL numericalyEqual2;
   int res2 = RegSetStrICmpEx(f1.Ext, f1.NameLen - (f1.Ext - f1.Name),
                              f2.Ext, f2.NameLen - (f2.Ext - f2.Name),
                              &numericalyEqual2);
-  if (numericalyEqual2 && res1 != 0) return res1; // pripony jsou shodne nebo numericky shodne a jmena jsou jen numericky shodna (porovnani jmen je prioritnejsi)
+  if (numericalyEqual2 && res1 != 0) return res1; // extensions are equal or numerically equal and names are only numerically equal (name comparison has priority)
   else
   {
-    if (res2 != 0 || f1.Name == f2.Name) return res2; // pokud jsou shodne adresy, musi se rovnat
+    if (res2 != 0 || f1.Name == f2.Name) return res2; // if addresses are the same, they must be equal
   }
-//--- shodna jmena (archivy nebo FS) - zkusime jestli se nelisi aspon ve velikosti pismen
+//--- equal names (archives or FS) - try if they differ at least in letter case
   res1 = RegSetStrCmpEx(f1.Name, (*f1.Ext != 0) ? (f1.Ext - 1 - f1.Name) : f1.NameLen,
                         f2.Name, (*f2.Ext != 0) ? (f2.Ext - 1 - f2.Name) : f2.NameLen,
                         &numericalyEqual1);
-  if (!numericalyEqual1) return res1;   // jmena se lisi (nejsou shodne ani numericky shodne)
-//--- podle Name se opet rovnaji, rozhodne Ext
+  if (!numericalyEqual1) return res1;   // names differ (are not equal nor numerically equal)
+//--- by Name they are again equal, Ext decides
   res2 = RegSetStrCmpEx(f1.Ext, f1.NameLen - (f1.Ext - f1.Name),
                         f2.Ext, f2.NameLen - (f2.Ext - f2.Name),
                         &numericalyEqual2);
-  if (numericalyEqual2 && res1 != 0) return res1; // pripony jsou shodne nebo numericky shodne a jmena jsou jen numericky shodna (porovnani jmen je prioritnejsi)
+  if (numericalyEqual2 && res1 != 0) return res1; // extensions are equal or numerically equal and names are only numerically equal (name comparison has priority)
   else return res2;
 */
-    //--- porovnavame cele Name (vcetne Ext), jako Explorer
+    //--- we compare the whole Name (including Ext), like Explorer
     int res = RegSetStrICmpEx(f1.Name, f1.NameLen, f2.Name, f2.NameLen, NULL);
     if (res != 0 || f1.Name == f2.Name)
-        return res; // pokud jsou shodne adresy, musi se rovnat
-                    //--- shodna jmena (archivy nebo FS) - zkusime jestli se nelisi aspon ve velikosti pismen
+        return res; // if addresses are the same, they must be equal
+                    //--- equal names (archives or FS) - try if they differ at least in letter case
     return RegSetStrCmpEx(f1.Name, f1.NameLen, f2.Name, f2.NameLen, NULL);
 }
 
@@ -360,7 +360,7 @@ LABEL_SortNameExtAux:
         }
     } while (i <= j);
 
-    // nasledujici "hezky" kod jsme nahradili kodem podstatne setricim stack (max. log(N) zanoreni rekurze)
+    // the following "nice" code was replaced by code significantly saving stack (max. log(N) recursion depth)
     //  if (left < j) SortNameExtAux(files, left, j, reverse);
     //  if (i < right) SortNameExtAux(files, i, right, reverse);
 
@@ -368,7 +368,7 @@ LABEL_SortNameExtAux:
     {
         if (i < right)
         {
-            if (j - left < right - i) // je potreba seradit obe "poloviny", tedy do rekurze posleme tu mensi, tu druhou zpracujeme pres "goto"
+            if (j - left < right - i) // need to sort both "halves", so we send the smaller one to recursion, process the other via "goto"
             {
                 SortNameExtAux(files, left, j, reverse);
                 left = i;
@@ -404,40 +404,40 @@ void SortNameExt(CFilesArray& files, int left, int right, BOOL reverse)
 
 //
 //*****************************************************************************
-// QuickSort   1.klic Ext, 2.klic Name
+// QuickSort   1.key Ext, 2.key Name
 //
 
 BOOL LessExtName(const CFileData& f1, const CFileData& f2, BOOL reverse)
 {
-    //--- nejprve podle Ext
+    //--- first by Ext
     BOOL numericalyEqual1;
     int res1 = RegSetStrICmpEx(f1.Ext, f1.NameLen - (int)(f1.Ext - f1.Name),
                                f2.Ext, f2.NameLen - (int)(f2.Ext - f2.Name),
                                &numericalyEqual1);
     if (!numericalyEqual1)
-        return reverse ? res1 > 0 : res1 < 0; // pripony se lisi (nejsou shodne ani numericky shodne)
-                                              //--- podle Ext se rovnaji, rozhodne Name
+        return reverse ? res1 > 0 : res1 < 0; // extensions differ (are not equal nor numerically equal)
+                                              //--- by Ext they are equal, Name decides
     BOOL numericalyEqual2;
     int res2 = RegSetStrICmpEx(f1.Name, (*f1.Ext != 0) ? (int)(f1.Ext - 1 - f1.Name) : f1.NameLen,
                                f2.Name, (*f2.Ext != 0) ? (int)(f2.Ext - 1 - f2.Name) : f2.NameLen,
                                &numericalyEqual2);
     if (numericalyEqual2 && res1 != 0)
-        return reverse ? res1 > 0 : res1 < 0; // pripony jsou shodne nebo numericky shodne a jmena jsou jen numericky shodna (porovnani jmen je prioritnejsi)
+        return reverse ? res1 > 0 : res1 < 0; // extensions are equal or numerically equal and names are only numerically equal (name comparison has priority)
     else
     {
-        if (res2 == 0 && f1.Name != f2.Name) // shodna jmena (archivy nebo FS) - zkusime jestli se nelisi aspon ve velikosti pismen
+        if (res2 == 0 && f1.Name != f2.Name) // equal names (archives or FS) - try if they differ at least in letter case
         {
             res1 = RegSetStrCmpEx(f1.Ext, f1.NameLen - (int)(f1.Ext - f1.Name),
                                   f2.Ext, f2.NameLen - (int)(f2.Ext - f2.Name),
                                   &numericalyEqual1);
             if (!numericalyEqual1)
-                return reverse ? res1 > 0 : res1 < 0; // pripony se lisi (nejsou shodne ani numericky shodne)
-            //--- podle Ext se opet rovnaji, rozhodne Name
+                return reverse ? res1 > 0 : res1 < 0; // extensions differ (are not equal nor numerically equal)
+            //--- by Ext they are again equal, Name decides
             res2 = RegSetStrCmpEx(f1.Name, (*f1.Ext != 0) ? (int)(f1.Ext - 1 - f1.Name) : f1.NameLen,
                                   f2.Name, (*f2.Ext != 0) ? (int)(f2.Ext - 1 - f2.Name) : f2.NameLen,
                                   &numericalyEqual2);
             if (numericalyEqual2 && res1 != 0)
-                return reverse ? res1 > 0 : res1 < 0; // jmena jsou shodna nebo numericky shodna a pripony jsou jen numericky shodne (porovnani pripon je prioritnejsi)
+                return reverse ? res1 > 0 : res1 < 0; // names are equal or numerically equal and extensions are only numerically equal (extension comparison has priority)
         }
         return reverse ? res2 > 0 : res2 < 0;
     }
@@ -468,7 +468,7 @@ LABEL_SortExtNameAux:
         }
     } while (i <= j);
 
-    // nasledujici "hezky" kod jsme nahradili kodem podstatne setricim stack (max. log(N) zanoreni rekurze)
+    // the following "nice" code was replaced by code significantly saving stack (max. log(N) recursion depth)
     //  if (left < j) SortExtNameAux(files, left, j, reverse);
     //  if (i < right) SortExtNameAux(files, i, right, reverse);
 
@@ -476,7 +476,7 @@ LABEL_SortExtNameAux:
     {
         if (i < right)
         {
-            if (j - left < right - i) // je potreba seradit obe "poloviny", tedy do rekurze posleme tu mensi, tu druhou zpracujeme pres "goto"
+            if (j - left < right - i) // need to sort both "halves", so we send the smaller one to recursion, process the other via "goto"
             {
                 SortExtNameAux(files, left, j, reverse);
                 left = i;
@@ -512,16 +512,16 @@ void SortExtName(CFilesArray& files, int left, int right, BOOL reverse)
 
 //
 //*****************************************************************************
-// QuickSort   1.klic Time 2.klic Name, 3.klic Ext
+// QuickSort   1.key Time 2.key Name, 3.key Ext
 //
 
 BOOL LessTimeNameExt(const CFileData& f1, const CFileData& f2, BOOL reverse)
 {
-    //--- nejprve podle Time
+    //--- first by Time
     int res = CompareFileTime(&f1.LastWrite, &f2.LastWrite);
     if (res != 0)
         return (reverse ^ Configuration.SortNewerOnTop) ? res > 0 : res < 0;
-    //--- podle Time se rovnaji, dale Name
+    //--- by Time they are equal, next Name
     res = CmpNameExt(f1, f2);
     return reverse ? res > 0 : res < 0;
 }
@@ -551,7 +551,7 @@ LABEL_SortTimeNameExtAux:
         }
     } while (i <= j);
 
-    // nasledujici "hezky" kod jsme nahradili kodem podstatne setricim stack (max. log(N) zanoreni rekurze)
+    // the following "nice" code was replaced by code significantly saving stack (max. log(N) recursion depth)
     //  if (left < j) SortTimeNameExtAux(files, left, j, reverse);
     //  if (i < right) SortTimeNameExtAux(files, i, right, reverse);
 
@@ -559,7 +559,7 @@ LABEL_SortTimeNameExtAux:
     {
         if (i < right)
         {
-            if (j - left < right - i) // je potreba seradit obe "poloviny", tedy do rekurze posleme tu mensi, tu druhou zpracujeme pres "goto"
+            if (j - left < right - i) // need to sort both "halves", so we send the smaller one to recursion, process the other via "goto"
             {
                 SortTimeNameExtAux(files, left, j, reverse);
                 left = i;
@@ -595,15 +595,15 @@ void SortTimeNameExt(CFilesArray& files, int left, int right, BOOL reverse)
 
 //
 //*****************************************************************************
-// QuickSort   1.klic Size 2.klic Name, 3.klic Ext
+// QuickSort   1.key Size 2.key Name, 3.key Ext
 //
 
 BOOL LessSizeNameExt(const CFileData& f1, const CFileData& f2, BOOL reverse)
 {
-    //--- nejprve podle Time
+    //--- first by Size
     if (f1.Size != f2.Size)
-        return reverse ? f1.Size > f2.Size : f1.Size < f2.Size; // prvni soubor = nejvetsi soubor
-                                                                //--- podle Size se rovnaji, dale Name
+        return reverse ? f1.Size > f2.Size : f1.Size < f2.Size; // first file = largest file
+                                                                //--- by Size they are equal, next Name
     int res = CmpNameExt(f1, f2);
     return reverse ? res > 0 : res < 0;
 }
@@ -633,7 +633,7 @@ LABEL_SortSizeNameExtAux:
         }
     } while (i <= j);
 
-    // nasledujici "hezky" kod jsme nahradili kodem podstatne setricim stack (max. log(N) zanoreni rekurze)
+    // the following "nice" code was replaced by code significantly saving stack (max. log(N) recursion depth)
     //  if (left < j) SortSizeNameExtAux(files, left, j, reverse);
     //  if (i < right) SortSizeNameExtAux(files, i, right, reverse);
 
@@ -641,7 +641,7 @@ LABEL_SortSizeNameExtAux:
     {
         if (i < right)
         {
-            if (j - left < right - i) // je potreba seradit obe "poloviny", tedy do rekurze posleme tu mensi, tu druhou zpracujeme pres "goto"
+            if (j - left < right - i) // need to sort both "halves", so we send the smaller one to recursion, process the other via "goto"
             {
                 SortSizeNameExtAux(files, left, j, reverse);
                 left = i;
@@ -677,21 +677,21 @@ void SortSizeNameExt(CFilesArray& files, int left, int right, BOOL reverse)
 
 //
 //*****************************************************************************
-// QuickSort   1.klic Attr 2.klic Name, 3.klic Ext
+// QuickSort   1.key Attr 2.key Name, 3.key Ext
 //
 
 BOOL LessAttrNameExt(const CFileData& f1, const CFileData& f2, BOOL reverse)
 {
-    // okopcim FILE_ATTRIBUTE_READONLY na nejvyznamejsi bit
+    // copy FILE_ATTRIBUTE_READONLY to the most significant bit
     //  DWORD f1Attr = f1.Attr;
     //  DWORD f2Attr = f2.Attr;
     //  if (f1.Attr & FILE_ATTRIBUTE_READONLY) f1Attr |= 0x80000000;
     //  if (f2.Attr & FILE_ATTRIBUTE_READONLY) f2Attr |= 0x80000000;
 
-    // pokud podporime zobrazovani dalsiho atributu,
-    // je treba rozsirit masku DISPLAYED_ATTRIBUTES
+    // if we support displaying another attribute,
+    // need to extend the DISPLAYED_ATTRIBUTES mask
 
-    // prejdeme na abecedni razeni, jako ma explorer a speed commander
+    // we switch to alphabetical sorting, as explorer and speed commander have
     DWORD f1Attr = 0;
     DWORD f2Attr = 0;
     if (f1.Attr & FILE_ATTRIBUTE_ARCHIVE)
@@ -724,10 +724,10 @@ BOOL LessAttrNameExt(const CFileData& f1, const CFileData& f2, BOOL reverse)
     if (f2.Attr & FILE_ATTRIBUTE_TEMPORARY)
         f2Attr |= 0x00000040;
 
-    //--- nejprve podle Attr
+    //--- first by Attr
     if (f1Attr != f2Attr)
         return reverse ? f1Attr > f2Attr : f1Attr < f2Attr;
-    //--- podle Attr se rovnaji, dale Name
+    //--- by Attr they are equal, next Name
     int res = CmpNameExt(f1, f2);
     return reverse ? res > 0 : res < 0;
 }
@@ -757,7 +757,7 @@ LABEL_SortAttrNameExtAux:
         }
     } while (i <= j);
 
-    // nasledujici "hezky" kod jsme nahradili kodem podstatne setricim stack (max. log(N) zanoreni rekurze)
+    // the following "nice" code was replaced by code significantly saving stack (max. log(N) recursion depth)
     //  if (left < j) SortAttrNameExtAux(files, left, j, reverse);
     //  if (i < right) SortAttrNameExtAux(files, i, right, reverse);
 
@@ -765,7 +765,7 @@ LABEL_SortAttrNameExtAux:
     {
         if (i < right)
         {
-            if (j - left < right - i) // je potreba seradit obe "poloviny", tedy do rekurze posleme tu mensi, tu druhou zpracujeme pres "goto"
+            if (j - left < right - i) // need to sort both "halves", so we send the smaller one to recursion, process the other via "goto"
             {
                 SortAttrNameExtAux(files, left, j, reverse);
                 left = i;
@@ -801,7 +801,7 @@ void SortAttrNameExt(CFilesArray& files, int left, int right, BOOL reverse)
 
 //
 //*****************************************************************************
-// QuickSort pro integer
+// QuickSort for integer
 //
 
 void IntSort(int array[], int left, int right)
@@ -829,7 +829,7 @@ LABEL_IntSort:
         }
     } while (i <= j);
 
-    // nasledujici "hezky" kod jsme nahradili kodem podstatne setricim stack (max. log(N) zanoreni rekurze)
+    // the following "nice" code was replaced by code significantly saving stack (max. log(N) recursion depth)
     //  if (left < j) IntSort(array, left, j);
     //  if (i < right) IntSort(array, i, right);
 
@@ -837,7 +837,7 @@ LABEL_IntSort:
     {
         if (i < right)
         {
-            if (j - left < right - i) // je potreba seradit obe "poloviny", tedy do rekurze posleme tu mensi, tu druhou zpracujeme pres "goto"
+            if (j - left < right - i) // need to sort both "halves", so we send the smaller one to recursion, process the other via "goto"
             {
                 IntSort(array, left, j);
                 left = i;
