@@ -495,8 +495,12 @@ BOOL CPluginInterfaceForMenu::ExecuteMenuItem(CSalamanderForOperationsAbstract* 
     {
     case MID_COMPAREFILES:
     {
-        char file1[MAX_PATH];
-        char file2[MAX_PATH];
+        // Use std::string/wstring for long path support
+        const int LONG_PATH_SIZE = 32767;
+        std::string file1, file2;
+        std::wstring file1W, file2W;
+        char pathBuf[LONG_PATH_SIZE]; // Temp buffer for GetPanelPath
+        wchar_t widePathBuf[LONG_PATH_SIZE]; // Temp buffer for wide path conversion
         const CFileData *fd1, *fd2 = NULL;
         int index = 0;
         BOOL isDir;
@@ -504,9 +508,6 @@ BOOL CPluginInterfaceForMenu::ExecuteMenuItem(CSalamanderForOperationsAbstract* 
         int tgtPathType;
         SG->GetPanelPath(PANEL_TARGET, NULL, 0, &tgtPathType, NULL);
         BOOL tgtPanelIsDisk = (tgtPathType == PATH_TYPE_WINDOWS);
-
-        *file1 = 0;
-        *file2 = 0;
 
         fd1 = SG->GetPanelSelectedItem(PANEL_SOURCE, &index, &isDir);
 
@@ -557,16 +558,37 @@ BOOL CPluginInterfaceForMenu::ExecuteMenuItem(CSalamanderForOperationsAbstract* 
             goto SELECTION_FINISHED; // empty panel
 
         // store the name of the first file
-        if (!SG->GetPanelPath(PANEL_SOURCE, file1, MAX_PATH, NULL, NULL))
+        if (!SG->GetPanelPath(PANEL_SOURCE, pathBuf, LONG_PATH_SIZE, NULL, NULL))
             return NULL;
-        SG->SalPathAppend(file1, fd1->Name, MAX_PATH);
+        SG->SalPathAppend(pathBuf, fd1->Name, LONG_PATH_SIZE);
+        file1 = pathBuf;
+        // Build wide path for Unicode filenames or long paths
+        MultiByteToWideChar(CP_ACP, 0, pathBuf, -1, widePathBuf, LONG_PATH_SIZE);
+        file1W = widePathBuf;
+        // Replace the corrupted ANSI filename part with the correct Unicode name
+        if (fd1->UseWideName())
+        {
+            size_t lastSlash = file1W.rfind(L'\\');
+            if (lastSlash != std::wstring::npos)
+                file1W = file1W.substr(0, lastSlash + 1) + fd1->NameW.c_str();
+        }
 
         if (fd2 &&
             !isDir && fd2 != fd1) // in case we take the file from the focus
         {
             // store the name of the second file
-            SG->GetPanelPath(PANEL_SOURCE, file2, MAX_PATH, NULL, NULL);
-            SG->SalPathAppend(file2, fd2->Name, MAX_PATH);
+            SG->GetPanelPath(PANEL_SOURCE, pathBuf, LONG_PATH_SIZE, NULL, NULL);
+            SG->SalPathAppend(pathBuf, fd2->Name, LONG_PATH_SIZE);
+            file2 = pathBuf;
+            // Build wide path for Unicode filenames or long paths
+            MultiByteToWideChar(CP_ACP, 0, pathBuf, -1, widePathBuf, LONG_PATH_SIZE);
+            file2W = widePathBuf;
+            if (fd2->UseWideName())
+            {
+                size_t lastSlash = file2W.rfind(L'\\');
+                if (lastSlash != std::wstring::npos)
+                    file2W = file2W.substr(0, lastSlash + 1) + fd2->NameW.c_str();
+            }
             secondFromSource = TRUE;
         }
         else
@@ -583,17 +605,36 @@ BOOL CPluginInterfaceForMenu::ExecuteMenuItem(CSalamanderForOperationsAbstract* 
                     index = 0;
                     while ((fd2 = SG->GetPanelItem(PANEL_TARGET, &index, &isDir)) != 0)
                     {
-                        if (!isDir && SG->StrICmp(fd1->Name, fd2->Name) == 0)
-                            break;
+                        // For Unicode filenames, compare using wide names
+                        if (!isDir)
+                        {
+                            if (fd1->UseWideName() && fd2->UseWideName())
+                            {
+                                if (_wcsicmp(fd1->NameW.c_str(), fd2->NameW.c_str()) == 0)
+                                    break;
+                            }
+                            else if (SG->StrICmp(fd1->Name, fd2->Name) == 0)
+                                break;
+                        }
                     }
                 }
 
                 if (fd2)
                 {
                     // store the name of the second file
-                    if (!SG->GetPanelPath(PANEL_TARGET, file2, MAX_PATH, NULL, NULL))
+                    if (!SG->GetPanelPath(PANEL_TARGET, pathBuf, LONG_PATH_SIZE, NULL, NULL))
                         return NULL;
-                    SG->SalPathAppend(file2, fd2->Name, MAX_PATH);
+                    SG->SalPathAppend(pathBuf, fd2->Name, LONG_PATH_SIZE);
+                    file2 = pathBuf;
+                    // Build wide path for Unicode filenames or long paths
+                    MultiByteToWideChar(CP_ACP, 0, pathBuf, -1, widePathBuf, LONG_PATH_SIZE);
+                    file2W = widePathBuf;
+                    if (fd2->UseWideName())
+                    {
+                        size_t lastSlash = file2W.rfind(L'\\');
+                        if (lastSlash != std::wstring::npos)
+                            file2W = file2W.substr(0, lastSlash + 1) + fd2->NameW.c_str();
+                    }
                 }
             }
         }
@@ -602,13 +643,20 @@ BOOL CPluginInterfaceForMenu::ExecuteMenuItem(CSalamanderForOperationsAbstract* 
 
         BOOL doNotSwapNames = secondFromSource || SG->GetSourcePanel() == PANEL_LEFT;
         SG->GetConfigParameter(SALCFG_ALWAYSONTOP, &AlwaysOnTop, sizeof(AlwaysOnTop), NULL);
-        CFilecompThread* d = new CFilecompThread(doNotSwapNames ? file1 : file2, doNotSwapNames ? file2 : file1, FALSE, "");
+        // Pass wide paths for Unicode/long path filenames
+        const std::string& f1 = doNotSwapNames ? file1 : file2;
+        const std::string& f2 = doNotSwapNames ? file2 : file1;
+        const std::wstring& w1 = doNotSwapNames ? file1W : file2W;
+        const std::wstring& w2 = doNotSwapNames ? file2W : file1W;
+        CFilecompThread* d = new CFilecompThread(f1.c_str(), f2.c_str(), FALSE, "",
+                                                 w1.empty() ? NULL : w1.c_str(),
+                                                 w2.empty() ? NULL : w2.c_str());
         if (!d)
             return Error((HWND)-1, IDS_LOWMEM);
         if (!d->Create(ThreadQueue))
             delete d;
         SG->SetUserWorkedOnPanelPath(PANEL_SOURCE); // treat this command as working with the path (appears in Alt+F12)
-        if (!secondFromSource && file2[0])
+        if (!secondFromSource && !file2.empty())
             SG->SetUserWorkedOnPanelPath(PANEL_TARGET); // also record the target panel
 
         return FALSE;
@@ -646,9 +694,19 @@ CFilecompThread::Body()
     HWND wnd;
     CCompareOptions options = DefCompareOptions;
 
-    if (!*Path1 || !*Path2 || !DontConfirmSelection && Configuration.ConfirmSelection)
+    // Local buffers for dialog editing (dialog needs writable char and wchar_t buffers)
+    const int DIALOG_PATH_SIZE = 32767;
+    char dialogPath1[DIALOG_PATH_SIZE], dialogPath2[DIALOG_PATH_SIZE];
+    wchar_t dialogPath1W[DIALOG_PATH_SIZE], dialogPath2W[DIALOG_PATH_SIZE];
+    strcpy(dialogPath1, Path1.c_str());
+    strcpy(dialogPath2, Path2.c_str());
+    wcscpy(dialogPath1W, Path1W.c_str());
+    wcscpy(dialogPath2W, Path2W.c_str());
+
+    if (Path1.empty() || Path2.empty() || !DontConfirmSelection && Configuration.ConfirmSelection)
     {
-        CCompareFilesDialog* dlg = new CCompareFilesDialog(0, Path1, Path2, succes, &options);
+        CCompareFilesDialog* dlg = new CCompareFilesDialog(0, dialogPath1, dialogPath2, succes, &options,
+                                                              dialogPath1W, dialogPath2W, DIALOG_PATH_SIZE);
         if (!dlg)
         {
             Error(HWND(NULL), IDS_LOWMEM);
@@ -664,8 +722,8 @@ CFilecompThread::Body()
     }
     else
     {
-        AddToHistory(Path2);
-        AddToHistory(Path1);
+        AddToHistory(Path2.c_str());
+        AddToHistory(Path1.c_str());
         goto LLAUNCHFC;
     }
 
@@ -694,6 +752,9 @@ CFilecompThread::Body()
 
     LLAUNCHFC:
 
+        // Use the wide path buffers directly - they contain the actual Unicode paths
+        // (the dialog now reads/writes via wide APIs)
+
         WINDOWPLACEMENT wp;
         wp.length = sizeof(wp);
         GetWindowPlacement(SG->GetMainWindowHWND(), &wp);
@@ -706,8 +767,9 @@ CFilecompThread::Body()
                    workRect.top - monitorRect.top);
 
         // if the main window is minimized, keep the File Comparator restored instead
-        CMainWindow* win = new CMainWindow(Path1, Path2, &options,
-                                           wp.showCmd == SW_SHOWMAXIMIZED ? SW_SHOWMAXIMIZED : SW_SHOW);
+        CMainWindow* win = new CMainWindow(dialogPath1, dialogPath2, &options,
+                                           wp.showCmd == SW_SHOWMAXIMIZED ? SW_SHOWMAXIMIZED : SW_SHOW,
+                                           dialogPath1W, dialogPath2W);
         if (!win)
         {
             Error(HWND(NULL), IDS_LOWMEM);

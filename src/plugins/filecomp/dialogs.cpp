@@ -54,12 +54,16 @@ void AddToHistory(LPCTSTR path)
 }
 
 CCompareFilesDialog::CCompareFilesDialog(HWND parent, LPTSTR path1, LPTSTR path2,
-                                         BOOL& succes, CCompareOptions* options)
+                                         BOOL& succes, CCompareOptions* options,
+                                         wchar_t* path1W, wchar_t* path2W, int pathWSize)
     : CCommonDialog(IDD_COMPAREFILES, parent), Succes(succes)
 {
     CALL_STACK_MESSAGE_NONE
     Path1 = path1;
     Path2 = path2;
+    Path1W = path1W;
+    Path2W = path2W;
+    PathWSize = pathWSize;
     Succes = succes;
     Options = options;
 }
@@ -73,43 +77,114 @@ BOOL FileExists(LPCTSTR path)
            ((attr == 0xffffffff) && ((i != ERROR_FILE_NOT_FOUND) && (i != ERROR_PATH_NOT_FOUND)));
 }
 
+// FileExistsW is now available from shared lcutils.h
+
 void CCompareFilesDialog::Validate(CTransferInfo& ti)
 {
     CALL_STACK_MESSAGE1("CCompareFilesDialog::Validate()");
-    TCHAR buffer[MAX_PATH];
+    const int LONG_PATH_SIZE = 32767;
+    TCHAR* buffer = (TCHAR*)malloc(LONG_PATH_SIZE * sizeof(TCHAR));
+    wchar_t* wideBuffer = (wchar_t*)malloc(LONG_PATH_SIZE * sizeof(wchar_t));
+    if (!buffer || !wideBuffer)
+    {
+        free(buffer);
+        free(wideBuffer);
+        return;
+    }
 
     int i;
     for (i = 0; i < 2; i++)
     {
-        ti.EditLine(IDE_PATH1 + i, buffer, MAX_PATH);
+        // Get text from edit control with large buffer
+        GetDlgItemText(HWindow, IDE_PATH1 + i, buffer, LONG_PATH_SIZE);
         if (!*buffer)
         {
             SG->SalMessageBox(HWindow, LoadStr(IDS_MISSINGPATH), LoadStr(IDS_ERROR), MB_ICONERROR);
             ti.ErrorOn(IDE_PATH1 + i);
+            free(buffer);
+            free(wideBuffer);
             return;
         }
-        if (!FileExists(buffer))
+        // Convert to wide for file existence check (supports long paths and Unicode)
+        MultiByteToWideChar(CP_ACP, 0, buffer, -1, wideBuffer, LONG_PATH_SIZE);
+        if (!FileExistsW(wideBuffer))
         {
-            TCHAR buf2[300 + MAX_PATH];
-
-            wsprintf(buf2, LoadStr(IDS_FILEDOESNOTEXIST), buffer);
-            SG->SalMessageBox(HWindow, buf2, LoadStr(IDS_ERROR), MB_ICONERROR);
+            TCHAR* buf2 = (TCHAR*)malloc((300 + LONG_PATH_SIZE) * sizeof(TCHAR));
+            if (buf2)
+            {
+                wsprintf(buf2, LoadStr(IDS_FILEDOESNOTEXIST), buffer);
+                SG->SalMessageBox(HWindow, buf2, LoadStr(IDS_ERROR), MB_ICONERROR);
+                free(buf2);
+            }
             ti.ErrorOn(IDE_PATH1 + i);
+            free(buffer);
+            free(wideBuffer);
             return;
         }
     }
+    free(buffer);
+    free(wideBuffer);
 }
 
 void CCompareFilesDialog::Transfer(CTransferInfo& ti)
 {
     CALL_STACK_MESSAGE1("CCompareFilesDialog::Transfer()");
-    ti.EditLine(IDE_PATH1, Path1, MAX_PATH);
-    ti.EditLine(IDE_PATH2, Path2, MAX_PATH);
-    if (ti.Type == ttDataFromWindow)
+
+    // Use wide APIs if wide path buffers are provided
+    if (Path1W && Path2W && PathWSize > 0)
     {
-        AddToHistory(Path2);
-        AddToHistory(Path1);
-        Succes = TRUE;
+        HWND hWnd1 = GetDlgItem(HWindow, IDE_PATH1);
+        HWND hWnd2 = GetDlgItem(HWindow, IDE_PATH2);
+
+        if (ti.Type == ttDataToWindow)
+        {
+            // For combo boxes, get the edit control child and set text there
+            // This ensures Unicode display even on ANSI dialog controls
+            HWND hEdit1 = GetWindow(hWnd1, GW_CHILD);
+            HWND hEdit2 = GetWindow(hWnd2, GW_CHILD);
+            if (hEdit1)
+                SendMessageW(hEdit1, WM_SETTEXT, 0, (LPARAM)Path1W);
+            else
+                SendMessageW(hWnd1, WM_SETTEXT, 0, (LPARAM)Path1W);
+            if (hEdit2)
+                SendMessageW(hEdit2, WM_SETTEXT, 0, (LPARAM)Path2W);
+            else
+                SendMessageW(hWnd2, WM_SETTEXT, 0, (LPARAM)Path2W);
+        }
+        else // ttDataFromWindow
+        {
+            // Read text from the edit control child
+            HWND hEdit1 = GetWindow(hWnd1, GW_CHILD);
+            HWND hEdit2 = GetWindow(hWnd2, GW_CHILD);
+            if (hEdit1)
+                SendMessageW(hEdit1, WM_GETTEXT, PathWSize, (LPARAM)Path1W);
+            else
+                SendMessageW(hWnd1, WM_GETTEXT, PathWSize, (LPARAM)Path1W);
+            if (hEdit2)
+                SendMessageW(hEdit2, WM_GETTEXT, PathWSize, (LPARAM)Path2W);
+            else
+                SendMessageW(hWnd2, WM_GETTEXT, PathWSize, (LPARAM)Path2W);
+
+            // Also update ANSI paths for history (lossy but OK for history)
+            WideCharToMultiByte(CP_ACP, 0, Path1W, -1, Path1, MAX_PATH, NULL, NULL);
+            WideCharToMultiByte(CP_ACP, 0, Path2W, -1, Path2, MAX_PATH, NULL, NULL);
+
+            AddToHistory(Path2);
+            AddToHistory(Path1);
+            Succes = TRUE;
+        }
+    }
+    else
+    {
+        // Fallback to ANSI if no wide buffers provided
+        ti.EditLine(IDE_PATH1, Path1, MAX_PATH);
+        ti.EditLine(IDE_PATH2, Path2, MAX_PATH);
+        if (ti.Type == ttDataFromWindow)
+        {
+            AddToHistory(Path2);
+            AddToHistory(Path1);
+            Succes = TRUE;
+        }
     }
 }
 
@@ -199,6 +274,8 @@ CCompareFilesDialog::DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
         }
 
         SendMessage(HWindow, WM_SETICON, ICON_BIG, (LPARAM)LoadIcon(DLLInstance, MAKEINTRESOURCE(IDI_FCICO)));
+
+        // Note: Wide path text is set via Transfer() which runs after WM_INITDIALOG
 
         break;
     }

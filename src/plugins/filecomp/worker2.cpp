@@ -36,7 +36,7 @@ void CFilecompWorker::CompareBinaryFiles()
     CBinaryCompareResults results(Options);
     for (i = 0; i < 2; i++)
     {
-        results.Files[i].Name = Files[i].Name;
+        results.Files[i].Name = Files[i].Name.c_str();
         results.Files[i].Size = Files[i].Size;
     }
     results.FirstChange = changeOffs;
@@ -90,13 +90,13 @@ void CFilecompWorker::CompareBinaryFiles()
                     TCHAR fmt[128];
                     CQuadWord qSize((DWORD)changes.size(), 0);
                     SG->ExpandPluralString(fmt, SizeOf(fmt), LoadStr(IDS_MAINWNDHEADER), 1, &qSize);
-                    _stprintf(buf, fmt, SG->SalPathFindFileName(Files[0].Name), "",
-                              SG->SalPathFindFileName(Files[1].Name), "", changes.size());
+                    _stprintf(buf, fmt, SG->SalPathFindFileName(Files[0].Name.c_str()), "",
+                              SG->SalPathFindFileName(Files[1].Name.c_str()), "", changes.size());
                 }
                 else
                 {
                     _stprintf(buf, LoadStr(IDS_MAINWNDHEADERTOOMANY),
-                              SG->SalPathFindFileName(Files[0].Name), SG->SalPathFindFileName(Files[1].Name));
+                              SG->SalPathFindFileName(Files[0].Name.c_str()), SG->SalPathFindFileName(Files[1].Name.c_str()));
                 }
                 SetWindowText(MainWindow, buf);
                 PostMessage(MainWindow, WM_USER_WORKERNOTIFIES, WN_CBINIT_FINISHED, 0);

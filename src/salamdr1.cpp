@@ -299,7 +299,7 @@ HBITMAP HZoomBitmap = NULL;
 
 HCURSOR HHelpCursor = NULL;
 
-int SystemDPI = 0; // Globalni DPI pres vsechny monitory. Salamander nepodporuje Per-Monitor DPI, viz https://msdn.microsoft.com/library/windows/desktop/dn469266.aspx
+int SystemDPI = 0; // Global DPI across all monitors. Salamander does not support Per-Monitor DPI, see https://msdn.microsoft.com/library/windows/desktop/dn469266.aspx
 int IconSizes[] = {16, 32, 48};
 int IconLRFlags = 0;
 HICON HSharedOverlays[] = {0};
@@ -2935,7 +2935,7 @@ HRESULT GetComCtlVersion(LPDWORD pdwMajor, LPDWORD pdwMinor)
      don't implement this function. That makes the lack of implementation of the
      function a version marker in itself.
     */
-        pDllGetVersion = (DLLGETVERSIONPROC)GetProcAddress(hComCtl, TEXT("DllGetVersion")); // nema header
+        pDllGetVersion = (DLLGETVERSIONPROC)GetProcAddress(hComCtl, TEXT("DllGetVersion")); // has no header
         if (pDllGetVersion)
         {
             DLLVERSIONINFO dvi;
@@ -3225,10 +3225,10 @@ int MyRTCErrorFunc(int errType, const wchar_t* file, int line,
     lstrcpyn(RTCErrorDescription, bufA, RTC_ERROR_DESCRIPTION_SIZE);
 
     // better to break here with exception, hopefully clearer callstack - if not, we can remove this exception here
-    // viz popis chovani _CrtDbgReportW - http://msdn.microsoft.com/en-us/library/8hyw4sy7(v=VS.90).aspx
-    RaiseException(OPENSAL_EXCEPTION_RTC, 0, 0, NULL); // nase vlastni "rtc" exception
+    // see description of _CrtDbgReportW behavior - http://msdn.microsoft.com/en-us/library/8hyw4sy7(v=VS.90).aspx
+    RaiseException(OPENSAL_EXCEPTION_RTC, 0, 0, NULL); // our own "rtc" exception
 
-    // sem uz se nedostaneme, proces byl ukoncen; pokracuji jen z formalnich duvodu, kdybychom neco menili
+    // we won't reach here anymore, process was terminated; continuing only for formality, in case we change something
 
     // Now, restore the RTC errortypes.
     for (int i = 0; i < numErrors; i++)
@@ -3245,7 +3245,7 @@ int MyRTCErrorFunc(int errType, const wchar_t* file, int line,
 
 #ifdef _DEBUG
 
-DWORD LastCrtCheckMemoryTime; // kdy jsme posledne kontrolovali pamet v IDLE
+DWORD LastCrtCheckMemoryTime; // when we last checked memory in IDLE
 
 #endif //_DEBUG
 
@@ -3272,9 +3272,9 @@ BOOL FindPluginsWithoutImportedCfg(BOOL* doNotDeleteImportedCfg)
         sprintf(msg, LoadStr(IDS_NOTALLPLUGINSCFGIMPORTED), names, skippedNames);
         params.Text = msg;
         char aliasBtnNames[200];
-        /* slouzi pro skript export_mnu.py, ktery generuje salmenu.mnu pro Translator
-   nechame pro tlacitka msgboxu resit kolize hotkeys tim, ze simulujeme, ze jde o menu
-MENU_TEMPLATE_ITEM MsgBoxButtons[] = 
+        /* serves for script export_mnu.py, which generates salmenu.mnu for Translator
+   we let msgbox buttons resolve hotkey collisions by simulating it's a menu
+MENU_TEMPLATE_ITEM MsgBoxButtons[] =
 {
   {MNTT_PB, 0
   {MNTT_IT, IDS_STARTWITHOUTMISSINGPLUGINS
@@ -3301,7 +3301,7 @@ void StartNotepad(const char* file)
     if (lstrlen(file) >= MAX_PATH)
         return;
 
-    GetSystemDirectory(buf, MAX_PATH); // dame mu systemovy adresar, at neblokuje mazani soucasneho pracovniho adresare
+    GetSystemDirectory(buf, MAX_PATH); // give it system directory, so it doesn't block deletion of current working directory
     wsprintf(buf2, "notepad.exe \"%s\"", file);
     si.cb = sizeof(STARTUPINFO);
     if (HANDLES(CreateProcess(NULL, buf2, NULL, NULL, TRUE, CREATE_DEFAULT_ERROR_MODE | NORMAL_PRIORITY_CLASS,
@@ -3521,7 +3521,7 @@ BOOL ParseCommandLineParameters(LPSTR cmdLine, CCommandLineParams* cmdLineParams
                 }
             }
 
-            if (StrICmp(argv[i], "-o") == 0) // tvarime se, jako by bylo nahozene OnlyOneIstance
+            if (StrICmp(argv[i], "-o") == 0) // pretend as if OnlyOneInstance was set
             {
                 Configuration.ForceOnlyOneInstance = TRUE;
                 continue;
@@ -3558,10 +3558,10 @@ int WinMainBody(HINSTANCE hInstance, HINSTANCE /*hPrevInstance*/, LPSTR cmdLine,
 {
     int myExitCode = 1;
 
-    //--- nechci zadne kriticke chyby jako "no disk in drive A:"
+    //--- don't want any critical errors like "no disk in drive A:"
     SetErrorMode(SetErrorMode(0) | SEM_FAILCRITICALERRORS);
 
-    // seed generatoru nahodnych cisel
+    // seed random number generator
     srand((unsigned)time(NULL) ^ (unsigned)_getpid());
 
 #ifdef _DEBUG
@@ -3572,37 +3572,37 @@ int WinMainBody(HINSTANCE hInstance, HINSTANCE /*hPrevInstance*/, LPSTR cmdLine,
     // #define _CRTDBG_CHECK_CRT_DF        0x10  /* Leak check/diff CRT blocks */
     // #define _CRTDBG_LEAK_CHECK_DF       0x20  /* Leak check at program exit */
 
-    // pri podezreni na prepis alokovane pameti lze odkomentovat nasledujici dva radky
-    // dojde ke zpomaleni Salamandera a pri kazdem free alloc se provede test konzistence heapu
+    // if you suspect overwriting allocated memory, you can uncomment the following two lines
+    // Salamander will slow down and heap consistency test will be performed on each free/alloc
     // int crtDbg = _CrtSetDbgFlag(_CRTDBG_REPORT_FLAG);   // Get the current bits
     // _CrtSetDbgFlag(crtDbg | _CRTDBG_CHECK_ALWAYS_DF);
     // _CrtSetDbgFlag(crtDbg | _CRTDBG_LEAK_CHECK_DF);
 
-    // dalsi zajimava funkce pro ladeni: pokud dojde k memory leaku, v zavorce je zobrazeno
-    // dekadicke cislo, ktere udava poradi alokovaneho bloku, napriklad _CRT_WARN: {104200};
-    // funkci _CrtSetBreakAlloc umoznuje breaknou na tomto bloku
+    // another interesting debugging function: if a memory leak occurs, a decimal number
+    // is displayed in brackets indicating the order of the allocated block, e.g. _CRT_WARN: {104200};
+    // _CrtSetBreakAlloc function allows to break on this block
     // _CrtSetBreakAlloc(7700);
 
     LastCrtCheckMemoryTime = GetTickCount();
 
-    // na tomto pripade prepisu konce pameti zabere ochrana -- v IDLE se zobrazi messagebox
-    // a do TraceServeru se nalejou debug hlasky
+    // this case of overwriting end of memory will trigger protection -- a messagebox will appear in IDLE
+    // and debug messages will be poured into TraceServer
     //
 //  char *p1 = (char*)malloc( 4 );
 //  strcpy( p1 , "Oops" );
 #endif //_DEBUG
 
     /*
-   // test "Heap Block Corruptions: Full-page heap", viz http://support.microsoft.com/kb/286470
-   // alokuje vsechny bloky (musi mit aspon 16 bytu) tak, ze za nimi je nepristupna stranka, takze
-   // jakykoliv prepis konce bloku vede k exceptione
-   // instalovat Debugging Tools for Windows, v gflags.exe pro "salamand.exe" vybrat "Enable page heap",
-   // fungovalo mi to pod W2K i pod XP (pod Vistou by melo taky)
-   // NEBO: pouzit pripravene sal-pageheap-register.reg a sal-pageheap-unregister.reg (to pak neni
-   // potreba instalovat Debugging Tools for Windows)
+   // test "Heap Block Corruptions: Full-page heap", see http://support.microsoft.com/kb/286470
+   // allocates all blocks (must have at least 16 bytes) so that there's an inaccessible page after them,
+   // thus any overwrite of block end leads to exception
+   // install Debugging Tools for Windows, in gflags.exe for "salamand.exe" select "Enable page heap",
+   // it worked for me under W2K and XP (should work under Vista too)
+   // OR: use prepared sal-pageheap-register.reg and sal-pageheap-unregister.reg (then you don't need
+   // to install Debugging Tools for Windows)
    //
-   // prosinec/2011: testoval jsem pod VS2008 + page heap + Win7x64 a nasledujici prepis nevyvolava exception
-   // nasel jsem popis alokace v tomto rezimu: http://msdn.microsoft.com/en-us/library/ms220938(v=VS.90).aspx
+   // December/2011: I tested under VS2008 + page heap + Win7x64 and the following overwrite doesn't trigger exception
+   // I found description of allocation in this mode: http://msdn.microsoft.com/en-us/library/ms220938(v=VS.90).aspx
 
   char *test = (char *)malloc(16);
 //  char *test = (char *)HeapAlloc(GetProcessHeap(), 0, 16);
@@ -3614,7 +3614,7 @@ int WinMainBody(HINSTANCE hInstance, HINSTANCE /*hPrevInstance*/, LPSTR cmdLine,
 
     char testCharValue = 129;
     int testChar = testCharValue;
-    if (testChar != 129) // pokud bude testChar zaporne, mame problem: LowerCase[testCharValue] saha mimo pole...
+    if (testChar != 129) // if testChar is negative, we have a problem: LowerCase[testCharValue] reaches outside the array...
     {
         MessageBox(NULL, "Default type 'char' is not 'unsigned char', but 'signed char'. See '/J' compiler switch in MSVC.",
                    "Compilation Error", MB_OK | MB_ICONSTOP);
@@ -3624,9 +3624,9 @@ int WinMainBody(HINSTANCE hInstance, HINSTANCE /*hPrevInstance*/, LPSTR cmdLine,
     HInstance = hInstance;
     CALL_STACK_MESSAGE4("WinMainBody(0x%p, , %s, %d)", hInstance, cmdLine, cmdShow);
 
-    // Tak za tohle ja nemuzu ... co delat, kdyz to dela konkurence, musime
-    // taky - inspirovano v Exploreru.
-    // A ja se divil, ze jim tak pekne chodi paint.
+    // Well, I'm not to blame for this... what to do when the competition does it, we must
+    // too - inspired by Explorer.
+    // And I was wondering why their paint runs so nicely.
     SetThreadPriority(GetCurrentThread(), THREAD_PRIORITY_ABOVE_NORMAL);
 
     SetTraceProcessName("Salamander");
@@ -3634,28 +3634,28 @@ int WinMainBody(HINSTANCE hInstance, HINSTANCE /*hPrevInstance*/, LPSTR cmdLine,
     SetMessagesTitle(MAINWINDOW_NAME);
     TRACE_I("Begin");
 
-    // inicializace OLE
+    // OLE initialization
     if (FAILED(OleInitialize(NULL)))
     {
         TRACE_E("Error in CoInitialize.");
         return 1;
     }
 
-    //  HOldWPHookProc = SetWindowsHookEx(WH_CALLWNDPROC,     // HANDLES neumi!
+    //  HOldWPHookProc = SetWindowsHookEx(WH_CALLWNDPROC,     // HANDLES doesn't know how!
     //                                    WPMessageHookProc,
     //                                    NULL, GetCurrentThreadId());
 
     User32DLL = NOHANDLES(LoadLibrary("user32.dll"));
     if (User32DLL == NULL)
-        TRACE_E("Unable to load library user32.dll."); // neni fatalni chyba
+        TRACE_E("Unable to load library user32.dll."); // not a fatal error
 
     TurnOFFWindowGhosting();
 
     NtDLL = HANDLES(LoadLibrary("NTDLL.DLL"));
     if (NtDLL == NULL)
-        TRACE_E("Unable to load library ntdll.dll."); // neni fatalni chyba
+        TRACE_E("Unable to load library ntdll.dll."); // not a fatal error
 
-    // detekce defaultniho userova charsetu pro fonty
+    // detection of default user charset for fonts
     CHARSETINFO ci;
     memset(&ci, 0, sizeof(ci));
     char bufANSI[10];
@@ -3667,7 +3667,7 @@ int WinMainBody(HINSTANCE hInstance, HINSTANCE /*hPrevInstance*/, LPSTR cmdLine,
         }
     }
 
-    // kvuli pouzivani souboru mapovanych do pameti je nutne ziskat granularitu alokaci
+    // due to using memory-mapped files, it's necessary to get allocation granularity
     SYSTEM_INFO si;
     GetSystemInfo(&si);
     AllocationGranularity = si.dwAllocationGranularity;
@@ -3682,13 +3682,13 @@ int WinMainBody(HINSTANCE hInstance, HINSTANCE /*hPrevInstance*/, LPSTR cmdLine,
     // Windows 7          6              1
     // Windows 8          6              2
     // Windows 8.1        6              3
-    // Windows 10         10             0             (poznamka: preview verze W10 z 2014 vracely verzi 6.4)
+    // Windows 10         10             0             (note: preview versions of W10 from 2014 returned version 6.4)
 
     if (!SalIsWindowsVersionOrGreater(6, 1, 0))
     {
-        // sem se to pravdepodobne nedostane, na starsich systemech budou chybet exporty staticky linkovanych
-        // knihoven a uzivatele serve nejaka nepochopitelna hlaska na urovni PE loaderu ve Windows
-        // nevolat SalMessageBox
+        // we probably won't get here, on older systems exports of statically linked libraries will be missing
+        // and the user will be served some incomprehensible message at the PE loader level in Windows
+        // do not call SalMessageBox
         MessageBox(NULL, "You need at least Windows 7 to run this program.",
                    SALAMANDER_TEXT_VERSION, MB_OK | MB_ICONEXCLAMATION);
     EXIT_1:
@@ -3716,7 +3716,7 @@ int WinMainBody(HINSTANCE hInstance, HINSTANCE /*hPrevInstance*/, LPSTR cmdLine,
     if (GetProcessIntegrityLevel(&integrityLevel) && integrityLevel >= SECURITY_MANDATORY_HIGH_RID)
         RunningAsAdmin = TRUE;
 
-    // pokud je to mozne, pouzijeme GetNativeSystemInfo, jinak si nechame vysledek GetSystemInfo
+    // if possible, we'll use GetNativeSystemInfo, otherwise we'll keep the result of GetSystemInfo
     typedef void(WINAPI * PGNSI)(LPSYSTEM_INFO);
     PGNSI pGNSI = (PGNSI)GetProcAddress(GetModuleHandle("kernel32.dll"), "GetNativeSystemInfo"); // Min: XP
     if (pGNSI != NULL)
@@ -3726,7 +3726,7 @@ int WinMainBody(HINSTANCE hInstance, HINSTANCE /*hPrevInstance*/, LPSTR cmdLine,
     if (!GetWindowsDirectory(WindowsDirectory, MAX_PATH))
         WindowsDirectory[0] = 0;
 
-    // zajima nas iface ITaskbarList3, ktery MS zavedli od Windows 7 - napriklad progress v taskbar buttons
+    // we're interested in the ITaskbarList3 interface, which MS introduced from Windows 7 - for example progress in taskbar buttons
     if (Windows7AndLater)
     {
         TaskbarBtnCreatedMsg = RegisterWindowMessage("TaskbarButtonCreated");
@@ -3737,22 +3737,22 @@ int WinMainBody(HINSTANCE hInstance, HINSTANCE /*hPrevInstance*/, LPSTR cmdLine,
         }
     }
 
-    // mame nastavene globalni promenne, muzeme inicializovat tento mutex
+    // we have global variables set, we can initialize this mutex
     if (!TaskList.Init())
         TRACE_E("TaskList.Init() failed!");
 
     if (!InitializeWinLib())
-        goto EXIT_1; // musime inicializovat WinLib pred prvnim zobrazenim
-                     // wait dialogu (musi byt registrovany tridy oken)
-                     // ImportConfiguration uz muze otevrit tento dialog
+        goto EXIT_1; // we must initialize WinLib before first showing
+                     // of wait dialog (window classes must be registered)
+                     // ImportConfiguration can already open this dialog
 
     LoadSaveToRegistryMutex.Init();
 
-    // zkusime z aktualni konfigurace vytahnout hodnotu "AutoImportConfig" -> existuje v pripade, ze provadime UPGRADE
+    // try to extract "AutoImportConfig" value from current configuration -> exists in case we're performing UPGRADE
     BOOL autoImportConfig = FALSE;
     char autoImportConfigFromKey[200];
     autoImportConfigFromKey[0] = 0;
-    if (!GetUpgradeInfo(&autoImportConfig, autoImportConfigFromKey, 200)) // user si preje exit softu
+    if (!GetUpgradeInfo(&autoImportConfig, autoImportConfigFromKey, 200)) // user wishes to exit the software
     {
         myExitCode = 0;
     EXIT_1a:
@@ -3761,22 +3761,22 @@ int WinMainBody(HINSTANCE hInstance, HINSTANCE /*hPrevInstance*/, LPSTR cmdLine,
     }
     const char* configKey = autoImportConfig ? autoImportConfigFromKey : SalamanderConfigurationRoots[0];
 
-    // zkusime z aktualni konfigurace vytahnout klic urcujici jazyk
+    // try to extract the language-determining key from current configuration
     LoadSaveToRegistryMutex.Enter();
     HKEY hSalamander;
-    DWORD langChanged = FALSE; // TRUE = startujeme Salama poprve s jinym jazykem (naloadime vsechny pluginy, at se overi ze mame tuto jazykovou verzi i pro ne, pripadne at user vyresi jake nahradni verze chce pouzivat)
+    DWORD langChanged = FALSE; // TRUE = we're starting Salamander for the first time with a different language (we'll load all plugins to verify we have this language version for them too, or let user decide which alternative versions to use)
     if (OpenKey(HKEY_CURRENT_USER, configKey, hSalamander))
     {
         HKEY actKey;
-        DWORD configVersion = 1; // toto je konfig od 1.52 a starsi
+        DWORD configVersion = 1; // this is config from 1.52 and older
         if (OpenKey(hSalamander, SALAMANDER_VERSION_REG, actKey))
         {
-            configVersion = 2; // toto je konfig od 1.6b1
+            configVersion = 2; // this is config from 1.6b1
             GetValue(actKey, SALAMANDER_VERSIONREG_REG, REG_DWORD,
                      &configVersion, sizeof(DWORD));
             CloseKey(actKey);
         }
-        if (configVersion >= 59 /* 2.53 beta 2 */ && // pred 2.53 beta 2 byla jen anglictina, tedy cteni nema smysl, nabidneme userovi defaultni jazyk systemu nebo rucni vyber jazyku
+        if (configVersion >= 59 /* 2.53 beta 2 */ && // before 2.53 beta 2 there was only English, so reading doesn't make sense, we'll offer user default system language or manual language selection
             OpenKey(hSalamander, SALAMANDER_CONFIG_REG, actKey))
         {
             GetValue(actKey, CONFIG_LANGUAGE_REG, REG_SZ,
@@ -3794,8 +3794,8 @@ int WinMainBody(HINSTANCE hInstance, HINSTANCE /*hPrevInstance*/, LPSTR cmdLine,
 
 FIND_NEW_SLG_FILE:
 
-    // pokud klic neexistuje, zobrazime vyberovy dialog
-    BOOL newSLGFile = FALSE; // TRUE pokud byl .SLG vybran pri tomto spusteni Salamandera
+    // if key doesn't exist, we'll show selection dialog
+    BOOL newSLGFile = FALSE; // TRUE if .SLG was selected during this Salamander launch
     if (Configuration.SLGName[0] == 0)
     {
         CLanguageSelectorDialog slgDialog(NULL, Configuration.SLGName, NULL);
@@ -3811,8 +3811,8 @@ FIND_NEW_SLG_FILE:
         Configuration.AltPluginSLGName[0] = 0;
 
         char prevVerSLGName[MAX_PATH];
-        if (!autoImportConfig &&                            // pri UPGRADE toto nema smysl (jazyk se cte o par radek vyse, tahle rutina by ho jen precetla znovu)
-            FindLanguageFromPrevVerOfSal(prevVerSLGName) && // importneme jazyk z predchozi verze, je dost pravdepodobne, ze ho user opet chce pouzit (jde o import stare konfigurace Salama)
+        if (!autoImportConfig &&                            // during UPGRADE this doesn't make sense (language is read a few lines above, this routine would just re-read it)
+            FindLanguageFromPrevVerOfSal(prevVerSLGName) && // we'll import language from previous version, it's quite probable user wants to use it again (it's about importing old Salamander configuration)
             slgDialog.SLGNameExists(prevVerSLGName))
         {
             lstrcpy(Configuration.SLGName, prevVerSLGName);
@@ -3820,22 +3820,22 @@ FIND_NEW_SLG_FILE:
         else
         {
             int langIndex = slgDialog.GetPreferredLanguageIndex(NULL, TRUE);
-            if (langIndex == -1) // tato instalace neobsahuje jazyk souhlasici s aktualnim user-locale ve Windows
+            if (langIndex == -1) // this installation doesn't contain language matching current user-locale in Windows
             {
 
-// kdyz se tohle zakomentuje, nebudeme posilat lidi tahat jazykove verze z webu (napr. kdyz tam zadne nejsou)
-// JRY: pro AS 2.53, kery jde s cestinou, nemcinou a anglictinou je pro ostatni jazyky posleme na forum do sekce
-//      "Translations" https://forum.altap.cz/viewforum.php?f=23 - treba to nekoho namotivuje a pujde svuj preklad vytvorit
+// if this is commented out, we won't send people to download language versions from web (e.g. when there are none)
+// JRY: for AS 2.53, which comes with Czech, German and English, for other languages we'll send them to forum section
+//      "Translations" https://forum.altap.cz/viewforum.php?f=23 - maybe it will motivate someone to create their translation
 #define OFFER_OTHERLANGUAGE_VERSIONS
 
 #ifndef OFFER_OTHERLANGUAGE_VERSIONS
                 if (slgDialog.GetLanguagesCount() == 1)
-                    slgDialog.GetSLGName(Configuration.SLGName); // pokud existuje jen jeden jazyk, pouzijeme ho
+                    slgDialog.GetSLGName(Configuration.SLGName); // if only one language exists, we'll use it
                 else
                 {
 #endif // OFFER_OTHERLANGUAGE_VERSIONS
 
-                    // otevreme dialog vyberu jazyku, aby mohl user downloadnout a nainstalovat dalsi jazyky
+                    // we'll open language selection dialog, so user can download and install other languages
                     if (slgDialog.Execute() == IDCANCEL)
                         goto EXIT_1a;
 
@@ -3845,7 +3845,7 @@ FIND_NEW_SLG_FILE:
             }
             else
             {
-                slgDialog.GetSLGName(Configuration.SLGName, langIndex); // pokud existuje jazyk odpovidajici aktualnim user-locale ve Windows, pouzijeme ho
+                slgDialog.GetSLGName(Configuration.SLGName, langIndex); // if language matching current user-locale in Windows exists, we'll use it
             }
         }
         newSLGFile = TRUE;
@@ -3862,7 +3862,7 @@ FIND_NEW_SLG_FILE:
     {
         if (HLanguage != NULL)
             HANDLES(FreeLibrary(HLanguage));
-        if (!newSLGFile) // zapamatovany .SLG soubor prestal nejspis existovat, zkusime najit jiny
+        if (!newSLGFile) // remembered .SLG file probably stopped existing, we'll try to find another one
         {
             sprintf(errorText, "File %s was not found or is not valid language file.\nOpen Salamander "
                                "will try to search for some other language file (.SLG).",
@@ -3871,7 +3871,7 @@ FIND_NEW_SLG_FILE:
             Configuration.SLGName[0] = 0;
             goto FIND_NEW_SLG_FILE;
         }
-        else // nemelo by vubec nastat - .SLG soubor jiz byl otestovan
+        else // shouldn't happen at all - .SLG file was already tested
         {
             sprintf(errorText, "File %s was not found or is not valid language file.\n"
                                "Please run Open Salamander again and try to choose some other language file.",
@@ -3883,10 +3883,10 @@ FIND_NEW_SLG_FILE:
 
     strcpy(Configuration.LoadedSLGName, Configuration.SLGName);
 
-    // nechame jiz bezici salmon nacist zvolene SLG (zatim pouzival nejake provizorni)
+    // let already running salmon load the selected SLG (it was using some provisional one so far)
     SalmonSetSLG(Configuration.SLGName);
 
-    // nastavime lokalizovane hlasky do modulu ALLOCHAN (zajistuje pri nedostatku pameti hlaseni uzivateli + Retry button + kdyz vse selze tak i Cancel pro terminate softu)
+    // set localized messages into ALLOCHAN module (ensures reporting to user when memory is low + Retry button + if all fails then Cancel to terminate the software)
     SetAllocHandlerMessage(LoadStr(IDS_ALLOCHANDLER_MSG), SALAMANDER_TEXT_VERSION,
                            LoadStr(IDS_ALLOCHANDLER_WRNIGNORE), LoadStr(IDS_ALLOCHANDLER_WRNABORT));
 
@@ -3909,8 +3909,8 @@ FIND_NEW_SLG_FILE:
     }
 
 #ifdef USE_BETA_EXPIRATION_DATE
-    // beta verze je casove limitovana, viz BETA_EXPIRATION_DATE
-    // pokud je dnes den urceny touto promennou nebo nejaky dalsi, zobrazime okenko a koncime
+    // beta version is time-limited, see BETA_EXPIRATION_DATE
+    // if today is the day specified by this variable or any later, we'll show a window and end
     SYSTEMTIME st;
     GetLocalTime(&st);
     SYSTEMTIME* expire = &BETA_EXPIRATION_DATE;
@@ -3923,12 +3923,12 @@ FIND_NEW_SLG_FILE:
     }
 #endif // USE_BETA_EXPIRATION_DATE
 
-    // otevreme splash screen
+    // open splash screen
 
     GetSystemDPI(NULL);
 
-    // pokud konfigurace neexistuje nebo bude nasledne pri importu ze souboru zmenena, ma uzivatel
-    // smulu a splash screen se bude ridit implicitni nebo starou hodnotou
+    // if configuration doesn't exist or will be subsequently changed during file import, user is out of luck
+    // and splash screen will follow default or old value
     LoadSaveToRegistryMutex.Enter();
     if (OpenKey(HKEY_CURRENT_USER, configKey, hSalamander))
     {
@@ -3946,7 +3946,7 @@ FIND_NEW_SLG_FILE:
     if (Configuration.ShowSplashScreen)
         SplashScreenOpen();
 
-    // okno pro import konfigurace obsahuje listview s checkboxama, musime inicializovat COMMON CONTROLS
+    // configuration import window contains listview with checkboxes, we must initialize COMMON CONTROLS
     INITCOMMONCONTROLSEX initCtrls;
     initCtrls.dwSize = sizeof(INITCOMMONCONTROLSEX);
     initCtrls.dwICC = ICC_BAR_CLASSES | ICC_LISTVIEW_CLASSES |
@@ -3959,42 +3959,42 @@ FIND_NEW_SLG_FILE:
         goto EXIT_2;
     }
 
-    SetWinLibStrings(LoadStr(IDS_INVALIDNUMBER), MAINWINDOW_NAME); // j.r. - posunout na spravne misto
+    SetWinLibStrings(LoadStr(IDS_INVALIDNUMBER), MAINWINDOW_NAME); // j.r. - move to correct place
 
-    // inicializace pakovacu; drive provadeno v konstruktorech; ted presunuto sem,
-    // kdy uz je rozhodnuto o jazykovem DLL
+    // initialization of packers; previously done in constructors; now moved here,
+    // when language DLL is already decided
     PackerFormatConfig.InitializeDefaultValues();
     ArchiverConfig.InitializeDefaultValues();
     PackerConfig.InitializeDefaultValues();
     UnpackerConfig.InitializeDefaultValues();
 
-    // pokud soubor existuje, bude importovan do registry
+    // if file exists, it will be imported to registry
     BOOL importCfgFromFileWasSkipped = FALSE;
     ImportConfiguration(NULL, ConfigurationName, ConfigurationNameIgnoreIfNotExists, autoImportConfig,
                         &importCfgFromFileWasSkipped);
 
-    // obslouzime prechod ze stareho configu na novy
+    // handle transition from old config to new
 
-    // Zavolame funkci, ktera se pokusi najit konfiguraci odpovidajici nasi verzi programu.
-    // Pokud se ji podari najit, bude nastavena promenna 'loadConfiguration' a funkce vrati
-    // TRUE. Pokud konfigurace jeste nebude existovat, funkce postupne prohleda stare
-    // konfigurace z pole 'SalamanderConfigurationRoots' (od nejmladsich k nejstrasim).
-    // Pokud nalezne nekterou z konfiguraci, zobrazi dialog a nabidne jeji konverzi do
-    // konfigurace soucasne a smazani z registry. Po zobrazeni posledniho dialogu vrati
-    // TRUE a nastavi promenne 'deleteConfigurations' a 'loadConfiguration' dle voleb
-    // uzivatele. Pokud uzivatel zvoli ukonceni aplikace, vrati funkce FALSE.
+    // Call function that will try to find configuration corresponding to our program version.
+    // If it succeeds, 'loadConfiguration' variable will be set and function will return
+    // TRUE. If configuration doesn't exist yet, function will sequentially search old
+    // configurations from 'SalamanderConfigurationRoots' array (from newest to oldest).
+    // If it finds one of the configurations, it will show dialog and offer its conversion to
+    // current configuration and deletion from registry. After showing the last dialog it will return
+    // TRUE and set 'deleteConfigurations' and 'loadConfiguration' variables according to user's
+    // choices. If user chooses to terminate application, function returns FALSE.
 
-    // pole urcujici indexy konfiguraci v poli 'SalamanderConfigurationRoots',
-    // ktere maji byt smazany (0 -> zadna)
+    // array determining configuration indices in 'SalamanderConfigurationRoots' array,
+    // which should be deleted (0 -> none)
     BOOL deleteConfigurations[SALCFG_ROOTS_COUNT];
     ZeroMemory(deleteConfigurations, sizeof(deleteConfigurations));
 
     CALL_STACK_MESSAGE1("WinMainBody::FindLatestConfiguration");
 
-    // ukazatel do pole 'SalamanderConfigurationRoots' na konfiguraci, ktera ma byt
-    // nactena (NULL -> zadna; pouziji se default hodnoty)
+    // pointer into 'SalamanderConfigurationRoots' array to configuration that should be
+    // loaded (NULL -> none; default values will be used)
     if (autoImportConfig)
-        SALAMANDER_ROOT_REG = autoImportConfigFromKey; // pri UPGRADE nema hledani konfigurace smysl
+        SALAMANDER_ROOT_REG = autoImportConfigFromKey; // during UPGRADE searching for configuration doesn't make sense
     else
     {
         if (!FindLatestConfiguration(deleteConfigurations, SALAMANDER_ROOT_REG))
@@ -4004,14 +4004,14 @@ FIND_NEW_SLG_FILE:
         }
     }
 
-    InitializeShellib(); // OLE je treba inicializovat pred otevrenim HTML helpu - CSalamanderEvaluation
+    InitializeShellib(); // OLE needs to be initialized before opening HTML help - CSalamanderEvaluation
 
-    // pokud jeste neexistuje novy klic konfigurace, vytvorime ho pred pripadnym smazanim
-    // starych klicu
+    // if new configuration key doesn't exist yet, we'll create it before potential deletion
+    // of old keys
     BOOL currentCfgDoesNotExist = autoImportConfig || SALAMANDER_ROOT_REG != SalamanderConfigurationRoots[0];
     BOOL saveNewConfig = currentCfgDoesNotExist;
 
-    // pokud uzivatel nechce vic instanci, pouze aktivujeme predchozi
+    // if user doesn't want multiple instances, we'll just activate the previous one
     if (!currentCfgDoesNotExist &&
         CheckOnlyOneInstance(&cmdLineParams))
     {
@@ -4022,10 +4022,10 @@ FIND_NEW_SLG_FILE:
         goto EXIT_2;
     }
 
-    // overim verzi CommonControlu
-    if (GetComCtlVersion(&CCVerMajor, &CCVerMinor) != S_OK) // JRYFIXME - testy kolem common controls posunout na W7+
+    // verify CommonControl version
+    if (GetComCtlVersion(&CCVerMajor, &CCVerMinor) != S_OK) // JRYFIXME - move tests around common controls to W7+
     {
-        CCVerMajor = 0; // tohle asi nikdy nenastane - nemaji comctl32.dll
+        CCVerMajor = 0; // this probably never happens - they don't have comctl32.dll
         CCVerMinor = 0;
     }
 
@@ -4106,20 +4106,20 @@ FIND_NEW_SLG_FILE:
     // OleSpyRegister();    // odpojeno, protoze po updatu Windows 2000 z 02/2005 zacal pri spusteni+zavreni Salama z MSVC vylitavat debug-breakpoint: Invalid Address specified to RtlFreeHeap( 130000, 14bc74 ) - asi MS nekde zacali volat primo RtlFreeHeap misto OLE free a diky bloku informaci spye na zacatku alokovaneho bloku se to podelalo (malloc vraci pointer posunuty za blok informaci spye)
     //OleSpySetBreak(2754); // brakne na [n-te] alokaci z dumpu
 
-    // inicializace workera (diskove operace)
+    // worker initialization (disk operations)
     InitWorker();
 
-    // inicializace knihovny pro komunikaci s SalShExt/SalamExt/SalExtX86/SalExtX64.DLL (shell copy hook + shell context menu)
+    // library initialization for communication with SalShExt/SalamExt/SalExtX86/SalExtX64.DLL (shell copy hook + shell context menu)
     InitSalShLib();
 
-    // inicializace knihovny pro praci s shell icon overlays (Tortoise SVN + CVS)
+    // library initialization for working with shell icon overlays (Tortoise SVN + CVS)
     LoadIconOvrlsInfo(SALAMANDER_ROOT_REG);
     InitShellIconOverlays();
 
-    // inicializace funkci pro prochazeni pres next/prev soubor v panelu/Findu z vieweru
+    // initialization of functions for browsing through next/prev file in panel/Find from viewer
     InitFileNamesEnumForViewers();
 
-    // nacteme seznam sharovanych adresaru
+    // load list of shared directories
     IfExistSetSplashScreenText(LoadStr(IDS_STARTUP_SHARES));
     Shares.Refresh();
 
@@ -4142,10 +4142,10 @@ FIND_NEW_SLG_FILE:
                                         SHELLEXECUTE_CLASSNAME,
                                         NULL);
 
-    Associations.ReadAssociations(FALSE); // nacteni asociaci z Registry
+    Associations.ReadAssociations(FALSE); // loading associations from Registry
 
-    // registrace shell extensions
-    // pokud najdeme v podadresari "utils" knihovnu, overime jeji registraci a pripadne ji zaregistrujeme
+    // shell extensions registration
+    // if we find library in "utils" subdirectory, we'll verify its registration and potentially register it
     char shellExtPath[MAX_PATH];
     GetModuleFileName(HInstance, shellExtPath, MAX_PATH);
     char* shellExtPathSlash = strrchr(shellExtPath, '\\');
@@ -4174,7 +4174,7 @@ FIND_NEW_SLG_FILE:
 #endif // _WIN64
     }
 
-    //--- vytvoreni hlavniho okna
+    //--- creating main window
     if (CMainWindow::RegisterUniversalClass(CS_DBLCLKS | CS_OWNDC,
                                             0,
                                             0,
@@ -4211,12 +4211,12 @@ FIND_NEW_SLG_FILE:
                 SetMessagesParent(MainWindow->HWindow);
                 PluginMsgBoxParent = MainWindow->HWindow;
 
-                // vytahneme z registry Group Policy
+                // extract Group Policy from registry
                 IfExistSetSplashScreenText(LoadStr(IDS_STARTUP_POLICY));
                 SystemPolicies.LoadFromRegistry();
 
                 CALL_STACK_MESSAGE1("WinMainBody::load_config");
-                BOOL setActivePanelAndPanelPaths = FALSE; // aktivni panel + cesty v panelech se nastavuji v MainWindow->LoadConfig()
+                BOOL setActivePanelAndPanelPaths = FALSE; // active panel + paths in panels are set in MainWindow->LoadConfig()
                 if (!MainWindow->LoadConfig(currentCfgDoesNotExist, !importCfgFromFileWasSkipped ? &cmdLineParams : NULL))
                 {
                     setActivePanelAndPanelPaths = TRUE;
@@ -4233,7 +4233,7 @@ FIND_NEW_SLG_FILE:
                         MainWindow->ToggleMiddleToolBar();
                     if (Configuration.BottomToolBarVisible)
                         MainWindow->ToggleBottomToolBar();
-                    MainWindow->CreateAndInsertWorkerBand(); // na zaver vlozime workera
+                    MainWindow->CreateAndInsertWorkerBand(); // finally insert worker
                     MainWindow->LeftPanel->UpdateDriveIcon(TRUE);
                     MainWindow->RightPanel->UpdateDriveIcon(TRUE);
                     MainWindow->LeftPanel->UpdateFilterSymbol();
@@ -4254,7 +4254,7 @@ FIND_NEW_SLG_FILE:
 
                 if (newSLGFile)
                 {
-                    Plugins.ClearLastSLGNames(); // aby pripadne doslo k nove volbe nahradniho jazyka u vsech pluginu
+                    Plugins.ClearLastSLGNames(); // so that potentially new alternative language selection can occur for all plugins
                     Configuration.ShowSLGIncomplete = TRUE;
                 }
 
@@ -4268,27 +4268,27 @@ FIND_NEW_SLG_FILE:
                 }
                 else
                 {
-                    if (!importCfgFromFileWasSkipped) // jen pokud hned nedojde k exitu softu (to pak nema smysl)
+                    if (!importCfgFromFileWasSkipped) // only if software doesn't immediately exit (then it doesn't make sense)
                         MainWindow->ApplyCommandLineParams(&cmdLineParams, setActivePanelAndPanelPaths);
 
                     if (Windows7AndLater)
                         CreateJumpList();
 
-                    IdleRefreshStates = TRUE;  // pri pristim Idle vynutime kontrolu stavovych promennych
-                    IdleCheckClipboard = TRUE; // nechame kontrolovat take clipboard
+                    IdleRefreshStates = TRUE;  // at next Idle we'll force check of state variables
+                    IdleCheckClipboard = TRUE; // let clipboard be checked too
 
                     AccelTable1 = HANDLES(LoadAccelerators(HInstance, MAKEINTRESOURCE(IDA_MAINACCELS1)));
                     AccelTable2 = HANDLES(LoadAccelerators(HInstance, MAKEINTRESOURCE(IDA_MAINACCELS2)));
 
-                    MainWindow->CanClose = TRUE; // ted teprve povolime zavreni hl. okna
-                    // aby soubory nevyskakovali postupne (jak se nacitaji jejich ikony)
+                    MainWindow->CanClose = TRUE; // only now we allow closing main window
+                    // so that files don't pop up gradually (as their icons are loading)
                     UpdateWindow(MainWindow->HWindow);
 
                     BOOL doNotDeleteImportedCfg = FALSE;
-                    if (autoImportConfig && // zjistime jestli nova verze nema mene pluginu nez stara a diky tomu se cast stare konfigurace neprenese
+                    if (autoImportConfig && // find out if new version doesn't have fewer plugins than old one and thus part of old configuration won't be transferred
                         FindPluginsWithoutImportedCfg(&doNotDeleteImportedCfg))
-                    {                               // je potreba exit softu bez ulozeni konfigurace
-                        SALAMANDER_ROOT_REG = NULL; // tohle by melo spolehlive zamezit zapisu do konfigurace v registry
+                    {                               // software exit without saving configuration is needed
+                        SALAMANDER_ROOT_REG = NULL; // this should reliably prevent writing to configuration in registry
                         PostMessage(MainWindow->HWindow, WM_USER_FORCECLOSE_MAINWND, 0, 0);
                     }
                     else
@@ -4298,57 +4298,57 @@ FIND_NEW_SLG_FILE:
                             || Configuration.AddX86OnlyPlugins
 #endif // _WIN64
                         )
-                        {                                            // auto-install plug-inu ze standardniho plug-in-podadresare "plugins"
+                        {                                            // auto-install plugins from standard plugin subdirectory "plugins"
 #ifndef _WIN64                                                       // FIXME_X64_WINSCP
-                            Configuration.AddX86OnlyPlugins = FALSE; // jednou staci
+                            Configuration.AddX86OnlyPlugins = FALSE; // once is enough
 #endif                                                               // _WIN64
                             Plugins.AutoInstallStdPluginsDir(MainWindow->HWindow);
-                            Configuration.LastPluginVer = 0;   // pri prechodu na novou verzi bude zrusen soubor plugins.ver
-                            Configuration.LastPluginVerOP = 0; // pri prechodu na novou verzi bude zrusen soubor plugins.ver i pro druhou platformu
-                            saveNewConfig = TRUE;              // nova konfigurace se musi ulozit (aby se tohle pri pristim spusteni neopakovalo)
+                            Configuration.LastPluginVer = 0;   // when transitioning to new version, plugins.ver file will be deleted
+                            Configuration.LastPluginVerOP = 0; // when transitioning to new version, plugins.ver file will be deleted for second platform too
+                            saveNewConfig = TRUE;              // new configuration must be saved (so this doesn't repeat on next launch)
                         }
-                        // nacteni souboru plugins.ver ((re)instalace plug-inu), nutne i poprve (pro pripad
-                        // instalace plug-inu pred prvnim spustenim Salamandera)
+                        // loading plugins.ver file ((re)installation of plugins), necessary even the first time (in case
+                        // of plugin installation before first Salamander launch)
                         if (Plugins.ReadPluginsVer(MainWindow->HWindow, Configuration.ConfigVersion < THIS_CONFIG_VERSION))
-                            saveNewConfig = TRUE; // nova konfigurace se musi ulozit (aby se tohle pri pristim spusteni neopakovalo)
-                        // load plug-inu, ktere maji nastaveny flag load-on-start
+                            saveNewConfig = TRUE; // new configuration must be saved (so this doesn't repeat on next launch)
+                        // load plugins that have load-on-start flag set
                         Plugins.HandleLoadOnStartFlag(MainWindow->HWindow);
-                        // pokud startujeme poprve se zmenenym jazykem, naloadime vsechny pluginy, aby se ukazalo,
-                        // jestli maji tuto jazykovou verzi + pripadne aby si user vybrat nahradni jazyky
+                        // if we're starting for the first time with changed language, we'll load all plugins to show
+                        // if they have this language version + potentially let user choose alternative languages
                         if (langChanged)
                             Plugins.LoadAll(MainWindow->HWindow);
 
-                        // pluginy FTP a WinSCP nove volaji SalamanderGeneral->SetPluginUsesPasswordManager() aby se prihlasily k odberu eventu z password managera
-                        // zavedeno s verzi kofigurace 45 -- dame vsem pluginum moznost se prihlasit
-                        if (Configuration.ConfigVersion < 45) // zavedeni password manageru
+                        // FTP and WinSCP plugins now call SalamanderGeneral->SetPluginUsesPasswordManager() to subscribe to password manager events
+                        // introduced with configuration version 45 -- let all plugins have chance to subscribe
+                        if (Configuration.ConfigVersion < 45) // password manager introduction
                             Plugins.LoadAll(MainWindow->HWindow);
 
-                        // save uz pujde do nejnovejsiho klice
+                        // save will now go to newest key
                         SALAMANDER_ROOT_REG = SalamanderConfigurationRoots[0];
-                        // konfiguraci ulozime hned, dokud je to cista konverze stare verze -- user muze
-                        // mit vypnuty "Save Cfg on Exit" a pokud behem chodu Salamandera neco zmeni, nechce to na zaver ulozit
+                        // we'll save configuration immediately, while it's still clean conversion of old version -- user may
+                        // have "Save Cfg on Exit" disabled and if they change something during Salamander operation, they don't want to save it at the end
                         if (saveNewConfig)
                         {
                             MainWindow->SaveConfig();
                         }
-                        // prohleda pole a pokud je nektery z rootu oznaceny pro smazani, smaze ho + smaze starou konfiguraci
-                        // po UPGRADE a tez smazne hodnotu "AutoImportConfig" v klici konfigurace teto verze Salama
+                        // browse array and if any root is marked for deletion, delete it + delete old configuration
+                        // after UPGRADE and also delete "AutoImportConfig" value in this Salamander version's configuration key
                         MainWindow->DeleteOldConfigurations(deleteConfigurations, autoImportConfig, autoImportConfigFromKey,
                                                             doNotDeleteImportedCfg);
 
-                        // jen prvni instance Salamandera: podivame se, jestli neni potreba vycistit
-                        // TEMP od zbytecnych souboru disk-cache (pri padu nebo zamknuti jinou aplikaci
-                        // muzou soubory v TEMPu zustat)
-                        // musime testoval na globalni (skrz vsechny sessions) promennou, aby se videly dve
-                        // instance Salamanderu spustene pod FastUserSwitching
-                        // Problem nahlasen na foru: https://forum.altap.cz/viewtopic.php?t=2643
+                        // only first Salamander instance: let's see if TEMP needs cleaning
+                        // of unnecessary disk-cache files (during crash or lock by another application
+                        // files in TEMP can remain)
+                        // we must test on global (across all sessions) variable, so that two
+                        // Salamander instances launched under FastUserSwitching can see each other
+                        // Problem reported on forum: https://forum.altap.cz/viewtopic.php?t=2643
                         if (FirstInstance_3_or_later)
                         {
                             DiskCache.ClearTEMPIfNeeded(MainWindow->HWindow, MainWindow->GetActivePanelHWND());
                         }
 
-                        if (importCfgFromFileWasSkipped) // pokud jsme preskocili import config.reg nebo jineho .reg souboru (parametr -C)
-                        {                                // informujeme usera o nutnosti noveho startu Salama a nechame ho exitnout soft
+                        if (importCfgFromFileWasSkipped) // if we skipped config.reg or other .reg file import (parameter -C)
+                        {                                // inform user about need for new Salamander start and let them exit the software
                             MSGBOXEX_PARAMS params;
                             memset(&params, 0, sizeof(params));
                             params.HParent = MainWindow->HWindow;
@@ -4356,9 +4356,9 @@ FIND_NEW_SLG_FILE:
                             params.Caption = SALAMANDER_TEXT_VERSION;
                             params.Text = LoadStr(IDS_IMPORTCFGFROMFILESKIPPED);
                             char aliasBtnNames[200];
-                            /* slouzi pro skript export_mnu.py, ktery generuje salmenu.mnu pro Translator
-   nechame pro tlacitka msgboxu resit kolize hotkeys tim, ze simulujeme, ze jde o menu
-MENU_TEMPLATE_ITEM MsgBoxButtons[] = 
+                            /* serves for script export_mnu.py, which generates salmenu.mnu for Translator
+   we let msgbox buttons resolve hotkey collisions by simulating it's a menu
+MENU_TEMPLATE_ITEM MsgBoxButtons[] =
 {
   {MNTT_PB, 0
   {MNTT_IT, IDS_SELLANGEXITBUTTON
@@ -4371,35 +4371,35 @@ MENU_TEMPLATE_ITEM MsgBoxButtons[] =
                             PostMessage(MainWindow->HWindow, WM_USER_FORCECLOSE_MAINWND, 0, 0);
                         }
                         /*
-            // je-li treba, vyvolame zobrazeni dialogu Tip of the Day
-            // 0xffffffff = open quiet - pokud to nedopadne, neserveme usera
+            // if needed, we'll trigger Tip of the Day dialog display
+            // 0xffffffff = open quiet - if it doesn't work out, we won't bother the user
             if (Configuration.ShowTipOfTheDay)
               PostMessage(MainWindow->HWindow, WM_COMMAND, CM_HELP_TIP, 0xffffffff);
   */
                     }
 
-                    // odted se uz budou pamatovat zavirane cesty
+                    // from now on closed paths will be remembered
                     MainWindow->CanAddToDirHistory = TRUE;
 
-                    // uzivatele chteji mit start-up cestu v historii i v pripade, ze ji neuspinili
+                    // users want to have start-up path in history even if they didn't dirty it
                     MainWindow->LeftPanel->UserWorkedOnThisPath = TRUE;
                     MainWindow->RightPanel->UserWorkedOnThisPath = TRUE;
 
-                    // dame seznamu procesu vedet, ze bezime a mame hlavni okno (je mozne nas aktivovat pri OnlyOneInstance)
+                    // let process list know that we're running and have main window (it's possible to activate us with OnlyOneInstance)
                     TaskList.SetProcessState(PROCESS_STATE_RUNNING, MainWindow->HWindow);
 
-                    // pozadame Salmon o kontrolu, zda na disku nejsou stare bug reporty, ktere by bylo potreba odeslat
+                    // ask Salmon to check if there are old bug reports on disk that need to be sent
                     SalmonCheckBugs();
 
                     if (IsSLGIncomplete[0] != 0 && Configuration.ShowSLGIncomplete)
                         PostMessage(MainWindow->HWindow, WM_USER_SLGINCOMPLETE, 0, 0);
 
-                    //--- aplikacni smycka
+                    //--- application loop
                     CALL_STACK_MESSAGE1("WinMainBody::message_loop");
                     DWORD activateParamsRequestUID = 0;
                     BOOL skipMenuBar;
                     MSG msg;
-                    BOOL haveMSG = FALSE; // FALSE pokud se ma volat GetMessage() v podmince cyklu
+                    BOOL haveMSG = FALSE; // FALSE if GetMessage() should be called in loop condition
                     while (haveMSG || GetMessage(&msg, NULL, 0, 0))
                     {
                         haveMSG = FALSE;

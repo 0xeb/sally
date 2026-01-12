@@ -2078,7 +2078,7 @@ void CMenuPopup::DoDispatchMessage(MSG* msg, BOOL* leaveMenu, DWORD* retValue, B
             }
             return;
         }
-        if (msg->wParam == VK_MENU && (msg->lParam & 0x40000000) == 0 || // Alt down, ale ne autorepeat
+        if (msg->wParam == VK_MENU && (msg->lParam & 0x40000000) == 0 || // Alt down, but not autorepeat
             (!shiftPressed && msg->wParam == VK_F10))
         {
             *leaveMenu = TRUE;

@@ -79,16 +79,36 @@ public:
 class CFilecompThread : public CThread
 {
 public:
-    char Path1[MAX_PATH];
-    char Path2[MAX_PATH];
+    std::string Path1;
+    std::string Path2;
+    std::wstring Path1W; // Wide path for Unicode/long path filenames
+    std::wstring Path2W; // Wide path for Unicode/long path filenames
     BOOL DontConfirmSelection;
     char ReleaseEvent[20];
 
     CFilecompThread(const char* file1, const char* file2, BOOL dontConfirmSelection,
-                    const char* releaseEvent) : CThread("Filecomp Thread")
+                    const char* releaseEvent,
+                    const wchar_t* file1W = NULL, const wchar_t* file2W = NULL) : CThread("Filecomp Thread")
     {
-        strcpy(Path1, file1);
-        strcpy(Path2, file2);
+        Path1 = file1 ? file1 : "";
+        Path2 = file2 ? file2 : "";
+        // Store wide paths if provided (for Unicode/long path filenames)
+        if (file1W)
+            Path1W = file1W;
+        else if (file1)
+        {
+            wchar_t buf[32767];
+            MultiByteToWideChar(CP_ACP, 0, file1, -1, buf, 32767);
+            Path1W = buf;
+        }
+        if (file2W)
+            Path2W = file2W;
+        else if (file2)
+        {
+            wchar_t buf[32767];
+            MultiByteToWideChar(CP_ACP, 0, file2, -1, buf, 32767);
+            Path2W = buf;
+        }
         DontConfirmSelection = dontConfirmSelection;
         strcpy(ReleaseEvent, releaseEvent);
     }

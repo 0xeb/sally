@@ -527,7 +527,7 @@ void CFilesWindow::UnpackZIPArchive(CFilesWindow* target, BOOL deleteOp, const c
                 // instead of a 'switch', use 'if' so that 'break' and 'continue' work correctly
                 if (pathType == PATH_TYPE_WINDOWS) // Windows path (disk + UNC)
                 {
-                    char newDirs[MAX_PATH]; // if a directory is being created for the operation, remember its name (so we can delete it in case of an error)
+                    CPathBuffer newDirs; // if a directory is being created for the operation, remember its name (so we can delete it in case of an error)
                     newDirs[0] = 0;
 
                     if (pathIsDir) // the existing part of the path is a directory
@@ -554,7 +554,7 @@ void CFilesWindow::UnpackZIPArchive(CFilesWindow* target, BOOL deleteOp, const c
                             if (Configuration.CnfrmCreatePath) // ask whether the path should be created
                             {
                                 BOOL dontShow = FALSE;
-                                sprintf(textBuf, LoadStr(IDS_MOVECOPY_CREATEPATH), newDirs);
+                                sprintf(textBuf, LoadStr(IDS_MOVECOPY_CREATEPATH), newDirs.Get());
 
                                 MSGBOXEX_PARAMS params;
                                 memset(&params, 0, sizeof(params));
@@ -604,12 +604,17 @@ void CFilesWindow::UnpackZIPArchive(CFilesWindow* target, BOOL deleteOp, const c
                                             invalidPath = TRUE;
                                     }
                                 }
-                                if (invalidPath || !CreateDirectory(newDirs, NULL))
+                                if (invalidPath || !SalLPCreateDirectory(newDirs, NULL))
                                 {
-                                    sprintf(textBuf, LoadStr(IDS_CREATEDIRFAILED), newDirs);
-                                    SalMessageBox(HWindow, textBuf, LoadStr(IDS_ERRORCOPY), MB_OK | MB_ICONEXCLAMATION);
-                                    ok = FALSE;
-                                    break;
+                                    DWORD lastErr = invalidPath ? ERROR_INVALID_NAME : GetLastError();
+                                    // ERROR_ALREADY_EXISTS is not a failure - the directory is there, which is what we want
+                                    if (lastErr != ERROR_ALREADY_EXISTS)
+                                    {
+                                        sprintf(textBuf, LoadStr(IDS_CREATEDIRFAILED), newDirs.Get());
+                                        SalMessageBox(HWindow, textBuf, LoadStr(IDS_ERRORCOPY), MB_OK | MB_ICONEXCLAMATION);
+                                        ok = FALSE;
+                                        break;
+                                    }
                                 }
                                 if (slash != NULL)
                                     *slash = '\\';

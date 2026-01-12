@@ -20,12 +20,16 @@ class CCompareFilesDialog : public CCommonDialog
 protected:
     char *Path1,
         *Path2;
+    wchar_t *Path1W,  // Wide paths for Unicode display and output
+        *Path2W;
+    int PathWSize;    // Size of wide path buffers
     BOOL& Succes;
     CCompareOptions* Options;
     WNDPROC OldEditProc1, OldEditProc2;
 
 public:
-    CCompareFilesDialog(HWND parent, char* path1, char* path2, BOOL& succes, CCompareOptions* options);
+    CCompareFilesDialog(HWND parent, char* path1, char* path2, BOOL& succes, CCompareOptions* options,
+                        wchar_t* path1W = NULL, wchar_t* path2W = NULL, int pathWSize = 0);
     virtual ~CCompareFilesDialog() { MainWindowQueue.Remove(HWindow); }
     virtual void Validate(CTransferInfo& ti);
     virtual void Transfer(CTransferInfo& ti);

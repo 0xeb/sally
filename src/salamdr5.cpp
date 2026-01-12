@@ -820,7 +820,8 @@ PARSE_AGAIN:
                 int len2 = (int)strlen(path);
                 if (path[len2 - 1] != '\\') // paths ending with backslash behave differently (classic and UNC): UNC returns success, classic ERROR_INVALID_NAME: extracting from archive on UNC path to path "" reported unknown archive (PackerFormatConfig.PackIsArchive received e.g. "...test.zip\\" instead of "...test.zip")
                 {
-                    DWORD attrs = len2 < MAX_PATH ? SalGetFileAttributes(path) : 0xFFFFFFFF;
+                    // SalGetFileAttributes supports long paths via SalLPGetFileAttributes
+                    DWORD attrs = SalGetFileAttributes(path);
                     if (attrs != 0xFFFFFFFF) // this part of path exists
                     {
                         if ((attrs & FILE_ATTRIBUTE_DIRECTORY) == 0) // it's a file
@@ -861,7 +862,7 @@ PARSE_AGAIN:
                     }
                     else
                     {
-                        DWORD err = len2 < MAX_PATH ? GetLastError() : ERROR_INVALID_NAME /* too long path */;
+                        DWORD err = GetLastError();
                         if (err != ERROR_FILE_NOT_FOUND && err != ERROR_INVALID_NAME &&
                             err != ERROR_PATH_NOT_FOUND && err != ERROR_BAD_PATHNAME &&
                             err != ERROR_DIRECTORY) // divna chyba - jen vypiseme
@@ -964,10 +965,15 @@ BOOL SalSplitWindowsPath(HWND parent, const char* title, const char* errorTitle,
                 }
                 if (invalidPath || !SalLPCreateDirectory(newDirs, NULL))
                 {
-                    _snprintf_s(textBuf.Get(), textBuf.Size(), _TRUNCATE, LoadStr(IDS_CREATEDIRFAILED), newDirs.Get());
-                    SalMessageBox(parent, textBuf, errorTitle, MB_OK | MB_ICONEXCLAMATION);
-                    ok = FALSE;
-                    break;
+                    DWORD lastErr = invalidPath ? ERROR_INVALID_NAME : GetLastError();
+                    // ERROR_ALREADY_EXISTS is not a failure - the directory is there, which is what we want
+                    if (lastErr != ERROR_ALREADY_EXISTS)
+                    {
+                        _snprintf_s(textBuf.Get(), textBuf.Size(), _TRUNCATE, LoadStr(IDS_CREATEDIRFAILED), newDirs.Get());
+                        SalMessageBox(parent, textBuf, errorTitle, MB_OK | MB_ICONEXCLAMATION);
+                        ok = FALSE;
+                        break;
+                    }
                 }
                 if (slash != NULL)
                     *slash = '\\';

@@ -213,3 +213,24 @@ protected:
 char* DupStr(const char* begin, const char* end);
 int RemoveCharacters(char* dest, const char* source, const char* charSet);
 BOOL SalGetFullName(char* name, int* errTextID, const char* curDir);
+
+// ****************************************************************************
+//
+// Wide string file utilities for Unicode and long path support
+//
+
+// FileExistsW - Check if a file exists using wide string path (supports Unicode and long paths)
+// Returns TRUE if the file exists, FALSE if it doesn't exist or is a directory
+inline BOOL FileExistsW(const wchar_t* path)
+{
+    DWORD attr = GetFileAttributesW(path);
+    if (attr == INVALID_FILE_ATTRIBUTES)
+    {
+        // File doesn't exist or path is invalid
+        DWORD err = GetLastError();
+        // Return TRUE for access-denied errors (file exists but we can't access it)
+        return (err != ERROR_FILE_NOT_FOUND) && (err != ERROR_PATH_NOT_FOUND);
+    }
+    // Return TRUE only if it's not a directory
+    return (attr & FILE_ATTRIBUTE_DIRECTORY) == 0;
+}

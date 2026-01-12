@@ -544,39 +544,6 @@ void CFilesWindow::DrawBriefDetailedItem(HDC hTgtDC, int itemIndex, RECT* itemRe
 
     TransferAssocIndex = -2; // we haven't looked up the extension for the drawn item in Associations yet
 
-    // Debug: Log column configuration (once)
-    {
-        static bool columnsLogged = false;
-        if (!columnsLogged)
-        {
-            char dbg[512];
-            sprintf_s(dbg, "COLUMNS: Count=%d, IsExtInSepCol=%d\n", Columns.Count, IsExtensionInSeparateColumn() ? 1 : 0);
-            OutputDebugStringA(dbg);
-            for (int ci = 0; ci < Columns.Count; ci++)
-            {
-                sprintf_s(dbg, "  COL[%d]: ID=%d, Width=%d\n", ci, Columns[ci].ID, Columns[ci].Width);
-                OutputDebugStringA(dbg);
-            }
-            columnsLogged = true;
-        }
-    }
-    // Debug: Log Unicode file info
-    if (f->UseWideName())
-    {
-        static int logCount = 0;
-        if (logCount < 5)
-        {
-            char dbg[512];
-            sprintf_s(dbg, "UNICODE FILE: Name=%s NameLen=%d Ext-Name=%d ExtChar='%c' UseWideName=%d\n",
-                      f->Name, f->NameLen, (int)(f->Ext - f->Name), f->Ext[0] ? f->Ext[0] : '?', f->UseWideName() ? 1 : 0);
-            OutputDebugStringA(dbg);
-            wchar_t wdbg[512];
-            swprintf_s(wdbg, L"UNICODE FILE-W: NameW=%s (len=%d)\n", f->NameW.c_str(), (int)f->NameW.length());
-            OutputDebugStringW(wdbg);
-            logCount++;
-        }
-    }
-
     //*****************************************
     //
     // drawing the icon
@@ -725,15 +692,6 @@ void CFilesWindow::DrawBriefDetailedItem(HDC hTgtDC, int itemIndex, RECT* itemRe
                 // For Unicode names, we don't apply AlterFileName transformation yet
                 // (TODO: add AlterFileNameW for proper uppercase/lowercase handling)
 
-                // Debug: Log Unicode name drawing details
-                static int unicodeDrawCount = 0;
-                if (unicodeDrawCount++ < 20)
-                {
-                    wchar_t dbg[512];
-                    swprintf_s(dbg, L"NAME_DRAW: NameW=%s nameLenW=%d nameLen=%d nameWidth=%d IsExtInSepCol=%d\n",
-                               f->NameW.c_str(), nameLenW, nameLen, nameWidth, IsExtensionInSeparateColumn() ? 1 : 0);
-                    OutputDebugStringW(dbg);
-                }
             }
 
             CColumn* column = &Columns[0];
@@ -750,15 +708,6 @@ void CFilesWindow::DrawBriefDetailedItem(HDC hTgtDC, int itemIndex, RECT* itemRe
                     {
                         GetTextExtentExPointW(hDC, f->NameW.c_str(), nameLenW, textWidth,
                                               &fitChars, DrawItemAlpDx, &fnSZ);
-                        // Debug: Log width measurement
-                        static int widthDbgCount = 0;
-                        if (widthDbgCount++ < 20)
-                        {
-                            wchar_t dbg[512];
-                            swprintf_s(dbg, L"  WIDTH: textWidth=%d fitChars=%d nameLenW=%d fnSZ.cx=%d\n",
-                                       textWidth, fitChars, nameLenW, fnSZ.cx);
-                            OutputDebugStringW(dbg);
-                        }
                     }
                     else
                         GetTextExtentExPoint(hDC, TransferBuffer, nameLen, textWidth,
@@ -793,15 +742,6 @@ void CFilesWindow::DrawBriefDetailedItem(HDC hTgtDC, int itemIndex, RECT* itemRe
                     {
                         GetTextExtentExPointW(hDC, f->NameW.c_str(), nameLenW, textWidth,
                                               &fitChars, DrawItemAlpDx, &fnSZ);
-                        // Debug: Log truncation check
-                        static int truncDbgCount = 0;
-                        if (truncDbgCount++ < 10)
-                        {
-                            wchar_t dbg[512];
-                            swprintf_s(dbg, L"TRUNC_CHECK: NameW=%s textWidth=%d fitChars=%d nameLenW=%d\n",
-                                       f->NameW.c_str(), textWidth, fitChars, nameLenW);
-                            OutputDebugStringW(dbg);
-                        }
                     }
                     else
                         GetTextExtentExPoint(hDC, TransferBuffer, nameLen, textWidth,
@@ -933,18 +873,6 @@ void CFilesWindow::DrawBriefDetailedItem(HDC hTgtDC, int itemIndex, RECT* itemRe
                 adjR.left = r.left = x;
                 adjR.right = r.right = x + column->Width;
 
-                // Debug: log column IDs (disabled - keeping only view mode check)
-                static bool viewModeLogged = false;
-                if (!viewModeLogged && f->UseWideName())
-                {
-                    char dbg[256];
-                    sprintf_s(dbg, "VIEW: IsExtInSepCol=%d, Columns.Count=%d, Col[1].ID=%d (EXT=%d)\n",
-                              IsExtensionInSeparateColumn() ? 1 : 0, Columns.Count,
-                              Columns.Count >= 2 ? Columns[1].ID : -1, COLUMN_ID_EXTENSION);
-                    OutputDebugStringA(dbg);
-                    viewModeLogged = true;
-                }
-
                 // check whether the column area is at least partially visible
                 if (drawFlags & DRAWFLAG_SKIP_VISTEST || RectVisible(hDC, &r))
                 {
@@ -957,24 +885,9 @@ void CFilesWindow::DrawBriefDetailedItem(HDC hTgtDC, int itemIndex, RECT* itemRe
                     else
                     {
                         // extension is an exception - it always follows Name and we handle it explicitly
-                        // Debug: confirm extension column is being processed
-                        {
-                            static int extColCount = 0;
-                            if (extColCount < 5)
-                            {
-                                char dbg[256];
-                                sprintf_s(dbg, "EXT COLUMN HIT: colID=%d Name=%s UseWideName=%d\n",
-                                          column->ID, f->Name, f->UseWideName() ? 1 : 0);
-                                OutputDebugStringA(dbg);
-                                extColCount++;
-                            }
-                        }
                         if (isDir && !Configuration.SortDirsByExt || f->Ext[0] == 0 || f->Ext <= f->Name + 1) // empty value in the Ext column (exception for names like ".htaccess", they appear in the Name column even though they are extensions)
                         {
                             TransferLen = 0;
-                            char dbg[256];
-                            sprintf_s(dbg, "EXT SKIP: Name=%s Ext[0]=%d Ext-Name=%d\n", f->Name, (int)f->Ext[0], (int)(f->Ext - f->Name));
-                            OutputDebugStringA(dbg);
                         }
                         else if (f->UseWideName())
                         {
@@ -986,9 +899,6 @@ void CFilesWindow::DrawBriefDetailedItem(HDC hTgtDC, int itemIndex, RECT* itemRe
                                 TransferLen = (int)wcslen(extPosW);
                                 // Copy extension to wide buffer and draw with ExtTextOutW below
                                 wmemcpy(DrawItemBuffW, extPosW, TransferLen + 1);
-                                wchar_t dbg[256];
-                                swprintf_s(dbg, L"EXT Unicode: ext=%s len=%d\n", DrawItemBuffW, TransferLen);
-                                OutputDebugStringW(dbg);
                             }
                             else
                                 TransferLen = 0;
@@ -1002,9 +912,6 @@ void CFilesWindow::DrawBriefDetailedItem(HDC hTgtDC, int itemIndex, RECT* itemRe
                             {
                                 MoveMemory(TransferBuffer, TransferBuffer + (f->Ext - f->Name), TransferLen); // buffer overlap may occur
                                 TransferBuffer[TransferLen] = 0;
-                                char dbg[256];
-                                sprintf_s(dbg, "EXT ANSI: Name=%s ext=%s len=%d\n", f->Name, TransferBuffer, TransferLen);
-                                OutputDebugStringA(dbg);
                             }
                         }
                     }

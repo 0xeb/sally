@@ -20,11 +20,18 @@ CBandParams BandsParams[2];
 
 const char* MAINWINDOW_CLASSNAME = "SFC Window Class";
 
-CMainWindow::CMainWindow(char* path1, char* path2, CCompareOptions* options, UINT showCmd)
+CMainWindow::CMainWindow(const char* path1, const char* path2, CCompareOptions* options, UINT showCmd,
+                         const wchar_t* path1W, const wchar_t* path2W)
 {
     CALL_STACK_MESSAGE1("CMainWindow::CMainWindow(, , )");
-    Path1 = path1;
-    Path2 = path2;
+    // Store owned copies of paths
+    Path1Str = path1 ? path1 : "";
+    Path2Str = path2 ? path2 : "";
+    Path1WStr = path1W ? path1W : L"";
+    Path2WStr = path2W ? path2W : L"";
+    // Set convenience pointers
+    Path1 = Path1Str.c_str();
+    Path2 = Path2Str.c_str();
     FileView[fviLeft] = NULL;
     FileView[fviRight] = NULL;
     Active = 0;
@@ -841,7 +848,8 @@ void CMainWindow::RestoreRebarLayout()
 }
 
 void CMainWindow::SpawnWorker(const char* path1, const char* path2,
-                              BOOL recompare, const CCompareOptions& options)
+                              BOOL recompare, const CCompareOptions& options,
+                              const wchar_t* path1W, const wchar_t* path2W)
 {
     CALL_STACK_MESSAGE3("CMainWindow::SpawnWorker(%s, %s, )", path1, path2);
 
@@ -872,7 +880,7 @@ void CMainWindow::SpawnWorker(const char* path1, const char* path2,
     CCompareOptions opt = options;
     opt.DetailedDifferences = DetailedDifferences ? 1 : 0;
     CFilecompWorker* worker = new CFilecompWorker(HWindow, HWindow, path1,
-                                                  path2, opt, CancelWorker, WorkerEvent);
+                                                  path2, opt, CancelWorker, WorkerEvent, path1W, path2W);
     if (!worker)
         Error(HWindow, IDS_LOWMEM);
     else
@@ -977,8 +985,10 @@ bool CMainWindow::TextFilesDiffer(CTextCompareResults<CChar>* res, char* message
     {
         DifferencesCount = int(ChangesToLines[ViewMode].size());
 
-        strcpy(Path1, res->Files[0].Name);
-        strcpy(Path2, res->Files[1].Name);
+        Path1Str = res->Files[0].Name;
+        Path2Str = res->Files[1].Name;
+        Path1 = Path1Str.c_str();
+        Path2 = Path2Str.c_str();
         LeftHeader->SetText(Path1);
         RightHeader->SetText(Path2);
 
@@ -1265,7 +1275,7 @@ CMainWindow::WindowProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
                 }
 
                 // start the worker
-                SpawnWorker(Path1, Path2, TRUE, Options);
+                SpawnWorker(Path1, Path2, TRUE, Options, Path1WStr.c_str(), Path2WStr.c_str());
             }
             return 0;
         }
@@ -1857,7 +1867,7 @@ CMainWindow::WindowProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
                         DetailedDifferences = FALSE;
                         CheckMenuItem(GetMenu(HWindow), CM_DETAILDIFF, MF_BYCOMMAND | (DetailedDifferences ? MF_CHECKED : MF_UNCHECKED));
                         // and compare again
-                        SpawnWorker(Path1, Path2, FALSE, Options);
+                        SpawnWorker(Path1, Path2, FALSE, Options, Path1WStr.c_str(), Path2WStr.c_str());
                         return 0;
                     }
                 }
@@ -1951,8 +1961,10 @@ CMainWindow::WindowProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
                 ((CHexFileViewWindow*)FileView[fviRight])->SetData(res->FirstChange, res->Files[1].Name, res->Files[0].Size))
             {
                 Options = res->Options;
-                strcpy(Path1, res->Files[0].Name);
-                strcpy(Path2, res->Files[1].Name);
+                Path1Str = res->Files[0].Name;
+                Path2Str = res->Files[1].Name;
+                Path1 = Path1Str.c_str();
+                Path2 = Path2Str.c_str();
                 LeftHeader->SetText(Path1);
                 RightHeader->SetText(Path2);
 
