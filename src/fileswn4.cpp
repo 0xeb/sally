@@ -724,6 +724,16 @@ void CFilesWindow::DrawBriefDetailedItem(HDC hTgtDC, int itemIndex, RECT* itemRe
                 nameLenW = (int)f->NameW.length();
                 // For Unicode names, we don't apply AlterFileName transformation yet
                 // (TODO: add AlterFileNameW for proper uppercase/lowercase handling)
+
+                // Debug: Log Unicode name drawing details
+                static int unicodeDrawCount = 0;
+                if (unicodeDrawCount++ < 20)
+                {
+                    wchar_t dbg[512];
+                    swprintf_s(dbg, L"NAME_DRAW: NameW=%s nameLenW=%d nameLen=%d nameWidth=%d IsExtInSepCol=%d\n",
+                               f->NameW.c_str(), nameLenW, nameLen, nameWidth, IsExtensionInSeparateColumn() ? 1 : 0);
+                    OutputDebugStringW(dbg);
+                }
             }
 
             CColumn* column = &Columns[0];
@@ -737,8 +747,19 @@ void CFilesWindow::DrawBriefDetailedItem(HDC hTgtDC, int itemIndex, RECT* itemRe
                 {
                     textWidth = nameWidth - 1 - IconSizes[ICONSIZE_16] - 1 - 2 - SPACE_WIDTH;
                     if (useWideDisplay)
+                    {
                         GetTextExtentExPointW(hDC, f->NameW.c_str(), nameLenW, textWidth,
                                               &fitChars, DrawItemAlpDx, &fnSZ);
+                        // Debug: Log width measurement
+                        static int widthDbgCount = 0;
+                        if (widthDbgCount++ < 20)
+                        {
+                            wchar_t dbg[512];
+                            swprintf_s(dbg, L"  WIDTH: textWidth=%d fitChars=%d nameLenW=%d fnSZ.cx=%d\n",
+                                       textWidth, fitChars, nameLenW, fnSZ.cx);
+                            OutputDebugStringW(dbg);
+                        }
+                    }
                     else
                         GetTextExtentExPoint(hDC, TransferBuffer, nameLen, textWidth,
                                              &fitChars, DrawItemAlpDx, &fnSZ);
@@ -769,8 +790,19 @@ void CFilesWindow::DrawBriefDetailedItem(HDC hTgtDC, int itemIndex, RECT* itemRe
                     // the string may be longer than the available space and must end with "..."
                     textWidth = nameWidth - 1 - IconSizes[ICONSIZE_16] - 1 - 2 - SPACE_WIDTH;
                     if (useWideDisplay)
+                    {
                         GetTextExtentExPointW(hDC, f->NameW.c_str(), nameLenW, textWidth,
                                               &fitChars, DrawItemAlpDx, &fnSZ);
+                        // Debug: Log truncation check
+                        static int truncDbgCount = 0;
+                        if (truncDbgCount++ < 10)
+                        {
+                            wchar_t dbg[512];
+                            swprintf_s(dbg, L"TRUNC_CHECK: NameW=%s textWidth=%d fitChars=%d nameLenW=%d\n",
+                                       f->NameW.c_str(), textWidth, fitChars, nameLenW);
+                            OutputDebugStringW(dbg);
+                        }
+                    }
                     else
                         GetTextExtentExPoint(hDC, TransferBuffer, nameLen, textWidth,
                                              &fitChars, DrawItemAlpDx, &fnSZ);

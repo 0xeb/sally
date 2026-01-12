@@ -1904,6 +1904,18 @@ BOOL CFilesWindow::CopyFocusedNameToClipboard(CCopyFocusedNameModeEnum mode)
     CFileData* file = (FocusedIndex < Dirs->Count) ? &Dirs->At(FocusedIndex) : &Files->At(FocusedIndex - Dirs->Count);
     if (Is(ptDisk) || Is(ptZIPArchive) || Is(ptPluginFS) && mode == cfnmShort)
     {
+        // For Unicode filenames, use wide path to preserve non-ANSI characters
+        if (file->UseWideName())
+        {
+            wchar_t buffW[2 * MAX_PATH];
+            // Convert path to wide
+            MultiByteToWideChar(CP_ACP, 0, buff, -1, buffW, 2 * MAX_PATH);
+            int l = (int)wcslen(buffW);
+            // Append wide filename (no AlterFileName for wide yet - TODO)
+            lstrcpynW(buffW + l, file->NameW.c_str(), 2 * MAX_PATH - l);
+            return CopyTextToClipboardW(buffW, -1, FALSE, NULL);
+        }
+
         char fileName[MAX_PATH];
         AlterFileName(fileName, file->Name, -1, Configuration.FileNameFormat, 0, FocusedIndex < Dirs->Count);
         int l = (int)strlen(buff);
