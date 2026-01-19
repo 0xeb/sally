@@ -86,7 +86,7 @@ char* ReadSVGFile(const char* fileName)
     return buff;
 }
 
-// vykresli ikony pro ktere mame SVG reprezentaci
+// render icons for which we have SVG representation
 void RenderSVGImage(NSVGrasterizer* rast, HDC hDC, int x, int y, const char* svgName, int iconSize, COLORREF bkColor, BOOL enabled)
 {
     char svgFile[2 * MAX_PATH];
