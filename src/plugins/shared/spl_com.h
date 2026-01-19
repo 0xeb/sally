@@ -879,50 +879,50 @@ public:
 class CSalamanderForOperationsAbstract
 {
 public:
-    // PROGRESS DIALOG: dialog obsahuje jeden/dva ('twoProgressBars' FALSE/TRUE) progress-metry
-    // otevre progress-dialog s titulkem 'title'; 'parent' je parent okno progress-dialogu (je-li
-    // NULL, pouzije se hlavni okno); pokud obsahuje jen jeden progress-metr, muze byt popsan
-    // jako "File" ('fileProgress' je TRUE) nebo "Total" ('fileProgress' je FALSE)
+    // PROGRESS DIALOG: the dialog contains one/two ('twoProgressBars' FALSE/TRUE) progress bars
+    // opens a progress dialog with title 'title'; 'parent' is the parent window of the dialog (if
+    // NULL, the main window is used); if it contains only one progress bar, it can be labeled
+    // as "File" ('fileProgress' is TRUE) or "Total" ('fileProgress' is FALSE)
     //
-    // dialog nebezi ve vlastnim threadu; pro jeho fungovani (tlacitko Cancel + vnitrni timer)
-    // je treba obcas vyprazdni message queue; to zajistuji metody ProgressDialogAddText,
-    // ProgressAddSize a ProgressSetSize
+    // the dialog does not run in its own thread; for it to work (Cancel button + internal timer)
+    // it is necessary to occasionally pump the message queue; this is ensured by ProgressDialogAddText,
+    // ProgressAddSize and ProgressSetSize
     //
-    // protoze real-time zobrazovani textu a zmen v progress bare silne zdrzuje, maji
-    // metody ProgressDialogAddText, ProgressAddSize a ProgressSetSize parametr
-    // 'delayedPaint'; ten by mel byt TRUE pro vsechny rychle se menici texty a hodnoty;
-    // metody si pak ulozi texty a zobrazi je az po doruceni vnitrniho timeru dialogu;
-    // 'delayedPaint' nastavime na FALSE pro inicializacni/koncove texty typu "preparing data..."
-    // nebo "canceling operation...", po jejiz zobrazeni nedame dialogu prilezitost k distribuci
-    // zprav (timeru); pokud je u takove operace pravdepodobne, ze bude trvat dlouho, meli
-    // bychom behem teto doby dialog "obcerstvovat" volanim ProgressAddSize(CQuadWord(0, 0), TRUE)
-    // a podle jeji navratove hodnoty akci pripadne predcasne ukoncit
+    // because real-time display of text and changes in the progress bar slows things down a lot, the
+    // ProgressDialogAddText, ProgressAddSize and ProgressSetSize methods have a parameter
+    // 'delayedPaint'; it should be TRUE for all rapidly changing texts and values; the methods then
+    // store the texts and show them only after the dialog's internal timer fires;
+    // set 'delayedPaint' to FALSE for initial/final texts like "preparing data..." or
+    // "canceling operation...", after showing which we do not give the dialog a chance to process
+    // messages (timer); if such an operation is likely to take a long time, we should
+    // "refresh" the dialog during this time by calling ProgressAddSize(CQuadWord(0, 0), TRUE)
+    // and, based on its return value, possibly terminate the action early
     virtual void WINAPI OpenProgressDialog(const char* title, BOOL twoProgressBars,
                                            HWND parent, BOOL fileProgress) = 0;
-    // vypise text 'txt' (i nekolik radku - provadi se rozpad na radky) do progress-dialogu
+    // writes text 'txt' (even multiple lines - it is split into lines) to the progress dialog
     virtual void WINAPI ProgressDialogAddText(const char* txt, BOOL delayedPaint) = 0;
-    // neni-li 'totalSize1' CQuadWord(-1, -1), nastavi 'totalSize1' jako 100 procent prvniho progress-metru,
-    // neni-li 'totalSize2' CQuadWord(-1, -1), nastavi 'totalSize2' jako 100 procent druheho progress-metru
-    // (pro progress-dialog s jednim progress-metrem je povinne 'totalSize2' CQuadWord(-1, -1))
+    // if 'totalSize1' is not CQuadWord(-1, -1), sets 'totalSize1' as 100 percent of the first progress bar,
+    // if 'totalSize2' is not CQuadWord(-1, -1), sets 'totalSize2' as 100 percent of the second progress bar
+    // (for a progress dialog with one progress bar, 'totalSize2' must be CQuadWord(-1, -1))
     virtual void WINAPI ProgressSetTotalSize(const CQuadWord& totalSize1, const CQuadWord& totalSize2) = 0;
-    // neni-li 'size1' CQuadWord(-1, -1), nastavi velikost 'size1' (size1/total1*100 procent) na prvnim progress-metru,
-    // neni-li 'size2' CQuadWord(-1, -1), nastavi velikost 'size2' (size2/total2*100 procent) na druhem progress-metru
-    // (pro progress-dialog s jednim progress-metrem je povinne 'size2' CQuadWord(-1, -1)), vraci informaci jestli ma
-    // akce pokracovat (FALSE = konec)
+    // if 'size1' is not CQuadWord(-1, -1), sets size 'size1' (size1/total1*100 percent) on the first progress bar,
+    // if 'size2' is not CQuadWord(-1, -1), sets size 'size2' (size2/total2*100 percent) on the second progress bar
+    // (for a progress dialog with one progress bar, 'size2' must be CQuadWord(-1, -1)), returns whether the
+    // action should continue (FALSE = end)
     virtual BOOL WINAPI ProgressSetSize(const CQuadWord& size1, const CQuadWord& size2, BOOL delayedPaint) = 0;
-    // prida (pripadne k oboum progress-metrum) velikost 'size' (size/total*100 procent progressu),
-    // vraci informaci jestli ma akce pokracovat (FALSE = konec)
+    // adds (optionally to both progress bars) size 'size' (size/total*100 percent of progress),
+    // returns whether the action should continue (FALSE = end)
     virtual BOOL WINAPI ProgressAddSize(int size, BOOL delayedPaint) = 0;
-    // enabluje/disabluje tlacitko Cancel
+    // enables/disables the Cancel button
     virtual void WINAPI ProgressEnableCancel(BOOL enable) = 0;
-    // vraci HWND dialogu progressu (hodi se pri vypisu chyb a dotazu pri otevrenem progress-dialogu)
+    // returns HWND of the progress dialog (useful when printing errors and prompts with the dialog open)
     virtual HWND WINAPI ProgressGetHWND() = 0;
-    // zavre progress-dialog
+    // closes the progress dialog
     virtual void WINAPI CloseProgressDialog() = 0;
 
-    // presune vsechny soubory ze 'source' adresare do 'target' adresare,
-    // navic premapovava predpony zobrazovanych jmen ('remapNameFrom' -> 'remapNameTo')
-    // vraci uspech operace
+    // moves all files from the 'source' directory to the 'target' directory,
+    // additionally remaps prefixes of displayed names ('remapNameFrom' -> 'remapNameTo')
+    // returns success of the operation
     virtual BOOL WINAPI MoveFiles(const char* source, const char* target, const char* remapNameFrom,
                                   const char* remapNameTo) = 0;
 };
