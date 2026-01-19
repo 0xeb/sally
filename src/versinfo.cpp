@@ -490,7 +490,7 @@ BOOL CVersionInfo::SaveBlock(CVersionBlock* block, BYTE*& ptr, const BYTE* maxPt
     }
     }
 
-    // pokud nemam childy, ulozime velikost bez paddingu
+    // if there are no children, store size without padding
     if (block->Children.Count == 0)
         *wLength = (WORD)(ptr - oldPtr);
 
@@ -506,7 +506,7 @@ BOOL CVersionInfo::SaveBlock(CVersionBlock* block, BYTE*& ptr, const BYTE* maxPt
             return FALSE;
     }
 
-    // v opacnem pripad s paddingem
+    // otherwise with padding
     if (block->Children.Count > 0)
         *wLength = (WORD)(ptr - oldPtr);
 
@@ -522,7 +522,7 @@ BOOL CVersionInfo::UpdateResource(HANDLE hUpdateRes, int resID)
         return FALSE;
     }
     memset(buff, 0, 50000);
-    BYTE* ptr = buff; // pozor, hodnota bude zmenena
+    BYTE* ptr = buff; // WARNING: value will be modified
     if (!SaveBlock(Root, ptr, ptr + 49999))
     {
         free(buff);
