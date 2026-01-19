@@ -747,8 +747,8 @@ PARSE_AGAIN:
                         *error = SPP_INCOMLETEPATH;
                     if (!curPathIsDiskOrArchive)
                     {
-                        // vracime FALSE bez hlaseni uzivateli - vyjimka umoznujici dalsi zpracovani
-                        // relativnich cest na FS
+                        // return FALSE without notifying the user - exception allowing further processing
+                        // of relative paths on FS
                         return FALSE;
                     }
                 }
@@ -865,7 +865,7 @@ PARSE_AGAIN:
                         DWORD err = GetLastError();
                         if (err != ERROR_FILE_NOT_FOUND && err != ERROR_INVALID_NAME &&
                             err != ERROR_PATH_NOT_FOUND && err != ERROR_BAD_PATHNAME &&
-                            err != ERROR_DIRECTORY) // divna chyba - jen vypiseme
+                            err != ERROR_DIRECTORY) // odd error - just print it
                         {
                             text = GetErrorText(err);
                             if (error != NULL)
@@ -1281,13 +1281,13 @@ void RecognizeFileType(HWND parent, const char* pattern, int patternLen, BOOL fo
 CSystemPolicies::CSystemPolicies()
     : RestrictRunList(10, 50), DisallowRunList(10, 50)
 {
-    // vsechno povolime
+    // enable everything
     EnableAll();
 }
 
 CSystemPolicies::~CSystemPolicies()
 {
-    // uvolnime seznamy
+    // release lists
     EnableAll();
 }
 
@@ -1410,14 +1410,14 @@ BOOL CSystemPolicies::GetMyCanRun(const char* fileName)
 
 void CSystemPolicies::LoadFromRegistry()
 {
-    // vsechno povolime
+    // enable everything
     EnableAll();
 
-    // vytahneme restrikce
+    // pull restrictions
     HKEY hKey;
     if (OpenKeyAux(NULL, HKEY_CURRENT_USER, "Software\\Microsoft\\Windows\\CurrentVersion\\Policies\\Explorer", hKey))
     {
-        // podle MSDN muzou byt hodnoty typu DWORD i BINARY:
+        // according to MSDN values can be DWORD and BINARY:
         // It is a REG_DWORD or 4-byte REG_BINARY data value, found under the same key.
         GetValueDontCheckTypeAux(hKey, "NoRun", /*REG_DWORD,*/ &NoRun, sizeof(DWORD));
         GetValueDontCheckTypeAux(hKey, "NoDrives", /*REG_DWORD,*/ &NoDrives, sizeof(DWORD));

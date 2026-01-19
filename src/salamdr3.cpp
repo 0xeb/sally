@@ -426,7 +426,7 @@ BOOL SalGetFullName(char* name, int* errTextID, const char* curDir, char* nextFo
             memmove(name, s, strlen(s) + 1);
         s = name + 2;
         if (*s == '.' || *s == '?')
-            err = IDS_PATHISINVALID; // cesty jako \\?\Volume{6e76293d-1828-11df-8f3c-806e6f6e6963}\ a \\.\PhysicalDisk5\ tady proste nepodporujeme...
+            err = IDS_PATHISINVALID; // paths like \\?\Volume{6e76293d-1828-11df-8f3c-806e6f6e6963}\ and \\.\PhysicalDisk5\ are simply not supported here...
         else
         {
             if (*s == 0 || *s == '\\')
@@ -788,7 +788,7 @@ void BeginStopRefresh(BOOL debugSkipOneCaller, BOOL debugDoNotTestCaller)
   {
     called_from = *(DWORD*)((char*)register_ebp + 4);
 
-pokud bude jeste nekdy potreba ozivit tenhle kod, vyuzit toho, ze lze nahradit (x86 i x64):
+if this code ever needs to be revived, note that it can be replaced (x86 and x64):
     called_from = *(DWORD_PTR *)_AddressOfReturnAddress();
 
     if (debugSkipOneCaller) caller_called_from = *(DWORD*)((char*)(*(DWORD *)(*register_ebp)) + 4);
@@ -818,7 +818,7 @@ void EndStopRefresh(BOOL postRefresh, BOOL debugSkipOneCaller, BOOL debugDoNotTe
   {
     called_from = *(DWORD*)((char*)register_ebp + 4);
 
-pokud bude jeste nekdy potreba ozivit tenhle kod, vyuzit toho, ze lze nahradit (x86 i x64):
+if this code ever needs to be revived, note that it can be replaced (x86 and x64):
     called_from = *(DWORD_PTR *)_AddressOfReturnAddress();
 
     if (debugSkipOneCaller) caller_called_from = *(DWORD*)((char*)(*(DWORD *)(*register_ebp)) + 4);
@@ -1522,8 +1522,8 @@ BOOL CPathHistoryItem::Execute(CFilesWindow* panel)
                 {
                     if (failReason == CHPPFR_CANNOTCLOSEPATH)
                     {
-                        ret = FALSE;   // zustavame na miste
-                        clear = FALSE; // zadny skok, neni treba mazat top-indexy
+                        ret = FALSE;   // stay in place
+                        clear = FALSE; // no jump, no need to clear top indexes
                     }
                     else
                     {
@@ -1561,8 +1561,8 @@ BOOL CPathHistoryItem::Execute(CFilesWindow* panel)
                                 {
                                     if (failReason == CHPPFR_CANNOTCLOSEPATH)
                                     {
-                                        ret = FALSE;   // zustavame na miste
-                                        clear = FALSE; // zadny skok, neni treba mazat top-indexy
+                                        ret = FALSE;   // stay in place
+                                        clear = FALSE; // no jump, no need to clear top indexes
                                     }
                                 }
 
@@ -1600,8 +1600,8 @@ BOOL CPathHistoryItem::Execute(CFilesWindow* panel)
                                     }
                                     if (failReason == CHPPFR_CANNOTCLOSEPATH)
                                     {
-                                        ret = FALSE;   // zustavame na miste
-                                        clear = FALSE; // zadny skok, neni treba mazat top-indexy
+                                        ret = FALSE;   // stay in place
+                                        clear = FALSE; // no jump, no need to clear top indexes
                                     }
                                 }
                                 else // complete success
@@ -1629,8 +1629,8 @@ BOOL CPathHistoryItem::Execute(CFilesWindow* panel)
                             }
                             if (failReason == CHPPFR_CANNOTCLOSEPATH)
                             {
-                                ret = FALSE;   // zustavame na miste
-                                clear = FALSE; // zadny skok, neni treba mazat top-indexy
+                                ret = FALSE;   // stay in place
+                                clear = FALSE; // no jump, no need to clear top indexes
                             }
                         }
                         else // complete success
@@ -1732,20 +1732,20 @@ void CPathHistory::ClearPluginFSFromHistory(CPluginFSInterfaceAbstract* fs)
 {
     if (NewItem != NULL && NewItem->PluginFS == fs)
     {
-        NewItem->PluginFS = NULL; // fs byl prave zavren -> NULLovani
+        NewItem->PluginFS = NULL; // FS was just closed -> set to NULL
     }
     int i;
     for (i = 0; i < Paths.Count; i++)
     {
         CPathHistoryItem* item = Paths[i];
         if (item->Type == 2 && item->PluginFS == fs)
-            item->PluginFS = NULL; // fs byl prave zavren -> NULLovani
+            item->PluginFS = NULL; // FS was just closed -> set to NULL
     }
 }
 
 void CPathHistory::FillBackForwardPopupMenu(CMenuPopup* popup, BOOL forward)
 {
-    // IDcka item musi byt v intervalu <1..?>
+    // item IDs must be in the range <1..?>
     char buffer[2 * MAX_PATH];
 
     MENU_ITEM_INFO mii;
@@ -1793,7 +1793,7 @@ void CPathHistory::FillHistoryPopupMenu(CMenuPopup* popup, DWORD firstID, int ma
 
     int firstIndex = popup->GetItemCount();
 
-    int added = 0; // pocet pridanych polozek
+    int added = 0; // number of added items
 
     int id = firstID;
     int count = (ForwardIndex == -1) ? Paths.Count : ForwardIndex;
@@ -2026,7 +2026,7 @@ void CPathHistory::AddPathUnique(int type, const char* pathOrArchiveOrFSName, co
     {
         TRACE_E(LOW_MEMORY);
         if (hIcon != NULL)
-            HANDLES(DestroyIcon(hIcon)); // musime sestrelit ikonu
+            HANDLES(DestroyIcon(hIcon)); // need to destroy the icon
         return;
     }
     if (Paths.Count > 0)
@@ -2039,20 +2039,20 @@ void CPathHistory::AddPathUnique(int type, const char* pathOrArchiveOrFSName, co
             if (n->IsTheSamePath(*item, curPluginFS))
             {
                 if (type == 2 && pluginFS != NULL)
-                { // jde o FS, nahradime pluginFS (aby se cesta otevrela na poslednim FS teto cesty)
+                { // it's an FS, replace pluginFS (so the path opens on the last FS for this path)
                     item->PluginFS = pluginFS;
                 }
                 delete n;
                 if (i < Paths.Count - 1)
                 {
-                    // vytahneme cestu v seznamu nahoru
+                    // move the path to the top of the list
                     Paths.Add(item);
                     if (Paths.IsGood())
-                        Paths.Detach(i); // pokud se pridani povedlo, vyhodime zdroj
+                        Paths.Detach(i); // if adding succeeded, remove the source
                     if (!Paths.IsGood())
                         Paths.ResetState();
                 }
-                return; // stejne cesty -> neni co delat
+                return; // same paths -> nothing to do
             }
         }
     }
