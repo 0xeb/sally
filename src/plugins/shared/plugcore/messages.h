@@ -4,13 +4,13 @@
 
 #pragma once
 
-// aby byly struktury nezavisle na nastavenem zarovnavani
+// to make structures independent of the configured alignment
 #pragma pack(push, 4)
 
 struct CMessage
 {
     int Size;
-    int SenderID; // doplni message center pri odeslani
+    int SenderID; // filled by message center when sending
 };
 
 #pragma pack(pop)
@@ -70,7 +70,7 @@ private:
     HANDLE HaveMessage;
     HANDLE FileMapping;
     CBuffer* Buffer;
-    HANDLE Reciever;   // jen pro odesilatele, handle ciloveho procesu
-    DWORD RecieverPid; // jen pro odesilatele, id ciloveho procesu
-    int SenderID;      // unikatni identifikator odesilatele
+    HANDLE Reciever;   // for sender only, handle of the target process
+    DWORD RecieverPid; // for sender only, ID of the target process
+    int SenderID;      // unique sender identifier
 };
