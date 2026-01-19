@@ -6,14 +6,14 @@
 
 // ****************************************************************************
 //
-// Eliminace TRACE a CALL-STACK pro projekty, ktere to nepodporuji
+// Elimination of TRACE and CALL-STACK for projects that do not support them
 
 // ****************************************************************************
 //
 // TRACE
 //
 
-// aby nedochazelo k problemum se stredniky v nize nadefinovanych makrech
+// to avoid problems with semicolons in the macros defined below
 inline void __TraceEmptyFunction() {}
 
 #define TRACE_MI(file, line, str) __TraceEmptyFunction()
@@ -45,7 +45,7 @@ inline void __TraceEmptyFunction() {}
 #define CALL_STACK_MESSAGE12(p1, p2, p3, p4, p5, p6, p7, p8, p9, p10, p11, p12)
 #define CALL_STACK_MESSAGE13(p1, p2, p3, p4, p5, p6, p7, p8, p9, p10, p11, p12, p13)
 
-// prazdne makro: oznamuje CheckStk, ze u teto funkce si call-stack message neprejeme
+// empty macro: tells CheckStk that we do not want a call-stack message for this function
 #define CALL_STACK_MESSAGE_NONE
 
 // ****************************************************************************
@@ -53,5 +53,5 @@ inline void __TraceEmptyFunction() {}
 // SetThreadNameInVCAndTrace
 //
 
-// eliminace volani SetThreadNameInVCAndTrace
+// eliminates calls to SetThreadNameInVCAndTrace
 inline void SetThreadNameInVCAndTrace(const char* name) {}

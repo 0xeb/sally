@@ -6,20 +6,20 @@
 
 // ****************************************************************************
 // TDirectArray2:
-//  -pole, ktere dynamicky roste/zmensuje se po blocich (neni nutne realokovat
-//   jiz obsazenou pamnet, pouze se prida dalsi blok)
-//  -pri mazani prvku z pole se vola metoda Destructor(index_prvku),
-//   ktera v zakladnim objektu nic neprovadi
+//  -array that grows/shrinks dynamically in blocks (no need to reallocate
+//   already used memory, only add another block)
+//  -when deleting an element from the array, method Destructor(index_element) is called,
+//   which in the base object does nothing
 
 template <class DATA_TYPE>
 class TDirectArray2
 {
 protected:
-    DATA_TYPE** Blocks; // ukazatel na pole bloku
-    int BlockSize;      // velikost jednoho bloku
+    DATA_TYPE** Blocks; // pointer to block array
+    int BlockSize;      // size of one block
 
 public:
-    int Count; // pocet prvku v poli
+    int Count; // number of elements in the array
 
     TDirectArray2<DATA_TYPE>(int blockSize)
     {
@@ -32,15 +32,15 @@ public:
 
     virtual void Destructor(int) {}
 
-    void Destroy();                    // vycisti pole
-    BOOL Add(const DATA_TYPE& member); // prida prvek na posledni pozici
-    BOOL Delete(int index);            // zrusi prvek na dane pozici, na jeho misto
-                                       // soupne prvek z posledniho mista a zmensi pole
+    void Destroy();                    // clears the array
+    BOOL Add(const DATA_TYPE& member); // adds an element at the last position
+    BOOL Delete(int index);            // removes element at the given position, replaces it
+                                       // with the last element and shrinks the array
                                        /*
-    CDynamicArray * const &operator[](float index); // funkce se nikdy nevola, ale kdyz tu neni
-                                                    // tak dela MSVC strasny veci
+    CDynamicArray * const &operator[](float index); // function is never called, but when it is not here
+                                                    // MSVC does nasty things
 */
-    DATA_TYPE& operator[](int index)   //vraci prvek na pozici
+    DATA_TYPE& operator[](int index)   // returns element at position
     {
         return Blocks[index / BlockSize][index % BlockSize];
     }
@@ -48,8 +48,8 @@ public:
 
 // ****************************************************************************
 // CArray2:
-//  -predek vsech indirect poli
-//  -drzi typ (void *) v DWORD poli (kvuli uspore mista v .exe)
+//  -base of all indirect arrays
+//  -stores type (void *) in DWORD array (to save space in .exe)
 
 class CArray2 : public TDirectArray2<DWORD_PTR>
 {
@@ -74,8 +74,8 @@ protected:
 
 // ****************************************************************************
 // TIndirectArray2:
-//  -vhodne pro ulozeni ukazatelu na objekty
-//  -ostatni vlastnosti viz CArray
+//  -suitable for storing pointers to objects
+//  -other properties see CArray
 
 template <class DATA_TYPE>
 class TIndirectArray2 : public CArray2
@@ -116,8 +116,8 @@ void TDirectArray2<DATA_TYPE>::Destroy()
         for (int i = 0; i < Count; i++)
             Destructor(i);
 
-        //byl-li Count == BlockSize delalo to problemy
-        //proto je zde Count - 1
+        // if Count == BlockSize it caused problems
+        // therefore Count - 1 is used here
         for (DATA_TYPE** block = Blocks; block <= Blocks + (Count - 1) / BlockSize; block++)
         {
             free(*block);

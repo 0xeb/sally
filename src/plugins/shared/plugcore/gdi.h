@@ -6,8 +6,8 @@
 
 // ****************************************************************************
 //
-// CBackbufferedDC -- DC s back bufferem, pro hladke kresleni slozitejsich
-// grafickych celku
+// CBackbufferedDC -- DC with a back buffer, for smooth drawing of more complex
+// graphics
 //
 
 class CBackbufferedDC
@@ -18,24 +18,24 @@ public:
     ~CBackbufferedDC();
     void Destroy();
 
-    // nastavi okno ke kteremu se DC vaze
+    // sets the window the DC is bound to
     void SetWindow(HWND window);
 
-    // aktualizuje vnitrni data v zavislosti na zmene velikosti okna/rozliseni
-    // obrazovky apod; nevolat mezi BeginPaint a EndPaint
+    // updates internal data depending on window size/screen resolution changes, etc.;
+    // do not call between BeginPaint and EndPaint
     void Update();
 
-    // zahaji kresleni do okna, _musi_ parovat s EndPaint, nelze volat
-    // opakovane
+    // starts drawing to the window, _must_ be paired with EndPaint, cannot be called
+    // repeatedly
     void BeginPaint();
 
-    // ukonci kresleni a zkopiruje obsah back-bufferu na obrazovku
+    // ends drawing and copies back-buffer contents to the screen
     void EndPaint();
 
-    // DC pro kresleni do okna, platne jen mezi BeginPaint a EndPaint
+    // DC for drawing to the window, valid only between BeginPaint and EndPaint
     operator HDC();
 
-    // vrati rectangle o rozmerech bufferu
+    // returns rectangle with buffer dimensions
     const RECT& GetRect() { return ClientRect; }
 
 private:
