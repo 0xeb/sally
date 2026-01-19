@@ -822,9 +822,9 @@ WCHAR* LoadStrW(int resID, HINSTANCE hInstance = NULL); // pulls wide-string fro
 // format string examples:
 //   - "{!}director{y|1|ies}" for parameter value from 0 to 1 (inclusive) will be
 //     "directory" and for value from 2 to "infinity" (2^64-1) will be "directories"
-//   - "{!}soubo{rů|0|r|1|ry|4|rů}" for parameter value 0 will be "souborů",
-//     for 1 will be "soubor", for 2 to 4 (inclusive) will be "soubory" and from 5
-//     to "infinity" will be "souborů"
+//   - "{!}file{s|0||1|s|4|s}" for parameter value 0 will be "files",
+//     for 1 will be "file", for 2 to 4 (inclusive) will be "files" and from 5
+//     to "infinity" will be "files"
 int ExpandPluralString(char* lpOut, int nOutMax, const char* lpFmt, int nParCount,
                        const CQuadWord* lpParArray);
 
