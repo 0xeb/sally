@@ -94,7 +94,7 @@ int CPluginsBar::GetNeededHeight()
 void CPluginsBar::Customize()
 {
     CALL_STACK_MESSAGE_NONE
-    // zobrazim okno Plugins
+    // show Plugins window
     PostMessage(MainWindow->HWindow, WM_COMMAND, CM_CUSTOMIZEPLUGINS, 0);
 }
 
