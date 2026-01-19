@@ -9,9 +9,9 @@ class CFilesWindow;
 extern HANDLE RefreshFinishedEvent;
 extern int SnooperSuspended;
 
-void AddDirectory(CFilesWindow* win, const char* path, BOOL registerDevNotification);                           // novy adresar pro cmuchala
-void ChangeDirectory(CFilesWindow* win, const char* newPath, BOOL registerDevNotification);                     // zmena zadaneho adresare
-void DetachDirectory(CFilesWindow* win, BOOL waitForHandleClosure = FALSE, BOOL closeDevNotifification = TRUE); // uz neni treba cmuchat
+void AddDirectory(CFilesWindow* win, const char* path, BOOL registerDevNotification);                           // new directory for snooper
+void ChangeDirectory(CFilesWindow* win, const char* newPath, BOOL registerDevNotification);                     // change of specified directory
+void DetachDirectory(CFilesWindow* win, BOOL waitForHandleClosure = FALSE, BOOL closeDevNotifification = TRUE); // no longer need to snoop
 
 BOOL InitializeThread();
 void TerminateThread();
@@ -22,5 +22,5 @@ void EndSuspendMode(BOOL debugDoNotTestCaller = FALSE);
 typedef TDirectArray<CFilesWindow*> CWindowArray; // (CFilesWindow *)
 typedef TDirectArray<HANDLE> CObjectArray;        // (HANDLE)
 
-extern CWindowArray WindowArray; // shodne indexovana pole
-extern CObjectArray ObjectArray; // k ObjectHandlu patri MainWindow
+extern CWindowArray WindowArray; // arrays indexed the same way
+extern CObjectArray ObjectArray; // ObjectHandle belongs to MainWindow
