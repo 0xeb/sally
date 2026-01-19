@@ -110,7 +110,7 @@ public:
     }
     int GetSortOrder() { return this->_sortorder; }
 
-    //FIXME: toto je hack :(
+//FIXME: this is a hack :(
     void SetClusterSize(int clustersize)
     {
         this->_clustersize = clustersize;
