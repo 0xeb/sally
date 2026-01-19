@@ -299,12 +299,12 @@ LPTSTR FindString( // Return value: pointer to matched substring of text, or nul
   WCHAR *f = FindString(LOCALE_USER_DEFAULT, 0, s1, -1, L"fi", -1, &fLen);
   f = FindString(LOCALE_USER_DEFAULT, 0, s1, -1, L"f", -1, &fLen);
   f = FindString(LOCALE_USER_DEFAULT, 0, s1, -1, L"\x00e4", -1, &fLen);
-  f = FindString(LOCALE_USER_DEFAULT, 0, s1, -1, L"a", -1, &fLen);  // NEFUNGUJE !!!
+  f = FindString(LOCALE_USER_DEFAULT, 0, s1, -1, L"a", -1, &fLen);  // DOES NOT WORK !!!
   WCHAR *ss = wcsstr(s1, L"\x00e4");
 / *  
-procist X:\ZUMPA\!\unicode\ch05.pdf - jak vubec ma vypadat to hledani v Unicode ???
+Read X:\ZUMPA\!\unicode\ch05.pdf - what should that Unicode search look like anyway ???
 
-Nekam odswapnout + casem proverit + odladit:
+Move somewhere + check and debug later:
 Some time ago I implemented a FindString function which in most cases takes only O(n) time (around 1.5*n CompareString
 calls most of which return immediately). In the end I didn't use it because I wasn't sure whether the relevant statement
 in the CompareString documentation can be relied on in a strict sense: "If the two strings are of different lengths,
