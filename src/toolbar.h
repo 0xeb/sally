@@ -26,21 +26,21 @@ protected:
                     // a bitmap, only text.
     HICON HIcon;
     HICON HOverlay;
-    DWORD CustomData; // FIXME_X64 - male pro ukazatel, neni nekdy potreba?
+    DWORD CustomData; // FIXME_X64 - too small for a pointer, is it ever needed?
     int Width;        // width of item (computed if TLBI_STYLE_AUTOSIZE is set)
 
     char* Name; // name in customize dialog (valid during custimize session)
 
-    // tyto hodnoty se pouzivaji pro optimalizovany pristup ke stavum polozek
-    DWORD* Enabler; // Ukazuje na promennou, ktera ridi stav polozky.
-                    // Hodnote ruzne od nuly odpovida nulovany bit TLBI_STATE_GRAYED.
-                    // Nule odpovida nastaveny bit TLBI_STATE_GRAYED.
+    // these values are used for optimized access to item states
+    DWORD* Enabler; // points to variable that drives the item state.
+                    // Non-zero means TLBI_STATE_GRAYED bit cleared.
+                    // Zero means TLBI_STATE_GRAYED bit set.
 
     // internal data
     int Height; // height of item
     int Offset; // position of item in whole toolbar
 
-    WORD IconX; // umisteni jednotlivych prvku
+    WORD IconX; // position of individual elements
     WORD TextX;
     WORD InnerX;
     WORD OutterX;
@@ -67,40 +67,40 @@ class CToolBar : public CWindow, public CGUIToolBarAbstract
 protected:
     TIndirectArray<CToolBarItem> Items;
 
-    int Width; // rozmery celeho okna
+    int Width; // overall window width
     int Height;
     HFONT HFont;
     int FontHeight;
-    HWND HNotifyWindow; // kam budeme dorucovat notifikace
+    HWND HNotifyWindow; // where notifications are delivered
     HIMAGELIST HImageList;
     HIMAGELIST HHotImageList;
-    int ImageWidth; // rozmery jednoho obrazku z imagelistu
+    int ImageWidth; // size of one image from the image list
     int ImageHeight;
     DWORD Style;          // TLB_STYLE_xxx
-    BOOL DirtyItems;      // nastala operace, ktera ovlivnuje rozlozeni polozek
-                          // a je treba provest prepocet
-    CBitmap* CacheBitmap; // pres tuto bitmapu kreslime ven
-    CBitmap* MonoBitmap;  // pro grayed ikonky
-    int CacheWidth;       // rozmery bitmapy
+    BOOL DirtyItems;      // an operation affecting item layout occurred
+                          // and a recompute is needed
+    CBitmap* CacheBitmap; // back buffer used for drawing
+    CBitmap* MonoBitmap;  // for grayed icons
+    int CacheWidth;       // bitmap dimensions
     int CacheHeight;
-    int HotIndex; // -1 = zadny
+    int HotIndex; // -1 = none
     int DownIndex;
     BOOL DropPressed;
     BOOL MonitorCapture;
     BOOL RelayToolTip;
     TOOLBAR_PADDING Padding;
-    BOOL HasIcon;       // pokud drzi nejakou ikonu, bude funkce GetNeededSpace() pocitat s jeji vyskou
-    BOOL HasIconDirty;  // je potreba detekovat pritomnost ikony pro GetNeededSpace()?
-    BOOL Customizing;   // je prave toolbara konfigurovana
-    int InserMarkIndex; // -1 = zadny
+    BOOL HasIcon;       // if there is an icon, GetNeededSpace() will include its height
+    BOOL HasIconDirty;  // need to detect icon presence for GetNeededSpace()?
+    BOOL Customizing;   // toolbar is currently being customized
+    int InserMarkIndex; // -1 = none
     BOOL InserMarkAfter;
-    BOOL MouseIsTracked;  // je mys sledovana pomoci TrackMouseEvent?
-    DWORD DropDownUpTime; // cas v [ms], kdy byl odmackunt drop down, pro ochranu pred novym zamacknutim
-    BOOL HelpMode;        // Salamander je Shift+F1 (ctx help) rezimu a toolbar by mel vysvitit i disabled polozky pod kurzorem
+    BOOL MouseIsTracked;  // is the mouse tracked via TrackMouseEvent?
+    DWORD DropDownUpTime; // time in [ms] when drop down was released, guarding against a re-press
+    BOOL HelpMode;        // Salamander is in Shift+F1 (ctx help) mode and toolbar should highlight disabled items under cursor
 
 public:
     //
-    // Vlastni metody
+    // Custom methods
     //
     CToolBar(HWND hNotifyWindow, CObjectOrigin origin = ooAllocated);
     ~CToolBar();
@@ -112,17 +112,17 @@ public:
     virtual BOOL WINAPI CreateWnd(HWND hParent);
     virtual HWND WINAPI GetHWND() { return HWindow; }
 
-    virtual int WINAPI GetNeededWidth(); // vrati rozmery, ktere budou pro okno potreba
+    virtual int WINAPI GetNeededWidth(); // returns width needed for the window
     virtual int WINAPI GetNeededHeight();
 
     virtual void WINAPI SetFont();
-    virtual BOOL WINAPI GetItemRect(int index, RECT& r); // vrati umisteni polozky ve screen souradnicich
+    virtual BOOL WINAPI GetItemRect(int index, RECT& r); // returns item position in screen coordinates
 
     virtual BOOL WINAPI CheckItem(DWORD position, BOOL byPosition, BOOL checked);
     virtual BOOL WINAPI EnableItem(DWORD position, BOOL byPosition, BOOL enabled);
 
-    // pokud je prirazen image list, vlozi do nej na odpovidajici misto ikonu
-    // promenne normal a hot urcuji, ktere imagelisty budou ovlivneny
+    // if an image list is assigned, inserts the icon at the corresponding position
+    // normal and hot variables specify which image lists are affected
     virtual BOOL WINAPI ReplaceImage(DWORD position, BOOL byPosition, HICON hIcon, BOOL normal = TRUE, BOOL hot = FALSE);
 
     virtual int WINAPI FindItemPosition(DWORD id);
@@ -133,7 +133,7 @@ public:
     virtual void WINAPI SetHotImageList(HIMAGELIST hImageList);
     virtual HIMAGELIST WINAPI GetHotImageList();
 
-    // styl toolbary
+    // toolbar style
     virtual void WINAPI SetStyle(DWORD style);
     virtual DWORD WINAPI GetStyle();
 
@@ -142,35 +142,35 @@ public:
 
     virtual int WINAPI GetItemCount() { return Items.Count; }
 
-    // vyvola konfiguracni dialog
+    // invokes configuration dialog
     virtual void WINAPI Customize();
 
     virtual void WINAPI SetPadding(const TOOLBAR_PADDING* padding);
     virtual void WINAPI GetPadding(TOOLBAR_PADDING* padding);
 
-    // obehne vsechny polozky a pokud maji nastaveny ukazatel 'EnablerData'
-    // porovna hodnoty (na kterou ukazuje) se skutecnym stavem polozky.
-    // Pokud se stav lisi, zmeni ho.
+    // walks all items and if they have the 'EnablerData' pointer set
+    // compares the value (it points to) with the actual item state.
+    // If the state differs, it updates it.
     virtual void WINAPI UpdateItemsState();
 
-    // pokud je bod nad nekterou z polozek (ne nad separatororem), vrati jeji index.
-    // jinak vrati zaporne cislo
+    // if the point is above an item (not a separator), returns its index.
+    // otherwise returns a negative number
     virtual int WINAPI HitTest(int xPos, int yPos);
 
-    // vraci TRUE, pokud je na pozice na rozhrani polozky; pak take nastavi 'index'
-    // na tuto polozku a promennout 'after', ktera udava, jestli jde o levou nebo
-    // pravou stranu polozky. Pokud je pod nad nejakou polozkou, vrati FALSE.
-    // Pokud bod nelezi nad zadnou plozkou, vrati TRUE a 'index' nastavi na -1.
+    // returns TRUE if the position is on an item boundary; then also sets 'index'
+    // to that item and the 'after' variable, which indicates whether it is the left or
+    // right side of the item. If the point is above an item, returns FALSE.
+    // If the point is not above any item, returns TRUE and sets 'index' to -1.
     virtual BOOL WINAPI InsertMarkHitTest(int xPos, int yPos, int& index, BOOL& after);
 
-    // nastavi InsertMark na pozici index (pred nebo za)
-    // pokud je index == -1, odstrani InsertMark
+    // sets InsertMark to index position (before or after)
+    // if index == -1, removes InsertMark
     virtual void WINAPI SetInsertMark(int index, BOOL after);
 
     // Sets the hot item in a toolbar. Returns the index of the previous hot item, or -1 if there was no hot item.
     virtual int WINAPI SetHotItem(int index);
 
-    // mohlo dojit ke zmene barevne hloubky obrazovky; je treba prebuildit CacheBitmap
+    // screen color depth may have changed; CacheBitmap must be rebuilt
     virtual void WINAPI OnColorsChanged();
 
     virtual BOOL WINAPI InsertItem2(DWORD position, BOOL byPosition, const TLBI_ITEM_INFO2* tii);
@@ -187,14 +187,14 @@ protected:
 
     void DrawInsertMark(HDC hDC);
 
-    // vraci TRUE, pokud je na pozici polozka; pak take nastavi 'index'
-    // jinak vraci FALSE
-    // pokud uzivatel kliknul na drop down, nastavi 'dropDown' na TRUE
+    // returns TRUE if there is an item at the position; then also sets 'index'
+    // otherwise returns FALSE
+    // if the user clicked drop down, sets 'dropDown' to TRUE
     BOOL HitTest(int xPos, int yPos, int& index, BOOL& dropDown);
 
-    // obehne vsechny polozky a napocit si k nim 'MinWidth' a 'XOffset'
-    // ridi se (a nastavuje) DirtyItems
-    // vrati TRUE, pokud doslo k prekresleni vsech polozek
+    // walks all items and computes their 'MinWidth' and 'XOffset'
+    // follows (and sets) DirtyItems
+    // returns TRUE if all items were redrawn
     BOOL Refresh();
 
     friend class CTBCustomizeDialog;
@@ -215,7 +215,7 @@ class CTBCustomizeDialog : public CCommonDialog
     };
 
 protected:
-    TDirectArray<TLBI_ITEM_INFO2> AllItems; // vsechny dostupne polozky
+    TDirectArray<TLBI_ITEM_INFO2> AllItems; // all available items
     CToolBar* ToolBar;
     HWND HAvailableLB;
     HWND HCurrentLB;
@@ -232,11 +232,11 @@ protected:
     virtual INT_PTR DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam);
 
     void DestroyItems();
-    BOOL EnumButtons(); // pomoci notifikace WM_USER_TBENUMBUTTON2 naplni pole Items vsema tlacitkama, ktere muze toolbar drzet
+    BOOL EnumButtons(); // via WM_USER_TBENUMBUTTON2 notification fills Items array with all buttons the toolbar can hold
 
-    BOOL PresentInToolBar(DWORD id);      // je tento command v toolbare ?
-    BOOL FindIndex(DWORD id, int* index); // vyhleda command v AllItems
-    void FillLists();                     // naplni oba listboxy
+    BOOL PresentInToolBar(DWORD id);      // is this command in the toolbar?
+    BOOL FindIndex(DWORD id, int* index); // finds command in AllItems
+    void FillLists();                     // fills both list boxes
 
     void EnableControls();
     void MoveItem(int srcIndex, int tgtIndex);
@@ -251,8 +251,8 @@ protected:
 //
 // CMainToolBar
 //
-// Toolbar, ktery jde konfigurovat, nese tlacitka s commandy. Lezi na vrsku
-// Salama a nad kazdym panelem.
+// Toolbar that can be customized, carries command buttons. It sits on top
+// of Salamander and above each panel.
 //
 
 enum CMainToolBarType
@@ -274,27 +274,27 @@ public:
     BOOL Load(const char* data);
     BOOL Save(char* data);
 
-    // je treba vratit tooltip
+    // needs to return tooltip
     void OnGetToolTip(LPARAM lParam);
-    // pri konfiguraci plni konfiguracni dialog polozkama
+    // during configuration fills the dialog with items
     BOOL OnEnumButton(LPARAM lParam);
-    // uzivatel stisknul reset v konfiguracnim dialogu - nalejeme default sestavu
+    // user pressed reset in the configuration dialog - load the default layout
     void OnReset();
 
     void SetType(CMainToolBarType type);
 
 protected:
-    // do 'tii' naplni data pro poozku 'tbbeIndex' a vrati TRUE
-    // pokud polozka neni uplna (zruseny prikaz), vrati FALSE
-    BOOL FillTII(int tbbeIndex, TLBI_ITEM_INFO2* tii, BOOL fillName); // 'buttonIndex' je z rodiny TBBE_xxxx; -1 = separator
+    // fills 'tii' with data for item 'tbbeIndex' and returns TRUE
+    // if the item is incomplete (command removed), returns FALSE
+    BOOL FillTII(int tbbeIndex, TLBI_ITEM_INFO2* tii, BOOL fillName); // 'buttonIndex' is from TBBE_xxxx family; -1 = separator
 };
 
 //*****************************************************************************
 //
 // CBottomToolBar
 //
-// toolbar ve spodni casti Salamandera - obsahuje napovedu pro F1-F12 v
-// kombinaci s Ctrl, Alt a Shift
+// toolbar at the bottom of Salamander - contains hints for F1-F12 in
+// combination with Ctrl, Alt and Shift
 //
 
 enum CBottomTBStateEnum
@@ -318,11 +318,11 @@ public:
 
     virtual BOOL WINAPI CreateWnd(HWND hParent);
 
-    // vola se pri kazde zmene modifikatoru (Ctrl,Alt,Shift) - obehne naplnenou
-    // toolbaru a nastavi ji texty a ID
+    // called on every modifier change (Ctrl, Alt, Shift) - walks the filled
+    // toolbar and sets its texts and IDs
     BOOL SetState(CBottomTBStateEnum state);
 
-    // inicializuje staticke pole, ze ktereho pak budeme toolbaru krmit
+    // initializes the static array from which we feed the toolbar
     static BOOL InitDataFromResources();
 
     void OnGetToolTip(LPARAM lParam);
@@ -332,10 +332,10 @@ public:
 protected:
     CBottomTBStateEnum State;
 
-    // interni funkce volana z InitDataFromResources
+    // internal function called from InitDataFromResources
     static BOOL InitDataResRow(CBottomTBStateEnum state, int textResID);
 
-    // pro kazde tlacitko najde nedelsi text a podle nej nastavi tlacitku sirku
+    // for each button finds the longest text and sets button width accordingly
     BOOL SetMaxItemWidths();
 };
 
@@ -349,7 +349,7 @@ class CUserMenuBar : public CToolBar
 public:
     CUserMenuBar(HWND hNotifyWindow, CObjectOrigin origin = ooStatic);
 
-    // vytahne z UserMenu polozky a naleje buttony do toolbary
+    // pulls items from UserMenu and loads buttons into the toolbar
     BOOL CreateButtons();
 
     void ToggleLabels();
@@ -376,7 +376,7 @@ class CHotPathsBar : public CToolBar
 public:
     CHotPathsBar(HWND hNotifyWindow, CObjectOrigin origin = ooStatic);
 
-    // vytahne z HotPaths polozky a naleje buttony do toolbary
+    // pulls items from HotPaths and loads buttons into the toolbar
     BOOL CreateButtons();
 
     void ToggleLabels();
@@ -403,7 +403,7 @@ class CDrivesList;
 class CDriveBar : public CToolBar
 {
 protected:
-    // navratove hodnoty pro List
+    // return values for List
     DWORD DriveType;
     DWORD_PTR DriveTypeParam;
     int PostCmd;
@@ -411,11 +411,11 @@ protected:
     BOOL FromContextMenu;
     CDrivesList* List;
 
-    // cache: obsahuje ?: nebo \\ pro UNC nebo prazdny retezec
+    // cache: contains ?: or \\ for UNC or empty string
     char CheckedDrive[3];
 
 public:
-    // ikony pluginu chceme zobrazovat cernobile, takze je musime drzet v image listech
+    // we want to display plugin icons in monochrome, so we keep them in image lists
     HIMAGELIST HDrivesIcons;
     HIMAGELIST HDrivesIconsGray;
 
@@ -425,39 +425,39 @@ public:
 
     void DestroyImageLists();
 
-    // vyhaze existujici a naleje nova tlacitka;
-    // neni-li 'copyDrivesListFrom' NULL, maji se data o discich kopirovat misto znovu ziskavat
-    // 'copyDrivesListFrom' muze odkazovat i na volany objekt
+    // clears existing and loads new buttons;
+    // if 'copyDrivesListFrom' is not NULL, copy drive data instead of re-fetching
+    // 'copyDrivesListFrom' can also refer to the called object
     BOOL CreateDriveButtons(CDriveBar* copyDrivesListFrom);
 
     virtual int WINAPI GetNeededHeight();
 
     void OnGetToolTip(LPARAM lParam);
 
-    // user clicknul na tlacitku s commandem id
+    // user clicked the button with command id
     void Execute(DWORD id);
 
-    // zamackne ikonku odpovidajici ceste; pokud takovou nenalezne, nebude
-    // zamackla zadna; promenna force vyradi cache
+    // presses the icon corresponding to the path; if none is found, none is pressed;
+    // the force variable invalidates the cache
     void SetCheckedDrive(CFilesWindow* panel, BOOL force = FALSE);
 
-    // pokud prijde notifikace o pridani/odstraneni disku, je treba znovu naplnit seznam;
-    // neni-li 'copyDrivesListFrom' NULL, maji se data o discich kopirovat misto znovu ziskavat
-    // 'copyDrivesListFrom' muze odkazovat i na volany objekt
+    // if a notification about drive add/remove arrives, the list must be rebuilt;
+    // if 'copyDrivesListFrom' is not NULL, copy drive data instead of re-fetching
+    // 'copyDrivesListFrom' can also refer to the called object
     void RebuildDrives(CDriveBar* copyDrivesListFrom = NULL);
 
-    // je treba vybalit context menu; poozka se urci z GetMessagePos; vrati TRUE,
-    // pokud bylo trefeno tlacitko a vybalilo se menu; jinak vrati FALSE
+    // need to show context menu; item is determined from GetMessagePos; returns TRUE
+    // if a button was hit and the menu opened; otherwise returns FALSE
     BOOL OnContextMenu();
 
-    // vraci bitove pole disku, jak bylo ziskano pri poslednim List->BuildData()
-    // pokud BuildData() jeste neprobehlo, vraci 0
-    // lze pouzit pro rychlou detekci, zda nedoslo k nejake zmene disku
+    // returns drive bitmask as obtained during last List->BuildData()
+    // if BuildData() has not run yet, returns 0
+    // can be used for quick detection of drive changes
     DWORD GetCachedDrivesMask();
 
-    // vraci bitove pole dostupnych cloud storages, jak bylo ziskano pri poslednim List->BuildData()
-    // pokud BuildData() jeste neprobehlo, vraci 0
-    // lze pouzit pro rychlou detekci, zda nedoslo k nejake zmene dostupnosti cloud storages
+    // returns available cloud storages bitmask as obtained during last List->BuildData()
+    // if BuildData() has not run yet, returns 0
+    // can be used for quick detection of cloud storages availability changes
     DWORD GetCachedCloudStoragesMask();
 
 protected:
@@ -472,7 +472,7 @@ protected:
 class CPluginsBar : public CToolBar
 {
 protected:
-    // ikonky reprezentujici pluginy, vyvorene pomoci CPlugins::CreateIconsList
+    // icons representing plugins, created using CPlugins::CreateIconsList
     HIMAGELIST HPluginsIcons;
     HIMAGELIST HPluginsIconsGray;
 
@@ -482,7 +482,7 @@ public:
 
     void DestroyImageLists();
 
-    // vyhaze existujici a naleje nova tlacitka
+    // clears existing and loads new buttons
     BOOL CreatePluginButtons();
 
     virtual int WINAPI GetNeededHeight();
