@@ -71,12 +71,12 @@ public:
         if (--RefCount == 0)
         {
             delete this;
-            return 0; // nesmime sahnout do objektu, uz neexistuje
+            return 0; // must not touch the object, it no longer exists
         }
         return RefCount;
     }
 
-    void HitTest(POINTL pt, int& insertIndex, BOOL& after, int& pasteIndex, char* fileName, BOOL insert) // fileName buffer ma delku MAX_PATH
+    void HitTest(POINTL pt, int& insertIndex, BOOL& after, int& pasteIndex, char* fileName, BOOL insert) // fileName buffer has length MAX_PATH
     {
         POINT p;
         p.x = pt.x;
@@ -325,9 +325,9 @@ public:
             DataObject = NULL;
         }
 
-        // sestrelim insert mark
+        // clear the insert mark
         UserMenuBar->SetInsertMark(-1, FALSE);
-        // sestrelim hot item
+        // clear the hot item
         UserMenuBar->SetHotItem(-1);
 
         return E_UNEXPECTED;
@@ -356,7 +356,7 @@ public:
 
             if (insertIndex != -1)
             {
-                // sestrelim insert mark
+                // clear the insert mark
                 UserMenuBar->SetInsertMark(-1, FALSE);
 
                 if (insert)
@@ -373,11 +373,11 @@ public:
                     char tmp[MAX_PATH];
                     BOOL shell = FALSE;
 
-                    // zmenil jsem metodu CMainWindow::UserMenu tak, ze pokud nespousti pres Shell,
-                    // vola ShellExecuteEx misto CreateProcess; proto uz nejsou potreba uvozovky
+                    // CMainWindow::UserMenu was changed so that if it does not launch via Shell,
+                    // it calls ShellExecuteEx instead of CreateProcess; therefore quotes are no longer needed
                     /*
-            // pokud se nejedna o spustitelny soubor (.exe, .com, .bat, .pif),
-            // soupnu nazev do uvozovek a spustim ho pres shell
+            // if it is not an executable file (.exe, .com, .bat, .pif),
+            // wrap the name in quotes and run it through the shell
             char *dot = strrchr(buff, '.');
             if (dot != NULL && *(dot + 1) != 0)
             {
@@ -398,7 +398,7 @@ public:
             }
 */
 
-                    // pokud je v ceste znak $, musim ho nahradit $$
+                    // if the path contains $, I must replace it with $$
                     strcpy(tmp, buff);
                     char* iterS = tmp;
                     char* iterT = buff;
@@ -420,7 +420,7 @@ public:
                     CUserMenuItem* item = new CUserMenuItem(name, buff, emptyBuffer, fullPathBuffer, emptyBuffer,
                                                             shell, FALSE, FALSE, TRUE, umitItem, NULL);
 
-                    // vyhledame misto, kam je treba polozku vlozit
+                    // find the place where the item should be inserted
                     int count = 0;
                     int i;
                     for (i = 0; i < MainWindow->UserMenuItems->Count; i++)
@@ -441,12 +441,12 @@ public:
                     }
                     MainWindow->UserMenuItems->Insert(i, item);
 
-                    if (UserMenuIconBkgndReader.IsReadingIcons()) // probiha nacitani ikon = musime ho nahodit znovu, zmenil se pocet polozek v user menu (jako side-efekt to zahodi prave nactenou ikonu dropleho souboru, ale na to proste kaslu)
+                    if (UserMenuIconBkgndReader.IsReadingIcons()) // icon loading in progress = must restart it, item count in user menu changed (side effect: drops just-loaded icon of the dropped file, but we ignore that)
                     {
                         CUserMenuIconDataArr* bkgndReaderData = new CUserMenuIconDataArr();
                         for (int i2 = 0; i2 < MainWindow->UserMenuItems->Count; i2++)
                             MainWindow->UserMenuItems->At(i2)->GetIconHandle(bkgndReaderData, FALSE);
-                        UserMenuIconBkgndReader.StartBkgndReadingIcons(bkgndReaderData); // POZOR: uvolni 'bkgndReaderData'
+                        UserMenuIconBkgndReader.StartBkgndReadingIcons(bkgndReaderData); // WARNING: frees 'bkgndReaderData'
                     }
 
                     MainWindow->UMToolBar->CreateButtons();
@@ -514,8 +514,8 @@ CUserMenuBar::CUserMenuBar(HWND hNotifyWindow, CObjectOrigin origin)
     RemoveAllItems();
     SetStyle(TLB_STYLE_IMAGE | (Configuration.UserMenuToolbarLabels ? TLB_STYLE_TEXT : 0));
 
-    // naleju ikonky do vlastni toolbary
-    // vlozim pouze itemy a submenu z nejvyssi urovne; ostatni se bude rozbalovat jako submenu
+    // load icons into own toolbar
+    // insert only items and submenus from the top level; the rest will expand as submenus
     int level = 0;
     TLBI_ITEM_INFO2 tii;
     int i;
@@ -588,7 +588,7 @@ void CUserMenuBar::ToggleLabels()
 int CUserMenuBar::GetNeededHeight()
 {
     CALL_STACK_MESSAGE_NONE
-    // i v pripade, ze nedrzime zadnou ikonu budeem vracet spravnou vysku
+    // even if we hold no icon, return the correct height
     int height = CToolBar::GetNeededHeight();
     int iconSize = GetIconSizeForSystemDPI(ICONSIZE_16);
     int minH = 3 + iconSize + 3;
@@ -600,7 +600,7 @@ int CUserMenuBar::GetNeededHeight()
 void CUserMenuBar::Customize()
 {
     CALL_STACK_MESSAGE_NONE
-    // nechame vybalit stranku UserMenu a rozeditovat polozku index
+    // let it open the UserMenu page and edit the item index
     PostMessage(MainWindow->HWindow, WM_USER_CONFIGURATION, 2, 0);
 }
 
