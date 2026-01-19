@@ -22,9 +22,9 @@ BOOL CtrlHandler(DWORD fdwCtrlType)
 {
     switch (fdwCtrlType)
     {
-    // vyignorujeme CTRL+C, Ctrl+Break a dalsi dobre duvody pro ukonceni... protoze ukoncit
-    // se musi nejdrive spousteny externi archivator (jinak archivator pokracuje ve spousteni,
-    // i kdyz uz Salamander pise, ze komprimace/dekomprimace skoncila)
+    // ignore CTRL+C, Ctrl+Break, and other good reasons to terminate... because we must
+    // first terminate the externally started archiver (otherwise it keeps running
+    // even when Salamander says compression/decompression has finished)
     case CTRL_C_EVENT:
     case CTRL_BREAK_EVENT:
     case CTRL_CLOSE_EVENT:

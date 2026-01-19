@@ -15,7 +15,7 @@ HANDLE Heap = NULL;
 #define GET_X_LPARAM(lp) ((int)(short)LOWORD(lp))
 #define GET_Y_LPARAM(lp) ((int)(short)HIWORD(lp))
 
-// callback, ktery vraci jmena oznacenych souboru pro vytvareni nasl. interfacu
+// callback that returns names of selected files for creating the next interface
 typedef const char* (*CEnumFileNamesFunction)(int index, void* param);
 
 void my_memcpy(void* dst, const void* src, int len)
@@ -27,7 +27,7 @@ void my_memcpy(void* dst, const void* src, int len)
 }
 
 // for VS2019
-#pragma intrinsic(memcpy) // abych mohli prekladat s optimalizaci na rychlost a prekladac nerval
+#pragma intrinsic(memcpy) // so we can compile with speed optimization and the compiler does not complain
 #pragma function(memcpy)  // error C2169:  'memcpy': intrinsic function, cannot be defined
 void* memcpy(void* dst, const void* src, size_t len)
 {
@@ -161,7 +161,7 @@ LPITEMIDLIST* CreateItemIdList(LPSHELLFOLDER folder, int files,
         if (pidl != NULL)
             list[i] = pidl;
         else
-            break; // nejaka chyba
+            break; // some error
     }
 
     if (pidl == NULL)
@@ -187,9 +187,9 @@ BOOL GetShellFolder(const char* dir, IShellFolder*& shellFolderObj, LPITEMIDLIST
     {
         int rootFolder;
         if (dir[0] != '\\')
-            rootFolder = CSIDL_DRIVES; // normalni cesta
+            rootFolder = CSIDL_DRIVES; // normal path
         else
-            rootFolder = CSIDL_NETWORK; // UNC - sitove zdroje
+            rootFolder = CSIDL_NETWORK; // UNC - network resources
         LPITEMIDLIST rootFolderID;
         if (SUCCEEDED((ret = SHGetSpecialFolderLocation(NULL, rootFolder, &rootFolderID))))
         {
@@ -198,7 +198,7 @@ BOOL GetShellFolder(const char* dir, IShellFolder*& shellFolderObj, LPITEMIDLIST
             {
                 char root[MAX_PATH];
                 GetRootPath(root, dir);
-                if (lstrlen(root) < lstrlen(dir)) // neni to root cesta
+                if (lstrlen(root) < lstrlen(dir)) // not a root path
                 {
                     lstrcpy(root, dir);
                     char* name = root + lstrlen(root);
@@ -279,10 +279,10 @@ BOOL GetShellFolder(const char* dir, IShellFolder*& shellFolderObj, LPITEMIDLIST
 
                                             if (name != NULL)
                                             {
-                                                if (lstrlen(name) <= 3 && StrNICmp(name, root, 2) == 0) // name = "c:" nebo "c:\"
+                                                if (lstrlen(name) <= 3 && StrNICmp(name, root, 2) == 0) // name = "c:" or "c:\"
                                                 {
                                                     pidlFolder = idList;
-                                                    break; // pidl nalezen (ziskan)
+                                                    break; // pidl found (retrieved)
                                                 }
                                             }
                                         }
@@ -299,9 +299,9 @@ BOOL GetShellFolder(const char* dir, IShellFolder*& shellFolderObj, LPITEMIDLIST
                     }
                     else
                     {
-                        if (rootFolder == CSIDL_NETWORK) // musime ziskat slozite pidl, jinak nechodi mapovani
+                        if (rootFolder == CSIDL_NETWORK) // must get a complex pidl, otherwise mapping does not work
                         {
-                            BOOL setWait = (GetCursor() != LoadCursor(NULL, IDC_WAIT)); // ceka uz ?
+                            BOOL setWait = (GetCursor() != LoadCursor(NULL, IDC_WAIT)); // already waiting?
                             HCURSOR oldCur;
                             if (setWait)
                                 oldCur = SetCursor(LoadCursor(NULL, IDC_WAIT));
@@ -372,7 +372,7 @@ BOOL GetShellFolder(const char* dir, IShellFolder*& shellFolderObj, LPITEMIDLIST
                                                             LPSHELLFOLDER swap = shellFolderObj;
                                                             shellFolderObj = folder2;
                                                             folder2 = swap;
-                                                            break; // pidl nalezen (ziskan)
+                                                            break; // pidl found (retrieved)
                                                         }
                                                     }
                                                 }
@@ -770,8 +770,8 @@ void WinMainCRTStartup()
         ExitProcess(1);
     }
 
-    // vytvorime skryte okno a z nej spustime menu
-    // pod W2K+ uz asi neni potreba
+    // create a hidden window and launch the menu from it
+    // on W2K+ probably no longer needed
     HINSTANCE hInstance = GetModuleHandle(NULL);
     WNDCLASS CWindowClass;
     CWindowClass.style = CS_DBLCLKS | CS_HREDRAW | CS_VREDRAW;
