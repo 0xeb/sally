@@ -397,7 +397,7 @@ int StrICmpEx(const char* s1, int l1, const char* s2, int l2)
 }
 
 /*
-// princip asm funkce
+// principle of the asm function
 int StrICmpEx(const char *s1, int l1, const char *s2, int l2)
 {
   int l = (l1 < l2) ? l1 : l2;
