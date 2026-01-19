@@ -4,108 +4,108 @@
 
 #pragma once
 
-// inicializace knihovny
+// library initialization
 BOOL InitializeShellib();
 
-// uvolneni knihovny
+// library release
 void ReleaseShellib();
 
-// bezpecne volani IContextMenu2::GetCommandString() ve kterem to MS obcas pada
+// safe call to IContextMenu2::GetCommandString() where MS sometimes crashes
 HRESULT AuxGetCommandString(IContextMenu2* menu, UINT_PTR idCmd, UINT uType, UINT* pReserved, LPSTR pszName, UINT cchMax);
 
-// callback, ktery vraci jmena oznacenych souboru pro vytvareni nasl. interfacu
+// callback that returns names of selected files for creating the next interface
 typedef const char* (*CEnumFileNamesFunction)(int index, void* param);
 
-// vytvori data object pro drag&drop operace nad oznacenymi soubory a adresari z rootDir
+// creates a data object for drag&drop operations on selected files and directories from rootDir
 IDataObject* CreateIDataObject(HWND hOwnerWindow, const char* rootDir, int files,
                                CEnumFileNamesFunction nextFile, void* param);
 
-// vytvori interface kontextoveho menu pro oznacene soubory a adresare z rootDir
+// creates a context menu interface for selected files and directories from rootDir
 IContextMenu2* CreateIContextMenu2(HWND hOwnerWindow, const char* rootDir, int files,
                                    CEnumFileNamesFunction nextFile, void* param);
 
-// vytvori interface kontextoveho menu pro dany adresar
+// creates a context menu interface for the specified directory
 IContextMenu2* CreateIContextMenu2(HWND hOwnerWindow, const char* dir);
 
-// ma dany adresar nebo soubor drop-target?
+// does the specified directory or file have a drop target?
 BOOL HasDropTarget(const char* dir);
 
-// vytvori drop-target pro drag&drop operace do daneho adresare nebo souboru
+// creates a drop target for drag&drop operations into the specified directory or file
 IDropTarget* CreateIDropTarget(HWND hOwnerWindow, const char* dir);
 
-// otevre okno specialniho foldru
+// opens the special folder window
 void OpenSpecFolder(HWND hOwnerWindow, int specFolder);
 
-// otevre okno folderu 'dir' a postavi focus na 'item'
+// opens the 'dir' folder window and focuses 'item'
 void OpenFolderAndFocusItem(HWND hOwnerWindow, const char* dir, const char* item);
 
-// otevre browse dialog a vybere cestu (mozne omezit jen na sitovou cestu)
-// hCenterWindow - okno, ke kteremu bude dialog centrovan
+// opens the browse dialog and selects a path (can be limited to a network path)
+// hCenterWindow - window to which the dialog will be centered
 BOOL GetTargetDirectory(HWND parent, HWND hCenterWindow, const char* title, const char* comment,
                         char* path, BOOL onlyNet = FALSE, const char* initDir = NULL);
 
-// rozpozna jestli se nejedna o cestu do NetHood (adresar se souborem target.lnk),
-// pripadne zjisti kam vede target.lnk a cestu vraci v 'path'; 'path' je in/out cesta
+// detects whether it is a NetHood path (directory with target.lnk),
+// optionally resolves target.lnk and returns the path in 'path'; 'path' is an in/out path
 // (min. MAX_PATH znaku)
 void ResolveNetHoodPath(char* path);
 
 class CMenuNew;
 
-// vraci New menu - handle popup-menu a IContextMenu pres ktere se prikazy spousti
+// returns the New menu - handle of popup-menu and IContextMenu through which commands run
 void GetNewOrBackgroundMenu(HWND hOwnerWindow, const char* dir, CMenuNew* menu,
                             int minCmd, int maxCmd, BOOL backgoundMenu);
 
 struct CDragDropOperData
 {
-    char SrcPath[MAX_PATH];     // zdrojova cesta spolecna vsem souborum/adresarum z Names ("" == nepodarila se konverze cesty z Unicode)
-    TIndirectArray<char> Names; // razena alokovana jmena souboru/adresaru (v CF_HDROP se nerozlisuje jestli jde o soubor nebo adresar) ("" == nepodarila se konverze cesty z Unicode)
+    char SrcPath[MAX_PATH];     // source path common to all files/dirs from Names ("" == failed conversion from Unicode)
+    TIndirectArray<char> Names; // sorted allocated names of files/dirs (CF_HDROP does not distinguish file vs dir) ("" == failed conversion from Unicode)
 
     CDragDropOperData() : Names(200, 200) { SrcPath[0] = 0; }
 };
 
-// zjisti jestli jsou v 'pDataObject' soubory a adresare z disku a zaroven jen z jedine cesty,
-// pripadne jejich jmena ulozi do 'namesList' (neni-li NULL)
+// determines whether 'pDataObject' contains disk files and dirs from a single path,
+// optionally stores their names in 'namesList' (if not NULL)
 BOOL IsSimpleSelection(IDataObject* pDataObject, CDragDropOperData* namesList);
 
-// vytahne pres GetDisplayNameOf(flags) jmeno pro 'pidl' (ID-list o jedno ID zkrati, ziska od
-// desktopu folder pro zkraceny ID-list a od tohoto folderu si vola GetDisplayNameOf pro posledni
-// ID se zadanymi 'flags'); pri uspechu vraci TRUE + jmeno v 'name' (buffer o velikosti 'nameSize');
-// 'pidl' nedealokuje; 'alloc' je iface ziskany pres CoGetMalloc
+// obtains the name for 'pidl' via GetDisplayNameOf(flags) (shortens the ID-list by one ID, gets
+// the folder for the shortened ID-list from desktop, then calls GetDisplayNameOf for the last
+// ID with the specified 'flags'); on success returns TRUE + name in 'name' (buffer size 'nameSize');
+// does not deallocate 'pidl'; 'alloc' is the iface obtained via CoGetMalloc
 BOOL GetSHObjectName(ITEMIDLIST* pidl, DWORD flags, char* name, int nameSize, IMalloc* alloc);
 
-// TRUE = effect drag&dropu se napocital v pluginovem FS, tedy neni potreba forcovat Copy
-// v CImpIDropSource::GiveFeedback
+// TRUE = drag&drop effect was calculated in plugin FS, so there is no need to force Copy
+// in CImpIDropSource::GiveFeedback
 extern BOOL DragFromPluginFSEffectIsFromPlugin;
 
 //*****************************************************************************
 //
 // CImpIDropSource
 //
-// Zakladni verze objektu, chova se standardne (default kurzory atd.).
+// Basic version of the object, behaves normally (default cursors, etc.).
 //
-// Vyjimka: pri tazeni z pluginoveho FS (s moznymi efekty Copy i Move) do Explorera
-// na disk s TEMP adresarem se defaultne nabizi Move misto Copy (coz je logicky
-// nesmysl, useri cekaji Copy), proto je tento pripad znasilneny tak, ze ukazujeme
-// jiny kurzor nez je dwEffect v GiveFeedback a vysledny efekt pak bereme podle
-// posledniho tvaru kurzoru misto podle vysledku DoDragDrop.
+// Exception: when dragging from plugin FS (with possible Copy and Move effects) into Explorer
+// to a disk with a TEMP directory, Move is offered by default instead of Copy (which makes no
+// sense; users expect Copy), so we force this case by showing a different cursor than dwEffect
+// in GiveFeedback and then taking the final effect from the last cursor shape instead of the
+// result of DoDragDrop.
 
 class CImpIDropSource : public IDropSource
 {
 private:
     long RefCount;
-    DWORD MouseButton; // -1 = neinicializovana hodnota, jinak MK_LBUTTON nebo MK_RBUTTON
+    DWORD MouseButton; // -1 = uninitialized value, otherwise MK_LBUTTON or MK_RBUTTON
 
 public:
-    // posledni efekt vraceny metodou GiveFeedback - zavadime, protoze
-    // DoDragDrop nevraci dwEffect == DROPEFFECT_MOVE, pri MOVE vraci dwEffect == 0,
-    // duvody viz "Handling Shell Data Transfer Scenarios" sekce "Handling Optimized Move Operations":
+    // last effect returned by GiveFeedback - we track it because
+    // DoDragDrop does not return dwEffect == DROPEFFECT_MOVE; for MOVE it returns dwEffect == 0,
+    // for reasons see "Handling Shell Data Transfer Scenarios" section "Handling Optimized Move Operations":
     // http://msdn.microsoft.com/en-us/library/windows/desktop/bb776904%28v=vs.85%29.aspx
-    // (zkracene: dela se optimalizovany Move, coz znamena ze se nedela kopie do cile nasledovana mazanim
-    //            originalu, aby zdroj nechtene nesmazal original (jeste nemusi byt presunuty), dostane
-    //            vysledek operace DROPEFFECT_NONE nebo DROPEFFECT_COPY)
+    // (short: optimized Move is used, which means no copy to target followed by deletion of the
+    //          original; so the source does not accidentally delete the original (it may not yet
+    //          be moved), it gets DROPEFFECT_NONE or DROPEFFECT_COPY as the result)
     DWORD LastEffect;
 
-    BOOL DragFromPluginFSWithCopyAndMove; // tazeni z pluginoveho FS s moznym Copy i Move, detaily viz vyse
+    BOOL DragFromPluginFSWithCopyAndMove; // dragging from plugin FS with possible Copy and Move, details above
 
 public:
     CImpIDropSource(BOOL dragFromPluginFSWithCopyAndMove)
@@ -132,7 +132,7 @@ public:
         if (--RefCount == 0)
         {
             delete this;
-            return 0; // nesmime sahnout do objektu, uz neexistuje
+            return 0; // must not touch the object, it no longer exists
         }
         return RefCount;
     }
@@ -145,7 +145,7 @@ public:
             BOOL shiftPressed = (GetKeyState(VK_SHIFT) & 0x8000) != 0;
             BOOL controlPressed = (GetKeyState(VK_CONTROL) & 0x8000) != 0;
             if ((!shiftPressed || controlPressed) && (dwEffect & DROPEFFECT_MOVE))
-            { // ma se delat Copy, ale nabizi se Move -> tuhle situaci znasilnime, ukazeme Copy kurzor a do LastEffect dame Copy
+            { // Copy should be done, but Move is offered -> force this case, show Copy cursor and set LastEffect to Copy
                 LastEffect = DROPEFFECT_COPY;
                 SetCursor(LoadCursor(HInstance, MAKEINTRESOURCE(IDC_DRAGCOPYEFFECT)));
                 return S_OK;
@@ -174,11 +174,11 @@ public:
 //
 // CImpDropTarget
 //
-// vola definovane callbacky pro ziskani drop targetu (adresare),
-// oznameni dropnuti nebo ESC,
-// zbytek operaci necha provest systemovy objekt IDropTarget z IShellFolder
+// calls defined callbacks to obtain drop target (directory),
+// drop notification or ESC,
+// leaves the rest of the operations to the system IDropTarget object from IShellFolder
 
-// zaznam pouzity v datech pro copy a move callback
+// record used in data for copy and move callback
 struct CCopyMoveRecord
 {
     char* FileName;     // ANSI filename (may have lossy conversion for Unicode names)
@@ -197,11 +197,11 @@ struct CCopyMoveRecord
     bool HasWideFileName() const { return FileNameW != NULL; }
 };
 
-// data pro copy a move callback
+// data for copy and move callback
 class CCopyMoveData : public TIndirectArray<CCopyMoveRecord>
 {
 public:
-    BOOL MakeCopyOfName; // TRUE pokud se ma snazit o "Copy of..." pokud cil jiz existuje
+    BOOL MakeCopyOfName; // TRUE if it should try "Copy of..." when target already exists
 
 public:
     CCopyMoveData(int base, int delta) : TIndirectArray<CCopyMoveRecord>(base, delta)
@@ -210,46 +210,46 @@ public:
     }
 };
 
-// callback pro copy a move operace, stara se o destrukci 'data'
+// callback for copy and move operations, handles destruction of 'data'
 typedef BOOL (*CDoCopyMove)(BOOL copy, char* targetDir, CCopyMoveData* data,
                             void* param);
 
-// callback pro drag&drop operace, 'copy' je TRUE/FALSE (copy/move), 'toArchive' je TRUE/FALSE
-// (to archive/FS), 'archiveOrFSName' (muze byt NULL, pokud se informace ma ziskat z panelu)
-// je jmeno souboru archivu nebo FS-name, 'archivePathOrUserPart' je cesta v archivu nebo
-// user-part FS cesty, 'data' obsahuji popis zdrojovych souboru/adresaru, funkce se stara
-// o destrukci objektu 'data', 'param' je parametr predany do konstruktoru CImpDropTarget
+// callback for drag&drop operations; 'copy' is TRUE/FALSE (copy/move), 'toArchive' is TRUE/FALSE
+// (to archive/FS), 'archiveOrFSName' (may be NULL if the info should be obtained from the panel)
+// is the archive file name or FS-name, 'archivePathOrUserPart' is a path in the archive or FS
+// user-part path, 'data' contains description of source files/dirs, the function handles destruction
+// of the 'data' object, 'param' is the parameter passed to CImpDropTarget constructor
 typedef void (*CDoDragDropOper)(BOOL copy, BOOL toArchive, const char* archiveOrFSName,
                                 const char* archivePathOrUserPart, CDragDropOperData* data,
                                 void* param);
 
-// callback, ktery vraci cilovy adresar pro dany bod 'pt'
+// callback that returns target directory for point 'pt'
 typedef const char* (*CGetCurDir)(POINTL& pt, void* param, DWORD* pdwEffect, BOOL rButton,
                                   BOOL& isTgtFile, DWORD keyState, int& tgtType, int srcType);
 
-// callback oznamujici konec drop operace, drop == FALSE pri ESC
+// callback notifying end of drop operation, drop == FALSE on ESC
 typedef void (*CDropEnd)(BOOL drop, BOOL shortcuts, void* param, BOOL ownRutine,
                          BOOL isFakeDataObject, int tgtType);
 
-// callback pro dotaz pred dokoncenim operace (drop)
+// callback for query before completing the operation (drop)
 typedef BOOL (*CConfirmDrop)(DWORD& effect, DWORD& defEffect, DWORD& grfKeyState);
 
-// callback oznamujici vstup a vystup mysi do targetu
+// callback notifying mouse enter/leave of target
 typedef void (*CEnterLeaveDrop)(BOOL enter, void* param);
 
-// callback, ktery povoluje pouziti nasich rutin pro copy/move
+// callback that allows use of our routines for copy/move
 typedef BOOL (*CUseOwnRutine)(IDataObject* pDataObject);
 
-// callback pro zjisteni default drop effectu pri tazeni z FS na FS
+// callback for determining default drop effect when dragging FS to FS
 typedef void (*CGetFSToFSDropEffect)(const char* srcFSPath, const char* tgtFSPath,
                                      DWORD allowedEffects, DWORD keyState,
                                      DWORD* dropEffect, void* param);
 
 enum CIDTTgtType
 {
-    idtttWindows,          // soubory/adresare z windowsove cesty na windowsovou cestu
-    idtttArchive,          // soubory/adresare z windowsove cesty do archivu
-    idtttPluginFS,         // soubory/adresare z windowsove cesty do FS
+    idtttWindows,          // files/dirs from Windows path to Windows path
+    idtttArchive,          // files/dirs from Windows path to archive
+    idtttPluginFS,         // files/dirs from Windows path to FS
     idtttArchiveOnWinPath, // archiv na windowsove ceste (drop=pack to archive)
     idtttFullPluginFSPath, // FS to FS
 };
@@ -261,9 +261,9 @@ private:
     HWND OwnerWindow;
     IDataObject* OldDataObject;
     BOOL OldDataObjectIsFake;
-    int OldDataObjectIsSimple;                 // -1 (neznama hodnota), TRUE/FALSE = je/neni jednoduchy (vsechna jmena na jedne ceste)
-    int OldDataObjectSrcType;                  // 0 (neznamy typ), 1/2 = archiv/FS
-    char OldDataObjectSrcFSPath[2 * MAX_PATH]; // jen pro typ FS: zdrojova FS cesta
+    int OldDataObjectIsSimple;                 // -1 (unknown value), TRUE/FALSE = is/is not simple (all names on one path)
+    int OldDataObjectSrcType;                  // 0 (unknown type), 1/2 = archive/FS
+    char OldDataObjectSrcFSPath[2 * MAX_PATH]; // only for FS type: source FS path
 
     CDoCopyMove DoCopyMove;
     void* DoCopyMoveParam;
@@ -280,18 +280,18 @@ private:
     CConfirmDrop ConfirmDrop;
     BOOL* ConfirmDropEnable;
 
-    int TgtType; // hodnoty viz CIDTTgtType; idtttWindows i pro archivy a FS bez moznosti dropnuti aktualniho dataobjectu
+    int TgtType; // values see CIDTTgtType; idtttWindows also for archives and FS without ability to drop current dataobject
     IDropTarget* CurDirDropTarget;
     char CurDir[2 * MAX_PATH];
 
     CEnterLeaveDrop EnterLeaveDrop;
     void* EnterLeaveDropParam;
 
-    BOOL RButton; // akce pravym tlacitkem mysi?
+    BOOL RButton; // action by right mouse button?
 
     CUseOwnRutine UseOwnRutine;
 
-    DWORD LastEffect; // posledni effect zjisteny v DragEnter nebo DragOver (-1 => neplatny)
+    DWORD LastEffect; // last effect found in DragEnter or DragOver (-1 => invalid)
 
     CGetFSToFSDropEffect GetFSToFSDropEffect;
     void* GetFSToFSDropEffectParam;
@@ -320,8 +320,8 @@ public:
         DropEndParam = dropEndParam;
         OldDataObject = NULL;
         OldDataObjectIsFake = FALSE;
-        OldDataObjectIsSimple = -1; // neznama hodnota
-        OldDataObjectSrcType = 0;   // neznamy typ
+        OldDataObjectIsSimple = -1; // unknown value
+        OldDataObjectSrcType = 0;   // unknown type
         OldDataObjectSrcFSPath[0] = 0;
         ConfirmDrop = confirmDrop;
         ConfirmDropEnable = confirmDropEnable;

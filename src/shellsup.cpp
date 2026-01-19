@@ -656,7 +656,7 @@ void DropEnd(BOOL drop, BOOL shortcuts, void* param, BOOL ownRutine, BOOL isFake
         while (again)
         {
             again = FALSE;
-            Sleep(shortcuts ? 333 : 1000); // makaj v jinym threadu, nechame jim cas
+            Sleep(shortcuts ? 333 : 1000); // they work in another thread, give them time
 
             if ((!MainWindow->LeftPanel->AutomaticRefresh || MainWindow->LeftPanel->GetNetworkDrive()) &&
                 MainWindow->LeftPanel->Is(ptDisk))
@@ -1213,7 +1213,7 @@ void ShellAction(CFilesWindow* panel, CShellAction action, BOOL useSelection,
         }
         if (action == saCopyToClipboard && !SalShExtRegistered)
             TRACE_E("Copy&paste from archives is not possible, shell extension utils\\salextx86.dll or utils\\salextx64.dll is missing!");
-        // dalsi cinnosti v archivu zatim neumime
+        // we do not support other archive operations yet
         return;
     }
     if (panel->Is(ptPluginFS) && dragFiles &&
@@ -2315,7 +2315,7 @@ MENU_TEMPLATE_ITEM PanelBkgndMenu[] =
                                     if (releaseRight && !changeToFixedDrv)
                                         MainWindow->RightPanel->HandsOff(FALSE);
 
-                                    //---  refresh neautomaticky refreshovanych adresaru
+                                    //---  refresh non-automatically refreshed directories
                                     // report change in current directory and its subdirectories (just to be safe, who knows what was launched)
                                     MainWindow->PostChangeOnPathNotification(panel->GetPath(), TRUE);
                                 }

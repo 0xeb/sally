@@ -309,7 +309,7 @@ void InitShellIconOverlaysAuxAux(CLSID* clsid, const char* name)
                 TRACE_I("InitShellIconOverlays(): unable to get icon overlay location for: " << name);
         }
         else
-            TRACE_I("InitShellIconOverlays(): GetOverlayInfo method returns error for: " << name); // Tortoise to dela, kdyz je registrovano vic nez 12 handleru
+            TRACE_I("InitShellIconOverlays(): GetOverlayInfo method returns error for: " << name); // Tortoise does this when more than 12 handlers are registered
         if (iconOverlayIdentifier != NULL)
             iconOverlayIdentifier->Release();
     }
