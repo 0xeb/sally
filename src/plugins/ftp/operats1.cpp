@@ -1061,10 +1061,10 @@ int CFTPQueue::GetUserInputNeededCount(BOOL onlyUINeeded, TDirectArray<DWORD>* U
         if (item->UID == focusedItemUID)
         {
             *indexInAll = i;
-            if (item->GetItemState() >= sqisSkipped /* sqisSkipped, sqisFailed, sqisForcedToFail nebo sqisUserInputNeeded */)
+            if (item->GetItemState() >= sqisSkipped /* sqisSkipped, sqisFailed, sqisForcedToFail or sqisUserInputNeeded */)
                 *indexInUIN = c;
         }
-        if (item->GetItemState() >= sqisSkipped /* sqisSkipped, sqisFailed, sqisForcedToFail nebo sqisUserInputNeeded */)
+        if (item->GetItemState() >= sqisSkipped /* sqisSkipped, sqisFailed, sqisForcedToFail or sqisUserInputNeeded */)
         {
             if (onlyUINeeded)
                 UINeededArr->Add(i);
