@@ -1165,7 +1165,7 @@ BOOL CMainToolBar::OnEnumButton(LPARAM lParam)
         break;
     }
     if (tbbeIndex == TBBE_TERMINATOR)
-        return FALSE; // vsechna tlacitka uz byla natlacena
+        return FALSE; // all buttons have already been provided
     FillTII(tbbeIndex, tii, TRUE);
     return TRUE;
 }
