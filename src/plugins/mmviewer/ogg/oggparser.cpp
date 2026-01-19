@@ -92,7 +92,7 @@ CParserOGG::GetFileInfo(COutputInterface* output)
     if (f)
     {
         // tags will be printed in this order. reorder them as you like
-        // musi byt upcase
+        // must be uppercase
         OGG_COMMENT comments[] = {
             {"TRACKNUMBER", IDS_OGG_TRACK, NULL},
             //The track number of this piece if part of a specific larger collection or album
