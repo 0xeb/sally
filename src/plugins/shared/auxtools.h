@@ -20,8 +20,8 @@
 struct CThreadQueueItem
 {
     HANDLE Thread;
-    DWORD ThreadID; // jen pro ladici ucely (nalezeni threadu v seznamu threadu v debuggeru)
-    int Locks;      // pocet zamku, je-li > 0 nesmime zavrit 'Thread'
+    DWORD ThreadID; // only for debugging purposes (finding the thread in the thread list in the debugger)
+    int Locks;      // lock count; if > 0 we must not close 'Thread'
     CThreadQueueItem* Next;
 
     CThreadQueueItem(HANDLE thread, DWORD tid)
@@ -36,11 +36,11 @@ struct CThreadQueueItem
 class CThreadQueue
 {
 protected:
-    const char* QueueName; // jmeno fronty (jen pro debugovaci ucely)
+    const char* QueueName; // queue name (for debugging purposes only)
     CThreadQueueItem* Head;
-    HANDLE Continue; // musime pockat na predani dat do startovaneho threadu
+    HANDLE Continue; // we must wait for data handoff to the started thread
 
-    struct CCS // pristup z vice threadu -> nutna synchronizace
+    struct CCS // access from multiple threads -> synchronization required
     {
         CRITICAL_SECTION cs;
 
@@ -55,95 +55,94 @@ public:
     CThreadQueue(const char* queueName /* napr. "DemoPlug Viewers" */);
     ~CThreadQueue();
 
-    // spusti funkci 'body' s parametrem 'param' v nove vytvorenem threadu se zasobnikem
-    // o velikosti 'stack_size' (0 = default); vraci handle threadu nebo NULL pri chybe,
-    // zaroven vysledek zapise pred spustenim threadu (resume) i do 'threadHandle'
-    // (neni-li NULL), vraceny handle threadu pouzivat jen na testy na NULL a pro volani
-    // metod CThreadQueue: WaitForExit() a KillThread(); zavreni handlu threadu zajistuje
-    // tento objekt fronty
-    // POZOR: -thread se muze spustit se zpozdenim az po navratu ze StartThread()
-    //         (je-li 'param' ukazatel na strukturu ulozenou na zasobniku, je nutne
-    //          synchronizovat predani dat z 'param' - hl. thread musi pockat
-    //          na prevzeti dat novym threadem)
-    //        -vraceny handle threadu jiz muze byt zavreny pokud thread dobehne pred
-    //         navratem ze StartThread() a z jineho threadu se vola StartThread() nebo
-    //         KillAll()
-    // mozne volat z libovolneho threadu
+    // starts function 'body' with parameter 'param' in a newly created thread with a stack
+    // of size 'stack_size' (0 = default); returns thread handle or NULL on error,
+    // also writes the result before starting the thread (resume) into 'threadHandle'
+    // (if not NULL); use the returned thread handle only for NULL tests and for calling
+    // CThreadQueue methods WaitForExit() and KillThread(); the thread handle is closed by
+    // this queue object
+    // WARNING: -the thread may start with a delay until after StartThread() returns
+    //         (if 'param' is a pointer to a structure stored on the stack, it is necessary
+    //          to synchronize handing off the data from 'param' - the main thread must wait
+    //          for the new thread to take the data)
+    //        -the returned thread handle may already be closed if the thread finishes before
+    //         returning from StartThread() and StartThread() or KillAll() is called from another thread
+    // can be called from any thread
     HANDLE StartThread(unsigned(WINAPI* body)(void*), void* param, unsigned stack_size = 0,
                        HANDLE* threadHandle = NULL, DWORD* threadID = NULL);
 
-    // ceka na ukonceni threadu z teto fronty; 'thread' je handle threadu, ktery jiz muze
-    // byt i zavreny (zavira tento objekt pri volani StartThread a KillAll); pokud se
-    // docka ukonceni threadu, vyradi thread z fronty a zavre jeho handle
+    // waits for a thread from this queue to finish; 'thread' is a thread handle that may already
+    // be closed (this object closes it when StartThread and KillAll are called); if it
+    // waits until the thread finishes, it removes the thread from the queue and closes its handle
     BOOL WaitForExit(HANDLE thread, int milliseconds = INFINITE);
 
-    // zabije thread z teto fronty (pres TerminateThread()); 'thread' je handle threadu,
-    // ktery jiz muze byt i zavreny (zavira tento objekt pri volani StartThread a KillAll);
-    // pokud thread najde, zabije ho, vyradi z fronty a zavre jeho handle (objekt threadu
-    // se nedealokuje, protoze jeho stav je neznamy, mozna nekonzistentni)
+    // kills a thread from this queue (via TerminateThread()); 'thread' is a thread handle
+    // that may already be closed (this object closes it when StartThread and KillAll are called);
+    // if it finds the thread, it kills it, removes it from the queue, and closes its handle (the thread object
+    // is not deallocated because its state is unknown, possibly inconsistent)
     void KillThread(HANDLE thread, DWORD exitCode = 666);
 
-    // overi, ze vsechny thready skoncily; je-li 'force' TRUE a nejaky thread jeste bezi,
-    // ceka 'forceWaitTime' (v ms) na ukonceni vsech threadu, pak bezici thready zabije
-    // (jejich objekty se nedealokuji, protoze jejich stav je neznamy, mozna nekonzistentni);
-    // vraci TRUE, jsou-li vsechny thready ukoncene, pri 'force' TRUE vzdy vraci TRUE;
-    // je-li 'force' FALSE a nejaky thread jeste bezi, ceka 'waitTime' (v ms) na ukonceni
-    // vsech threadu, pokud pak jeste stale neco bezi, vraci FALSE; cas INFINITE = neomezene
-    // dlouhe cekani
-    // mozne volat z libovolneho threadu
+    // verifies that all threads finished; if 'force' is TRUE and a thread is still running,
+    // waits 'forceWaitTime' (ms) for all threads to finish, then kills the running threads
+    // (their objects are not deallocated because their state is unknown, possibly inconsistent);
+    // returns TRUE if all threads have finished; with 'force' TRUE it always returns TRUE;
+    // if 'force' is FALSE and a thread is still running, waits 'waitTime' (ms) for all threads to finish,
+    // if something is still running afterwards, returns FALSE; INFINITE means unlimited
+    // wait time
+    // can be called from any thread
     BOOL KillAll(BOOL force, int waitTime = 1000, int forceWaitTime = 200, DWORD exitCode = 666);
 
-protected:                                                 // vnitrni nesynchronizovane metody
-    BOOL Add(CThreadQueueItem* item);                      // prida polozku do fronty, vraci uspech
-    BOOL FindAndLockItem(HANDLE thread);                   // najde polozku pro 'thread' ve fronte a zamkne ji
-    void UnlockItem(HANDLE thread, BOOL deleteIfUnlocked); // odemkne polozku pro 'thread' ve fronte, pripadne ji smaze
-    void ClearFinishedThreads();                           // vyradi z fronty thready, ktere jiz dobehly
-    static DWORD WINAPI ThreadBase(void* param);           // univerzalni body threadu
+protected:                                                 // internal unsynchronized methods
+    BOOL Add(CThreadQueueItem* item);                      // adds an item to the queue, returns success
+    BOOL FindAndLockItem(HANDLE thread);                   // finds the item for 'thread' in the queue and locks it
+    void UnlockItem(HANDLE thread, BOOL deleteIfUnlocked); // unlocks the item for 'thread' in the queue, optionally deletes it
+    void ClearFinishedThreads();                           // removes threads that already finished from the queue
+    static DWORD WINAPI ThreadBase(void* param);           // universal thread body
 };
 
 //
 // ****************************************************************************
 // CThread
 //
-// POZOR: musi se alokovat (neni mozne mit CThread jen na stacku); dealokuje se sam
-//        jen v pripade uspesneho vytvoreni threadu metodou Create()
+// WARNING: must be allocated (CThread cannot be only on the stack); it deallocates itself
+//         only in case of successful thread creation via Create()
 
 class CThread
 {
 public:
-    // handle threadu (NULL = thread jeste nebezi/nebezel), POZOR: po ukonceni threadu se
-    // sam zavira (je neplatny), navic tento objekt uz je dealokovany
+    // thread handle (NULL = thread not running/has not run), WARNING: after the thread ends it
+    // closes itself (is invalid); in addition this object is already deallocated
     HANDLE Thread;
 
 protected:
-    char Name[101]; // buffer pro jmeno threadu (pouziva se v TRACE a CALL-STACK pro identifikaci threadu)
-                    // POZOR: pokud budou data threadu obsahovat odkazy na stack nebo jine docasne objekty,
-                    //        je potreba zajistit, aby se s temito odkazy pracovalo jen po dobu jejich platnosti
+    char Name[101]; // buffer for the thread name (used in TRACE and CALL-STACK to identify the thread)
+                    // WARNING: if thread data contains references to the stack or other temporary objects,
+                    //          it is necessary to ensure those references are used only while they are valid
 
 public:
     CThread(const char* name = NULL);
     virtual ~CThread() {} // aby se spravne volaly destruktory potomku
 
-    // vytvoreni (start) threadu ve fronte threadu 'queue'; 'stack_size' je velikost zasobniku
-    // noveho threadu v bytech (0 = default); vraci handle noveho threadu nebo NULL pri chybe;
-    // zavreni handlu zajistuje objekt 'queue'; pokud se podari vytvorit thread, je tento objekt
-    // dealokovan pri ukonceni threadu, pri chybe spousteni je dealokace objektu na volajicim
-    // POZOR: bez pridani synchronizace muze thread dobehnout jeste pred navratem z Create() ->
-    //        ukazatel "this" je proto po uspesnem volani Create() nutne povazovat za neplatny,
-    //        to same plati pro vraceny handle threadu (pouzivat jen na testy na NULL a pro volani
-    //        metod CThreadQueue: WaitForExit() a KillThread())
-    // mozne volat z libovolneho threadu
+    // creation (start) of a thread in the 'queue' thread queue; 'stack_size' is the stack size
+    // of the new thread in bytes (0 = default); returns the new thread handle or NULL on error;
+    // closing the handle is handled by the 'queue' object; if the thread is created successfully, this object
+    // is deallocated when the thread ends; if creation fails, deallocation is on the caller
+    // WARNING: without additional synchronization the thread may finish before Create() returns ->
+    //          therefore the "this" pointer must be considered invalid after a successful Create() call,
+    //          the same applies to the returned thread handle (use only for NULL tests and for calling
+    //          CThreadQueue methods WaitForExit() and KillThread())
+    // can be called from any thread
     HANDLE Create(CThreadQueue& queue, unsigned stack_size = 0, DWORD* threadID = NULL);
 
-    // vraci 'Thread' viz vyse
+    // returns 'Thread' see above
     HANDLE GetHandle() { return Thread; }
 
-    // vraci jmeno threadu
+    // returns thread name
     const char* GetName() { return Name; }
 
-    // tato metoda obsahuje telo threadu
+    // this method contains the thread body
     virtual unsigned Body() = 0;
 
 protected:
-    static unsigned WINAPI UniversalBody(void* param); // pomocna metoda pro spousteni threadu
+    static unsigned WINAPI UniversalBody(void* param); // helper method for starting the thread
 };
