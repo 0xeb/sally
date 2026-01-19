@@ -93,7 +93,7 @@ try_again:
         if (lastError == ERROR_INVALID_HANDLE && ++num_of_retries <= 10)
         {
             CloseHandle(File);
-            Sleep(100); // cekame 10x 100ms na "zvalidneni" handlu (asi do toho zasahuje antivir?)
+            Sleep(100); // wait 10x 100ms for handle "validation" (maybe antivirus interferes?)
             goto try_again;
         }
         TRACE_E("Error reading headers.");
@@ -139,7 +139,7 @@ try_again:
         TRACE_I(".rsrc section not found.");
     else
     {
-        // overime ze nalezena section obsahuje resource dir
+        // verify that the found section contains resource dir
         if (Sections[RsrcSectIndex].VirtualAddress > OptHead.DataDirectory[IMAGE_DIRECTORY_ENTRY_RESOURCE].VirtualAddress ||
             Sections[RsrcSectIndex].VirtualAddress + Sections[RsrcSectIndex].SizeOfRawData <= OptHead.DataDirectory[IMAGE_DIRECTORY_ENTRY_RESOURCE].VirtualAddress)
         {
@@ -147,8 +147,8 @@ try_again:
             goto error;
         }
 
-        // overime .rsrc section neobsahuje jine data adresare (jako napr UPXnuty exac,
-        // ktery ma v .rsrc sekci ulozenou import tabulku)
+        // verify the .rsrc section does not contain other data directories (e.g. a UPX-packed exe
+        // that has the import table stored in the .rsrc section)
         DWORD alignedSize = ((Sections[RsrcSectIndex].Misc.VirtualSize + OptHead.SectionAlignment - 1) / OptHead.SectionAlignment) * OptHead.SectionAlignment;
         for (i = 0; i < OptHead.NumberOfRvaAndSizes; i++)
         {
@@ -707,7 +707,7 @@ void SortDirEntries(int left, int right, TIndirectArray2<CDirEntry>& entries)
 DWORD CResDir::Save(CSaveRes* save)
 {
     CALL_STACK_MESSAGE1("CResDir::Save()");
-    //seradime polozky, nejprve abecedne ty se jmenem a pak ciselne ty s ID
+    // sort entries, first alphabetically those with names and then numerically those with IDs
     SortDirEntries(0, DirEntries.Count - 1, DirEntries);
 
     IMAGE_RESOURCE_DIRECTORY rsdirh;
