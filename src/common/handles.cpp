@@ -2379,7 +2379,7 @@ HDWP C__Handles::DeferWindowPos(HDWP hWinPosInfo, HWND hWnd, HWND hWndInsertAfte
 {
     HDWP ret = ::DeferWindowPos(hWinPosInfo, hWnd, hWndInsertAfter, x, y, cx, cy, uFlags);
 
-    if (ret != hWinPosInfo) // doslo k realokaci struktury - musime zmenit hodnotu hlidaneho handlu
+    if (ret != hWinPosInfo) // structure was reallocated - we must update the tracked handle value
     {
         CheckClose(TRUE, (HANDLE)hWinPosInfo, __htDeferWindowPos, __GetHandlesOrigin(__hoDeferWindowPos), ERROR_SUCCESS, FALSE);
         CheckCreate(ret != NULL, __htDeferWindowPos, __hoDeferWindowPos, (HANDLE)ret, GetLastError());
