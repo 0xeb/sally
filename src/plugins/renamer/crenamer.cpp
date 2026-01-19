@@ -644,7 +644,7 @@ BOOL CRenamer::SafeSubst(char* dest, int max, int& pos)
                             changeCase = ccStripDia;
                             replace += sizeof("stripdia") - 1 + 1;
                             break;
-                        default: // '}' nebo ')'
+                        default: // '}' or ')'
                             replace++;
                             break;
                         }
