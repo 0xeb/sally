@@ -753,7 +753,7 @@ BOOL GetIconFromAssocAux(BOOL initFlagAndIndexes, HKEY root, const char* keyName
     {
         memmove(keyNameBuf + size - 1, "\\Shell", 7);
         if (HANDLES_Q(RegOpenKey(root, keyNameBuf, &openKey)) == ERROR_SUCCESS)
-        { // obsahuje-li "\\shell" nejaky podklic, da se otvirat (asociace na Enter)
+        { // if "\\shell" contains any subkey, it can be opened (association on Enter)
             DWORD keys;
             if (RegQueryInfoKey(openKey, NULL, NULL, NULL, &keys, NULL,
                                 NULL, NULL, NULL, NULL, NULL, NULL) == ERROR_SUCCESS)

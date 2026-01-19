@@ -1193,7 +1193,7 @@ BOOL CIconList::Copy(int dstIndex, CIconList* srcIL, int srcIndex)
     ImageFlags[dstIndex] = srcIL->ImageFlags[srcIndex];
     HANDLES(LeaveCriticalSection(&CriticalSection));
 
-    // verze kopirovani pomoci BitBlt
+    // version of copying using BitBlt
     //  HDC hSrcMemDC = HANDLES(CreateCompatibleDC(NULL));
     //  if (hSrcMemDC == NULL)
     //  {
