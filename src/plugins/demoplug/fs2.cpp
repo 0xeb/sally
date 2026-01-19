@@ -1567,14 +1567,14 @@ BOOL DFS_IsValidPath(const char* path, CDFSPathError* err)
                     *err = dfspeShareNameMissing;
             }
             else
-                return TRUE; // cesta OK
+                return TRUE; // path OK
         }
     }
     else // path specified via a drive (c:\...)
     {
         if (LowerCase[*s] >= 'a' && LowerCase[*s] <= 'z' && *(s + 1) == ':' && *(s + 2) == '\\') // "c:\..."
         {
-            return TRUE; // cesta OK
+            return TRUE; // path OK
         }
         else
         {
@@ -2476,7 +2476,7 @@ CPluginFSInterface::CopyOrMoveFromDiskToFS(BOOL copy, int mode, const char* fsNa
     {
         // 'targetPath' contains the raw path entered by the user (all we know is that it
         // belongs to this FS, otherwise Salamander would not call this method)
-        char* userPart = strchr(targetPath, ':') + 1; // v 'targetPath' musi byt fs-name + ':'
+        char* userPart = strchr(targetPath, ':') + 1; // 'targetPath' must contain fs-name + ':'
 
         CDFSPathError err;
         BOOL invPath = !DFS_IsValidPath(userPart, &err);

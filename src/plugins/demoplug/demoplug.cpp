@@ -484,11 +484,11 @@ CPluginInterfaceAbstract* WINAPI SalamanderPluginEntry(CSalamanderPluginEntryAbs
     //  SalamanderGeneral->CallLoadOrSaveConfiguration(TRUE, TestLoadOrSaveConfiguration, (void *)0x1234);
 
     // test CopyTextToClipboard
-    //  BOOL success = SalamanderGeneral->CopyTextToClipboard("testíček", -1,
+    //  BOOL success = SalamanderGeneral->CopyTextToClipboard("test", -1,
     //                                                        TRUE, salamander->GetParentWindow());
 
     // test CopyTextToClipboardW
-    //  BOOL success = SalamanderGeneral->CopyTextToClipboardW(L"testíček", -1,
+    //  BOOL success = SalamanderGeneral->CopyTextToClipboardW(L"test", -1,
     //                                                         TRUE, salamander->GetParentWindow());
 
     // test SetPluginBugReportInfo
