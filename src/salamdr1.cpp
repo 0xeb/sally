@@ -4101,10 +4101,14 @@ FIND_NEW_SLG_FILE:
         goto EXIT_9;
     }
 
-    // pripojeni OLE SPYe
-    // posunuto pod InitializeGraphics, ktere pod WinXP vyhazovala leaky (asi zase neajake cache)
-    // OleSpyRegister();    // odpojeno, protoze po updatu Windows 2000 z 02/2005 zacal pri spusteni+zavreni Salama z MSVC vylitavat debug-breakpoint: Invalid Address specified to RtlFreeHeap( 130000, 14bc74 ) - asi MS nekde zacali volat primo RtlFreeHeap misto OLE free a diky bloku informaci spye na zacatku alokovaneho bloku se to podelalo (malloc vraci pointer posunuty za blok informaci spye)
-    //OleSpySetBreak(2754); // brakne na [n-te] alokaci z dumpu
+    // attach OLE SPY
+    // moved below InitializeGraphics, which under WinXP reported leaks (probably some cache again)
+    // OleSpyRegister();    // disconnected because after the Windows 2000 update from 02/2005, starting+closing
+    //                       // Salamander from MSVC began to hit debug-breakpoint: Invalid Address specified to
+    //                       // RtlFreeHeap( 130000, 14bc74 ) - apparently MS started calling RtlFreeHeap directly
+    //                       // instead of OLE free and because of the spy info block at the start of the allocated
+    //                       // block it broke (malloc returns a pointer shifted past the spy info block)
+    //OleSpySetBreak(2754); // break on [nth] allocation from the dump
 
     // worker initialization (disk operations)
     InitWorker();
@@ -4406,7 +4410,7 @@ MENU_TEMPLATE_ITEM MsgBoxButtons[] =
                         if (msg.message != WM_USER_SHOWWINDOW && msg.message != WM_USER_WAKEUP_FROM_IDLE && /*msg.message != WM_USER_SETPATHS &&*/
                             msg.message != WM_QUERYENDSESSION && msg.message != WM_USER_SALSHEXT_PASTE &&
                             msg.message != WM_USER_CLOSE_MAINWND && msg.message != WM_USER_FORCECLOSE_MAINWND)
-                        { // krom "connect", "shutdown", "do-paste" a "close-main-wnd" messages jsou vsechny zacatkem BUSY rezimu
+                        { // except for "connect", "shutdown", "do-paste" and "close-main-wnd" messages, all others begin BUSY mode
                             SalamanderBusy = TRUE;
                             LastSalamanderIdleTime = GetTickCount();
                         }
@@ -4414,22 +4418,22 @@ MENU_TEMPLATE_ITEM MsgBoxButtons[] =
                         if ((msg.message == WM_SYSKEYDOWN || msg.message == WM_KEYDOWN) &&
                             msg.wParam != VK_MENU && msg.wParam != VK_CONTROL && msg.wParam != VK_SHIFT)
                         {
-                            SetCurrentToolTip(NULL, 0); // zhasneme tooltip
+                            SetCurrentToolTip(NULL, 0); // hide the tooltip
                         }
 
                         skipMenuBar = FALSE;
                         if (Configuration.QuickSearchEnterAlt && msg.message == WM_SYSCHAR)
                             skipMenuBar = TRUE;
 
-                        // zajistime zaslani zprav do naseho menu (obchazime tim potrebu hooku pro klavesnici)
+                        // ensure messages are sent to our menu (bypassing the need for a keyboard hook)
                         if (MainWindow == NULL || MainWindow->MenuBar == NULL || !MainWindow->CaptionIsActive ||
                             MainWindow->QuickRenameWindowActive() ||
-                            skipMenuBar || GetCapture() != NULL || // je-li captured mouse - mohli bychom zpusobit vizualni problemy
+                            skipMenuBar || GetCapture() != NULL || // if the mouse is captured, we could cause visual issues
                             !MainWindow->MenuBar->IsMenuBarMessage(&msg))
                         {
                             CWindowsObject* wnd = WindowsManager.GetWindowPtr(GetActiveWindow());
 
-                            // Bottom Toolbar - zmena textu podle VK_CTRL, VK_MENU a VK_SHIFT
+                            // Bottom Toolbar - change text based on VK_CTRL, VK_MENU and VK_SHIFT
                             if ((msg.message == WM_SYSKEYDOWN || msg.message == WM_KEYDOWN ||
                                  msg.message == WM_SYSKEYUP || msg.message == WM_KEYUP) &&
                                 MainWindow != NULL)
@@ -4437,7 +4441,7 @@ MENU_TEMPLATE_ITEM MsgBoxButtons[] =
 
                             if ((wnd == NULL || !wnd->Is(otDialog) ||
                                  !IsDialogMessage(wnd->HWindow, &msg)) &&
-                                (MainWindow == NULL || !MainWindow->CaptionIsActive || // pridano "!MainWindow->CaptionIsActive", aby se v nemodalnich oknech pluginu neprekladaly akceleratory (F7 v "FTP Logs" neni nic moc)
+                                (MainWindow == NULL || !MainWindow->CaptionIsActive || // added "!MainWindow->CaptionIsActive" so accelerators are not translated in modeless plugin windows (F7 in "FTP Logs" is not great)
                                  MainWindow->QuickRenameWindowActive() ||
                                  !TranslateAccelerator(MainWindow->HWindow, AccelTable1, &msg) &&
                                      (MainWindow->EditMode || !TranslateAccelerator(MainWindow->HWindow, AccelTable2, &msg))))
@@ -4448,7 +4452,7 @@ MENU_TEMPLATE_ITEM MsgBoxButtons[] =
                         }
 
                         if (MainWindow != NULL && MainWindow->CanClose)
-                        { // je-li Salamander nastartovany, muzeme ho prohlasit za NE BUSY
+                        { // if Salamander is started, we can mark it as NOT BUSY
                             SalamanderBusy = FALSE;
                         }
 
@@ -4456,16 +4460,16 @@ MENU_TEMPLATE_ITEM MsgBoxButtons[] =
                         if (PeekMessage(&msg, NULL, 0, 0, PM_REMOVE))
                         {
                             if (msg.message == WM_QUIT)
-                                break;      // ekvivalent situace, kdy GetMessage() vraci FALSE
-                            haveMSG = TRUE; // mame zpravu, jdeme ji zpracovat (bez volani GetMessage())
+                                break;      // equivalent to GetMessage() returning FALSE
+                            haveMSG = TRUE; // we have a message, process it (without calling GetMessage())
                         }
-                        else // pokud ve fronte neni zadna message, provedeme Idle processing
+                        else // if there is no message in the queue, perform idle processing
                         {
 #ifdef _DEBUG
-                            // jednou za tri vteriny osetrime konzistenci heapu
+                            // once every three seconds check heap consistency
                             if (_CrtSetDbgFlag(_CRTDBG_REPORT_FLAG) & _CRTDBG_ALLOC_MEM_DF)
                             {
-                                if (GetTickCount() - LastCrtCheckMemoryTime > 3000) // kazde tri vteriny
+                                if (GetTickCount() - LastCrtCheckMemoryTime > 3000) // every three seconds
                                 {
                                     if (!_CrtCheckMemory())
                                     {
@@ -4481,40 +4485,40 @@ MENU_TEMPLATE_ITEM MsgBoxButtons[] =
 
                             if (MainWindow != NULL)
                             {
-                                CannotCloseSalMainWnd = TRUE; // musime zamezit zavreni hlavniho okna Salamandera behem provadeni nasledujicich rutin
+                                CannotCloseSalMainWnd = TRUE; // prevent closing the main Salamander window while running the following routines
                                 MainWindow->OnEnterIdle();
 
-                                // na pusteni ESC cekame jen pokud refresh listingu v panelu primo
-                                // navazuje (coz pres IDLE nehrozi)
+                                // wait for ESC release only if a panel listing refresh directly follows
+                                // (which does not happen during IDLE)
                                 if (WaitForESCReleaseBeforeTestingESC)
                                     WaitForESCReleaseBeforeTestingESC = FALSE;
 
-                                // zjistime, zda nas nezada cizi "OnlyOneInstance" Salamander o aktivaci a nastaveni cest v panelech?
-                                // FControlThread by v takovem pripade nastavil parametry do globalni CommandLineParams a zvysil RequestUID
-                                // pokud byl hlavni thread v IDLE, probral se diky postnute WM_USER_WAKEUP_FROM_IDLE
+                                // check whether another "OnlyOneInstance" Salamander asks us to activate and set panel paths
+                                // FControlThread would then set parameters into global CommandLineParams and increase RequestUID
+                                // if the main thread was in IDLE, it woke up due to posted WM_USER_WAKEUP_FROM_IDLE
                                 if (!SalamanderBusy && CommandLineParams.RequestUID > activateParamsRequestUID)
                                 {
                                     CCommandLineParams paramsCopy;
                                     BOOL applyParams = FALSE;
 
                                     NOHANDLES(EnterCriticalSection(&CommandLineParamsCS));
-                                    // tesne pred vstupem do kriticke sekce mohlo dojit k timeoutu v control threadu, overime ze jeste stoji o vysledek
-                                    // zaroven overime, ze pozadavak neexpiroval (volajici vlakno ceka pouze do TASKLIST_TODO_TIMEOUT a potom cekani
-                                    // vzda a spusti novou instanci Salamander; nechceme v takovem pripade pozadavek vyplnit)
+                                    // just before entering the critical section a timeout may have occurred in the control thread; verify it still wants the result
+                                    // also verify the request has not expired (the calling thread waits only until TASKLIST_TODO_TIMEOUT and then
+                                    // gives up and starts a new Salamander instance; we do not want to fulfill the request in that case)
                                     DWORD tickCount = GetTickCount();
                                     if (CommandLineParams.RequestUID != 0 && tickCount - CommandLineParams.RequestTimestamp < TASKLIST_TODO_TIMEOUT)
                                     {
                                         memcpy(&paramsCopy, &CommandLineParams, sizeof(CCommandLineParams));
                                         applyParams = TRUE;
 
-                                        // ulozime UID, ktere jsme jiz odbavili, abychom necyklili
+                                        // store the UID we already processed so we do not loop
                                         activateParamsRequestUID = CommandLineParams.RequestUID;
-                                        // dame control threadu zpravu, ze jsme cesty prijali
+                                        // signal the control thread that we accepted the paths
                                         SetEvent(CommandLineParamsProcessed);
                                     }
                                     NOHANDLES(LeaveCriticalSection(&CommandLineParamsCS));
 
-                                    // uvolnili jsme sdilene prostredky, muzeme se jit parat s cestama
+                                    // we released shared resources, we can work on the paths
                                     if (applyParams && MainWindow != NULL)
                                     {
                                         SendMessage(MainWindow->HWindow, WM_USER_SHOWWINDOW, 0, 0);
@@ -4522,7 +4526,7 @@ MENU_TEMPLATE_ITEM MsgBoxButtons[] =
                                     }
                                 }
 
-                                // zajistime unik z odstranenych drivu na fixed drive (po vysunuti device - USB flash disk, atd.)
+                                // ensure escape from removed drives to a fixed drive (after ejecting a device - USB flash disk, etc.)
                                 if (!SalamanderBusy && ChangeLeftPanelToFixedWhenIdle)
                                 {
                                     ChangeLeftPanelToFixedWhenIdle = FALSE;
@@ -4546,35 +4550,35 @@ MENU_TEMPLATE_ITEM MsgBoxButtons[] =
                                         PostMessage(MainWindow->HWindow, WM_USER_CONFIGURATION, 6, 0);
                                 }
 
-                                // pokud nejaky plug-in chtel unload nebo rebuild menu, provedeme ho... (jen neni-li "busy")
+                                // if a plug-in requested unload or menu rebuild, perform it... (only when not "busy")
                                 if (!SalamanderBusy && ExecCmdsOrUnloadMarkedPlugins)
                                 {
                                     int cmd;
                                     CPluginData* data;
                                     Plugins.GetCmdAndUnloadMarkedPlugins(MainWindow->HWindow, &cmd, &data);
                                     ExecCmdsOrUnloadMarkedPlugins = (cmd != -1);
-                                    if (cmd >= 0 && cmd < 500) // spusteni prikazu Salamandera na zadost plug-inu
+                                    if (cmd >= 0 && cmd < 500) // execute a Salamander command at the plug-in's request
                                     {
                                         int wmCmd = GetWMCommandFromSalCmd(cmd);
                                         if (wmCmd != -1)
                                         {
-                                            // vygenerujeme WM_COMMAND a nechame ho hned zpracovat
+                                            // generate WM_COMMAND and process it immediately
                                             msg.hwnd = MainWindow->HWindow;
                                             msg.message = WM_COMMAND;
-                                            msg.wParam = (DWORD)LOWORD(wmCmd); // radsi orizneme horni WORD (0 - cmd z menu)
+                                            msg.wParam = (DWORD)LOWORD(wmCmd); // truncate the high WORD (0 - cmd from menu)
                                             msg.lParam = 0;
                                             msg.time = GetTickCount();
                                             GetCursorPos(&msg.pt);
 
-                                            haveMSG = TRUE; // mame zpravu, jdeme ji zpracovat (bez volani GetMessage())
+                                            haveMSG = TRUE; // we have a message, process it (without calling GetMessage())
                                         }
                                     }
                                     else
                                     {
-                                        if (cmd >= 500 && cmd < 1000500) // spusteni prikazu menuExt na zadost plug-inu
+                                        if (cmd >= 500 && cmd < 1000500) // execute menuExt command at the plug-in's request
                                         {
                                             int id = cmd - 500;
-                                            SalamanderBusy = TRUE; // jdeme provest prikaz menu - uz jsme zase "busy"
+                                            SalamanderBusy = TRUE; // about to execute a menu command - we are "busy" again
                                             LastSalamanderIdleTime = GetTickCount();
                                             if (data != NULL && data->GetLoaded())
                                             {
@@ -4583,13 +4587,13 @@ MENU_TEMPLATE_ITEM MsgBoxButtons[] =
                                                     CALL_STACK_MESSAGE4("CPluginInterfaceForMenuExt::ExecuteMenuItem(, , %d,) (%s v. %s)",
                                                                         id, data->DLLName, data->Version);
 
-                                                    // snizime prioritu threadu na "normal" (aby operace prilis nezatezovaly stroj)
+                                                    // lower thread priority to "normal" (so operations do not overload the machine)
                                                     SetThreadPriority(GetCurrentThread(), THREAD_PRIORITY_NORMAL);
 
                                                     CSalamanderForOperations sm(MainWindow->GetActivePanel());
                                                     data->GetPluginInterfaceForMenuExt()->ExecuteMenuItem(&sm, MainWindow->HWindow, id, 0);
 
-                                                    // opet zvysime prioritu threadu, operace dobehla
+                                                    // raise thread priority again, operation completed
                                                     SetThreadPriority(GetCurrentThread(), THREAD_PRIORITY_ABOVE_NORMAL);
                                                 }
                                                 else
@@ -4600,16 +4604,16 @@ MENU_TEMPLATE_ITEM MsgBoxButtons[] =
                                             }
                                             else
                                             {
-                                                // nemusi byt naloaden, staci aby se PostMenuExtCommand zavolal z Release pluginu,
-                                                // ktery je vyvolany postnutym unloadem
+                                                // it does not need to be loaded; it is enough that PostMenuExtCommand is called from the
+                                                // Release plug-in, which is invoked by a posted unload
                                                 // TRACE_E("Unexpected situation during call of menu command in \"sal-idle\".");
                                             }
-                                            if (MainWindow != NULL && MainWindow->CanClose) // konec provadeni prikazu menu
-                                            {                                               // je-li Salamander nastartovany, muzeme ho prohlasit za NE BUSY
+                                            if (MainWindow != NULL && MainWindow->CanClose) // end of menu command execution
+                                            {                                               // if Salamander is started, we can mark it as NOT BUSY
                                                 SalamanderBusy = FALSE;
                                             }
                                             CannotCloseSalMainWnd = FALSE;
-                                            goto TEST_IDLE; // zkusime znovu "idle" (napr. aby se mohl zpracovat dalsi postnuty prikaz/unload)
+                                            goto TEST_IDLE; // try "idle" again (e.g. to process another posted command/unload)
                                         }
                                     }
                                 }
@@ -4619,18 +4623,18 @@ MENU_TEMPLATE_ITEM MsgBoxButtons[] =
                                     int pluginIndex;
                                     Plugins.OpenPackOrUnpackDlgForMarkedPlugins(&data, &pluginIndex);
                                     OpenPackOrUnpackDlgForMarkedPlugins = (data != NULL);
-                                    if (data != NULL) // otevreni Pack/Unpack dialogu na zadost plug-inu
+                                    if (data != NULL) // open Pack/Unpack dialog at the plug-in's request
                                     {
-                                        SalamanderBusy = TRUE; // jdeme provest prikaz menu - uz jsme zase "busy"
+                                        SalamanderBusy = TRUE; // about to execute a menu command - we are "busy" again
                                         LastSalamanderIdleTime = GetTickCount();
                                         if (data->OpenPackDlg)
                                         {
                                             CFilesWindow* activePanel = MainWindow->GetActivePanel();
                                             if (activePanel != NULL && activePanel->Is(ptDisk))
-                                            { // otevreni Pack dialogu
+                                            { // open Pack dialog
                                                 MainWindow->CancelPanelsUI();
                                                 activePanel->UserWorkedOnThisPath = TRUE;
-                                                activePanel->StoreSelection(); // ulozime selection pro prikaz Restore Selection
+                                                activePanel->StoreSelection(); // store selection for Restore Selection command
                                                 activePanel->Pack(MainWindow->GetNonActivePanel(), pluginIndex,
                                                                   data->Name, data->PackDlgDelFilesAfterPacking);
                                             }
@@ -4645,10 +4649,10 @@ MENU_TEMPLATE_ITEM MsgBoxButtons[] =
                                             {
                                                 CFilesWindow* activePanel = MainWindow->GetActivePanel();
                                                 if (activePanel != NULL && activePanel->Is(ptDisk))
-                                                { // otevreni Unpack dialogu
+                                                { // open Unpack dialog
                                                     MainWindow->CancelPanelsUI();
                                                     activePanel->UserWorkedOnThisPath = TRUE;
-                                                    activePanel->StoreSelection(); // ulozime selection pro prikaz Restore Selection
+                                                    activePanel->StoreSelection(); // store selection for Restore Selection command
                                                     activePanel->Unpack(MainWindow->GetNonActivePanel(), pluginIndex,
                                                                         data->Name, data->UnpackDlgUnpackMask);
                                                 }
@@ -4660,16 +4664,16 @@ MENU_TEMPLATE_ITEM MsgBoxButtons[] =
                                                 data->UnpackDlgUnpackMask = NULL;
                                             }
                                         }
-                                        if (MainWindow != NULL && MainWindow->CanClose) // konec otevirani Pack/Unpack dialogu
-                                        {                                               // je-li Salamander nastartovany, muzeme ho prohlasit za NE BUSY
+                                        if (MainWindow != NULL && MainWindow->CanClose) // end of opening Pack/Unpack dialog
+                                        {                                               // if Salamander is started, we can mark it as NOT BUSY
                                             SalamanderBusy = FALSE;
                                         }
                                         CannotCloseSalMainWnd = FALSE;
-                                        goto TEST_IDLE; // zkusime znovu "idle" (napr. aby se mohl zpracovat dalsi postnuty prikaz/unload/Pack/Unpack)
+                                        goto TEST_IDLE; // try "idle" again (e.g. to process another posted command/unload/Pack/Unpack)
                                     }
                                 }
                                 if (!SalamanderBusy && OpenReadmeInNotepad[0] != 0)
-                                { // spustime notepad se souborem 'OpenReadmeInNotepad' pro instalak pod Vista+
+                                { // start notepad with file 'OpenReadmeInNotepad' for installer on Vista+
                                     StartNotepad(OpenReadmeInNotepad);
                                     OpenReadmeInNotepad[0] = 0;
                                 }
@@ -4689,35 +4693,35 @@ MENU_TEMPLATE_ITEM MsgBoxButtons[] =
     else
         TRACE_E("Unable to register main window class.");
 
-    // pro pripad chyby zkusim zavrit dialog
+    // in case of error, try to close the dialog
     SplashScreenCloseIfExist();
 
-    // vratime prioritu do puvodniho stavu
+    // restore thread priority to the original state
     SetThreadPriority(GetCurrentThread(), THREAD_PRIORITY_NORMAL);
 
-    //--- vsem oknum dame 1 sekundu na to, aby se uzavreli, pak je nechame odpojit
+    //--- give all windows 1 second to close, then let them detach
     int timeOut = 10;
     int winsCount = WindowsManager.GetCount();
     while (timeOut-- && winsCount > 0)
     {
         Sleep(100);
         int c = WindowsManager.GetCount();
-        if (winsCount > c) // zatim jeste ubyvaji okna, budeme cekat dale aspon 1 sekundu
+        if (winsCount > c) // windows are still decreasing, wait at least one more second
         {
             winsCount = c;
             timeOut = 10;
         }
     }
 
-//--- informace
+//--- info
 #ifdef __DEBUG_WINLIB
     TRACE_I("WindowsManager: " << WindowsManager.maxWndCount << " windows, " << WindowsManager.search << " searches, " << WindowsManager.cache << " cached searches.");
 #endif
     //---
-    DestroySafeWaitWindow(TRUE); // povel "terminate" safe-wait-message threadu
-    Sleep(1000);                 // nechame vsem threadum viewru cas, aby se ukoncili
-    NBWNetAC3Thread.Close(TRUE); // bezici thread nechame zabit (presun do AuxThreads), dalsi akce zablokujeme
-    TerminateAuxThreads();       // zbytek nasilne terminujeme
+    DestroySafeWaitWindow(TRUE); // "terminate" command for the safe-wait-message thread
+    Sleep(1000);                 // give all viewer threads time to finish
+    NBWNetAC3Thread.Close(TRUE); // kill the running thread (move to AuxThreads), block further actions
+    TerminateAuxThreads();       // terminate the rest forcibly
                                  //---
     TerminateThread();
     ReleaseFileNamesEnumForViewers();
@@ -4737,7 +4741,7 @@ MENU_TEMPLATE_ITEM MsgBoxButtons[] =
     HANDLES(FreeLibrary(HLanguage));
     HLanguage = NULL;
 
-    // pro jistotu zavreme az jako posledni, ale asi zbytecne obavy
+    // just in case, close it last, but probably unnecessary worry
     ReleaseSalOpen();
 
     if (NtDLL != NULL)
@@ -4752,9 +4756,9 @@ MENU_TEMPLATE_ITEM MsgBoxButtons[] =
     }
 
     //OleSpyStressTest(); // multi-threaded stress test
-    // OleSpyRevoke();     // odpojime OLESPY
-    OleUninitialize(); // deinicializace OLE
-    // OleSpyDump();       // vypiseme leaky
+    // OleSpyRevoke();     // detach OLESPY
+    OleUninitialize(); // deinitialize OLE
+    // OleSpyDump();       // dump leaks
 
     TRACE_I("End");
     return 0;
