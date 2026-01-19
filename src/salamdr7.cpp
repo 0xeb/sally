@@ -16,25 +16,25 @@
 // RegenEnvironmentVariables
 //
 
-// Windows Explorer dokaze realtime regenerovat env. promenne, jakmile je nekdo zmeni pres control panel nebo
-// v registry a rozesle notifikaci WM_SETTINGCHANGE / lParam == "Environment".
-// Regeneraci provadi promoci nedokumentovane funkce SHELL32.DLL / RegenerateUserEnvironment, ktera sestavi
-// env. promenne pro novy proces. Roky jsme tuto funkci pouzivali, ale pri pruzkumu problemu nahlaseneho
-// na foru https://forum.altap.cz/viewtopic.php?f=2&t=6188 se ukazalo, ze pro Salamandera neni funkce idealni.
-// Ma dva problemy: pri zavolani z x86 procesu na x64 Windows zahodi nekolik podstatnych promennych:
+// Windows Explorer can regenerate env variables in real time as soon as someone changes them via Control Panel
+// or in the registry and broadcasts WM_SETTINGCHANGE / lParam == "Environment".
+// Regeneration is done via the undocumented SHELL32.DLL / RegenerateUserEnvironment function, which builds
+// env variables for a new process. We used this function for years, but while investigating the issue reported
+// on the forum https://forum.altap.cz/viewtopic.php?f=2&t=6188 we found it is not ideal for Salamander.
+// It has two problems: when called from an x86 process on x64 Windows it drops several important variables:
 // "CommonProgramFiles(x86)", "CommonProgramW6432", "ProgramFiles(x86)", "ProgramW6432".
-// Druhy problem je, ze zahodi promenne, ktere proces podedil pri spousteni. V pripade Windows Explorer
-// ani jedna vec neni problem, protoze ten je pod x64 Win vzdy x64 a zaroven nededi zadne specialni promenne,
-// protoze ho nespousti uzivatel, ale system.
+// The second problem is that it drops variables that the process inherited on startup. For Windows Explorer
+// neither issue is a problem because on x64 Windows it is always x64 and also does not inherit any special
+// variables since it is not started by the user but by the system.
 //
-// Naprogramovani vlastniho RegenerateUserEnvironment se jevi jako problematicka, protoze je potreba
-// vytahnout z nekolika mist v registry data, expandovat je, mergovat cesty, atd. Zaroven lze predpokladat,
-// ze se funkce bude lisit dle verze Windows. Tento postup pouziva FAR jako reakci na WM_SETTINGCHANGE.
+// Implementing our own RegenerateUserEnvironment seems problematic, because we would need to pull data from
+// several registry locations, expand it, merge paths, etc. It can also be expected to differ by Windows version.
+// FAR uses this approach as a response to WM_SETTINGCHANGE.
 //
-// Jako optimalni reseni vidime pouziti systemove RegenerateUserEnvironment chytrejsim zpusobem.
-// Pri spusteni procesu vytahnout env. promenne pomoci GetEnvironmentStrings() API. Nasledne zavolat
-// RegenerateUserEnvironment() (trva 4ms, takze neni problem) a opet vytahnout env. promenne.
-// Zjistit diference. Dostaneme seznam promennych, ktere zmizely nebo pribyly nebou se zmenily.
+// An optimal solution is to use the system RegenerateUserEnvironment in a smarter way.
+// At process start, read env variables using GetEnvironmentStrings() API. Then call
+// RegenerateUserEnvironment() (takes 4ms, so no problem) and read env variables again.
+// Find the differences. We get a list of variables that disappeared, appeared, or changed.
 
 BOOL EnvVariablesDifferencesFound = FALSE; // protection against premature regeneration until we have found differences
 

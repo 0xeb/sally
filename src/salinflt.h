@@ -84,8 +84,8 @@ __forceinline uch NextByte(CDecompressionObject* decompress)
     else
     {
         if (decompress->DataPtr == decompress->DataEnd)
-            decompress->DataPtr++; // chybovy stav je az decompress->DataPtr > decompress->DataEnd
-        return 0 /* chyba */;
+            decompress->DataPtr++; // error state is only when decompress->DataPtr > decompress->DataEnd
+        return 0 /* error */;
     }
 }
 #endif //_DEBUG
