@@ -186,13 +186,13 @@ CArgv::CArgv(const char* commandLine) : TIndirectArray<char>(8, 8)
     const char* start = commandLine;
     while (*start)
     {
-        // orizneme white-space na zacatku
+        // trim whitespace at the beginning
         while (*start && IsSpace(*start))
             start++;
         if (!*start)
             break;
         const char* end = start;
-        // najdeme konec tokenu
+        // find the end of the token
         while (*end && !IsSpace(*end))
         {
             if (*end++ == '"')
@@ -204,7 +204,7 @@ CArgv::CArgv(const char* commandLine) : TIndirectArray<char>(8, 8)
                     end = start + strlen(start);
             }
         }
-        // pridame token do pole
+        // add token to the array
         char* str = DupStr(start, end);
         RemoveCharacters(str, str, "\"");
         Add(str);
@@ -244,12 +244,12 @@ BOOL SalGetFullName(char* name, int* errTextID, const char* curDir)
     CALL_STACK_MESSAGE3("SalGetFullName(%s, , %s)", name, curDir);
     int err = 0;
 
-    size_t rootOffset = 3; // offset zacatku adresarove casti cesty (3 pro "c:\path")
+    size_t rootOffset = 3; // offset of start of the directory part of the path (3 for "c:\path")
     char* s = name;
     while (*s == ' ')
         s++;
     if (*s == '\\' && *(s + 1) == '\\') // UNC (\\server\share\...)
-    {                                   // eliminace mezer na zacatku cesty
+    {                                   // remove leading spaces from path
         if (s != name)
             memmove(name, s, strlen(s) + 1);
         s = name + 2;
@@ -258,7 +258,7 @@ BOOL SalGetFullName(char* name, int* errTextID, const char* curDir)
         else
         {
             while (*s != 0 && *s != '\\')
-                s++; // prejeti servername
+                s++; // skip server name
             if (*s == '\\')
                 s++;
             if (*s == 0 || *s == '\\')
@@ -266,36 +266,36 @@ BOOL SalGetFullName(char* name, int* errTextID, const char* curDir)
             else
             {
                 while (*s != 0 && *s != '\\')
-                    s++; // prejeti sharename
+                    s++; // skip share name
                 if (*s == '\\')
                     s++;
             }
         }
     }
-    else // cesta zadana pomoci disku (c:\...)
+    else // path specified by drive (c:\...)
     {
         if (*s != 0)
         {
             if (*(s + 1) == ':') // "c:..."
             {
                 if (*(s + 2) == '\\') // "c:\..."
-                {                     // eliminace mezer na zacatku cesty
+                {                     // remove leading spaces from path
                     if (s != name)
                         memmove(name, s, strlen(s) + 1);
                 }
                 else // "c:path..."
                 {
                     /*
-          int l1 = strlen(s + 2);  // delka zbytku ("path...")
+          int l1 = strlen(s + 2);  // length of the remainder ("path...")
           if (SalamanderGeneral->CharToLowerCase(*s) >= 'a' && SalamanderGeneral->CharToLowerCase(*s) <= 'z')
           {
             const char *head;
             if (curDir != NULL && SalamanderGeneral->CharToLowerCase(curDir[0]) == SalamanderGeneral->CharToLowerCase(*s)) head = curDir;
             else head = DefaultDir[LowerCase[*s] - 'a'];
             int l2 = strlen(head);
-            if (head[l2 - 1] != '\\') l2++;  // misto pro '\\'
+            if (head[l2 - 1] != '\\') l2++;  // space for '\\'
             if (l1 + l2 >= MAX_PATH) err = GFN_TOOLONGPATH;
-            else  // sestaveni full path
+            else  // build full path
             {
               memmove(name + l2, s + 2, l1 + 1);
               *(name + l2 - 1) = '\\';
@@ -324,7 +324,7 @@ BOOL SalGetFullName(char* name, int* errTextID, const char* curDir)
                                 root++;
                             if (l1 + (root - curDir) >= MAX_PATH)
                                 err = GFN_TOOLONGPATH;
-                            else // sestaveni cesty z rootu akt. disku
+                            else // build path from current drive root
                             {
                                 memmove(name + (root - curDir), s, l1 + 1);
                                 memmove(name, curDir, root - curDir);
@@ -379,32 +379,32 @@ BOOL SalGetFullName(char* name, int* errTextID, const char* curDir)
         }
     }
 
-    if (err == 0) // eliminace '.' a '..' v ceste
+    if (err == 0) // remove '.' and '..' in the path
     {
         if (!SG->SalRemovePointsFromPath(s))
             err = GFN_PATHISINVALID;
     }
 
-    if (err == 0) // vyhozeni pripadneho nezadouciho backslashe z konce retezce
+    if (err == 0) // remove any unwanted trailing backslash from the end of the string
     {
         size_t l = strlen(name);
-        if (l > 1 && name[1] == ':') // typ cesty "c:\path"
+        if (l > 1 && name[1] == ':') // path type "c:\path"
         {
-            if (l > 3) // neni root cesta
+            if (l > 3) // not a root path
             {
                 if (name[l - 1] == '\\')
-                    name[l - 1] = 0; // orez backslashe
+                    name[l - 1] = 0; // trim backslash
             }
             else
             {
-                name[2] = '\\'; // root cesta, backslash nutny ("c:\")
+                name[2] = '\\'; // root path, backslash required ("c:\")
                 name[3] = 0;
             }
         }
-        else // UNC cesta
+        else // UNC path
         {
             if (l > 0 && name[l - 1] == '\\')
-                name[l - 1] = 0; // orez backslashe
+                name[l - 1] = 0; // trim backslash
         }
     }
 

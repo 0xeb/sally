@@ -12,19 +12,19 @@
 
 #pragma once
 
-// makro MHANDLES_ENABLE - zapina monitorovani handlu
-// POZOR: volat HANDLES_CAN_USE_TRACE() tesne po inicializaci "dbg.h" modulu
-//        (po inicializaci SalamanderDebug a SalamanderVersion)
-// POZOR: MHANDLES se inicializuji/rusi na urovni "lib", pokud tedy plugin
-//        uroven "lib" (nebo "compiler") pouziva, musi si sam zajistit, ze na
-//        techto urovnich nebude pouzivat MHANDLES (viz #pragma init_seg (lib))
-// POZNAMKA: pro snazsi rozmisteni maker HANDLES() a HANDLES_Q() pouzijte program CheckHnd.exe
+// MHANDLES_ENABLE macro - enables handle monitoring
+// WARNING: call HANDLES_CAN_USE_TRACE() right after initializing the "dbg.h" module
+//          (after initializing SalamanderDebug and SalamanderVersion)
+// WARNING: MHANDLES are initialized/terminated at the "lib" level; if a plugin
+//          uses the "lib" (or "compiler") level, it must ensure it does not use
+//          MHANDLES at those levels (see #pragma init_seg (lib))
+// NOTE: for easier placement of HANDLES() and HANDLES_Q() macros use CheckHnd.exe
 
 #define NOHANDLES(function) function
 
 #ifndef MHANDLES_ENABLE
 
-// aby nedochazelo k problemum se stredniky v nize nadefinovanych makrech
+// to avoid problems with semicolons in the macros defined below
 inline void __HandlesEmptyFunction() {}
 
 #define HANDLES_CAN_USE_TRACE() __HandlesEmptyFunction()
@@ -55,8 +55,8 @@ enum C__HandlesOutputType
 
 enum C__HandlesType
 {
-    __htHandle_comp_with_CloseHandle,  // handle kompatibilni s CloseHandle() a DuplicateHandle()
-    __htHandle_comp_with_DeleteObject, // handle kompatibilni s DeleteObject() a GetStockObject()
+    __htHandle_comp_with_CloseHandle,  // handle compatible with CloseHandle() and DuplicateHandle()
+    __htHandle_comp_with_DeleteObject, // handle compatible with DeleteObject() and GetStockObject()
     __htKey,
     __htIcon,
     __htGlobal,
@@ -221,7 +221,7 @@ struct C__HandlesHandle
 {
     C__HandlesType Type;
     C__HandlesOrigin Origin;
-    HANDLE Handle; // univerzalni, pro vsechny druhy handlu
+    HANDLE Handle; // universal, for all handle types
 
     C__HandlesHandle() {}
 
@@ -285,16 +285,16 @@ typedef unsigned int uintptr_t;
 class C__Handles
 {
 public:
-    // objekty pro praci s messageboxy, zde je jen pro zaruceni poradi konstrukce/destrukce
+    // objects for working with message boxes, here only to guarantee construction/destruction order
     std::ostream __MessagesStrStream;
     C__Messages __Messages;
 
 protected:
-    C_HandlesDataArray Handles;       // vsechny kontrolovane handly
-    C__HandlesData TemporaryHandle;   // pri vkladani nastaven z SetInfo()
-    C__HandlesOutputType OutputType;  // typ vystupu hlasek
-    CRITICAL_SECTION CriticalSection; // pro synchronizaci multi-threadu
-    BOOL CanUseTrace;                 // TRUE az po inicializaci "dbg.h" modulu, az bude mozne pouzivat TRACE_ makra
+    C_HandlesDataArray Handles;       // all monitored handles
+    C__HandlesData TemporaryHandle;   // set by SetInfo() when adding
+    C__HandlesOutputType OutputType;  // output type for messages
+    CRITICAL_SECTION CriticalSection; // for multi-thread synchronization
+    BOOL CanUseTrace;                 // TRUE only after "dbg.h" module initialization, when TRACE_ macros can be used
 
 public:
     C__Handles();
@@ -678,9 +678,9 @@ public:
     BOOL OpenProcessToken(HANDLE ProcessHandle, DWORD DesiredAccess, PHANDLE TokenHandle);
 
 protected:
-    void AddHandle(C__HandlesHandle handle); // prida TemporaryHandle
+    void AddHandle(C__HandlesHandle handle); // adds TemporaryHandle
 
-    // vyjme handle, pri uspechu vraci TRUE
+    // removes handle, returns TRUE on success
     BOOL DeleteHandle(C__HandlesType& type, HANDLE handle,
                       C__HandlesOrigin* origin,
                       C__HandlesType expType);
