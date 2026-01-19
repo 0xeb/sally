@@ -50,19 +50,19 @@ void CTBCustomizeDialog::DestroyItems()
     }
 }
 
-// naplni Items pole vsema tlacitkama, ktere muze toolbar obsahovat
+// fills the Items array with all buttons the toolbar can hold
 BOOL CTBCustomizeDialog::EnumButtons()
 {
     CALL_STACK_MESSAGE1("CTBCustomizeDialog::EnumButtons()");
-    // vycistime pole
+    // clear the array
     DestroyItems();
 
-    char textBuffer[1024]; // docasne buffery pro prijem retezcu
+    char textBuffer[1024]; // temporary buffers for receiving strings
     char nameBuffer[1024];
 
     HWND hNotifyWnd = ToolBar->HNotifyWindow;
     TLBI_ITEM_INFO2 tii;
-    tii.Mask = TLBI_MASK_STYLE; // na prvni misto seznamu zaradime separator
+    tii.Mask = TLBI_MASK_STYLE; // put a separator at the start of the list
     tii.Style = TLBI_STYLE_SEPARATOR;
     tii.Index = -1;
     BOOL sent = TRUE;
@@ -82,7 +82,7 @@ BOOL CTBCustomizeDialog::EnumButtons()
         }
         if (sent)
         {
-            // naalokujeme kopie retezcu text a name
+            // allocate copies of text and name strings
             tii.TextLen = lstrlen(tii.Text);
             tii.NameLen = lstrlen(tii.Name);
             char* text = (char*)malloc(tii.TextLen + 1);
@@ -95,7 +95,7 @@ BOOL CTBCustomizeDialog::EnumButtons()
             name[tii.NameLen] = 0;
             tii.Text = text;
             tii.Name = name;
-            // vlozime polozku do pole
+            // insert item into array
             AllItems.Add(tii);
             tii.Index++;
         }
@@ -118,7 +118,7 @@ BOOL CTBCustomizeDialog::PresentInToolBar(DWORD id)
 BOOL CTBCustomizeDialog::FindIndex(DWORD id, int* index)
 {
     CALL_STACK_MESSAGE_NONE
-    // preskocime virtualni separator
+    // skip the virtual separator
     int i;
     for (i = 1; i < AllItems.Count; i++)
     {
@@ -141,9 +141,9 @@ void CTBCustomizeDialog::FillLists()
     SendMessage(HCurrentLB, LB_RESETCONTENT, 0, 0);
     int i;
     for (i = 0; i < AllItems.Count; i++)
-        if (i == 0 || !PresentInToolBar(AllItems[i].ID)) // pokud se nejedna o virtualni separator, kontrolujeme pritomnost v toolbare
+        if (i == 0 || !PresentInToolBar(AllItems[i].ID)) // if it is not the virtual separator, check presence in the toolbar
         {
-            int ret = (int)SendMessage(HAvailableLB, LB_ADDSTRING, 0, 1); // 1 je dumy hodnota, obchazime chybu WinXP
+            int ret = (int)SendMessage(HAvailableLB, LB_ADDSTRING, 0, 1); // 1 is a dummy value, workaround for WinXP bug
             if (ret != LB_ERR)
                 SendMessage(HAvailableLB, LB_SETITEMDATA, ret, (LPARAM)i);
         }
@@ -151,7 +151,7 @@ void CTBCustomizeDialog::FillLists()
     {
         int index;
         if (ToolBar->Items[i]->Style == TLBI_STYLE_SEPARATOR)
-            index = 0; // virtualni separator
+            index = 0; // virtual separator
         else
         {
             if (!FindIndex(ToolBar->Items[i]->ID, &index))
@@ -160,14 +160,14 @@ void CTBCustomizeDialog::FillLists()
                 continue;
             }
         }
-        int ret = (int)SendMessage(HCurrentLB, LB_ADDSTRING, 0, 1); // 1 je dumy hodnota, obchazime chybu WinXP
+        int ret = (int)SendMessage(HCurrentLB, LB_ADDSTRING, 0, 1); // 1 is a dummy value, workaround for WinXP bug
         if (ret != LB_ERR)
             SendMessage(HCurrentLB, LB_SETITEMDATA, ret, (LPARAM)index);
     }
-    // virtualni separator
+    // virtual separator
     SendMessage(HCurrentLB, LB_ADDSTRING, 0, (LPARAM)-1);
 
-    // nastavime selected polozky
+    // set selected items
     SendMessage(HAvailableLB, LB_SETCURSEL, 0, 0);
     SendMessage(HCurrentLB, LB_SETCURSEL, 0, 0);
 
@@ -204,12 +204,12 @@ void CTBCustomizeDialog::OnAdd()
             if (aIndex >= aCount - 1)
                 aIndex = aCount - 2;
         }
-        // fix: pokud byl seznam odrolovan dolu a odebiraly se polozky zespodu,
-        // zmensoval se scrollbar, ale neupravoval se topindex
+        // fix: if the list was scrolled down and items were removed from the bottom,
+        // the scrollbar shrank but the top index was not updated
         SendMessage(HAvailableLB, LB_SETCURSEL, 0, 0);
         SendMessage(HAvailableLB, LB_SETCURSEL, aIndex, 0);
         SendMessage(HAvailableLB, WM_SETREDRAW, TRUE, 0);
-        int ret = (int)SendMessage(HCurrentLB, LB_INSERTSTRING, cIndex, 1); // 1 je dumy hodnota, obchazime chybu WinXP
+        int ret = (int)SendMessage(HCurrentLB, LB_INSERTSTRING, cIndex, 1); // 1 is a dummy value, workaround for WinXP bug
         if (ret != LB_ERR)
             SendMessage(HCurrentLB, LB_SETITEMDATA, ret, data);
         SendMessage(HCurrentLB, LB_SETCURSEL, cIndex + 1, 0);
@@ -230,8 +230,8 @@ void CTBCustomizeDialog::OnRemove()
         int data = (int)SendMessage(HCurrentLB, LB_GETITEMDATA, cIndex, 0);
         SendMessage(HCurrentLB, WM_SETREDRAW, FALSE, 0);
         SendMessage(HCurrentLB, LB_DELETESTRING, cIndex, 0);
-        // fix: pokud byl seznam odrolovan dolu a odebiraly se polozky zespodu,
-        // zmensoval se scrollbar, ale neupravoval se topindex
+        // fix: if the list was scrolled down and items were removed from the bottom,
+        // the scrollbar shrank but the top index was not updated
         SendMessage(HCurrentLB, LB_SETCURSEL, 0, 0);
         SendMessage(HCurrentLB, LB_SETCURSEL, cIndex, 0);
         SendMessage(HCurrentLB, WM_SETREDRAW, TRUE, 0);
@@ -321,7 +321,7 @@ CTBCustomizeDialog::DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
             DragIndex = LBItemFromPt(dli->hWnd, dli->ptCursor, FALSE);
             if (DragMode == tbcdDragCurrent && DragIndex >= ToolBar->Items.Count)
             {
-                // virtualni separator nenechame tahnout
+                // do not allow dragging the virtual separator
                 DragMode = tbcdDragNone;
                 SetWindowLongPtr(HWindow, DWLP_MSGRESULT, FALSE);
             }
@@ -399,12 +399,12 @@ CTBCustomizeDialog::DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
         MakeDragList(HCurrentLB);
         DragNotify = RegisterWindowMessage(DRAGLISTMSGSTRING);
 
-        // vytahneme tlacitka
+        // fetch buttons
         EnumButtons();
         FillLists();
         EnableControls();
 
-        // napocitame vysku radku
+        // compute row height
         int iconSize = GetIconSizeForSystemDPI(ICONSIZE_16);
         int minHeight = max(iconSize, ToolBar->ImageHeight);
         HFONT hFont = (HFONT)SendMessage(HAvailableLB, WM_GETFONT, 0, 0);
@@ -417,7 +417,7 @@ CTBCustomizeDialog::DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
         SelectObject(hDC, hOldFont);
         HANDLES(ReleaseDC(HWindow, hDC));
         minHeight += 2;
-        // nastavime oba listboxy
+        // set both list boxes
         SendMessage(HAvailableLB, LB_SETITEMHEIGHT, 0, minHeight);
         SendMessage(HCurrentLB, LB_SETITEMHEIGHT, 0, minHeight);
         break;
@@ -527,22 +527,22 @@ void CToolBar::Customize()
     if (!(Style & TLB_STYLE_ADJUSTABLE))
         return;
 
-    // posleme notifikaci o zacatku konfigurace
+    // send notification about configuration start
     SendMessage(HNotifyWindow, WM_USER_TBBEGINADJUST, (WPARAM)HWindow, 0);
 
-    // behem konfigurace jsou vsechna tlacitka enabled
+    // during configuration all buttons are enabled
     Customizing = TRUE;
     InvalidateRect(HWindow, NULL, FALSE);
     UpdateWindow(HWindow);
 
-    // provedeme konfiguraci
+    // perform configuration
     CTBCustomizeDialog dialog(this);
     dialog.Execute();
 
-    // vratime se k puvodnimu nastaveni tlacitek
+    // restore the original button state
     Customizing = FALSE;
     InvalidateRect(HWindow, NULL, FALSE);
 
-    // posleme notifikaci o ukonceni konfigurace
+    // send notification about configuration end
     SendMessage(HNotifyWindow, WM_USER_TBENDADJUST, (WPARAM)HWindow, 0);
 }
