@@ -89,7 +89,7 @@ BOOL CToolTip::Create(HWND hParent)
     {
         if (IsWindowVisible(HWindow)) // if the window is already hidden, we won't warn because it's a delayed message delivery and the window would be destroyed next, see CToolTip::MessageLoop()
             TRACE_E("CToolTip::Create() Tooltip window already exists!");
-        // prekrocime hranici threadu a zhasneme tooltip v threadu, ve kterem byl otevren
+        // cross thread boundary and hide tooltip in the thread where it was opened
         SendMessage(HWindow, WM_USER_HIDETOOLTIP, 0, 0);
     }
 
@@ -338,7 +338,7 @@ BOOL CToolTip::Show(int x, int y, BOOL considerCursor, BOOL modal, HWND hParent)
 
     if (GetText())
     {
-        // merime text
+        // measure text
         SIZE sz;
         GetNeededWindowSize(&sz);
 
