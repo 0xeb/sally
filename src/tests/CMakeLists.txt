@@ -52,4 +52,33 @@ set_target_properties(test_operations PROPERTIES
     RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/tests"
 )
 
+# fsutil test - tests UI-decoupled file system utilities
+add_executable(test_fsutil
+    test_fsutil.cpp
+    fsutil_standalone.cpp
+)
+
+target_include_directories(test_fsutil PRIVATE
+    ${CMAKE_CURRENT_SOURCE_DIR}/..
+    ${CMAKE_CURRENT_SOURCE_DIR}/../common
+)
+
+target_compile_definitions(test_fsutil PRIVATE
+    WIN32
+    _WINDOWS
+    _CRT_SECURE_NO_WARNINGS
+)
+
+target_link_libraries(test_fsutil PRIVATE
+    kernel32
+)
+
+# Register with CTest
+add_test(NAME fsutil_test COMMAND test_fsutil)
+
+# Output to tests directory
+set_target_properties(test_fsutil PROPERTIES
+    RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/tests"
+)
+
 add_subdirectory(gtest)

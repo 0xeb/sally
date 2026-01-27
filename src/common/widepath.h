@@ -109,6 +109,14 @@ public:
     // Returns TRUE if allocation succeeded
     BOOL IsValid() const { return m_buffer != NULL; }
 
+    // Appends a path component (adds backslash if needed)
+    // Returns TRUE on success, FALSE if buffer full or invalid
+    BOOL Append(const wchar_t* name);
+
+    // Appends an ANSI path component (converts to wide, adds backslash if needed)
+    // Returns TRUE on success, FALSE if buffer full or invalid
+    BOOL Append(const char* name);
+
 private:
     wchar_t* m_buffer;
 

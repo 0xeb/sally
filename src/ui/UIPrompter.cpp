@@ -3,7 +3,6 @@
 
 #include "precomp.h"
 #include "ui/IPrompter.h"
-#include "dialogs.h"
 #include "mainwnd.h"
 
 IPrompter* gPrompter = nullptr;
@@ -27,34 +26,34 @@ public:
                 lstrcpynW(buf + len, existingInfo, (int)(_countof(buf) - len));
             }
         }
-        int res = SalMessageBox(MainWindow->HWindow, buf, LoadStr(IDS_CONFIRM_OVERWRITEW),
-                                MB_YESNO | MB_ICONQUESTION | MB_DEFBUTTON2);
+        int res = MessageBoxW(MainWindow->HWindow, buf, L"Confirm Overwrite",
+                              MB_YESNO | MB_ICONQUESTION | MB_DEFBUTTON2);
         return res == IDYES ? PromptResult{PromptResult::kYes} : PromptResult{PromptResult::kNo};
     }
 
     PromptResult ConfirmAdsLoss(const wchar_t* path) override
     {
-        int res = SalMessageBox(MainWindow->HWindow, path, LoadStr(IDS_CONFIRM_ADSLOSSW),
-                                MB_YESNO | MB_ICONQUESTION | MB_DEFBUTTON2);
+        int res = MessageBoxW(MainWindow->HWindow, path, L"Alternate Data Streams",
+                              MB_YESNO | MB_ICONQUESTION | MB_DEFBUTTON2);
         return res == IDYES ? PromptResult{PromptResult::kYes} : PromptResult{PromptResult::kNo};
     }
 
     PromptResult ConfirmDelete(const wchar_t* path, bool recycleBin) override
     {
-        int res = SalMessageBox(MainWindow->HWindow, path,
-                                LoadStr(recycleBin ? IDS_CONFIRM_DELETE_RECYCLEW : IDS_CONFIRM_DELETEW),
-                                MB_YESNO | MB_ICONQUESTION | MB_DEFBUTTON2);
+        int res = MessageBoxW(MainWindow->HWindow, path,
+                              recycleBin ? L"Confirm Delete (Recycle)" : L"Confirm Delete",
+                              MB_YESNO | MB_ICONQUESTION | MB_DEFBUTTON2);
         return res == IDYES ? PromptResult{PromptResult::kYes} : PromptResult{PromptResult::kNo};
     }
 
     void ShowError(const wchar_t* title, const wchar_t* message) override
     {
-        SalMessageBox(MainWindow->HWindow, message, title, MB_OK | MB_ICONEXCLAMATION);
+        MessageBoxW(MainWindow->HWindow, message, title, MB_OK | MB_ICONEXCLAMATION);
     }
 
     void ShowInfo(const wchar_t* title, const wchar_t* message) override
     {
-        SalMessageBox(MainWindow->HWindow, message, title, MB_OK | MB_ICONINFORMATION);
+        MessageBoxW(MainWindow->HWindow, message, title, MB_OK | MB_ICONINFORMATION);
     }
 };
 

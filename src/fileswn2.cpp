@@ -27,7 +27,6 @@ extern "C"
 #include "common/widepath.h"
 #include "ui/IPrompter.h"
 #include "common/unicode/helpers.h"
-#include "common/unicode_helpers.h"
 
 //
 // ****************************************************************************

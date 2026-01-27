@@ -322,6 +322,58 @@ CWidePathBuffer::~CWidePathBuffer()
     }
 }
 
+BOOL CWidePathBuffer::Append(const wchar_t* name)
+{
+    if (m_buffer == NULL || name == NULL)
+        return FALSE;
+
+    size_t currentLen = wcslen(m_buffer);
+    size_t nameLen = wcslen(name);
+
+    // Add backslash if path doesn't end with one and isn't empty
+    BOOL needsBackslash = (currentLen > 0 && m_buffer[currentLen - 1] != L'\\');
+    size_t totalLen = currentLen + (needsBackslash ? 1 : 0) + nameLen;
+
+    if (totalLen >= SAL_MAX_LONG_PATH)
+        return FALSE; // Would overflow
+
+    if (needsBackslash)
+    {
+        m_buffer[currentLen] = L'\\';
+        currentLen++;
+    }
+
+    wcscpy(m_buffer + currentLen, name);
+    return TRUE;
+}
+
+BOOL CWidePathBuffer::Append(const char* name)
+{
+    if (m_buffer == NULL || name == NULL)
+        return FALSE;
+
+    // Convert ANSI to wide
+    int wideLen = MultiByteToWideChar(CP_ACP, 0, name, -1, NULL, 0);
+    if (wideLen <= 0)
+        return FALSE;
+
+    // Allocate temp buffer for converted name
+    wchar_t* wideName = (wchar_t*)malloc(wideLen * sizeof(wchar_t));
+    if (wideName == NULL)
+        return FALSE;
+
+    if (MultiByteToWideChar(CP_ACP, 0, name, -1, wideName, wideLen) == 0)
+    {
+        free(wideName);
+        return FALSE;
+    }
+
+    // Use the wide version of Append
+    BOOL result = Append(wideName);
+    free(wideName);
+    return result;
+}
+
 //
 // Convenience wrappers
 //

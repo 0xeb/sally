@@ -430,13 +430,11 @@ void CFilesWindow::FilesAction(CActionType type, CFilesWindow* target, int count
         }
         }
         CTruncatedString str;
-        std::wstring subject;
+        char subject[MAX_PATH + 100 + 200]; // + 200 is a reserve (Windows can create paths longer than MAX_PATH)
         if (resID != 0)
         {
-            WCHAR buf[2 * MAX_PATH + 200] = {0};
-            swprintf_s(buf, LoadStrW(resID), AnsiToWide(expanded).c_str());
-            subject = buf;
-            str.Set(subject.empty() ? NULL : subject.c_str(), count > 1 ? NULL : formatedFileName);
+            sprintf(subject, LoadStr(resID), expanded);
+            str.Set(subject, count > 1 ? NULL : formatedFileName);
         }
 
         //---

@@ -21,8 +21,8 @@
 #include "find.h"
 #include "menu.h"
 #include "common/widepath.h"
+#include "common/fsutil.h"
 #include "ui/IPrompter.h"
-#include "common/unicode/helpers.h"
 #include "common/unicode/helpers.h"
 
 //
@@ -249,23 +249,17 @@ void CFilesWindow::ChangeAttr(BOOL setCompress, BOOL compressed, BOOL setEncrypt
 
                             BOOL timeObtained = FALSE;
 
-                            // retrieve the file times
-                            char fileName[MAX_PATH];
-                            strcpy(fileName, GetPath());
-                            SalPathAppend(fileName, f->Name, MAX_PATH);
-
-                            WIN32_FIND_DATA find;
-                            HANDLE hFind = HANDLES_Q(FindFirstFile(fileName, &find));
-                            if (hFind != INVALID_HANDLE_VALUE)
+                            // retrieve the file times using decoupled helper
+                            std::wstring fullPath = BuildPathW(GetPath(), f->Name);
+                            SalFileInfo fileInfo = GetFileInfoW(fullPath.c_str());
+                            if (fileInfo.IsValid)
                             {
-                                HANDLES(FindClose(hFind));
-
                                 FILETIME ft;
-                                if (FileTimeToLocalFileTime(&find.ftCreationTime, &ft) &&
+                                if (FileTimeToLocalFileTime(&fileInfo.CreationTime, &ft) &&
                                     FileTimeToSystemTime(&ft, &timeCreated) &&
-                                    FileTimeToLocalFileTime(&find.ftLastAccessTime, &ft) &&
+                                    FileTimeToLocalFileTime(&fileInfo.LastAccessTime, &ft) &&
                                     FileTimeToSystemTime(&ft, &timeAccessed) &&
-                                    FileTimeToLocalFileTime(&find.ftLastWriteTime, &ft) &&
+                                    FileTimeToLocalFileTime(&fileInfo.LastWriteTime, &ft) &&
                                     FileTimeToSystemTime(&ft, &timeModified))
                                 {
                                     timeObtained = TRUE;

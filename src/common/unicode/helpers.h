@@ -18,8 +18,27 @@ inline std::wstring AnsiToWide(const char* s)
     return out;
 }
 
+// Convert wide string to ANSI (lossy for non-codepage characters)
+inline std::string WideToAnsi(const wchar_t* s)
+{
+    if (s == NULL)
+        return std::string();
+    int len = WideCharToMultiByte(CP_ACP, 0, s, -1, NULL, 0, NULL, NULL);
+    if (len <= 0)
+        return std::string();
+    std::string out(len - 1, '\0');
+    WideCharToMultiByte(CP_ACP, 0, s, -1, out.data(), len, NULL, NULL);
+    return out;
+}
+
+inline std::string WideToAnsi(const std::wstring& s)
+{
+    return WideToAnsi(s.c_str());
+}
+
 // Helper to show an error/info via gPrompter if available, otherwise fallback MessageBox.
-inline void ShowErrorViaPrompter(const wchar_t* title, const wchar_t* message, HWND hwndFallback)
+// The HWND parameter is optional - if omitted (or NULL), uses GetActiveWindow() for fallback.
+inline void ShowErrorViaPrompter(const wchar_t* title, const wchar_t* message, HWND hwndFallback = NULL)
 {
     if (gPrompter != NULL)
     {
@@ -27,11 +46,11 @@ inline void ShowErrorViaPrompter(const wchar_t* title, const wchar_t* message, H
     }
     else
     {
-        MessageBoxW(hwndFallback, message, title, MB_OK | MB_ICONEXCLAMATION);
+        MessageBoxW(hwndFallback ? hwndFallback : GetActiveWindow(), message, title, MB_OK | MB_ICONEXCLAMATION);
     }
 }
 
-inline void ShowInfoViaPrompter(const wchar_t* title, const wchar_t* message, HWND hwndFallback)
+inline void ShowInfoViaPrompter(const wchar_t* title, const wchar_t* message, HWND hwndFallback = NULL)
 {
     if (gPrompter != NULL)
     {
@@ -39,6 +58,6 @@ inline void ShowInfoViaPrompter(const wchar_t* title, const wchar_t* message, HW
     }
     else
     {
-        MessageBoxW(hwndFallback, message, title, MB_OK | MB_ICONINFORMATION);
+        MessageBoxW(hwndFallback ? hwndFallback : GetActiveWindow(), message, title, MB_OK | MB_ICONINFORMATION);
     }
 }
