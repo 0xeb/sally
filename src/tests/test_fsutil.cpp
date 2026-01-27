@@ -284,6 +284,113 @@ void TestGetShortPathW()
     TEST_ASSERT(GetShortPathW(NULL) == L"", "GetShortPathW handles NULL");
 }
 
+//
+// Test 13: Unicode filename operations - integration test
+//
+void TestUnicodeFilenames()
+{
+    printf("\n=== Test: Unicode filename operations ===\n");
+
+    std::wstring testDir = GetTestDir();
+
+    // Create file with Unicode name (Japanese characters)
+    std::wstring unicodeFile = testDir + L"\\テスト.txt";
+    HANDLE h = CreateFileW(unicodeFile.c_str(), GENERIC_WRITE, 0, NULL,
+                           CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL, NULL);
+    TEST_ASSERT(h != INVALID_HANDLE_VALUE, "Create file with Unicode name");
+    if (h != INVALID_HANDLE_VALUE)
+    {
+        CloseHandle(h);
+
+        // Verify we can find it with GetFileInfoW
+        SalFileInfo info = GetFileInfoW(unicodeFile.c_str());
+        TEST_ASSERT(info.IsValid, "GetFileInfoW finds Unicode-named file");
+        TEST_ASSERT(info.FileName == L"テスト.txt", "GetFileInfoW returns correct Unicode name");
+
+        // Test rename with MoveFileW (what RenameFileInternalW uses)
+        std::wstring renamedFile = testDir + L"\\テスト_renamed.txt";
+        BOOL moved = MoveFileW(unicodeFile.c_str(), renamedFile.c_str());
+        TEST_ASSERT(moved, "MoveFileW renames Unicode file");
+
+        if (moved)
+        {
+            // Verify renamed file exists
+            info = GetFileInfoW(renamedFile.c_str());
+            TEST_ASSERT(info.IsValid, "Renamed Unicode file exists");
+            DeleteFileW(renamedFile.c_str());
+        }
+        else
+        {
+            DeleteFileW(unicodeFile.c_str());
+        }
+    }
+
+    // Create file with Chinese characters
+    std::wstring chineseFile = testDir + L"\\中文文件.txt";
+    h = CreateFileW(chineseFile.c_str(), GENERIC_WRITE, 0, NULL,
+                    CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL, NULL);
+    TEST_ASSERT(h != INVALID_HANDLE_VALUE, "Create file with Chinese name");
+    if (h != INVALID_HANDLE_VALUE)
+    {
+        CloseHandle(h);
+        TEST_ASSERT(PathExistsW(chineseFile.c_str()), "PathExistsW finds Chinese-named file");
+        DeleteFileW(chineseFile.c_str());
+    }
+
+    // Create file with emoji (if supported)
+    std::wstring emojiFile = testDir + L"\\file_\U0001F600.txt";  // grinning face emoji
+    h = CreateFileW(emojiFile.c_str(), GENERIC_WRITE, 0, NULL,
+                    CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL, NULL);
+    if (h != INVALID_HANDLE_VALUE)
+    {
+        CloseHandle(h);
+        TEST_ASSERT(PathExistsW(emojiFile.c_str()), "PathExistsW finds emoji-named file");
+        DeleteFileW(emojiFile.c_str());
+        printf("  [PASS] Emoji filename supported on this system\n");
+        g_passed++;
+    }
+    else
+    {
+        printf("  [SKIP] Emoji filename not supported (expected on older Windows)\n");
+    }
+}
+
+//
+// Test 14: Path building with Unicode - integration test
+//
+void TestBuildPathW_Unicode()
+{
+    printf("\n=== Test: BuildPathW with Unicode ===\n");
+
+    std::wstring result = BuildPathW(L"C:\\Users\\日本語", L"ファイル.txt");
+    TEST_ASSERT(result == L"C:\\Users\\日本語\\ファイル.txt", "BuildPathW with Japanese path");
+
+    result = BuildPathW(L"C:\\数据", L"文件.doc");
+    TEST_ASSERT(result == L"C:\\数据\\文件.doc", "BuildPathW with Chinese path");
+
+    // Test actual directory creation and file access
+    std::wstring testDir = GetTestDir();
+    std::wstring unicodeSubdir = testDir + L"\\サブフォルダ";
+
+    BOOL created = CreateDirectoryW(unicodeSubdir.c_str(), NULL);
+    TEST_ASSERT(created || GetLastError() == ERROR_ALREADY_EXISTS, "Create Unicode subdirectory");
+
+    if (created || GetLastError() == ERROR_ALREADY_EXISTS)
+    {
+        std::wstring filePath = BuildPathW(unicodeSubdir.c_str(), L"test.txt");
+        HANDLE h = CreateFileW(filePath.c_str(), GENERIC_WRITE, 0, NULL,
+                               CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL, NULL);
+        TEST_ASSERT(h != INVALID_HANDLE_VALUE, "Create file in Unicode subdirectory");
+        if (h != INVALID_HANDLE_VALUE)
+        {
+            CloseHandle(h);
+            TEST_ASSERT(IsDirectoryW(unicodeSubdir.c_str()), "IsDirectoryW on Unicode path");
+            DeleteFileW(filePath.c_str());
+        }
+        RemoveDirectoryW(unicodeSubdir.c_str());
+    }
+}
+
 int main()
 {
     printf("=====================================================\n");
@@ -313,6 +420,8 @@ int main()
     TestGetDirectoryW();
     TestGetExtensionW();
     TestGetShortPathW();
+    TestUnicodeFilenames();
+    TestBuildPathW_Unicode();
 
     // Cleanup
     printf("\nCleaning up...\n");
