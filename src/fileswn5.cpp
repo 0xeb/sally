@@ -22,6 +22,8 @@
 #include "menu.h"
 #include "common/widepath.h"
 #include "ui/IPrompter.h"
+#include "common/unicode/helpers.h"
+#include "common/unicode/helpers.h"
 
 //
 // ****************************************************************************
@@ -150,22 +152,21 @@ void CFilesWindow::Convert()
                     // change in the directory displayed in the panel and also in subdirectories if work was done there as well
                     script->SetWorkPath1(GetPath(), convertDlg.SubDirs);
 
-                    if (!res || !StartProgressDialog(script, LoadStr(IDS_CONVERTTITLE), NULL, &dlgData))
+                if (!res || !StartProgressDialog(script, LoadStr(IDS_CONVERTTITLE), NULL, &dlgData))
+                {
+                    if (script->IsGood() && script->Count == 0)
                     {
-                        if (script->IsGood() && script->Count == 0)
-                        {
-                            SalMessageBox(HWindow, LoadStr(IDS_NOFILE_MATCHEDMASK), LoadStr(IDS_INFOTITLE),
-                                          MB_OK | MB_ICONINFORMATION);
+                        if (gPrompter != NULL)
+                            ShowInfoViaPrompter(LoadStrW(IDS_INFOTITLE), LoadStrW(IDS_NOFILE_MATCHEDMASK));
 
-                            // none of the files had to pass through the mask filter
-                            SetSel(FALSE, -1, TRUE);                        // explicit repaint
-                            PostMessage(HWindow, WM_USER_SELCHANGED, 0, 0); // selection change notify
-                        }
-                        UpdateWindow(MainWindow->HWindow);
-                        if (!script->IsGood())
-                            script->ResetState();
-                        FreeScript(script);
+                        SetSel(FALSE, -1, TRUE);                        // explicit repaint
+                        PostMessage(HWindow, WM_USER_SELCHANGED, 0, 0); // selection change notify
                     }
+                    UpdateWindow(MainWindow->HWindow);
+                    if (!script->IsGood())
+                        script->ResetState();
+                    FreeScript(script);
+                }
                     else // removal of selection index (no waiting for operation finish, operation runs in another thread)
                     {
                         SetSel(FALSE, -1, TRUE);                        // explicit repaint
@@ -839,11 +840,8 @@ void CFilesWindow::ViewFile(char* name, BOOL altView, DWORD handlerID, int enumF
                                                     plugin != NULL, plugin, &errorCode);
                     if (name == NULL)
                     {
-                        if (errorCode == DCGNE_TOOLONGNAME)
-                        {
-                            SalMessageBox(HWindow, LoadStr(IDS_UNPACKTOOLONGNAME),
-                                          LoadStr(IDS_ERRORTITLE), MB_OK | MB_ICONEXCLAMATION);
-                        }
+                        if (errorCode == DCGNE_TOOLONGNAME && gPrompter != NULL)
+                            ShowErrorViaPrompter(LoadStrW(IDS_ERRORTITLE), LoadStrW(IDS_UNPACKTOOLONGNAME));
                         return;
                     }
 
@@ -877,11 +875,8 @@ void CFilesWindow::ViewFile(char* name, BOOL altView, DWORD handlerID, int enumF
                         else
                         {
                             SetCursor(oldCur);
-                            if (renamingNotSupported) // to avoid repeating the same message for many plugins, display it here for all of them
-                            {
-                                SalMessageBox(HWindow, LoadStr(IDS_UNPACKINVNAMERENUNSUP),
-                                              LoadStr(IDS_ERRORTITLE), MB_OK | MB_ICONEXCLAMATION);
-                            }
+                            if (renamingNotSupported && gPrompter != NULL) // to avoid repeating the same message for many plugins, display it here for all of them
+                                ShowErrorViaPrompter(LoadStrW(IDS_ERRORTITLE), LoadStrW(IDS_UNPACKINVNAMERENUNSUP));
                             SetThreadPriority(GetCurrentThread(), THREAD_PRIORITY_ABOVE_NORMAL);
                             DiskCache.ReleaseName(dcFileName, FALSE); // not unpacked, nothing to cache
                             EndStopRefresh();                         // snooper will start again now
@@ -1109,7 +1104,8 @@ BOOL ViewFileInt(HWND parent, const char* name, BOOL altView, DWORD handlerID, B
                         DWORD err = GetLastError();
                         char buff[4 * MAX_PATH];
                         sprintf(buff, LoadStr(IDS_ERROREXECVIEW), expCommand, GetErrorText(err));
-                        SalMessageBox(parent, buff, LoadStr(IDS_ERRORTITLE), MB_OK | MB_ICONEXCLAMATION);
+                        if (gPrompter != NULL)
+                            ShowErrorViaPrompter(LoadStrW(IDS_ERRORTITLE), AnsiToWide(buff).c_str());
                     }
                     else
                     {
@@ -1126,11 +1122,13 @@ BOOL ViewFileInt(HWND parent, const char* name, BOOL altView, DWORD handlerID, B
                 }
                 else
                 {
-                    char buff[4 * MAX_PATH];
-                    sprintf(buff, LoadStr(IDS_ERROREXECVIEW), expCommand, LoadStr(IDS_TOOLONGNAME));
-                    SalMessageBox(parent, buff, LoadStr(IDS_ERRORTITLE), MB_OK | MB_ICONEXCLAMATION);
+                if (gPrompter != NULL)
+                {
+                    std::wstring buffW = AnsiToWide(LoadStr(IDS_ERROREXECVIEW));
+                    ShowErrorViaPrompter(LoadStrW(IDS_ERRORTITLE), buffW.c_str());
                 }
             }
+        }
             break;
         }
 
@@ -1206,7 +1204,8 @@ BOOL ViewFileInt(HWND parent, const char* name, BOOL altView, DWORD handlerID, B
         char buff[MAX_PATH + 300];
         int textID = altView ? IDS_CANT_VIEW_FILE_ALT : IDS_CANT_VIEW_FILE;
         sprintf(buff, LoadStr(textID), name);
-        SalMessageBox(parent, buff, LoadStr(IDS_ERRORTITLE), MB_OK | MB_ICONEXCLAMATION);
+        if (gPrompter != NULL)
+            ShowErrorViaPrompter(LoadStrW(IDS_ERRORTITLE), AnsiToWide(buff).c_str());
     }
     return success;
 }
@@ -1260,8 +1259,8 @@ void CFilesWindow::EditFile(char* name, DWORD handlerID)
                         strcpy(s, f->DosName);
                     else
                     {
-                        SalMessageBox(HWindow, LoadStr(IDS_TOOLONGNAME), LoadStr(IDS_ERRORTITLE),
-                                      MB_OK | MB_ICONEXCLAMATION);
+                        if (gPrompter != NULL)
+                            ShowErrorViaPrompter(LoadStrW(IDS_ERRORTITLE), LoadStrW(IDS_TOOLONGNAME));
                         return;
                     }
                 }
@@ -1432,7 +1431,8 @@ void CFilesWindow::EditFile(char* name, DWORD handlerID)
                     DWORD err = GetLastError();
                     char buff[4 * MAX_PATH];
                     sprintf(buff, LoadStr(IDS_ERROREXECEDIT), expCommand, GetErrorText(err));
-                    SalMessageBox(HWindow, buff, LoadStr(IDS_ERRORTITLE), MB_OK | MB_ICONEXCLAMATION);
+                    if (gPrompter != NULL)
+                        ShowErrorViaPrompter(LoadStrW(IDS_ERRORTITLE), AnsiToWide(buff).c_str());
                 }
                 else
                 {
@@ -1444,7 +1444,8 @@ void CFilesWindow::EditFile(char* name, DWORD handlerID)
             {
                 char buff[4 * MAX_PATH];
                 sprintf(buff, LoadStr(IDS_ERROREXECEDIT), expCommand, LoadStr(IDS_TOOLONGNAME));
-                SalMessageBox(HWindow, buff, LoadStr(IDS_ERRORTITLE), MB_OK | MB_ICONEXCLAMATION);
+                if (gPrompter != NULL)
+                    ShowErrorViaPrompter(LoadStrW(IDS_ERRORTITLE), AnsiToWide(buff).c_str());
             }
         }
     }
@@ -1452,8 +1453,8 @@ void CFilesWindow::EditFile(char* name, DWORD handlerID)
     {
         char buff[MAX_PATH + 300];
         sprintf(buff, LoadStr(IDS_CANT_EDIT_FILE), name);
-        SalMessageBox(HWindow, buff, LoadStr(IDS_ERRORTITLE),
-                      MB_OK | MB_ICONEXCLAMATION);
+        if (gPrompter != NULL)
+            ShowErrorViaPrompter(LoadStrW(IDS_ERRORTITLE), AnsiToWide(buff).c_str());
     }
 }
 
@@ -1539,13 +1540,14 @@ void CFilesWindow::EditNewFile()
                 BOOL editExisting = FALSE;
                 if (hFile == INVALID_HANDLE_VALUE && GetLastError() == ERROR_FILE_EXISTS)
                 {
-                    if (SalMessageBox(HWindow, LoadStr(IDS_EDITNEWALREADYEX), LoadStr(IDS_QUESTION),
-                                      MB_YESNO | MB_ICONEXCLAMATION | MSGBOXEX_ESCAPEENABLED) == IDYES)
+                    if (gPrompter != NULL)
                     {
-                        editExisting = TRUE;
+                        PromptResult pr = gPrompter->ConfirmOverwrite(NULL, LoadStrW(IDS_EDITNEWALREADYEX));
+                        if (pr.type == PromptResult::kYes)
+                            editExisting = TRUE;
+                        else
+                            break;
                     }
-                    else
-                        break;
                 }
                 if (hFile != INVALID_HANDLE_VALUE || editExisting)
                 {
@@ -1564,8 +1566,8 @@ void CFilesWindow::EditNewFile()
             }
             else
                 errText = LoadStr(errTextID);
-            SalMessageBox(HWindow, errText, LoadStr(IDS_ERRORTITLE),
-                          MB_OK | MB_ICONEXCLAMATION);
+            if (gPrompter != NULL)
+                ShowErrorViaPrompter(LoadStrW(IDS_ERRORTITLE), AnsiToWide(errText).c_str());
         }
         else
             break;
@@ -1979,8 +1981,8 @@ void CFilesWindow::CreateDir(CFilesWindow* target)
           return; // empty string, nothing to do
         }
         */
-                SalMessageBox(HWindow, LoadStr(errTextID), LoadStr(IDS_ERRORCREATINGDIR),
-                              MB_OK | MB_ICONEXCLAMATION);
+                if (gPrompter != NULL)
+                    ShowErrorViaPrompter(LoadStrW(IDS_ERRORCREATINGDIR), LoadStrW(errTextID));
                 goto CREATE_AGAIN;
             }
             else
@@ -2110,7 +2112,8 @@ void CFilesWindow::RenameFileInternal(CFileData* f, const char* formatedFileName
         // Guard against buffer overflow - this function only handles paths up to MAX_PATH
         if (l >= MAX_PATH)
         {
-            SalMessageBox(HWindow, LoadStr(IDS_TOOLONGNAME), LoadStr(IDS_ERRORTITLE), MB_OK | MB_ICONEXCLAMATION);
+            if (gPrompter != NULL)
+                ShowErrorViaPrompter(LoadStrW(IDS_ERRORTITLE), LoadStrW(IDS_TOOLONGNAME));
             *tryAgain = FALSE;
             return;
         }
@@ -2303,20 +2306,26 @@ void CFilesWindow::RenameFileInternal(CFileData* f, const char* formatedFileName
                 }
 
                 if (err != ERROR_SUCCESS)
-                    SalMessageBox(HWindow, GetErrorText(err), LoadStr(IDS_ERRORRENAMINGFILE),
-                                  MB_OK | MB_ICONEXCLAMATION);
+                {
+                    if (gPrompter != NULL)
+                        ShowErrorViaPrompter(LoadStrW(IDS_ERRORRENAMINGFILE), GetErrorTextW(err));
+                }
             }
             if (handsOFF)
                 otherPanel->HandsOff(FALSE);
             *tryAgain = !ret;
         }
         else
-            SalMessageBox(HWindow, LoadStr(IDS_TOOLONGNAME), LoadStr(IDS_ERRORRENAMINGFILE),
-                          MB_OK | MB_ICONEXCLAMATION);
+        {
+            if (gPrompter != NULL)
+                ShowErrorViaPrompter(LoadStrW(IDS_ERRORRENAMINGFILE), LoadStrW(IDS_TOOLONGNAME));
+        }
     }
     else
-        SalMessageBox(HWindow, GetErrorText(ERROR_INVALID_NAME), LoadStr(IDS_ERRORRENAMINGFILE),
-                      MB_OK | MB_ICONEXCLAMATION);
+    {
+        if (gPrompter != NULL)
+            ShowErrorViaPrompter(LoadStrW(IDS_ERRORRENAMINGFILE), GetErrorTextW(ERROR_INVALID_NAME));
+    }
 }
 
 void CFilesWindow::RenameFileInternalW(CFileData* f, const std::wstring& newName, BOOL* mayChange, BOOL* tryAgain)
@@ -2329,16 +2338,16 @@ void CFilesWindow::RenameFileInternalW(CFileData* f, const std::wstring& newName
         if (c == L'\\' || c == L'/' || c == L':' || c < 32 ||
             c == L'<' || c == L'>' || c == L'|' || c == L'"')
         {
-            SalMessageBox(HWindow, GetErrorText(ERROR_INVALID_NAME), LoadStr(IDS_ERRORRENAMINGFILE),
-                          MB_OK | MB_ICONEXCLAMATION);
+            if (gPrompter != NULL)
+                ShowErrorViaPrompter(LoadStrW(IDS_ERRORRENAMINGFILE), GetErrorTextW(ERROR_INVALID_NAME));
             return;
         }
     }
 
     if (newName.empty())
     {
-        SalMessageBox(HWindow, GetErrorText(ERROR_INVALID_NAME), LoadStr(IDS_ERRORRENAMINGFILE),
-                      MB_OK | MB_ICONEXCLAMATION);
+        if (gPrompter != NULL)
+            ShowErrorViaPrompter(LoadStrW(IDS_ERRORRENAMINGFILE), GetErrorTextW(ERROR_INVALID_NAME));
         return;
     }
 
@@ -2425,9 +2434,8 @@ void CFilesWindow::RenameFileInternalW(CFileData* f, const std::wstring& newName
     }
     else
     {
-        if (err != ERROR_SUCCESS)
-            SalMessageBox(HWindow, GetErrorText(err), LoadStr(IDS_ERRORRENAMINGFILE),
-                          MB_OK | MB_ICONEXCLAMATION);
+        if (err != ERROR_SUCCESS && gPrompter != NULL)
+            ShowErrorViaPrompter(LoadStrW(IDS_ERRORRENAMINGFILE), GetErrorTextW(err));
         *tryAgain = FALSE; // Don't retry on error for Unicode files
     }
 
@@ -2481,13 +2489,19 @@ void CFilesWindow::RenameFile(int specialIndex)
 #ifndef _WIN64
         if (Windows64Bit && isDir)
         {
-            char path[MAX_PATH];
-            lstrcpyn(path, GetPath(), MAX_PATH);
-            if (SalPathAppend(path, f->Name, MAX_PATH) && IsWin64RedirectedDir(path, NULL, FALSE))
+            CWidePathBuffer pathW(GetPathW());
+            pathW.Append(f->Name);
+            if (IsWin64RedirectedDir(pathW, NULL, FALSE))
             {
-                char msg[300 + MAX_PATH];
-                _snprintf_s(msg, _TRUNCATE, LoadStr(IDS_ERRRENAMINGW64ALIAS), f->Name);
-                SalMessageBox(MainWindow->HWindow, msg, LoadStr(IDS_ERRORTITLE), MB_OK | MB_ICONEXCLAMATION);
+                wchar_t msg[400];
+                _snwprintf_s(msg, _TRUNCATE, LoadStrW(IDS_ERRRENAMINGW64ALIAS), pathW.Get());
+                if (gPrompter != NULL)
+                    ShowErrorViaPrompter(LoadStrW(IDS_ERRORTITLE), msg);
+                else
+                    if (gPrompter != NULL)
+                        ShowErrorViaPrompter(LoadStrW(IDS_ERRORTITLE), LoadStrW(IDS_ERRRENAMINGW64ALIAS));
+                    else
+                        SalMessageBox(MainWindow->HWindow, LoadStr(IDS_ERRRENAMINGW64ALIAS), LoadStr(IDS_ERRORTITLE), MB_OK | MB_ICONEXCLAMATION);
                 return;
             }
         }

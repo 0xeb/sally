@@ -17,3 +17,28 @@ inline std::wstring AnsiToWide(const char* s)
     MultiByteToWideChar(CP_ACP, 0, s, -1, out.data(), len);
     return out;
 }
+
+// Helper to show an error/info via gPrompter if available, otherwise fallback MessageBox.
+inline void ShowErrorViaPrompter(const wchar_t* title, const wchar_t* message, HWND hwndFallback)
+{
+    if (gPrompter != NULL)
+    {
+        gPrompter->ShowError(title, message);
+    }
+    else
+    {
+        MessageBoxW(hwndFallback, message, title, MB_OK | MB_ICONEXCLAMATION);
+    }
+}
+
+inline void ShowInfoViaPrompter(const wchar_t* title, const wchar_t* message, HWND hwndFallback)
+{
+    if (gPrompter != NULL)
+    {
+        gPrompter->ShowInfo(title, message);
+    }
+    else
+    {
+        MessageBoxW(hwndFallback, message, title, MB_OK | MB_ICONINFORMATION);
+    }
+}
