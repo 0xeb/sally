@@ -13,6 +13,7 @@
 #include "worker.h"
 #include "pack.h"
 #include "mapi.h"
+#include "ui/IPrompter.h"
 
 //
 // ****************************************************************************
@@ -503,9 +504,13 @@ void CFilesWindow::FilesAction(CActionType type, CFilesWindow* target, int count
                         // but the dialog path buffer is 2*MAX_PATH, so check against that
                         if (strlen(path) >= 2 * MAX_PATH)
                         {
-                            SalMessageBox(HWindow, LoadStr(IDS_TOOLONGPATH),
-                                          (type == atCopy) ? LoadStr(IDS_ERRORCOPY) : LoadStr(IDS_ERRORMOVE),
-                                          MB_OK | MB_ICONEXCLAMATION);
+                            if (gPrompter != NULL)
+                                gPrompter->ShowError(LoadStrW((type == atCopy) ? IDS_ERRORCOPY : IDS_ERRORMOVE),
+                                                     LoadStrW(IDS_TOOLONGPATH));
+                            else
+                                SalMessageBox(HWindow, LoadStr(IDS_TOOLONGPATH),
+                                              (type == atCopy) ? LoadStr(IDS_ERRORCOPY) : LoadStr(IDS_ERRORMOVE),
+                                              MB_OK | MB_ICONEXCLAMATION);
                             continue;
                         }
 

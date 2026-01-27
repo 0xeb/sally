@@ -25,6 +25,7 @@ extern "C"
 #include "salshlib.h"
 #include "shellib.h"
 #include "common/widepath.h"
+#include "ui/IPrompter.h"
 
 //
 // ****************************************************************************
@@ -2138,7 +2139,16 @@ BOOL CFilesWindow::ChangePathToArchive(const char* archive, const char* archiveP
                 if (err2 != NO_ERROR)
                 {
                     if (!isRefresh) // during refresh missing-path messages are not displayed
-                        DialogError(HWindow, BUTTONS_OK, archive, GetErrorText(err2), LoadStr(IDS_ERROROPENINGFILE));
+                    {
+                        if (gPrompter != NULL)
+                        {
+                            wchar_t archW[MAX_PATH];
+                            MultiByteToWideChar(CP_ACP, 0, archive, -1, archW, MAX_PATH);
+                            gPrompter->ShowError(LoadStrW(IDS_ERROROPENINGFILE), archW);
+                        }
+                        else
+                            DialogError(HWindow, BUTTONS_OK, archive, GetErrorText(err2), LoadStr(IDS_ERROROPENINGFILE));
+                    }
                     if (failReason != NULL)
                         *failReason = CHPPFR_INVALIDPATH;
                     goto ERROR_1; // error

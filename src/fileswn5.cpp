@@ -21,6 +21,7 @@
 #include "find.h"
 #include "menu.h"
 #include "common/widepath.h"
+#include "ui/IPrompter.h"
 
 //
 // ****************************************************************************

@@ -3632,6 +3632,9 @@ int WinMainBody(HINSTANCE hInstance, HINSTANCE /*hPrevInstance*/, LPSTR cmdLine,
     SetTraceProcessName("Salamander");
     SetThreadNameInVCAndTrace("Main");
     SetMessagesTitle(MAINWINDOW_NAME);
+
+    // Initialize default UI prompter (UTF-16 first) for decoupled prompts.
+    gPrompter = GetUIPrompter();
     TRACE_I("Begin");
 
     // OLE initialization
