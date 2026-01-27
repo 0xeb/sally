@@ -203,3 +203,58 @@ std::wstring GetShortPathW(const wchar_t* path)
 
     return result;
 }
+
+std::wstring ExpandEnvironmentW(const wchar_t* input)
+{
+    if (input == NULL || input[0] == L'\0')
+        return std::wstring();
+
+    // First call to get required buffer size
+    DWORD needed = ExpandEnvironmentStringsW(input, NULL, 0);
+    if (needed == 0)
+        return std::wstring(input); // Failed, return original
+
+    std::wstring result(needed - 1, L'\0');
+    DWORD written = ExpandEnvironmentStringsW(input, result.data(), needed);
+    if (written == 0 || written > needed)
+        return std::wstring(input); // Failed, return original
+
+    return result;
+}
+
+void RemoveDoubleBackslashesW(std::wstring& path)
+{
+    if (path.empty())
+        return;
+
+    size_t writePos = 0;
+    size_t readPos = 0;
+
+    // Preserve UNC prefix (\\) or long path prefix (\\?\)
+    if (path.length() >= 2 && path[0] == L'\\' && path[1] == L'\\')
+    {
+        writePos = 2;
+        readPos = 2;
+
+        // Check for \\?\ prefix
+        if (path.length() >= 4 && path[2] == L'?' && path[3] == L'\\')
+        {
+            writePos = 4;
+            readPos = 4;
+        }
+    }
+
+    while (readPos < path.length())
+    {
+        path[writePos++] = path[readPos++];
+
+        // Skip consecutive backslashes (keep only one)
+        if (path[writePos - 1] == L'\\')
+        {
+            while (readPos < path.length() && path[readPos] == L'\\')
+                readPos++;
+        }
+    }
+
+    path.resize(writePos);
+}

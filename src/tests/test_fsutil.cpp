@@ -391,6 +391,90 @@ void TestBuildPathW_Unicode()
     }
 }
 
+//
+// Test 15: ExpandEnvironmentW - environment variable expansion
+//
+void TestExpandEnvironmentW()
+{
+    printf("\n=== Test: ExpandEnvironmentW ===\n");
+
+    // Test basic expansion - WINDIR should always exist
+    std::wstring result = ExpandEnvironmentW(L"%WINDIR%");
+    TEST_ASSERT(!result.empty() && result != L"%WINDIR%", "ExpandEnvironmentW expands WINDIR");
+    TEST_ASSERT(result.find(L"Windows") != std::wstring::npos ||
+                result.find(L"windows") != std::wstring::npos,
+                "WINDIR contains 'Windows'");
+
+    // Test expansion with surrounding text
+    result = ExpandEnvironmentW(L"Path is: %WINDIR%\\System32");
+    TEST_ASSERT(result.find(L"Path is:") != std::wstring::npos, "Prefix preserved");
+    TEST_ASSERT(result.find(L"\\System32") != std::wstring::npos, "Suffix preserved");
+
+    // Test multiple variables
+    result = ExpandEnvironmentW(L"%SystemDrive%%HOMEPATH%");
+    TEST_ASSERT(result.find(L'%') == std::wstring::npos, "All variables expanded");
+
+    // Test non-existent variable (should remain as-is)
+    result = ExpandEnvironmentW(L"%NONEXISTENT_VAR_12345%");
+    TEST_ASSERT(result == L"%NONEXISTENT_VAR_12345%", "Non-existent var unchanged");
+
+    // Test empty and NULL
+    TEST_ASSERT(ExpandEnvironmentW(L"") == L"", "Empty string returns empty");
+    TEST_ASSERT(ExpandEnvironmentW(NULL) == L"", "NULL returns empty");
+
+    // Test plain string (no variables)
+    result = ExpandEnvironmentW(L"C:\\Users\\Test");
+    TEST_ASSERT(result == L"C:\\Users\\Test", "Plain string unchanged");
+}
+
+//
+// Test 16: RemoveDoubleBackslashesW - backslash cleanup
+//
+void TestRemoveDoubleBackslashesW()
+{
+    printf("\n=== Test: RemoveDoubleBackslashesW ===\n");
+
+    // Test basic double backslash removal
+    std::wstring path = L"C:\\\\Users\\\\test.txt";
+    RemoveDoubleBackslashesW(path);
+    TEST_ASSERT(path == L"C:\\Users\\test.txt", "Removes double backslashes");
+
+    // Test triple+ backslashes
+    path = L"C:\\\\\\\\foo\\\\\\bar";
+    RemoveDoubleBackslashesW(path);
+    TEST_ASSERT(path == L"C:\\foo\\bar", "Removes triple+ backslashes");
+
+    // Test UNC path preservation (\\server\share)
+    path = L"\\\\server\\\\share\\\\file.txt";
+    RemoveDoubleBackslashesW(path);
+    TEST_ASSERT(path == L"\\\\server\\share\\file.txt", "Preserves UNC prefix");
+
+    // Test long path prefix preservation (\\?\)
+    path = L"\\\\?\\C:\\\\Users\\\\test.txt";
+    RemoveDoubleBackslashesW(path);
+    TEST_ASSERT(path == L"\\\\?\\C:\\Users\\test.txt", "Preserves long path prefix");
+
+    // Test UNC long path preservation (\\?\UNC\)
+    path = L"\\\\?\\UNC\\\\server\\\\share";
+    RemoveDoubleBackslashesW(path);
+    TEST_ASSERT(path == L"\\\\?\\UNC\\server\\share", "Cleans after \\\\?\\UNC");
+
+    // Test path without doubles (no change)
+    path = L"C:\\Users\\test.txt";
+    RemoveDoubleBackslashesW(path);
+    TEST_ASSERT(path == L"C:\\Users\\test.txt", "Normal path unchanged");
+
+    // Test empty string
+    path = L"";
+    RemoveDoubleBackslashesW(path);
+    TEST_ASSERT(path == L"", "Empty string stays empty");
+
+    // Test single backslash
+    path = L"\\";
+    RemoveDoubleBackslashesW(path);
+    TEST_ASSERT(path == L"\\", "Single backslash unchanged");
+}
+
 int main()
 {
     printf("=====================================================\n");
@@ -422,6 +506,8 @@ int main()
     TestGetShortPathW();
     TestUnicodeFilenames();
     TestBuildPathW_Unicode();
+    TestExpandEnvironmentW();
+    TestRemoveDoubleBackslashesW();
 
     // Cleanup
     printf("\nCleaning up...\n");

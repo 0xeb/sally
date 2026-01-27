@@ -130,3 +130,26 @@ std::wstring GetExtensionW(const wchar_t* path);
 //   Short path name, or empty string if unavailable
 //
 std::wstring GetShortPathW(const wchar_t* path);
+
+//
+// Environment and command expansion helpers
+//
+
+// Expands environment variables in a string (e.g., %WINDIR% → C:\Windows).
+// Uses ExpandEnvironmentStringsW internally.
+//
+// Parameters:
+//   input - String containing environment variables to expand
+//
+// Returns:
+//   Expanded string, or original if no variables or error
+//
+std::wstring ExpandEnvironmentW(const wchar_t* input);
+
+// Removes consecutive backslashes from a path (e.g., C:\\\\foo → C:\foo).
+// This matches the behavior of RemoveDoubleBackslahesFromPath.
+//
+// Parameters:
+//   path - Path to clean up (modified in place)
+//
+void RemoveDoubleBackslashesW(std::wstring& path);
