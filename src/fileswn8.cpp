@@ -61,21 +61,28 @@ BOOL CFilesWindow::DeleteThroughRecycleBin(int* selection, int selCount, CFileDa
     CALL_STACK_MESSAGE2("CFilesWindow::DeleteThroughRecycleBin(, %d,)", selCount);
 
     int i = 0;
-    char path[MAX_PATH];
-    strcpy(path, GetPath());
-    SalPathAddBackslash(path, MAX_PATH);
-    int pathLen = (int)strlen(path);
+    // Use wide path for full Unicode support (no MAX_PATH limit)
+    std::wstring pathW = AnsiToWide(GetPath());
+    if (!pathW.empty() && pathW.back() != L'\\')
+        pathW += L'\\';
+
     // Verify that the path does not contain components ending with a space or dot;
     // as this can confuse the Recycle Bin and cause it to delete from a different path (it quietly trims
     // those spaces or dots)
-    if (!PathContainsValidComponents(path, TRUE))
+    // Note: PathContainsValidComponents uses ANSI, but GetPath() is ANSI-safe so this check is still valid
+    char pathAnsi[MAX_PATH];
+    lstrcpynA(pathAnsi, GetPath(), MAX_PATH);
+    SalPathAddBackslash(pathAnsi, MAX_PATH);
+    if (!PathContainsValidComponents(pathAnsi, TRUE))
     {
         char textBuf[2 * MAX_PATH + 200];
-        sprintf(textBuf, LoadStr(IDS_RECYCLEBINERROR), path);
+        sprintf(textBuf, LoadStr(IDS_RECYCLEBINERROR), pathAnsi);
         SalMessageBox(MainWindow->HWindow, textBuf, LoadStr(IDS_ERRORTITLE), MB_OK | MB_ICONEXCLAMATION);
         return FALSE; // quick dirty bloody hack - Recycle Bin simply cannot handle names ending with a space or dot (it deletes a different name created by trimming those characters, which we definitely don't want)
     }
-    CDynamicStringImp names;
+
+    // Build double-null terminated list of paths (wide)
+    std::wstring namesW;
     do
     {
         if (selCount > 0)
@@ -91,28 +98,31 @@ BOOL CFilesWindow::DeleteThroughRecycleBin(int* selection, int selCount, CFileDa
             return FALSE; // quick dirty bloody hack - Recycle Bin simply cannot handle names ending with a space or dot (it deletes a different name created by trimming those characters, which we definitely do not want)
         }
         // oneFile points to the selected item or the caret item in the filebox
-        if (!names.Add(path, pathLen) ||
-            !names.Add(oneFile->Name, oneFile->NameLen + 1))
-            return FALSE;
+        // Use NameW if available (Unicode filename), otherwise convert from ANSI
+        namesW += pathW;
+        if (!oneFile->NameW.empty())
+            namesW += oneFile->NameW;
+        else
+            namesW += AnsiToWide(oneFile->Name);
+        namesW += L'\0'; // null terminator between paths
     } while (i < selCount);
-    if (!names.Add("\0", 2))
-        return FALSE; // two zeros for the case of an empty list ("always false")
+    namesW += L'\0'; // double-null termination
 
-    SetCurrentDirectory(GetPath()); // for faster operation
+    SetCurrentDirectoryW(pathW.c_str()); // for faster operation
 
     CShellExecuteWnd shellExecuteWnd;
-    SHFILEOPSTRUCT fo;
+    SHFILEOPSTRUCTW fo = {};
     fo.hwnd = shellExecuteWnd.Create(MainWindow->HWindow, "SEW: CFilesWindow::DeleteThroughRecycleBin");
     fo.wFunc = FO_DELETE;
-    fo.pFrom = names.Text;
+    fo.pFrom = namesW.c_str();
     fo.pTo = NULL;
     fo.fFlags = FOF_ALLOWUNDO;
     fo.fAnyOperationsAborted = FALSE;
     fo.hNameMappings = NULL;
-    fo.lpszProgressTitle = "";
-    // Perform the actual deletion - wonderfully simple, unfortunately it sometimes crashes ;-)
-    CALL_STACK_MESSAGE1("CFilesWindow::DeleteThroughRecycleBin::SHFileOperation");
-    BOOL ret = DeleteThroughRecycleBinAux(&fo) == 0;
+    fo.lpszProgressTitle = L"";
+    // Perform the actual deletion using wide API for Unicode support
+    CALL_STACK_MESSAGE1("CFilesWindow::DeleteThroughRecycleBin::SHFileOperationW");
+    BOOL ret = SHFileOperationW(&fo) == 0;
     SetCurrentDirectoryToSystem();
 
     return FALSE; /*ret && !fo.fAnyOperationsAborted*/
