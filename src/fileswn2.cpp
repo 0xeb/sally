@@ -26,6 +26,8 @@ extern "C"
 #include "shellib.h"
 #include "common/widepath.h"
 #include "ui/IPrompter.h"
+#include "common/unicode/helpers.h"
+#include "common/unicode_helpers.h"
 
 //
 // ****************************************************************************
@@ -2140,12 +2142,10 @@ BOOL CFilesWindow::ChangePathToArchive(const char* archive, const char* archiveP
                 {
                     if (!isRefresh) // during refresh missing-path messages are not displayed
                     {
+                        std::wstring archW = AnsiToWide(archive);
+                        std::wstring msgW = AnsiToWide(GetErrorText(err2));
                         if (gPrompter != NULL)
-                        {
-                            wchar_t archW[MAX_PATH];
-                            MultiByteToWideChar(CP_ACP, 0, archive, -1, archW, MAX_PATH);
-                            gPrompter->ShowError(LoadStrW(IDS_ERROROPENINGFILE), archW);
-                        }
+                            gPrompter->ShowError(LoadStrW(IDS_ERROROPENINGFILE), archW.empty() ? msgW.c_str() : archW.c_str());
                         else
                             DialogError(HWindow, BUTTONS_OK, archive, GetErrorText(err2), LoadStr(IDS_ERROROPENINGFILE));
                     }

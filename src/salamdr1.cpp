@@ -18,6 +18,7 @@
 #include "worker.h"
 #include "snooper.h"
 #include "viewer.h"
+#include "ui/IPrompter.h"
 #include "editwnd.h"
 #include "find.h"
 #include "zip.h"

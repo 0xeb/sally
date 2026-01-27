@@ -14,6 +14,7 @@
 #include "pack.h"
 #include "mapi.h"
 #include "ui/IPrompter.h"
+#include "common/unicode/helpers.h"
 
 //
 // ****************************************************************************
@@ -429,11 +430,13 @@ void CFilesWindow::FilesAction(CActionType type, CFilesWindow* target, int count
         }
         }
         CTruncatedString str;
-        char subject[MAX_PATH + 100 + 200]; // + 200 is a reserve (Windows can create paths longer than MAX_PATH)
+        std::wstring subject;
         if (resID != 0)
         {
-            sprintf(subject, LoadStr(resID), expanded);
-            str.Set(subject, count > 1 ? NULL : formatedFileName);
+            WCHAR buf[2 * MAX_PATH + 200] = {0};
+            swprintf_s(buf, LoadStrW(resID), AnsiToWide(expanded).c_str());
+            subject = buf;
+            str.Set(subject.empty() ? NULL : subject.c_str(), count > 1 ? NULL : formatedFileName);
         }
 
         //---
@@ -504,9 +507,10 @@ void CFilesWindow::FilesAction(CActionType type, CFilesWindow* target, int count
                         // but the dialog path buffer is 2*MAX_PATH, so check against that
                         if (strlen(path) >= 2 * MAX_PATH)
                         {
+                            std::wstring titleW = AnsiToWide((type == atCopy) ? LoadStr(IDS_ERRORCOPY) : LoadStr(IDS_ERRORMOVE));
+                            std::wstring msgW = AnsiToWide(LoadStr(IDS_TOOLONGPATH));
                             if (gPrompter != NULL)
-                                gPrompter->ShowError(LoadStrW((type == atCopy) ? IDS_ERRORCOPY : IDS_ERRORMOVE),
-                                                     LoadStrW(IDS_TOOLONGPATH));
+                                gPrompter->ShowError(titleW.c_str(), msgW.c_str());
                             else
                                 SalMessageBox(HWindow, LoadStr(IDS_TOOLONGPATH),
                                               (type == atCopy) ? LoadStr(IDS_ERRORCOPY) : LoadStr(IDS_ERRORMOVE),
@@ -911,16 +915,26 @@ void CFilesWindow::FilesAction(CActionType type, CFilesWindow* target, int count
         case atDelete:
         {
             if (Configuration.CnfrmFileDirDel && recycle != 1)
-            {                                                                                                           // ask only if requested and if we don't use the SHFileOperation API for deletion
-                HICON hIcon = (HICON)HANDLES(LoadImage(Shell32DLL, MAKEINTRESOURCE(WindowsVistaAndLater ? 16777 : 161), // delete icon
-                                                       IMAGE_ICON, 32, 32, IconLRFlags));
-                int myRes = CMessageBox(HWindow, MSGBOXEX_YESNO | MSGBOXEX_ESCAPEENABLED | MSGBOXEX_SILENT,
-                                        LoadStr(IDS_CONFIRM_DELETE_TITLE), &str, NULL,
-                                        NULL, hIcon, 0, NULL, NULL, NULL, NULL)
-                                .Execute();
-                HANDLES(DestroyIcon(hIcon));
-                res = (myRes == IDYES ? IDOK : IDCANCEL);
-                UpdateWindow(MainWindow->HWindow);
+            { // ask only if requested and if we don't use the SHFileOperation API for deletion
+                if (gPrompter != NULL)
+                {
+                    std::wstring msgW = AnsiToWide(str.Get());
+                    PromptResult pr = gPrompter->ConfirmDelete(msgW.c_str(), recycle == 1);
+                    res = (pr.type == PromptResult::kYes ? IDOK : IDCANCEL);
+                    UpdateWindow(MainWindow->HWindow);
+                }
+                else
+                {
+                    HICON hIcon = (HICON)HANDLES(LoadImage(Shell32DLL, MAKEINTRESOURCE(WindowsVistaAndLater ? 16777 : 161), // delete icon
+                                                           IMAGE_ICON, 32, 32, IconLRFlags));
+                    int myRes = CMessageBox(HWindow, MSGBOXEX_YESNO | MSGBOXEX_ESCAPEENABLED | MSGBOXEX_SILENT,
+                                            LoadStr(IDS_CONFIRM_DELETE_TITLE), &str, NULL,
+                                            NULL, hIcon, 0, NULL, NULL, NULL, NULL)
+                                    .Execute();
+                    HANDLES(DestroyIcon(hIcon));
+                    res = (myRes == IDYES ? IDOK : IDCANCEL);
+                    UpdateWindow(MainWindow->HWindow);
+                }
             }
             else
                 res = IDOK;

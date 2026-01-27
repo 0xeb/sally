@@ -17,6 +17,7 @@
 #include "shellib.h"
 #include "filesbox.h"
 #include "ui/IPrompter.h"
+#include "common/unicode/helpers.h"
 
 // helper variables for the dialogs in BuildScriptXXX()
 BOOL ConfirmADSLossAll = FALSE;
@@ -203,7 +204,7 @@ BOOL CFilesWindow::MakeFileList(HANDLE hFile)
                         {
                             DWORD err = GetLastError();
                             if (gPrompter != NULL)
-                                gPrompter->ShowError(LoadStrW(IDS_ERRORTITLE), DupStrW(GetErrorText(err)));
+                                gPrompter->ShowError(LoadStrW(IDS_ERRORTITLE), GetErrorTextW(err));
                             else
                                 SalMessageBox(HWindow, GetErrorText(err),
                                               LoadStr(IDS_ERRORTITLE), MB_OK | MB_ICONEXCLAMATION);
