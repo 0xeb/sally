@@ -51,3 +51,5 @@ add_test(NAME operations_test COMMAND test_operations)
 set_target_properties(test_operations PROPERTIES
     RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/tests"
 )
+
+add_subdirectory(gtest)
