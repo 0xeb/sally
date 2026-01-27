@@ -378,6 +378,135 @@ void TestLongUnicodeStrings()
                 "Long path is actually long (beyond SSO)");
 }
 
+//
+// Test 5: ANSI to Wide path conversion (simulates PopulateWidePathsFromAnsi)
+//
+void TestAnsiToWideConversion()
+{
+    printf("\n=== Test 5: ANSI to Wide path conversion ===\n");
+
+    // Simulate what PopulateWidePathsFromAnsi does
+    auto AnsiToWide = [](const char* ansi) -> std::wstring {
+        if (ansi == NULL) return std::wstring();
+        int len = MultiByteToWideChar(CP_ACP, 0, ansi, -1, NULL, 0);
+        if (len <= 0) return std::wstring();
+        std::wstring wide(len - 1, L'\0');
+        MultiByteToWideChar(CP_ACP, 0, ansi, -1, wide.data(), len);
+        return wide;
+    };
+
+    // Test basic conversion
+    const char* ansiPath = "C:\\Users\\Test\\file.txt";
+    std::wstring widePath = AnsiToWide(ansiPath);
+    TEST_ASSERT(widePath == L"C:\\Users\\Test\\file.txt", "Basic ANSI to wide conversion");
+
+    // Test with operation struct
+    TestOperationW op;
+    op.SourceName = _strdup(ansiPath);
+    op.SourceNameW = AnsiToWide(op.SourceName);
+    TEST_ASSERT(op.SourceNameW == L"C:\\Users\\Test\\file.txt", "Conversion in operation struct");
+
+    // Test NULL handling
+    TEST_ASSERT(AnsiToWide(NULL).empty(), "NULL input returns empty string");
+}
+
+//
+// Test 6: Wide path with Unicode filename (simulates SetSourceNameW)
+//
+void TestWidePathWithUnicodeFilename()
+{
+    printf("\n=== Test 6: Wide path with Unicode filename ===\n");
+
+    // Simulate SetSourceNameW behavior: combine ANSI directory with Unicode filename
+    auto BuildWidePath = [](const char* ansiDir, const std::wstring& unicodeFilename) -> std::wstring {
+        // Convert directory to wide
+        int len = MultiByteToWideChar(CP_ACP, 0, ansiDir, -1, NULL, 0);
+        std::wstring dirW(len - 1, L'\0');
+        MultiByteToWideChar(CP_ACP, 0, ansiDir, -1, dirW.data(), len);
+
+        // Add backslash if needed
+        if (!dirW.empty() && dirW.back() != L'\\')
+            dirW += L'\\';
+
+        // Append Unicode filename
+        return dirW + unicodeFilename;
+    };
+
+    // Test with Japanese filename
+    std::wstring path1 = BuildWidePath("C:\\Users\\Test", L"テスト.txt");
+    TEST_ASSERT(path1 == L"C:\\Users\\Test\\テスト.txt", "Japanese filename appended correctly");
+
+    // Test with Chinese filename
+    std::wstring path2 = BuildWidePath("C:\\Data", L"中文文件.doc");
+    TEST_ASSERT(path2 == L"C:\\Data\\中文文件.doc", "Chinese filename appended correctly");
+
+    // Test with directory that already has backslash
+    std::wstring path3 = BuildWidePath("C:\\Users\\", L"file.txt");
+    TEST_ASSERT(path3 == L"C:\\Users\\file.txt", "No double backslash");
+
+    // Test in operation struct (simulating real usage)
+    TestOperationW op;
+    op.SourceNameW = BuildWidePath("C:\\Source", L"日本語ファイル.txt");
+    op.TargetNameW = BuildWidePath("C:\\Target", L"日本語ファイル.txt");
+    TEST_ASSERT(op.SourceNameW.find(L"日本語") != std::wstring::npos, "Source has Japanese chars");
+    TEST_ASSERT(op.TargetNameW.find(L"日本語") != std::wstring::npos, "Target has Japanese chars");
+}
+
+//
+// Test 7: Container with mixed ANSI and Unicode paths
+//
+void TestMixedPathContainer()
+{
+    printf("\n=== Test 7: Container with mixed ANSI and Unicode paths ===\n");
+
+    std::vector<TestOperationW> ops;
+
+    // Add operations with various path types
+    // Op 1: Pure ANSI (ASCII-only filename)
+    TestOperationW op1;
+    op1.SourceName = _strdup("C:\\Source\\ascii_file.txt");
+    op1.SourceNameW = L"C:\\Source\\ascii_file.txt";
+    ops.push_back(op1);
+
+    // Op 2: Unicode filename (Japanese)
+    TestOperationW op2;
+    op2.SourceName = _strdup("C:\\Source\\????.txt"); // Lossy ANSI
+    op2.SourceNameW = L"C:\\Source\\テスト.txt";       // Actual Unicode
+    ops.push_back(op2);
+
+    // Op 3: Unicode filename (Chinese)
+    TestOperationW op3;
+    op3.SourceName = _strdup("C:\\Source\\????.txt"); // Lossy ANSI
+    op3.SourceNameW = L"C:\\Source\\中文.txt";         // Actual Unicode
+    ops.push_back(op3);
+
+    // Op 4: Long path (>MAX_PATH)
+    TestOperationW op4;
+    std::wstring longPath = L"C:\\";
+    for (int i = 0; i < 30; i++)
+        longPath += L"very_long_directory_name\\";
+    longPath += L"file.txt";
+    op4.SourceNameW = longPath;
+    ops.push_back(op4);
+
+    // Verify all preserved after container operations
+    TEST_ASSERT(ops[0].SourceNameW == L"C:\\Source\\ascii_file.txt", "ASCII path preserved");
+    TEST_ASSERT(ops[1].SourceNameW == L"C:\\Source\\テスト.txt", "Japanese path preserved");
+    TEST_ASSERT(ops[2].SourceNameW == L"C:\\Source\\中文.txt", "Chinese path preserved");
+    TEST_ASSERT(ops[3].SourceNameW.length() > 260, "Long path preserved (>MAX_PATH)");
+
+    // Force reallocation and verify again
+    for (int i = 0; i < 100; i++)
+    {
+        TestOperationW op;
+        op.SourceNameW = L"filler";
+        ops.push_back(op);
+    }
+
+    TEST_ASSERT(ops[1].SourceNameW == L"C:\\Source\\テスト.txt", "Japanese path survives realloc");
+    TEST_ASSERT(ops[3].SourceNameW.length() > 260, "Long path survives realloc");
+}
+
 int main()
 {
     printf("=====================================================\n");
@@ -389,6 +518,9 @@ int main()
     TestVectorWithWstring();
     TestReallocBreaksWstring();
     TestLongUnicodeStrings();
+    TestAnsiToWideConversion();
+    TestWidePathWithUnicodeFilename();
+    TestMixedPathContainer();
 
     printf("\n=====================================================\n");
     printf("  Results: %d passed, %d failed\n", g_passed, g_failed);
