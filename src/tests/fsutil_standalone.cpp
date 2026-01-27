@@ -156,3 +156,66 @@ BOOL IsDirectoryW(const wchar_t* path)
     SalFileInfo info = GetFileInfoW(path);
     return info.IsValid && (info.Attributes & FILE_ATTRIBUTE_DIRECTORY);
 }
+
+std::wstring GetFileNameW(const wchar_t* path)
+{
+    if (path == NULL || path[0] == L'\0')
+        return std::wstring();
+
+    const wchar_t* lastSlash = wcsrchr(path, L'\\');
+    if (lastSlash == NULL)
+        return std::wstring(path); // No backslash, return entire path
+
+    return std::wstring(lastSlash + 1);
+}
+
+std::wstring GetDirectoryW(const wchar_t* path)
+{
+    if (path == NULL || path[0] == L'\0')
+        return std::wstring();
+
+    const wchar_t* lastSlash = wcsrchr(path, L'\\');
+    if (lastSlash == NULL)
+        return std::wstring(); // No backslash, no directory part
+
+    return std::wstring(path, lastSlash - path);
+}
+
+std::wstring GetExtensionW(const wchar_t* path)
+{
+    if (path == NULL || path[0] == L'\0')
+        return std::wstring();
+
+    // Find the filename part first (after last backslash)
+    const wchar_t* namePart = wcsrchr(path, L'\\');
+    if (namePart == NULL)
+        namePart = path;
+    else
+        namePart++;
+
+    // Find the last dot in the filename
+    const wchar_t* lastDot = wcsrchr(namePart, L'.');
+    if (lastDot == NULL)
+        return std::wstring(); // No dot, no extension
+
+    // Return extension without the dot
+    return std::wstring(lastDot + 1);
+}
+
+std::wstring GetShortPathW(const wchar_t* path)
+{
+    if (path == NULL || path[0] == L'\0')
+        return std::wstring();
+
+    // First call to get required buffer size
+    DWORD needed = GetShortPathNameW(path, NULL, 0);
+    if (needed == 0)
+        return std::wstring(); // Failed (file may not exist)
+
+    std::wstring result(needed - 1, L'\0');
+    DWORD written = GetShortPathNameW(path, result.data(), needed);
+    if (written == 0 || written >= needed)
+        return std::wstring(); // Failed
+
+    return result;
+}

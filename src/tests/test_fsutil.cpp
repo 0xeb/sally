@@ -216,6 +216,74 @@ void TestIsDirectoryW()
     TEST_ASSERT(!IsDirectoryW((testDir + L"\\nope").c_str()), "IsDirectoryW returns false for non-existent");
 }
 
+//
+// Test 9: GetFileNameW - pure string operation
+//
+void TestGetFileNameW()
+{
+    printf("\n=== Test: GetFileNameW ===\n");
+
+    TEST_ASSERT(GetFileNameW(L"C:\\Users\\test.txt") == L"test.txt", "GetFileNameW extracts filename");
+    TEST_ASSERT(GetFileNameW(L"C:\\Users\\Dir\\file.doc") == L"file.doc", "GetFileNameW works with deep path");
+    TEST_ASSERT(GetFileNameW(L"test.txt") == L"test.txt", "GetFileNameW handles no directory");
+    TEST_ASSERT(GetFileNameW(L"C:\\") == L"", "GetFileNameW handles root path");
+    TEST_ASSERT(GetFileNameW(L"C:\\Users\\") == L"", "GetFileNameW handles trailing backslash");
+    TEST_ASSERT(GetFileNameW(NULL) == L"", "GetFileNameW handles NULL");
+    TEST_ASSERT(GetFileNameW(L"") == L"", "GetFileNameW handles empty");
+}
+
+//
+// Test 10: GetDirectoryW - pure string operation
+//
+void TestGetDirectoryW()
+{
+    printf("\n=== Test: GetDirectoryW ===\n");
+
+    TEST_ASSERT(GetDirectoryW(L"C:\\Users\\test.txt") == L"C:\\Users", "GetDirectoryW extracts directory");
+    TEST_ASSERT(GetDirectoryW(L"C:\\Users\\Dir\\file.doc") == L"C:\\Users\\Dir", "GetDirectoryW works with deep path");
+    TEST_ASSERT(GetDirectoryW(L"test.txt") == L"", "GetDirectoryW handles no directory");
+    TEST_ASSERT(GetDirectoryW(L"C:\\file.txt") == L"C:", "GetDirectoryW handles root file");
+    TEST_ASSERT(GetDirectoryW(NULL) == L"", "GetDirectoryW handles NULL");
+}
+
+//
+// Test 11: GetExtensionW - pure string operation
+//
+void TestGetExtensionW()
+{
+    printf("\n=== Test: GetExtensionW ===\n");
+
+    TEST_ASSERT(GetExtensionW(L"test.txt") == L"txt", "GetExtensionW extracts extension");
+    TEST_ASSERT(GetExtensionW(L"C:\\Users\\file.doc") == L"doc", "GetExtensionW works with full path");
+    TEST_ASSERT(GetExtensionW(L"archive.tar.gz") == L"gz", "GetExtensionW returns last extension");
+    TEST_ASSERT(GetExtensionW(L".cvspass") == L"cvspass", "GetExtensionW handles dotfile as extension");
+    TEST_ASSERT(GetExtensionW(L"noextension") == L"", "GetExtensionW handles no extension");
+    TEST_ASSERT(GetExtensionW(L"C:\\folder.name\\file") == L"", "GetExtensionW ignores dot in directory");
+    TEST_ASSERT(GetExtensionW(NULL) == L"", "GetExtensionW handles NULL");
+}
+
+//
+// Test 12: GetShortPathW - filesystem operation
+//
+void TestGetShortPathW()
+{
+    printf("\n=== Test: GetShortPathW ===\n");
+
+    std::wstring testFile = GetTestDir() + L"\\test.txt";
+    std::wstring shortPath = GetShortPathW(testFile.c_str());
+
+    // Short path should exist and not be empty for existing file
+    TEST_ASSERT(!shortPath.empty(), "GetShortPathW returns non-empty for existing file");
+    // Short path should contain the file
+    TEST_ASSERT(shortPath.find(L"TEST") != std::wstring::npos ||
+                shortPath.find(L"test") != std::wstring::npos,
+                "GetShortPathW result contains filename");
+
+    // Non-existent file should return empty
+    TEST_ASSERT(GetShortPathW(L"C:\\nonexistent12345.txt") == L"", "GetShortPathW returns empty for non-existent");
+    TEST_ASSERT(GetShortPathW(NULL) == L"", "GetShortPathW handles NULL");
+}
+
 int main()
 {
     printf("=====================================================\n");
@@ -241,6 +309,10 @@ int main()
     TestBuildPathW_Ansi();
     TestPathExistsW();
     TestIsDirectoryW();
+    TestGetFileNameW();
+    TestGetDirectoryW();
+    TestGetExtensionW();
+    TestGetShortPathW();
 
     // Cleanup
     printf("\nCleaning up...\n");

@@ -81,3 +81,52 @@ BOOL PathExistsW(const wchar_t* path);
 //   TRUE if path exists and is a directory, FALSE otherwise
 //
 BOOL IsDirectoryW(const wchar_t* path);
+
+//
+// Path parsing helpers - pure string operations, no filesystem access
+//
+
+// Extracts the filename (with extension) from a full path.
+// Example: "C:\Users\test.txt" => "test.txt"
+//
+// Parameters:
+//   path - Full path (wide string)
+//
+// Returns:
+//   Filename portion after the last backslash, or entire path if no backslash
+//
+std::wstring GetFileNameW(const wchar_t* path);
+
+// Extracts the directory portion from a full path.
+// Example: "C:\Users\test.txt" => "C:\Users"
+//
+// Parameters:
+//   path - Full path (wide string)
+//
+// Returns:
+//   Directory portion before the last backslash, or empty if no backslash
+//
+std::wstring GetDirectoryW(const wchar_t* path);
+
+// Extracts the file extension (without dot) from a path or filename.
+// Example: "test.txt" => "txt", "archive.tar.gz" => "gz"
+// Note: ".cvspass" is treated as having extension "cvspass" (Windows behavior)
+//
+// Parameters:
+//   path - Path or filename (wide string)
+//
+// Returns:
+//   Extension without the dot, or empty string if no extension
+//
+std::wstring GetExtensionW(const wchar_t* path);
+
+// Gets the 8.3 short path name for a file (if available).
+// Uses GetShortPathNameW internally.
+//
+// Parameters:
+//   path - Full path to file or directory (wide string)
+//
+// Returns:
+//   Short path name, or empty string if unavailable
+//
+std::wstring GetShortPathW(const wchar_t* path);
