@@ -2346,14 +2346,7 @@ void CFilesWindow::RenameFileInternalW(CFileData* f, const std::wstring& newName
     }
 
     // Convert current path to wide string
-    std::wstring pathW;
-    int pathLen = MultiByteToWideChar(CP_ACP, 0, GetPath(), -1, NULL, 0);
-    if (pathLen > 0)
-    {
-        pathW.resize(pathLen);
-        MultiByteToWideChar(CP_ACP, 0, GetPath(), -1, &pathW[0], pathLen);
-        pathW.resize(pathLen - 1); // remove null terminator from length
-    }
+    std::wstring pathW = AnsiToWide(GetPath());
 
     // Build source path using the original wide name (or convert ANSI name if no wide name)
     std::wstring srcPath = pathW;
@@ -2365,10 +2358,8 @@ void CFilesWindow::RenameFileInternalW(CFileData* f, const std::wstring& newName
     }
     else
     {
-        // Convert ANSI filename to Unicode
-        wchar_t nameW[MAX_PATH];
-        MultiByteToWideChar(CP_ACP, 0, f->Name, -1, nameW, MAX_PATH);
-        srcPath += nameW;
+        // Convert ANSI filename to Unicode (no MAX_PATH limit)
+        srcPath += AnsiToWide(f->Name);
     }
 
     // Build target path
@@ -2386,14 +2377,7 @@ void CFilesWindow::RenameFileInternalW(CFileData* f, const std::wstring& newName
     // Check if other panel needs to be notified
     BOOL handsOFF = FALSE;
     CFilesWindow* otherPanel = MainWindow->GetNonActivePanel();
-    std::wstring otherPathW;
-    int otherPathLen = MultiByteToWideChar(CP_ACP, 0, otherPanel->GetPath(), -1, NULL, 0);
-    if (otherPathLen > 0)
-    {
-        otherPathW.resize(otherPathLen);
-        MultiByteToWideChar(CP_ACP, 0, otherPanel->GetPath(), -1, &otherPathW[0], otherPathLen);
-        otherPathW.resize(otherPathLen - 1);
-    }
+    std::wstring otherPathW = AnsiToWide(otherPanel->GetPath());
 
     if (otherPathW.length() >= srcPath.length() &&
         _wcsnicmp(srcPath.c_str(), otherPathW.c_str(), srcPath.length()) == 0 &&
