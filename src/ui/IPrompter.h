@@ -28,6 +28,11 @@ public:
 
     virtual void ShowError(const wchar_t* title, const wchar_t* message) = 0;
     virtual void ShowInfo(const wchar_t* title, const wchar_t* message) = 0;
+
+    // Error with OK/Cancel - returns kOk or kCancel
+    virtual PromptResult ConfirmError(const wchar_t* title, const wchar_t* message) = 0;
+    // Question with Yes/No - returns kYes or kNo
+    virtual PromptResult AskYesNo(const wchar_t* title, const wchar_t* message) = 0;
 };
 
 // Global prompter used by UI and worker code. Default is UI-backed.

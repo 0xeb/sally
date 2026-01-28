@@ -2986,9 +2986,11 @@ MENU_TEMPLATE_ITEM MsgBoxButtons[] =
         {
             if (!script->SkipAllCountSizeErrors)
             {
-                sprintf(message, LoadStr(IDS_GETCOMPRFILESIZEERROR), name, GetErrorText(err));
-                script->SkipAllCountSizeErrors = SalMessageBox(HWindow, message, LoadStr(IDS_ERRORTITLE),
-                                                               MB_YESNO | MB_ICONEXCLAMATION) == IDYES;
+                // TODO: Use wide format string when IDS_GETCOMPRFILESIZEERROR supports %ls
+                std::wstring nameW = AnsiToWide(name);
+                script->SkipAllCountSizeErrors =
+                    gPrompter->AskYesNo(LoadStrW(IDS_ERRORTITLE),
+                        (nameW + L": " + GetErrorTextW(err)).c_str()).type == PromptResult::kYes;
                 UpdateWindow(MainWindow->HWindow);
             }
             s = fileSizeLoc; // cannot determine compressed size, we settle for the normal size

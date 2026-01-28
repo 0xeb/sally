@@ -36,6 +36,18 @@ public:
         log.push_back(L"ShowInfo:" + std::wstring(title ? title : L"") + L":" + std::wstring(message ? message : L""));
     }
 
+    PromptResult ConfirmError(const wchar_t* title, const wchar_t* message) override
+    {
+        log.push_back(L"ConfirmError:" + std::wstring(title ? title : L"") + L":" + std::wstring(message ? message : L""));
+        return {PromptResult::kOk};
+    }
+
+    PromptResult AskYesNo(const wchar_t* title, const wchar_t* message) override
+    {
+        log.push_back(L"AskYesNo:" + std::wstring(title ? title : L"") + L":" + std::wstring(message ? message : L""));
+        return {PromptResult::kYes};
+    }
+
     std::vector<std::wstring> log;
 };
 

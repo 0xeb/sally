@@ -1206,10 +1206,9 @@ BOOL EmailFilesAddDirectory(CSimpleMAPI* mapi, const char* path, BOOL* errGetFil
         DWORD err = GetLastError();
         if (err != ERROR_FILE_NOT_FOUND && err != ERROR_NO_MORE_FILES)
         {
-            char text[2 * MAX_PATH + 100];
-            sprintf(text, LoadStr(IDS_CANNOTREADDIR), path, GetErrorText(err));
-            if (SalMessageBox(MainWindow->HWindow, text, LoadStr(IDS_ERRORTITLE),
-                              MB_OKCANCEL | MB_ICONEXCLAMATION) == IDCANCEL)
+            std::wstring pathW = AnsiToWide(path);
+            if (gPrompter->ConfirmError(LoadStrW(IDS_ERRORTITLE),
+                    (pathW + L": " + GetErrorTextW(err)).c_str()).type == PromptResult::kCancel)
             {
                 SetCursor(LoadCursor(NULL, IDC_WAIT));
                 return FALSE; // user wants to quit

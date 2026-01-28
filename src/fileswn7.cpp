@@ -11,6 +11,8 @@
 #include "dialogs.h"
 #include "zip.h"
 #include "pack.h"
+#include "ui/IPrompter.h"
+#include "common/unicode/helpers.h"
 
 //
 // ****************************************************************************
@@ -124,10 +126,12 @@ ENUM_NEXT:
                 { // path is too long
                     if (errorOccured != NULL)
                         *errorOccured = SALENUM_ERROR;
-                    _snprintf_s(errText, _TRUNCATE, LoadStr(IDS_NAMEISTOOLONG), f->Name, curZIPPath);
+                    // TODO: Use wide format string when IDS_NAMEISTOOLONG supports %ls
+                    std::wstring nameW = f->NameW.empty() ? AnsiToWide(f->Name) : f->NameW;
+                    std::wstring zipPathW = AnsiToWide(curZIPPath);
                     if (parent != NULL &&
-                        SalMessageBox(parent, errText, LoadStr(IDS_ERRORTITLE),
-                                      MB_OKCANCEL | MB_ICONEXCLAMATION) == IDCANCEL)
+                        gPrompter->ConfirmError(LoadStrW(IDS_ERRORTITLE),
+                            (nameW + L" / " + zipPathW + L" - " + LoadStrW(IDS_TOOLONGNAME)).c_str()).type == PromptResult::kCancel)
                     {
                         if (errorOccured != NULL)
                             *errorOccured = SALENUM_CANCEL;
@@ -204,12 +208,13 @@ ENUM_NEXT:
                     { // path is too long
                         if (errorOccured != NULL)
                             *errorOccured = SALENUM_ERROR;
-                        _snprintf_s(errText, _TRUNCATE, LoadStr(IDS_NAMEISTOOLONG),
-                                    (tooLong1 || f->DosName == NULL ? f->Name : f->DosName),
-                                    (tooLong1 ? data->EnumLastPath : data->EnumLastDosPath));
+                        const char* nameA = (tooLong1 || f->DosName == NULL ? f->Name : f->DosName);
+                        const char* pathA = (tooLong1 ? data->EnumLastPath : data->EnumLastDosPath);
+                        std::wstring nameW = f->NameW.empty() ? AnsiToWide(nameA) : f->NameW;
+                        std::wstring pathW = AnsiToWide(pathA);
                         if (parent != NULL &&
-                            SalMessageBox(parent, errText, LoadStr(IDS_ERRORTITLE),
-                                          MB_OKCANCEL | MB_ICONEXCLAMATION) == IDCANCEL)
+                            gPrompter->ConfirmError(LoadStrW(IDS_ERRORTITLE),
+                                (nameW + L" / " + pathW + L" - " + LoadStrW(IDS_TOOLONGNAME)).c_str()).type == PromptResult::kCancel)
                         {
                             if (errorOccured != NULL)
                                 *errorOccured = SALENUM_CANCEL;
@@ -249,12 +254,13 @@ ENUM_NEXT:
                         { // path is too long
                             if (errorOccured != NULL)
                                 *errorOccured = SALENUM_ERROR;
-                            _snprintf_s(errText, _TRUNCATE, LoadStr(IDS_NAMEISTOOLONG),
-                                        (tooLong1 || f->DosName == NULL ? f->Name : f->DosName),
-                                        (tooLong1 ? data->EnumLastPath + zipPathLen + (zipPathLen > 0 ? 1 : 0) : data->EnumLastDosPath));
+                            const char* nameA = (tooLong1 || f->DosName == NULL ? f->Name : f->DosName);
+                            const char* pathA = (tooLong1 ? data->EnumLastPath + zipPathLen + (zipPathLen > 0 ? 1 : 0) : data->EnumLastDosPath);
+                            std::wstring nameW = f->NameW.empty() ? AnsiToWide(nameA) : f->NameW;
+                            std::wstring pathW = AnsiToWide(pathA);
                             if (parent != NULL &&
-                                SalMessageBox(parent, errText, LoadStr(IDS_ERRORTITLE),
-                                              MB_OKCANCEL | MB_ICONEXCLAMATION) == IDCANCEL)
+                                gPrompter->ConfirmError(LoadStrW(IDS_ERRORTITLE),
+                                    (nameW + L" / " + pathW + L" - " + LoadStrW(IDS_TOOLONGNAME)).c_str()).type == PromptResult::kCancel)
                             {
                                 if (errorOccured != NULL)
                                     *errorOccured = SALENUM_CANCEL;
@@ -847,11 +853,11 @@ BOOL _ReadDirectoryTree(HWND parent, char (&path)[MAX_PATH], char* name, CSalama
             if (errorOccured != NULL)
                 *errorOccured = SALENUM_ERROR;
             strcpy(end, name);
-            sprintf(text, LoadStr(IDS_CANNOTREADDIR), path, GetErrorText(err));
+            std::wstring pathW = AnsiToWide(path);
             *end = 0; // restore the path
             if (parent != NULL &&
-                SalMessageBox(parent, text, LoadStr(IDS_ERRORTITLE),
-                              MB_OKCANCEL | MB_ICONEXCLAMATION) == IDCANCEL)
+                gPrompter->ConfirmError(LoadStrW(IDS_ERRORTITLE),
+                    (pathW + L": " + GetErrorTextW(err)).c_str()).type == PromptResult::kCancel)
             {
                 if (errorOccured != NULL)
                     *errorOccured = SALENUM_CANCEL;
@@ -1039,11 +1045,11 @@ BOOL _ReadDirectoryTree(HWND parent, char (&path)[MAX_PATH], char* name, CSalama
             if (errorOccured != NULL)
                 *errorOccured = SALENUM_ERROR;
             strcpy(end, name);
-            sprintf(text, LoadStr(IDS_CANNOTREADDIR), path, GetErrorText(err));
+            std::wstring pathW = AnsiToWide(path);
             *end = 0; // restore the path
             if (parent != NULL &&
-                SalMessageBox(parent, text, LoadStr(IDS_ERRORTITLE),
-                              MB_OKCANCEL | MB_ICONEXCLAMATION) == IDCANCEL)
+                gPrompter->ConfirmError(LoadStrW(IDS_ERRORTITLE),
+                    (pathW + L": " + GetErrorTextW(err)).c_str()).type == PromptResult::kCancel)
             {
                 if (errorOccured != NULL)
                     *errorOccured = SALENUM_CANCEL;

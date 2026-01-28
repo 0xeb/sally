@@ -55,6 +55,18 @@ public:
     {
         MessageBoxW(MainWindow->HWindow, message, title, MB_OK | MB_ICONINFORMATION);
     }
+
+    PromptResult ConfirmError(const wchar_t* title, const wchar_t* message) override
+    {
+        int res = MessageBoxW(MainWindow->HWindow, message, title, MB_OKCANCEL | MB_ICONEXCLAMATION);
+        return res == IDOK ? PromptResult{PromptResult::kOk} : PromptResult{PromptResult::kCancel};
+    }
+
+    PromptResult AskYesNo(const wchar_t* title, const wchar_t* message) override
+    {
+        int res = MessageBoxW(MainWindow->HWindow, message, title, MB_YESNO | MB_ICONQUESTION);
+        return res == IDYES ? PromptResult{PromptResult::kYes} : PromptResult{PromptResult::kNo};
+    }
 };
 
 IPrompter* GetUIPrompter()
