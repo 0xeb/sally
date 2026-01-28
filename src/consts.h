@@ -861,6 +861,7 @@ void MinimizeApp(HWND mainWnd);             // minimize app
 void RestoreApp(HWND mainWnd, HWND dlgWnd); // restore from minimized state of app
                                             // changes name format (letter case), filename must always be null-terminated
 void AlterFileName(char* tgtName, char* filename, int filenameLen, int format, int change, BOOL dir);
+std::wstring AlterFileNameW(const wchar_t* filename, int format, int change, bool isDir);
 
 // Returns string with file size and times; Returns time in 'fileTime', variable can be NULL;
 // if 'getTimeFailed' is not NULL, TRUE is written to it on file time retrieval error
