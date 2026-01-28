@@ -4,6 +4,8 @@
 
 #include "precomp.h"
 
+#include "ui/IPrompter.h"
+#include "common/unicode/helpers.h"
 #include "menu.h"
 #include "cfgdlg.h"
 #include "dialogs.h"
@@ -426,8 +428,7 @@ CZIPUnpackProgress::DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
                 FlushDataToControls();
 
                 // ask the user whether they want to abort the operation
-                Cancel = (SalMessageBox(HWindow, LoadStr(IDS_CANCELOPERATION), LoadStr(IDS_QUESTION),
-                                        MB_YESNO | MB_ICONQUESTION) == IDYES);
+                Cancel = (gPrompter->AskYesNo(LoadStrW(IDS_QUESTION), LoadStrW(IDS_CANCELOPERATION)).type == PromptResult::kYes);
             }
         }
         // do not let the command fall through, otherwise the dialog would close
@@ -5439,14 +5440,13 @@ CSalamanderForViewFileOnFS::AllocFileNameInCache(HWND parent, const char* unique
     const char* name = DiskCache.GetName(uniqueFileName, nameInCache, &fileExists, FALSE, rootTmpPath, FALSE, NULL, &errorCode);
     if (name == NULL)
     {
-        char buff[2000];
-        strcpy(buff, LoadStr(IDS_VIEWFILEFAILED));
+        std::wstring msg = LoadStrW(IDS_VIEWFILEFAILED);
         if (errorCode == DCGNE_TOOLONGNAME)
         {
-            strcat(buff, "\n");
-            strcat(buff, LoadStr(IDS_VIEWFILETOOLONGNAME));
+            msg += L"\n";
+            msg += LoadStrW(IDS_VIEWFILETOOLONGNAME);
         }
-        SalMessageBox(parent, buff, LoadStr(IDS_ERRORTITLE), MB_OK | MB_ICONEXCLAMATION);
+        gPrompter->ShowError(LoadStrW(IDS_ERRORTITLE), msg.c_str());
     }
     else
     {
@@ -6489,11 +6489,10 @@ BOOL TestFreeSpace(HWND parent, const char* path, const CQuadWord& totalSize, co
     {
         char buf1[50];
         char buf2[50];
-        char buf3[200];
-        sprintf(buf3, LoadStr(IDS_NOTENOUGHSPACE),
-                NumberToStr(buf1, totalSize),
-                NumberToStr(buf2, freeSpace));
-        return SalMessageBox(parent, buf3, messageTitle, MB_YESNO | MB_ICONQUESTION | MSGBOXEX_ESCAPEENABLED) == IDYES;
+        NumberToStr(buf1, totalSize);
+        NumberToStr(buf2, freeSpace);
+        std::wstring msg = FormatStrW(LoadStrW(IDS_NOTENOUGHSPACE), AnsiToWide(buf1).c_str(), AnsiToWide(buf2).c_str());
+        return gPrompter->AskYesNo(AnsiToWide(messageTitle).c_str(), msg.c_str()).type == PromptResult::kYes;
     }
     return TRUE;
 }
