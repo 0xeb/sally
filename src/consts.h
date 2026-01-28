@@ -293,6 +293,8 @@ BOOL SalPathAppend(char* path, const char* name, int pathSize);
 // If 'path' doesn't end with backslash yet, adds it at end of 'path'; 'path' is buffer of at least 'pathSize'
 // chars; returns TRUE if backslash fits after 'path'; if 'path' is empty, backslash is not added
 BOOL SalPathAddBackslash(char* path, int pathSize);
+void SalPathAppendW(std::wstring& path, const wchar_t* name);
+void SalPathAddBackslashW(std::wstring& path);
 
 // If 'path' ends with backslash, removes it
 void SalPathRemoveBackslash(char* path);

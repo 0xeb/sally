@@ -71,6 +71,14 @@ public:
             *checkboxValue = true;
     }
 
+    void ShowErrorWithCheckbox(const wchar_t* title, const wchar_t* message,
+                               const wchar_t* checkboxText, bool* checkboxValue) override
+    {
+        log.push_back(L"ShowErrorWithCheckbox:" + std::wstring(title ? title : L"") + L":" + std::wstring(message ? message : L""));
+        if (checkboxValue)
+            *checkboxValue = true;
+    }
+
     PromptResult ConfirmWithCheckbox(const wchar_t* title, const wchar_t* message,
                                      const wchar_t* checkboxText, bool* checkboxValue) override
     {

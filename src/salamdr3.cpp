@@ -76,6 +76,37 @@ BOOL SalPathAddBackslash(char* path, int pathSize)
     return TRUE;
 }
 
+// Wide version - appends name to path (modifies path in-place)
+// Handles leading/trailing backslashes properly
+void SalPathAppendW(std::wstring& path, const wchar_t* name)
+{
+    if (name == nullptr)
+        return;
+    
+    // Skip leading backslash in name
+    if (*name == L'\\')
+        name++;
+    
+    // Remove trailing backslash from path
+    if (!path.empty() && path.back() == L'\\')
+        path.pop_back();
+    
+    // Append name if non-empty
+    if (*name != L'\0')
+    {
+        if (!path.empty())
+            path += L'\\';
+        path += name;
+    }
+}
+
+// Wide version - ensures path ends with backslash
+void SalPathAddBackslashW(std::wstring& path)
+{
+    if (!path.empty() && path.back() != L'\\')
+        path += L'\\';
+}
+
 // ****************************************************************************
 
 void SalPathRemoveBackslash(char* path)
