@@ -4,6 +4,8 @@
 
 #include "precomp.h"
 
+#include "ui/IPrompter.h"
+
 // Attributes
 const char* FILTERCRITERIA_ATTRIBUTESMASK_REG = "Attributes Mask";
 const char* FILTERCRITERIA_ATTRIBUTESVALUE_REG = "Attributes Value";
@@ -1078,8 +1080,7 @@ void CFilterCriteriaDialog::Validate(CTransferInfo& ti)
         MaxSizeForUnits(&limit, Data->MinSizeUnits);
         if (Data->MinSize > limit)
         {
-            SalMessageBox(HWindow, LoadStr(IDS_SIZE_LIMIT_16EB), LoadStr(IDS_ERRORTITLE),
-                          MB_ICONEXCLAMATION | MB_OK);
+            gPrompter->ShowError(LoadStrW(IDS_ERRORTITLE), LoadStrW(IDS_SIZE_LIMIT_16EB));
             ti.ErrorOn(IDC_FFA_SIZEMIN_VALUE);
         }
     }
@@ -1091,8 +1092,7 @@ void CFilterCriteriaDialog::Validate(CTransferInfo& ti)
         MaxSizeForUnits(&limit, Data->MaxSizeUnits);
         if (Data->MaxSize > limit)
         {
-            SalMessageBox(HWindow, LoadStr(IDS_SIZE_LIMIT_16EB), LoadStr(IDS_ERRORTITLE),
-                          MB_ICONEXCLAMATION | MB_OK);
+            gPrompter->ShowError(LoadStrW(IDS_ERRORTITLE), LoadStrW(IDS_SIZE_LIMIT_16EB));
             ti.ErrorOn(IDC_FFA_SIZEMAX_VALUE);
         }
     }
@@ -1106,8 +1106,7 @@ void CFilterCriteriaDialog::Validate(CTransferInfo& ti)
         SizeToBytes(&maxSizeBytes, &Data->MaxSize, Data->MaxSizeUnits);
         if (maxSizeBytes < minSizeBytes)
         {
-            SalMessageBox(HWindow, LoadStr(IDS_SIZE_MAX_MIN), LoadStr(IDS_ERRORTITLE),
-                          MB_ICONEXCLAMATION | MB_OK);
+            gPrompter->ShowError(LoadStrW(IDS_ERRORTITLE), LoadStrW(IDS_SIZE_MAX_MIN));
             ti.ErrorOn(IDC_FFA_SIZEMAX_VALUE);
         }
     }
@@ -1117,8 +1116,7 @@ void CFilterCriteriaDialog::Validate(CTransferInfo& ti)
         // the value must be at least 1
         if (ti.IsGood() && Data->DuringTime.Value < 1)
         {
-            SalMessageBox(HWindow, LoadStr(IDS_TIME_MIN), LoadStr(IDS_ERRORTITLE),
-                          MB_ICONEXCLAMATION | MB_OK);
+            gPrompter->ShowError(LoadStrW(IDS_ERRORTITLE), LoadStrW(IDS_TIME_MIN));
             ti.ErrorOn(IDC_FFA_TIMEDURING_VALUE);
         }
 
@@ -1129,8 +1127,7 @@ void CFilterCriteriaDialog::Validate(CTransferInfo& ti)
             MaxTimeForUnits(&limit, Data->DuringTimeUnits);
             if (Data->DuringTime.Value > limit)
             {
-                SalMessageBox(HWindow, LoadStr(IDS_TIME_MAX), LoadStr(IDS_ERRORTITLE),
-                              MB_ICONEXCLAMATION | MB_OK);
+                gPrompter->ShowError(LoadStrW(IDS_ERRORTITLE), LoadStrW(IDS_TIME_MAX));
                 ti.ErrorOn(IDC_FFA_TIMEDURING_VALUE);
             }
         }
@@ -1153,23 +1150,20 @@ void CFilterCriteriaDialog::Validate(CTransferInfo& ti)
         // FROM
         if (ti.IsGood() && !Data->UseFromDate && !Data->UseToDate)
         {
-            SalMessageBox(HWindow, LoadStr(IDS_SPECIFY_DATE), LoadStr(IDS_ERRORTITLE),
-                          MB_ICONEXCLAMATION | MB_OK);
+            gPrompter->ShowError(LoadStrW(IDS_ERRORTITLE), LoadStrW(IDS_SPECIFY_DATE));
             ti.ErrorOn(IDC_FFA_FROM_DATE);
         }
 
         if (ti.IsGood() && Data->UseFromTime && Data->From == (unsigned __int64)0)
         {
-            SalMessageBox(HWindow, LoadStr(IDS_INVALIDDATE), LoadStr(IDS_ERRORTITLE),
-                          MB_ICONEXCLAMATION | MB_OK);
+            gPrompter->ShowError(LoadStrW(IDS_ERRORTITLE), LoadStrW(IDS_INVALIDDATE));
             ti.ErrorOn(IDC_FFA_FROM_DATE);
         }
 
         // TO
         if (ti.IsGood() && Data->UseToTime && Data->To == (unsigned __int64)0)
         {
-            SalMessageBox(HWindow, LoadStr(IDS_INVALIDDATE), LoadStr(IDS_ERRORTITLE),
-                          MB_ICONEXCLAMATION | MB_OK);
+            gPrompter->ShowError(LoadStrW(IDS_ERRORTITLE), LoadStrW(IDS_INVALIDDATE));
             ti.ErrorOn(IDC_FFA_TO_DATE);
         }
 
@@ -1178,8 +1172,7 @@ void CFilterCriteriaDialog::Validate(CTransferInfo& ti)
             Data->PrepareForTest();
             if (Data->MinTime > Data->MaxTime)
             {
-                SalMessageBox(HWindow, LoadStr(IDS_TIME_MAX_MIN), LoadStr(IDS_ERRORTITLE),
-                              MB_ICONEXCLAMATION | MB_OK);
+                gPrompter->ShowError(LoadStrW(IDS_ERRORTITLE), LoadStrW(IDS_TIME_MAX_MIN));
                 ti.ErrorOn(IDC_FFA_TO_DATE);
             }
         }
