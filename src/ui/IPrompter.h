@@ -2,6 +2,8 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 #pragma once
 
+#include <cstdint>
+
 // UTF-16 first prompt/result definitions for UI ↔ logic decoupling.
 
 struct PromptResult
@@ -54,7 +56,7 @@ public:
     virtual PromptResult AskSkipSkipAllCancel(const wchar_t* title, const wchar_t* message) = 0;
 
     // Error with OK and Help button - helpId is for context-sensitive help
-    virtual void ShowErrorWithHelp(const wchar_t* title, const wchar_t* message, DWORD helpId) = 0;
+    virtual void ShowErrorWithHelp(const wchar_t* title, const wchar_t* message, uint32_t helpId) = 0;
 };
 
 // Global prompter used by UI and worker code. Default is UI-backed.

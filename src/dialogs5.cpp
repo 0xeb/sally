@@ -4,6 +4,8 @@
 
 #include "precomp.h"
 
+#include "ui/IPrompter.h"
+#include "common/unicode/helpers.h"
 #include "tasklist.h"
 #include "mainwnd.h"
 #include "edtlbwnd.h"
@@ -784,12 +786,11 @@ CPluginsDlg::DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
                     int index;
                     if (Plugins.FindDLL(pluginName, index))
                     {
-                        char buf2[MAX_PATH + 300];
-                        sprintf(buf2, LoadStr(IDS_PLUGINEXISTS), Plugins.Get(index)->Name,
-                                Plugins.Get(index)->DLLName);
+                        std::wstring msg = FormatStrW(LoadStrW(IDS_PLUGINEXISTS), AnsiToWide(Plugins.Get(index)->Name).c_str(),
+                                AnsiToWide(Plugins.Get(index)->DLLName).c_str());
                         //                add = SalMessageBox(HWindow, buf2, LoadStr(IDS_QUESTION),
                         //                                    MB_YESNOCANCEL | MB_ICONQUESTION | MB_DEFBUTTON2) == IDYES;
-                        SalMessageBox(HWindow, buf2, LoadStr(IDS_ERRORTITLE), MB_OK | MB_ICONEXCLAMATION);
+                        gPrompter->ShowError(LoadStrW(IDS_ERRORTITLE), msg.c_str());
                         add = FALSE;
                     }
                     if (add && Plugins.AddPlugin(HWindow, pluginName))
@@ -825,10 +826,8 @@ CPluginsDlg::DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
             if (p != NULL)
             {
                 strcpy(name, p->Name);
-                char buf[MAX_PATH + 100];
-                sprintf(buf, LoadStr(IDS_PLUGINREMOVEOK), name);
-                if (SalMessageBox(HWindow, buf, LoadStr(IDS_QUESTION),
-                                  MB_YESNO | MB_ICONQUESTION) == IDYES)
+                std::wstring msg = FormatStrW(LoadStrW(IDS_PLUGINREMOVEOK), AnsiToWide(name).c_str());
+                if (gPrompter->AskYesNo(LoadStrW(IDS_QUESTION), msg.c_str()).type == PromptResult::kYes)
                 {
                     Plugins.Remove(HWindow, index, TRUE);
                     RefreshListView(FALSE, lvIndex); // a DLL was removed, we have fresher data ...
@@ -845,9 +844,8 @@ CPluginsDlg::DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
             {
                 if (p->InitDLL(HWindow))
                 {
-                    char buf[MAX_PATH + 100];
-                    sprintf(buf, LoadStr(IDS_PLUGINTESTOK), p->Name);
-                    SalMessageBox(HWindow, buf, LoadStr(IDS_INFOTITLE), MB_OK | MB_ICONINFORMATION);
+                    std::wstring msg = FormatStrW(LoadStrW(IDS_PLUGINTESTOK), AnsiToWide(p->Name).c_str());
+                    gPrompter->ShowInfo(LoadStrW(IDS_INFOTITLE), msg.c_str());
                 }
                 RefreshListView(); // a DLL was loaded, we have fresher data ...
             }
@@ -868,14 +866,13 @@ CPluginsDlg::DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
         {
             CPluginData* p = GetSelectedPlugin();
 #ifdef _WIN64 // FIXME_X64_WINSCP - this will probably need to be solved differently... (ignoring the missing WinSCP in the x64 version of Salamander)
-            char bufText[MAX_PATH + 200];
             if (p != NULL && IsPluginUnsupportedOnX64(p->DLLName))
             {
                 // inform the user that this plugin is available only in the 32-bit version (x86)
                 // IDS_PLUGINISX86ONLY is not an ideal text but I don't care, it will do,
                 // and we won't bother translators unnecessarily
-                sprintf(bufText, LoadStr(IDS_PLUGINISX86ONLY), p->Name);
-                SalMessageBox(HWindow, bufText, LoadStr(IDS_INFOTITLE), MB_OK | MB_ICONINFORMATION);
+                std::wstring msg = FormatStrW(LoadStrW(IDS_PLUGINISX86ONLY), AnsiToWide(p->Name).c_str());
+                gPrompter->ShowInfo(LoadStrW(IDS_INFOTITLE), msg.c_str());
                 return 0;
             }
 #endif // _WIN64
@@ -1332,9 +1329,8 @@ CPluginKeys::DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
 
         case IDC_RESET:
         {
-            char buf[MAX_PATH + 100];
-            sprintf(buf, LoadStr(IDS_PLUGINRESETKEYS), Plugin->Name);
-            if (SalMessageBox(HWindow, buf, LoadStr(IDS_INFOTITLE), MB_OKCANCEL | MB_ICONQUESTION) == IDOK)
+            std::wstring msg = FormatStrW(LoadStrW(IDS_PLUGINRESETKEYS), AnsiToWide(Plugin->Name).c_str());
+            if (gPrompter->ConfirmError(LoadStrW(IDS_INFOTITLE), msg.c_str()).type == PromptResult::kOk)
             {
                 int i;
                 for (i = 0; i < Plugin->MenuItems.Count; i++)
@@ -1444,8 +1440,7 @@ CArchiveUpdateDlg::DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
         {
             if (SendMessage(GetDlgItem(HWindow, IDL_UPDATEDFILES), LB_GETCOUNT, 0, 0) != 0)
             { // only if there are some files in the listbox
-                if (SalMessageBox(HWindow, LoadStr(IDS_ARCREALLYIGNOREALL), LoadStr(IDS_QUESTION),
-                                  MB_YESNO | MSGBOXEX_ESCAPEENABLED | MB_ICONQUESTION | MB_DEFBUTTON2) != IDYES)
+                if (gPrompter->AskYesNo(LoadStrW(IDS_QUESTION), LoadStrW(IDS_ARCREALLYIGNOREALL)).type != PromptResult::kYes)
                 {
                     return 0; // cancel of cancel
                 }
@@ -1492,8 +1487,7 @@ CArchiveUpdateDlg::DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
             int selCount = (int)SendMessage(list, LB_GETSELCOUNT, 0, 0);
             if (selCount > 0)
             {
-                if (SalMessageBox(HWindow, LoadStr(IDS_ARCREALLYIGNORESEL), LoadStr(IDS_QUESTION),
-                                  MB_YESNO | MSGBOXEX_ESCAPEENABLED | MB_ICONQUESTION | MB_DEFBUTTON2) == IDYES)
+                if (gPrompter->AskYesNo(LoadStrW(IDS_QUESTION), LoadStrW(IDS_ARCREALLYIGNORESEL)).type == PromptResult::kYes)
                 {
                     int* indexes = new int[selCount];
                     if (indexes != NULL)
@@ -1975,8 +1969,7 @@ void CCfgPageViewers::Validate(CTransferInfo& ti)
                 if (forbiddenChar != NULL)
                     errorPos1 = (int)(forbiddenChar - masks.GetMasksString());
                 EditLB->SetCurSel(i);
-                SalMessageBox(HWindow, LoadStr(IDS_INCORRECTSYNTAX), LoadStr(IDS_ERRORTITLE),
-                              MB_OK | MB_ICONEXCLAMATION);
+                gPrompter->ShowError(LoadStrW(IDS_ERRORTITLE), LoadStrW(IDS_INCORRECTSYNTAX));
                 ti.ErrorOn(IDL_FILEMASKS);
                 PostMessage(HWindow, WM_USER_EDIT, errorPos1, errorPos1 + 1);
                 return;
@@ -2388,8 +2381,7 @@ void CCfgPageEditors::Validate(CTransferInfo& ti)
             if (!masks.PrepareMasks(errorPos1))
             {
                 EditLB->SetCurSel(i);
-                SalMessageBox(HWindow, LoadStr(IDS_INCORRECTSYNTAX), LoadStr(IDS_ERRORTITLE),
-                              MB_OK | MB_ICONEXCLAMATION);
+                gPrompter->ShowError(LoadStrW(IDS_ERRORTITLE), LoadStrW(IDS_INCORRECTSYNTAX));
                 ti.ErrorOn(IDL_FILEMASKS);
                 PostMessage(HWindow, WM_USER_EDIT, errorPos1, errorPos1 + 1);
                 return;
@@ -3557,14 +3549,12 @@ CTaskListDialog::DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
             DWORD pid = GetCurPID();
             if (pid == GetCurrentProcessId())
             {
-                SalMessageBox(HWindow, LoadStr(IDS_CURRENTPROCESSBREAK), LoadStr(IDS_ERRORTITLE),
-                              MB_OK | MB_ICONEXCLAMATION);
+                gPrompter->ShowError(LoadStrW(IDS_ERRORTITLE), LoadStrW(IDS_CURRENTPROCESSBREAK));
                 return 0;
             }
             if (pid != -1)
             {
-                if (SalMessageBox(HWindow, LoadStr(IDS_CONFIRM_BREAK), LoadStr(IDS_QUESTION),
-                                  MB_YESNO | MSGBOXEX_ESCAPEENABLED | MB_ICONQUESTION) == IDYES)
+                if (gPrompter->AskYesNo(LoadStrW(IDS_QUESTION), LoadStrW(IDS_CONFIRM_BREAK)).type == PromptResult::kYes)
                 {
                     if (!TaskList.FireEvent(TASKLIST_TODO_BREAK, pid))
                     {
@@ -3580,8 +3570,7 @@ CTaskListDialog::DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
             DWORD pid = GetCurPID();
             if (pid == GetCurrentProcessId())
             {
-                if (SalMessageBox(HWindow, LoadStr(IDS_CURRENTPROCESSTERMINATE), LoadStr(IDS_QUESTION),
-                                  MB_YESNO | MSGBOXEX_ESCAPEENABLED | MB_DEFBUTTON2 | MB_ICONQUESTION) == IDYES)
+                if (gPrompter->AskYesNo(LoadStrW(IDS_QUESTION), LoadStrW(IDS_CURRENTPROCESSTERMINATE)).type == PromptResult::kYes)
                 {
                     TRACE_I("CTaskListDialog::DialogProc(IDB_KILLTASK): calling ExitProcess(668).");
                     // ExitProcess(668);
@@ -3591,8 +3580,7 @@ CTaskListDialog::DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
             }
             if (pid != -1)
             {
-                if (SalMessageBox(HWindow, LoadStr(IDS_CONFIRM_TERMINATE), LoadStr(IDS_QUESTION),
-                                  MB_YESNO | MSGBOXEX_ESCAPEENABLED | MB_ICONQUESTION) == IDYES)
+                if (gPrompter->AskYesNo(LoadStrW(IDS_QUESTION), LoadStrW(IDS_CONFIRM_TERMINATE)).type == PromptResult::kYes)
                 {
                     if (!TaskList.FireEvent(TASKLIST_TODO_TERMINATE, pid))
                     {

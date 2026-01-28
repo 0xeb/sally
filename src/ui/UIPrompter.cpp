@@ -172,7 +172,7 @@ public:
         return {PromptResult::kCancel};
     }
 
-    void ShowErrorWithHelp(const wchar_t* title, const wchar_t* message, DWORD helpId) override
+    void ShowErrorWithHelp(const wchar_t* title, const wchar_t* message, uint32_t helpId) override
     {
         std::string titleA = WideToAnsi(title);
         std::string msgA = WideToAnsi(message);

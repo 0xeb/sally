@@ -83,7 +83,7 @@ public:
         return {PromptResult::kSkip};
     }
 
-    void ShowErrorWithHelp(const wchar_t* title, const wchar_t* message, DWORD helpId) override
+    void ShowErrorWithHelp(const wchar_t* title, const wchar_t* message, uint32_t helpId) override
     {
         log.push_back(L"ShowErrorWithHelp:" + std::wstring(title ? title : L"") + L":" + std::wstring(message ? message : L""));
     }

@@ -4,6 +4,8 @@
 
 #include "precomp.h"
 
+#include "ui/IPrompter.h"
+#include "common/unicode/helpers.h"
 #include "mainwnd.h"
 #include "plugins.h"
 #include "fileswnd.h"
@@ -81,8 +83,7 @@ void CConvertFilesDlg::Validate(CTransferInfo& ti)
             int errorPos;
             if (!mask.PrepareMasks(errorPos))
             {
-                SalMessageBox(HWindow, LoadStr(IDS_INCORRECTSYNTAX), LoadStr(IDS_ERRORTITLE),
-                              MB_OK | MB_ICONEXCLAMATION);
+                gPrompter->ShowError(LoadStrW(IDS_ERRORTITLE), LoadStrW(IDS_INCORRECTSYNTAX));
                 SetFocus(hWnd);
                 SendMessage(hWnd, CB_SETEDITSEL, 0, MAKELPARAM(errorPos, errorPos + 1));
                 ti.ErrorOn(IDE_FILEMASK);
@@ -95,8 +96,7 @@ void CConvertFilesDlg::Validate(CTransferInfo& ti)
         int noneEOF = IsDlgButtonChecked(HWindow, IDC_CHC_EOFNONE) == BST_CHECKED;
         if (noneEOF && CodeType == 0)
         {
-            SalMessageBox(HWindow, LoadStr(IDS_SPECIFY_CONVERT_ACTION), LoadStr(IDS_ERRORTITLE),
-                          MB_OK | MB_ICONEXCLAMATION);
+            gPrompter->ShowError(LoadStrW(IDS_ERRORTITLE), LoadStrW(IDS_SPECIFY_CONVERT_ACTION));
             ti.ErrorOn(IDC_CHC_CHANGECODING);
         }
     }
@@ -283,8 +283,7 @@ void CFilterDialog::Validate(CTransferInfo& ti)
         int errorPos;
         if (!Filter->PrepareMasks(errorPos))
         {
-            SalMessageBox(HWindow, LoadStr(IDS_INCORRECTSYNTAX), LoadStr(IDS_ERRORTITLE),
-                          MB_OK | MB_ICONEXCLAMATION);
+            gPrompter->ShowError(LoadStrW(IDS_ERRORTITLE), LoadStrW(IDS_INCORRECTSYNTAX));
             SetFocus(GetDlgItem(HWindow, IDE_FILTER));
             SendMessage(GetDlgItem(HWindow, IDE_FILTER), EM_SETSEL, errorPos, errorPos + 1);
             ti.ErrorOn(IDE_FILTER);
@@ -932,8 +931,7 @@ void CCopyMoveMoreDialog::Validate(CTransferInfo& ti)
         GetDlgItemText(HWindow, IDE_CM_SPEEDLIMIT, speedLimitText, 20);
         if (!GetSpeedLimit(sel, speedLimitText, NULL))
         {
-            SalMessageBox(HWindow, LoadStr(IDS_SPEEDLIMITSIZE), LoadStr(IDS_ERRORTITLE),
-                          MB_OK | MB_ICONEXCLAMATION);
+            gPrompter->ShowError(LoadStrW(IDS_ERRORTITLE), LoadStrW(IDS_SPEEDLIMITSIZE));
             ti.ErrorOn(IDE_CM_SPEEDLIMIT);
             return;
         }
@@ -949,8 +947,7 @@ void CCopyMoveMoreDialog::Validate(CTransferInfo& ti)
         int errorPos;
         if (!masks.PrepareMasks(errorPos))
         {
-            SalMessageBox(HWindow, LoadStr(IDS_INCORRECTSYNTAX), LoadStr(IDS_ERRORTITLE),
-                          MB_OK | MB_ICONEXCLAMATION);
+            gPrompter->ShowError(LoadStrW(IDS_ERRORTITLE), LoadStrW(IDS_INCORRECTSYNTAX));
             SetFocus(GetDlgItem(HWindow, IDC_CM_NAMED_MASK));
             SendMessage(GetDlgItem(HWindow, IDC_CM_NAMED_MASK), EM_SETSEL, errorPos, errorPos + 1);
             ti.ErrorOn(IDC_CM_NAMED_MASK);
@@ -1421,9 +1418,8 @@ void CDriveInfo::Validate(CTransferInfo& ti)
                 MainWindow->RightPanel->HandsOff(FALSE);
             if (!res)
             {
-                char buf[MAX_PATH + 100];
-                sprintf(buf, LoadStr(IDS_UNABLETOCHANGEDRIVELABEL), GetErrorText(err));
-                SalMessageBox(HWindow, buf, LoadStr(IDS_ERRORTITLE), MB_OK | MB_ICONEXCLAMATION);
+                std::wstring msg = FormatStrW(LoadStrW(IDS_UNABLETOCHANGEDRIVELABEL), GetErrorTextW(err));
+                gPrompter->ShowError(LoadStrW(IDS_ERRORTITLE), msg.c_str());
                 ti.ErrorOn(IDE_VOLNAME);
             }
         }
@@ -2334,10 +2330,8 @@ AGAIN:
 
     if (MainWindow->GetActivePanel()->CheckPath(FALSE, fileName) != ERROR_SUCCESS)
     {
-        char buff[1024];
-        sprintf(buff, LoadStr(IDS_CANNONTFINDFILE), fileName);
-        SalMessageBox(HWindow, buff, LoadStr(IDS_ERRORTITLE),
-                      MB_OK | MB_ICONEXCLAMATION);
+        std::wstring msg = FormatStrW(LoadStrW(IDS_CANNONTFINDFILE), AnsiToWide(fileName).c_str());
+        gPrompter->ShowError(LoadStrW(IDS_ERRORTITLE), msg.c_str());
 
         // fall back to default
         GetShell32(fileName);
@@ -2361,10 +2355,8 @@ AGAIN:
 
     if (IconsCount == 0)
     {
-        char buff[1024];
-        sprintf(buff, LoadStr(IDS_NOICONS), fileName);
-        SalMessageBox(HWindow, buff, LoadStr(IDS_ERRORTITLE),
-                      MB_OK | MB_ICONEXCLAMATION);
+        std::wstring msg = FormatStrW(LoadStrW(IDS_NOICONS), AnsiToWide(fileName).c_str());
+        gPrompter->ShowError(LoadStrW(IDS_ERRORTITLE), msg.c_str());
 
         // fall back to default
         GetShell32(fileName);

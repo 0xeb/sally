@@ -4,6 +4,9 @@
 
 #include "precomp.h"
 
+#include "ui/IPrompter.h"
+#include "common/unicode/helpers.h"
+
 #include "mainwnd.h"
 #include "plugins.h"
 #include "fileswnd.h"
@@ -93,8 +96,7 @@ BOOL CChangeAttrDialog::GetAndValidateTime(CTransferInfo* ti, int resIDDate, int
     FILETIME dummyFT;
     if (!SystemTimeToFileTime(&st2, &dummyFT))
     {
-        SalMessageBox(HWindow, LoadStr(IDS_INVALIDDATE), LoadStr(IDS_ERRORTITLE),
-                      MB_OK | MB_ICONEXCLAMATION);
+        gPrompter->ShowError(LoadStrW(IDS_ERRORTITLE), LoadStrW(IDS_INVALIDDATE));
         ti->ErrorOn(resIDDate);
         return FALSE;
     }
@@ -1350,10 +1352,8 @@ MENU_TEMPLATE_ITEM ProgressDialogMenu2[] =
                     PostMessage(HWindow, WM_TIMER, IDT_UPDATESTATUS, 0); // send one more timer so the "stopped" status is displayed
                 }
 
-                int ret = SalMessageBox(HWindow, LoadStr(IDS_CANCELOPERATION),
-                                        LoadStr(IDS_QUESTION),
-                                        MB_YESNO | MB_ICONQUESTION /*| MSGBOXEX_ESCAPEENABLED*/); // Escape key is not a good
-                // idea -- Zarevak accidentally started deleting a large batch of files, then began hitting Escape (the machine was
+                PromptResult res = gPrompter->AskYesNo(LoadStrW(IDS_QUESTION), LoadStrW(IDS_CANCELOPERATION));
+                // Escape key is not enabled -- Zarevak accidentally started deleting a large batch of files, then began hitting Escape (the machine was
                 // heavily loaded so it did not respond immediately) canceling the confirmation, therefore the confirmation can
                 // no longer be closed with Escape.
 
@@ -1361,7 +1361,7 @@ MENU_TEMPLATE_ITEM ProgressDialogMenu2[] =
 
                 StatusPaused = FALSE; // now time-left and speed can be displayed again
 
-                if (ret == IDYES)
+                if (res.type == PromptResult::kYes)
                 {
                     CancelWorker = TRUE; // set cancel of the worker
                     EnableWindow(GetDlgItem(HWindow, IDB_PAUSERESUME), FALSE);
@@ -1920,7 +1920,7 @@ void CFileListDialog::Validate(CTransferInfo& ti)
             int errTextID;
             if (!SalGetFullName(buffFile, &errTextID, MainWindow->GetActivePanel()->Is(ptDisk) ? MainWindow->GetActivePanel()->GetPath() : NULL))
             {
-                SalMessageBox(HWindow, LoadStr(errTextID), LoadStr(IDS_ERRORTITLE), MB_OK | MB_ICONEXCLAMATION);
+                gPrompter->ShowError(LoadStrW(IDS_ERRORTITLE), LoadStrW(errTextID));
                 ti.ErrorOn(IDC_FL_FILENAME);
                 return;
             }
@@ -1939,18 +1939,15 @@ void CFileListDialog::Validate(CTransferInfo& ti)
 
             if (attr != 0xFFFFFFFF && (attr & FILE_ATTRIBUTE_DIRECTORY))
             {
-                SalMessageBox(HWindow, LoadStr(IDS_NAMEALREADYUSEDFORDIR),
-                              LoadStr(IDS_ERRORTITLE), MB_OK | MB_ICONEXCLAMATION);
+                gPrompter->ShowError(LoadStrW(IDS_ERRORTITLE), LoadStrW(IDS_NAMEALREADYUSEDFORDIR));
                 ti.ErrorOn(IDC_FL_FILENAME);
                 return;
             }
             // if not appending, ask whether to overwrite
             if (!append && attr != 0xFFFFFFFF)
             {
-                char text[300];
-                sprintf(text, LoadStr(IDS_FILEALREADYEXIST), buffFile);
-                if (SalMessageBox(HWindow, text, LoadStr(IDS_QUESTION),
-                                  MB_YESNO | MB_ICONQUESTION | MB_DEFBUTTON2) != IDYES)
+                std::wstring msg = FormatStrW(LoadStrW(IDS_FILEALREADYEXIST), AnsiToWide(buffFile).c_str());
+                if (gPrompter->AskYesNo(LoadStrW(IDS_QUESTION), msg.c_str()).type != PromptResult::kYes)
                 {
                     ti.ErrorOn(IDC_FL_FILENAME);
                     return;
@@ -2158,8 +2155,7 @@ void CSetSpeedLimDialog::Validate(CTransferInfo& ti)
         GetDlgItemText(HWindow, IDE_SETSPLIMNUMBER, speedLimitText, 20);
         if (!GetSpeedLimit(sel, speedLimitText, NULL))
         {
-            SalMessageBox(HWindow, LoadStr(IDS_SPEEDLIMITSIZE), LoadStr(IDS_ERRORTITLE),
-                          MB_OK | MB_ICONEXCLAMATION);
+            gPrompter->ShowError(LoadStrW(IDS_ERRORTITLE), LoadStrW(IDS_SPEEDLIMITSIZE));
             ti.ErrorOn(IDE_SETSPLIMNUMBER);
         }
     }

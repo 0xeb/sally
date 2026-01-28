@@ -6,6 +6,8 @@
 
 #include <lm.h>
 
+#include "ui/IPrompter.h"
+#include "common/unicode/helpers.h"
 #include "mainwnd.h"
 #include "plugins.h"
 #include "fileswnd.h"
@@ -214,9 +216,8 @@ CTipOfTheDayDialog::LoadTips(BOOL quiet)
   {
     if (!quiet)
     {
-      char buf[MAX_PATH + 100];
-      sprintf(buf, LoadStr(IDS_FILEREADERROR), fileName);
-      SalMessageBox(MainWindow->HWindow, buf, LoadStr(IDS_ERRORTITLE), MB_OK | MB_ICONEXCLAMATION);
+      std::wstring msg = FormatStrW(LoadStrW(IDS_FILEREADERROR), AnsiToWide(fileName).c_str());
+      gPrompter->ShowError(LoadStrW(IDS_ERRORTITLE), msg.c_str());
     }
     return FALSE;
   }
@@ -226,9 +227,8 @@ CTipOfTheDayDialog::LoadTips(BOOL quiet)
   {
     if (!quiet)
     {
-      char buf[MAX_PATH + 100];
-      sprintf(buf, LoadStr(IDS_FILEREADERROR), fileName);
-      SalMessageBox(MainWindow->HWindow, buf, LoadStr(IDS_ERRORTITLE), MB_OK | MB_ICONEXCLAMATION);
+      std::wstring msg = FormatStrW(LoadStrW(IDS_FILEREADERROR), AnsiToWide(fileName).c_str());
+      gPrompter->ShowError(LoadStrW(IDS_ERRORTITLE), msg.c_str());
     }
     HANDLES(CloseHandle(hFile));
     return FALSE;
@@ -247,9 +247,8 @@ CTipOfTheDayDialog::LoadTips(BOOL quiet)
   {
     if (!quiet)
     {
-      char buf[MAX_PATH + 100];
-      sprintf(buf, LoadStr(IDS_FILEREADERROR), fileName);
-      SalMessageBox(MainWindow->HWindow, buf, LoadStr(IDS_ERRORTITLE), MB_OK | MB_ICONEXCLAMATION);
+      std::wstring msg = FormatStrW(LoadStrW(IDS_FILEREADERROR), AnsiToWide(fileName).c_str());
+      gPrompter->ShowError(LoadStrW(IDS_ERRORTITLE), msg.c_str());
     }
     free(data);
     HANDLES(CloseHandle(hFile));
@@ -640,10 +639,8 @@ CSharesDialog::DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
                 const char* remoteName;
                 if (SharedDirs.GetItem(index, NULL, &remoteName, NULL))
                 {
-                    char buff[2000];
-                    wsprintf(buff, LoadStr(IDS_CONFIRM_STOPSHARE), remoteName);
-                    if (SalMessageBox(HWindow, buff, LoadStr(IDS_QUESTION),
-                                      MB_OKCANCEL | MB_ICONQUESTION) == IDOK)
+                    std::wstring msg = FormatStrW(LoadStrW(IDS_CONFIRM_STOPSHARE), AnsiToWide(remoteName).c_str());
+                    if (gPrompter->ConfirmError(LoadStrW(IDS_QUESTION), msg.c_str()).type == PromptResult::kOk)
                     {
                         DeleteShare(remoteName);
                         Refresh();
@@ -986,7 +983,7 @@ void CDisconnectDialog::EnumConnections()
     else
     {
         if (err != ERROR_NO_NETWORK)
-            SalMessageBox(Parent, GetErrorText(err), LoadStr(IDS_NETWORKERROR), MB_OK | MB_ICONEXCLAMATION);
+            gPrompter->ShowError(LoadStrW(IDS_NETWORKERROR), GetErrorTextW(err));
     }
 
     // Network: REMEMBERED resources
@@ -1037,7 +1034,7 @@ void CDisconnectDialog::EnumConnections()
     else
     {
         if (err != ERROR_NO_NETWORK)
-            SalMessageBox(Parent, GetErrorText(err), LoadStr(IDS_NETWORKERROR), MB_OK | MB_ICONEXCLAMATION);
+            gPrompter->ShowError(LoadStrW(IDS_NETWORKERROR), GetErrorTextW(err));
     }
 
     // if at least one network drive was inserted, add it in front of the first network group
@@ -1479,8 +1476,7 @@ BOOL ValidateMask(HWND parent, CTransferInfo& ti, int checkbox, int editline)
         int errorPos;
         if (!masks.PrepareMasks(errorPos))
         {
-            SalMessageBox(parent, LoadStr(IDS_INCORRECTSYNTAX), LoadStr(IDS_ERRORTITLE),
-                          MB_OK | MB_ICONEXCLAMATION);
+            gPrompter->ShowError(LoadStrW(IDS_ERRORTITLE), LoadStrW(IDS_INCORRECTSYNTAX));
             SetFocus(GetDlgItem(parent, editline));
             SendMessage(GetDlgItem(parent, editline), EM_SETSEL, errorPos, errorPos + 1);
             ti.ErrorOn(editline);
@@ -1880,8 +1876,7 @@ CCmpDirProgressDialog::DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
                 FlushDataToControls();
 
                 // ask the user if he wants to interrupt the operation
-                Cancel = (SalMessageBox(HWindow, LoadStr(IDS_CANCELOPERATION), LoadStr(IDS_QUESTION),
-                                        MB_YESNO | MB_ICONQUESTION) == IDYES);
+                Cancel = (gPrompter->AskYesNo(LoadStrW(IDS_QUESTION), LoadStrW(IDS_CANCELOPERATION)).type == PromptResult::kYes);
             }
         }
         // do not let the command fall through, or the dialog will close
@@ -2557,8 +2552,7 @@ void CCfgPageIconOvrls::Transfer(CTransferInfo& ti)
             strcmp(oldDisabledCustomIconOverlays != NULL ? oldDisabledCustomIconOverlays : "",
                    Configuration.DisabledCustomIconOverlays != NULL ? Configuration.DisabledCustomIconOverlays : "") != 0)
         { // configuration change -> notify that it takes effect after Salamander restarts
-            SalMessageBox(HWindow, LoadStr(IDS_ICONOVRLS_CHANGE), LoadStr(IDS_INFOTITLE),
-                          MB_OK | MB_ICONINFORMATION);
+            gPrompter->ShowInfo(LoadStrW(IDS_INFOTITLE), LoadStrW(IDS_ICONOVRLS_CHANGE));
         }
         if (oldDisabledCustomIconOverlays != NULL)
             free(oldDisabledCustomIconOverlays);

@@ -4,6 +4,8 @@
 
 #include "precomp.h"
 
+#include "ui/IPrompter.h"
+#include "common/unicode/helpers.h"
 #include "mainwnd.h"
 #include "usermenu.h"
 #include "edtlbwnd.h"
@@ -136,8 +138,7 @@ BOOL ValidatePathIsNotEmpty(HWND hParent, const char* path)
     // an empty string is not allowed
     if (empty)
     {
-        SalMessageBox(hParent, LoadStr(IDS_THEPATHISINVALID), LoadStr(IDS_ERRORTITLE),
-                      MB_OK | MB_ICONEXCLAMATION);
+        gPrompter->ShowError(LoadStrW(IDS_ERRORTITLE), LoadStrW(IDS_THEPATHISINVALID));
         return FALSE;
     }
     /* originally this function was called ValidateCommandFile and checked file existence, but we abandoned that idea (maybe because of network issues?)
@@ -794,8 +795,7 @@ void CCfgPageGeneral::Validate(CTransferInfo& ti)
         ti.EditLine(IDE_TIMERESOLUTION, timerRes);
         if (timerRes < 0 || timerRes > 3600)
         {
-            SalMessageBox(HWindow, LoadStr(IDS_BADTIMERESOLUTION), LoadStr(IDS_ERRORTITLE),
-                          MB_OK | MB_ICONEXCLAMATION);
+            gPrompter->ShowError(LoadStrW(IDS_ERRORTITLE), LoadStrW(IDS_BADTIMERESOLUTION));
             ti.ErrorOn(IDE_TIMERESOLUTION);
         }
     }
@@ -886,8 +886,7 @@ void CCfgPageRegional::Transfer(CTransferInfo& ti)
     {
         if (stricmp(Configuration.SLGName, SLGName) != 0)
         {
-            SalMessageBox(HWindow, LoadStr(IDS_LANGUAGE_CHANGE), LoadStr(IDS_INFOTITLE),
-                          MB_OK | MB_ICONINFORMATION);
+            gPrompter->ShowInfo(LoadStrW(IDS_INFOTITLE), LoadStrW(IDS_LANGUAGE_CHANGE));
             lstrcpy(Configuration.SLGName, SLGName);
             Configuration.ShowSLGIncomplete = TRUE; // if the language is not complete, show a message at startup (recruit translators)
         }
@@ -897,8 +896,7 @@ void CCfgPageRegional::Transfer(CTransferInfo& ti)
             lstrcpy(Configuration.ConversionTable, DirName);
             if (CodeTables.IsLoaded())
             {
-                SalMessageBox(HWindow, LoadStr(IDS_CONVERSION_CHANGE), LoadStr(IDS_INFOTITLE),
-                              MB_OK | MB_ICONINFORMATION);
+                gPrompter->ShowInfo(LoadStrW(IDS_INFOTITLE), LoadStrW(IDS_CONVERSION_CHANGE));
             }
         }
     }
@@ -1640,8 +1638,7 @@ void CCfgPageViewer::Validate(CTransferInfo& ti)
     ti.EditLine(IDC_TABSIZE, dummy);
     if (dummy <= 0 || dummy > 30)
     {
-        SalMessageBox(HWindow, LoadStr(IDS_BADTABSIZE), LoadStr(IDS_ERRORTITLE),
-                      MB_OK | MB_ICONEXCLAMATION);
+        gPrompter->ShowError(LoadStrW(IDS_ERRORTITLE), LoadStrW(IDS_BADTABSIZE));
         ti.ErrorOn(IDC_TABSIZE);
     }
 
@@ -1654,8 +1651,7 @@ void CCfgPageViewer::Validate(CTransferInfo& ti)
         int errorPos;
         if (!Configuration.TextModeMasks.PrepareMasks(errorPos))
         {
-            SalMessageBox(HWindow, LoadStr(IDS_INCORRECTSYNTAX), LoadStr(IDS_ERRORTITLE),
-                          MB_OK | MB_ICONEXCLAMATION);
+            gPrompter->ShowError(LoadStrW(IDS_ERRORTITLE), LoadStrW(IDS_INCORRECTSYNTAX));
             SetFocus(GetDlgItem(HWindow, IDC_VIEW_INTEXT));
             SendMessage(GetDlgItem(HWindow, IDC_VIEW_INTEXT), EM_SETSEL, errorPos, errorPos + 1);
             ti.ErrorOn(IDC_VIEW_INTEXT);
@@ -1672,8 +1668,7 @@ void CCfgPageViewer::Validate(CTransferInfo& ti)
         int errorPos;
         if (!Configuration.HexModeMasks.PrepareMasks(errorPos))
         {
-            SalMessageBox(HWindow, LoadStr(IDS_INCORRECTSYNTAX), LoadStr(IDS_ERRORTITLE),
-                          MB_OK | MB_ICONEXCLAMATION);
+            gPrompter->ShowError(LoadStrW(IDS_ERRORTITLE), LoadStrW(IDS_INCORRECTSYNTAX));
             SetFocus(GetDlgItem(HWindow, IDC_VIEW_INHEX));
             SendMessage(GetDlgItem(HWindow, IDC_VIEW_INHEX), EM_SETSEL, errorPos, errorPos + 1);
             ti.ErrorOn(IDC_VIEW_INHEX);
@@ -3140,8 +3135,7 @@ void CCfgPageSystem::Validate(CTransferInfo& ti)
         int errorPos;
         if (!Configuration.RecycleMasks.PrepareMasks(errorPos))
         {
-            SalMessageBox(HWindow, LoadStr(IDS_INCORRECTSYNTAX), LoadStr(IDS_ERRORTITLE),
-                          MB_OK | MB_ICONEXCLAMATION);
+            gPrompter->ShowError(LoadStrW(IDS_ERRORTITLE), LoadStrW(IDS_INCORRECTSYNTAX));
             SetFocus(GetDlgItem(HWindow, IDE_RECYCLEMASKS));
             SendMessage(GetDlgItem(HWindow, IDE_RECYCLEMASKS), EM_SETSEL, errorPos, errorPos + 1);
             ti.ErrorOn(IDE_RECYCLEMASKS);
@@ -3528,8 +3522,7 @@ void CCfgPageColors::Validate(CTransferInfo& ti)
             if (!masks.PrepareMasks(errorPos1))
             {
                 EditLB->SetCurSel(i);
-                SalMessageBox(HWindow, LoadStr(IDS_INCORRECTSYNTAX), LoadStr(IDS_ERRORTITLE),
-                              MB_OK | MB_ICONEXCLAMATION);
+                gPrompter->ShowError(LoadStrW(IDS_ERRORTITLE), LoadStrW(IDS_INCORRECTSYNTAX));
                 ti.ErrorOn(IDC_C_LIST);
                 PostMessage(HWindow, WM_USER_EDIT, errorPos1, errorPos1 + 1);
                 return;
@@ -4073,12 +4066,10 @@ CCfgPageHistory::DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
         {
         case IDC_HISTORY_CLEARHISTORY:
         {
-            if (SalMessageBox(HWindow, LoadStr(IDS_CLEARHISTORY_CNFRM), LoadStr(IDS_QUESTION),
-                              MB_YESNO | MB_ICONQUESTION) == IDYES)
+            if (gPrompter->AskYesNo(LoadStrW(IDS_QUESTION), LoadStrW(IDS_CLEARHISTORY_CNFRM)).type == PromptResult::kYes)
             {
                 OnClearHistory();
-                SalMessageBox(HWindow, LoadStr(IDS_HISTORY_WAS_CLEARED), LoadStr(IDS_INFOTITLE),
-                              MB_OK | MB_ICONINFORMATION);
+                gPrompter->ShowInfo(LoadStrW(IDS_INFOTITLE), LoadStrW(IDS_HISTORY_WAS_CLEARED));
             }
             return 0;
         }

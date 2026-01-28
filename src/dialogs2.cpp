@@ -4,6 +4,8 @@
 
 #include "precomp.h"
 
+#include "ui/IPrompter.h"
+#include "common/unicode/helpers.h"
 #include "cfgdlg.h"
 #include "dialogs.h"
 #include "usermenu.h"
@@ -540,8 +542,7 @@ void CSelectDialog::Validate(CTransferInfo& ti)
             int errorPos;
             if (!mask.PrepareMasks(errorPos))
             {
-                SalMessageBox(HWindow, LoadStr(IDS_INCORRECTSYNTAX), LoadStr(IDS_ERRORTITLE),
-                              MB_OK | MB_ICONEXCLAMATION);
+                gPrompter->ShowError(LoadStrW(IDS_ERRORTITLE), LoadStrW(IDS_INCORRECTSYNTAX));
                 SetFocus(hWnd);
                 SendMessage(hWnd, CB_SETEDITSEL, 0, MAKELPARAM(errorPos, errorPos + 1));
                 ti.ErrorOn(IDE_FILEMASK);
@@ -1169,16 +1170,14 @@ void CCompareArgsDlg::Validate(CTransferInfo& ti)
     ti.EditLine(IDE_UMC_NAME1, buf, MAX_PATH);
     if (buf[0] == 0)
     {
-        SalMessageBox(HWindow, LoadStr(IDS_FF_EMPTYSTRING), LoadStr(IDS_ERRORTITLE),
-                      MB_OK | MB_ICONEXCLAMATION);
+        gPrompter->ShowError(LoadStrW(IDS_ERRORTITLE), LoadStrW(IDS_FF_EMPTYSTRING));
         ti.ErrorOn(IDE_UMC_NAME1);
         return;
     }
     ti.EditLine(IDE_UMC_NAME2, buf, MAX_PATH);
     if (buf[0] == 0)
     {
-        SalMessageBox(HWindow, LoadStr(IDS_FF_EMPTYSTRING), LoadStr(IDS_ERRORTITLE),
-                      MB_OK | MB_ICONEXCLAMATION);
+        gPrompter->ShowError(LoadStrW(IDS_ERRORTITLE), LoadStrW(IDS_FF_EMPTYSTRING));
         ti.ErrorOn(IDE_UMC_NAME2);
         return;
     }
