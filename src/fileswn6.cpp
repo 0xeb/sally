@@ -202,12 +202,7 @@ BOOL CFilesWindow::MakeFileList(HANDLE hFile)
                         DWORD written;
                         if (!WriteFile(hFile, buff, len, &written, NULL) || written != len)
                         {
-                            DWORD err = GetLastError();
-                            if (gPrompter != NULL)
-                                gPrompter->ShowError(LoadStrW(IDS_ERRORTITLE), GetErrorTextW(err));
-                            else
-                                SalMessageBox(HWindow, GetErrorText(err),
-                                              LoadStr(IDS_ERRORTITLE), MB_OK | MB_ICONEXCLAMATION);
+                            gPrompter->ShowError(LoadStrW(IDS_ERRORTITLE), GetErrorTextW(GetLastError()));
                             ret = FALSE;
                             goto exitus;
                         }
@@ -985,10 +980,10 @@ BOOL CFilesWindow::BuildScriptMain2(COperations* script, BOOL copy, char* target
                         err = GetLastError();
                     if (err != NO_ERROR)
                     {
-                        char message[MAX_PATH + 100];
-                        sprintf(message, LoadStr(IDS_FILEERRORFORMAT), fileName, GetErrorText(err));
+                        std::wstring fileNameW = data->At(i)->FileNameW ? std::wstring(data->At(i)->FileNameW) : AnsiToWide(fileName);
+                        std::wstring errTextW = GetErrorTextW(err);
                         SetCurrentDirectoryToSystem();
-                        SalMessageBox(HWindow, message, LoadStr(IDS_ERRORTITLE), MB_OK | MB_ICONEXCLAMATION);
+                        gPrompter->ShowError(LoadStrW(IDS_ERRORTITLE), (fileNameW + L": " + errTextW).c_str());
                         if (usedNames != NULL)
                             delete usedNames;
                         return FALSE;
@@ -997,11 +992,9 @@ BOOL CFilesWindow::BuildScriptMain2(COperations* script, BOOL copy, char* target
             }
             else
             {
-                char message[MAX_PATH + 100];
-                sprintf(message, LoadStr(IDS_FILEERRORFORMAT), fileName,
-                        GetErrorText(ERROR_INVALID_DATA));
+                std::wstring errFileW = fileNameW ? std::wstring(fileNameW) : AnsiToWide(fileName);
                 SetCurrentDirectoryToSystem();
-                SalMessageBox(HWindow, message, LoadStr(IDS_ERRORTITLE), MB_OK | MB_ICONEXCLAMATION);
+                gPrompter->ShowError(LoadStrW(IDS_ERRORTITLE), (errFileW + L": " + GetErrorTextW(ERROR_INVALID_DATA)).c_str());
                 if (usedNames != NULL)
                     delete usedNames;
                 return FALSE;
@@ -1009,11 +1002,10 @@ BOOL CFilesWindow::BuildScriptMain2(COperations* script, BOOL copy, char* target
         }
         else
         {
-            char message[MAX_PATH + 100];
-            sprintf(message, LoadStr(IDS_FILEERRORFORMAT), fileName,
-                    GetErrorText(GetLastError()));
+            std::wstring errFileW = fileNameW ? std::wstring(fileNameW) : AnsiToWide(fileName);
+            DWORD lastErr = GetLastError();
             //      SetCurrentDirectoryToSystem();
-            SalMessageBox(HWindow, message, LoadStr(IDS_ERRORTITLE), MB_OK | MB_ICONEXCLAMATION);
+            gPrompter->ShowError(LoadStrW(IDS_ERRORTITLE), (errFileW + L": " + GetErrorTextW(lastErr)).c_str());
             //      if (usedNames != NULL) delete usedNames;
             //      return FALSE;
         }
@@ -1728,8 +1720,7 @@ MENU_TEMPLATE_ITEM MsgBoxButtons[] =
         {
             *sourceEnd = 0; // restoring sourcePath
             *targetEnd = 0; // restoring targetPath
-            SalMessageBox(MainWindow->HWindow, LoadStr(IDS_CANNOTMOVEDIRTOITSELF),
-                          LoadStr(IDS_ERRORTITLE), MB_OK | MB_ICONEXCLAMATION);
+            gPrompter->ShowError(LoadStrW(IDS_ERRORTITLE), LoadStrW(IDS_CANNOTMOVEDIRTOITSELF));
             return FALSE;
         }
         BOOL sameDisk;
@@ -2645,15 +2636,9 @@ MENU_TEMPLATE_ITEM MsgBoxButtons[] =
             free(op.TargetName);
             op.TargetName = NULL;
             if (type == atMove) // moving where it already is ...
-            {
-                SalMessageBox(MainWindow->HWindow, LoadStr(IDS_CANNOTMOVEFILETOITSELF),
-                              LoadStr(IDS_ERRORTITLE), MB_OK | MB_ICONEXCLAMATION);
-            }
+                gPrompter->ShowError(LoadStrW(IDS_ERRORTITLE), LoadStrW(IDS_CANNOTMOVEFILETOITSELF));
             else
-            {
-                SalMessageBox(MainWindow->HWindow, LoadStr(IDS_CANNOTCOPYFILETOITSELF),
-                              LoadStr(IDS_ERRORTITLE), MB_OK | MB_ICONEXCLAMATION);
-            }
+                gPrompter->ShowError(LoadStrW(IDS_ERRORTITLE), LoadStrW(IDS_CANNOTCOPYFILETOITSELF));
             return FALSE;
         }
         // if a rename (within the same volume) is enough, remove the OPFL_AS_ENCRYPTED flag again

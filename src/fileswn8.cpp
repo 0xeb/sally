@@ -75,12 +75,8 @@ BOOL CFilesWindow::DeleteThroughRecycleBin(int* selection, int selCount, CFileDa
     SalPathAddBackslash(pathAnsi, MAX_PATH);
     if (!PathContainsValidComponents(pathAnsi, TRUE))
     {
-        char textBuf[2 * MAX_PATH + 200];
-        sprintf(textBuf, LoadStr(IDS_RECYCLEBINERROR), pathAnsi);
-        if (gPrompter != NULL)
-            gPrompter->ShowError(LoadStrW(IDS_ERRORTITLE), AnsiToWide(textBuf).c_str());
-        else
-            SalMessageBox(MainWindow->HWindow, textBuf, LoadStr(IDS_ERRORTITLE), MB_OK | MB_ICONEXCLAMATION);
+        // TODO: Use wide format string once IDS_RECYCLEBINERROR supports wide
+        gPrompter->ShowError(LoadStrW(IDS_ERRORTITLE), (pathW + L" - invalid path component").c_str());
         return FALSE; // quick dirty bloody hack - Recycle Bin simply cannot handle names ending with a space or dot (it deletes a different name created by trimming those characters, which we definitely don't want)
     }
 
@@ -95,12 +91,9 @@ BOOL CFilesWindow::DeleteThroughRecycleBin(int* selection, int selCount, CFileDa
         }
         if (oneFile->Name[oneFile->NameLen - 1] <= ' ' || oneFile->Name[oneFile->NameLen - 1] == '.')
         {
-            char textBuf[2 * MAX_PATH + 200];
-            sprintf(textBuf, LoadStr(IDS_RECYCLEBINERROR), oneFile->Name);
-            if (gPrompter != NULL)
-                gPrompter->ShowError(LoadStrW(IDS_ERRORTITLE), AnsiToWide(textBuf).c_str());
-            else
-                SalMessageBox(MainWindow->HWindow, textBuf, LoadStr(IDS_ERRORTITLE), MB_OK | MB_ICONEXCLAMATION);
+            // Use wide name if available, otherwise convert from ANSI
+            std::wstring nameW = oneFile->NameW.empty() ? AnsiToWide(oneFile->Name) : oneFile->NameW;
+            gPrompter->ShowError(LoadStrW(IDS_ERRORTITLE), (nameW + L" - invalid filename (ends with space or dot)").c_str());
             return FALSE; // quick dirty bloody hack - Recycle Bin simply cannot handle names ending with a space or dot (it deletes a different name created by trimming those characters, which we definitely do not want)
         }
         // oneFile points to the selected item or the caret item in the filebox
@@ -257,14 +250,12 @@ void CFilesWindow::FilesAction(CActionType type, CFilesWindow* target, int count
                 ContainsWin64RedirectedDir(this, count > 0 ? indexes : &oneIndex,
                                            count > 0 ? count : 1, redirectedDir, FALSE))
             {
+                // TODO: Use wide format strings when available
                 char msg[300 + MAX_PATH];
                 _snprintf_s(msg, _TRUNCATE,
                             LoadStr(type == atMove ? IDS_ERRMOVESELCONTW64ALIAS : IDS_ERRDELETESELCONTW64ALIAS),
                             redirectedDir);
-                if (gPrompter != NULL)
-                    gPrompter->ShowError(LoadStrW(IDS_ERRORTITLE), AnsiToWide(msg).c_str());
-                else
-                    SalMessageBox(HWindow, msg, LoadStr(IDS_ERRORTITLE), MB_OK | MB_ICONEXCLAMATION);
+                gPrompter->ShowError(LoadStrW(IDS_ERRORTITLE), AnsiToWide(msg).c_str());
 
                 if (indexes != NULL)
                     delete[] (indexes);
@@ -524,14 +515,9 @@ void CFilesWindow::FilesAction(CActionType type, CFilesWindow* target, int count
                         // but the dialog path buffer is 2*MAX_PATH, so check against that
                         if (strlen(path) >= 2 * MAX_PATH)
                         {
-                            std::wstring titleW = AnsiToWide((type == atCopy) ? LoadStr(IDS_ERRORCOPY) : LoadStr(IDS_ERRORMOVE));
-                            std::wstring msgW = AnsiToWide(LoadStr(IDS_TOOLONGPATH));
-                            if (gPrompter != NULL)
-                                gPrompter->ShowError(titleW.c_str(), msgW.c_str());
-                            else
-                                SalMessageBox(HWindow, LoadStr(IDS_TOOLONGPATH),
-                                              (type == atCopy) ? LoadStr(IDS_ERRORCOPY) : LoadStr(IDS_ERRORMOVE),
-                                              MB_OK | MB_ICONEXCLAMATION);
+                            gPrompter->ShowError(
+                                LoadStrW((type == atCopy) ? IDS_ERRORCOPY : IDS_ERRORMOVE),
+                                LoadStrW(IDS_TOOLONGPATH));
                             continue;
                         }
 
