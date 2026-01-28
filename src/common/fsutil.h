@@ -253,3 +253,27 @@ std::wstring GetFileNameWithoutExtensionW(const wchar_t* path);
 //   Parent path, or empty if at root
 //
 std::wstring GetParentPathW(const wchar_t* path);
+
+// Compares two paths for equality (case-insensitive, ignores trailing backslash).
+// Example: IsTheSamePathW("C:\\Users", "c:\\users\\") => TRUE
+//
+// Parameters:
+//   path1 - First path
+//   path2 - Second path
+//
+// Returns:
+//   TRUE if paths are equivalent, FALSE otherwise
+//
+BOOL IsTheSamePathW(const wchar_t* path1, const wchar_t* path2);
+
+// Checks if path starts with prefix (case-insensitive).
+// Example: PathStartsWithW("C:\\Users\\Test", "C:\\Users") => TRUE
+//
+// Parameters:
+//   path - Full path to check
+//   prefix - Prefix to look for
+//
+// Returns:
+//   TRUE if path starts with prefix, FALSE otherwise
+//
+BOOL PathStartsWithW(const wchar_t* path, const wchar_t* prefix);

@@ -428,3 +428,58 @@ std::wstring GetParentPathW(const wchar_t* path)
 
     return p.substr(0, lastSlash);
 }
+
+BOOL IsTheSamePathW(const wchar_t* path1, const wchar_t* path2)
+{
+    if (path1 == NULL || path2 == NULL)
+        return (path1 == path2);
+
+    // Skip leading backslash if present
+    if (*path1 == L'\\')
+        path1++;
+    if (*path2 == L'\\')
+        path2++;
+
+    // Case-insensitive comparison
+    while (*path1 != L'\0' && towlower(*path1) == towlower(*path2))
+    {
+        path1++;
+        path2++;
+    }
+
+    // Skip trailing backslash if present
+    if (*path1 == L'\\')
+        path1++;
+    if (*path2 == L'\\')
+        path2++;
+
+    return *path1 == L'\0' && *path2 == L'\0';
+}
+
+BOOL PathStartsWithW(const wchar_t* path, const wchar_t* prefix)
+{
+    if (path == NULL || prefix == NULL)
+        return FALSE;
+    if (*prefix == L'\0')
+        return TRUE; // Empty prefix matches everything
+
+    // Case-insensitive comparison
+    while (*prefix != L'\0')
+    {
+        if (towlower(*path) != towlower(*prefix))
+            return FALSE;
+        path++;
+        prefix++;
+    }
+
+    // Prefix matched. Check if we're at path boundary
+    // (either end of path, or at a backslash)
+    if (*path == L'\0' || *path == L'\\')
+        return TRUE;
+
+    // Also valid if prefix ended with backslash
+    if (*(prefix - 1) == L'\\')
+        return TRUE;
+
+    return FALSE;
+}

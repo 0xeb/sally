@@ -267,6 +267,40 @@ void TestGetParentPathW()
     TEST_ASSERT(GetParentPathW(NULL) == L"", "NULL");
 }
 
+//
+// IsTheSamePathW tests
+//
+void TestIsTheSamePathW()
+{
+    printf("\n=== Test: IsTheSamePathW ===\n");
+
+    TEST_ASSERT(IsTheSamePathW(L"C:\\Users", L"C:\\Users"), "Exact match");
+    TEST_ASSERT(IsTheSamePathW(L"C:\\Users", L"c:\\users"), "Case insensitive");
+    TEST_ASSERT(IsTheSamePathW(L"C:\\Users", L"C:\\Users\\"), "Trailing backslash");
+    TEST_ASSERT(IsTheSamePathW(L"C:\\Users\\", L"C:\\Users"), "Reverse trailing");
+    TEST_ASSERT(!IsTheSamePathW(L"C:\\Users", L"C:\\Temp"), "Different paths");
+    TEST_ASSERT(!IsTheSamePathW(L"C:\\Users", L"C:\\Users\\Test"), "Prefix only");
+    TEST_ASSERT(IsTheSamePathW(NULL, NULL), "Both NULL");
+    TEST_ASSERT(!IsTheSamePathW(L"C:\\", NULL), "One NULL");
+}
+
+//
+// PathStartsWithW tests
+//
+void TestPathStartsWithW()
+{
+    printf("\n=== Test: PathStartsWithW ===\n");
+
+    TEST_ASSERT(PathStartsWithW(L"C:\\Users\\Test", L"C:\\Users"), "Basic prefix");
+    TEST_ASSERT(PathStartsWithW(L"C:\\Users\\Test", L"c:\\users"), "Case insensitive");
+    TEST_ASSERT(PathStartsWithW(L"C:\\Users\\Test", L"C:\\Users\\"), "Prefix with slash");
+    TEST_ASSERT(PathStartsWithW(L"C:\\Users", L"C:\\Users"), "Exact match");
+    TEST_ASSERT(!PathStartsWithW(L"C:\\Users", L"C:\\Users\\Test"), "Longer prefix");
+    TEST_ASSERT(!PathStartsWithW(L"C:\\Usernames", L"C:\\Users"), "Partial match");
+    TEST_ASSERT(PathStartsWithW(L"C:\\Users", L""), "Empty prefix");
+    TEST_ASSERT(!PathStartsWithW(NULL, L"C:\\"), "NULL path");
+}
+
 int main()
 {
     printf("=====================================================\n");
@@ -285,6 +319,8 @@ int main()
     TestExpandEnvironmentW();
     TestExtensionHelpers();
     TestGetParentPathW();
+    TestIsTheSamePathW();
+    TestPathStartsWithW();
 
     printf("\n=====================================================\n");
     printf("  Results: %d passed, %d failed\n", g_passed, g_failed);
