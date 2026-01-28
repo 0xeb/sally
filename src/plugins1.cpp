@@ -4,6 +4,8 @@
 
 #include "precomp.h"
 
+#include "ui/IPrompter.h"
+#include "common/unicode/helpers.h"
 #include "menu.h"
 #include "cfgdlg.h"
 #include "plugins.h"
@@ -1578,9 +1580,8 @@ BOOL CSalamanderPluginEntry::SetBasicPluginData(const char* pluginName, DWORD fu
         Plugin->SupportViewer && !supportViewer ||
         Plugin->SupportFS && !supportFS)
     { // downgrading capabilities is not possible ...
-        char bufText[MAX_PATH + 200];
-        sprintf(bufText, LoadStr(IDS_REINSTALLPLUGIN), Plugin->Name, Plugin->DLLName);
-        SalMessageBox(Parent, bufText, LoadStr(IDS_ERRORTITLE), MB_OK | MB_ICONERROR);
+        std::wstring msg = FormatStrW(LoadStrW(IDS_REINSTALLPLUGIN), AnsiToWide(Plugin->Name).c_str(), AnsiToWide(Plugin->DLLName).c_str());
+        gPrompter->ShowError(LoadStrW(IDS_ERRORTITLE), msg.c_str());
         Error = TRUE;
         return FALSE;
     }
@@ -1745,16 +1746,11 @@ CSalamanderPluginEntry::LoadLanguageModule(HWND parent, const char* pluginName)
         {
             if (!Configuration.DoNotDispCantLoadPluginSLG)
             {
-                MSGBOXEX_PARAMS params;
-                memset(&params, 0, sizeof(params));
-                params.HParent = parent;
-                params.Flags = MB_OK | MB_ICONERROR;
-                params.Caption = pluginName;
-                _snprintf_s(errorText, _TRUNCATE, LoadStr(IDS_CANTLOADPLUGINSLG1), path);
-                params.Text = errorText;
-                params.CheckBoxText = LoadStr(IDS_DONOTSHOWCANTLOADPLUGINSLG);
-                params.CheckBoxValue = &Configuration.DoNotDispCantLoadPluginSLG;
-                SalMessageBoxEx(&params);
+                std::wstring msg = FormatStrW(LoadStrW(IDS_CANTLOADPLUGINSLG1), AnsiToWide(path).c_str());
+                bool dontShow = Configuration.DoNotDispCantLoadPluginSLG != FALSE;
+                gPrompter->ShowErrorWithCheckbox(AnsiToWide(pluginName).c_str(), msg.c_str(),
+                                                 LoadStrW(IDS_DONOTSHOWCANTLOADPLUGINSLG), &dontShow);
+                Configuration.DoNotDispCantLoadPluginSLG = dontShow ? TRUE : FALSE;
             }
         }
         else // try to load the .slg chosen during the previous plugin load
@@ -1768,16 +1764,11 @@ CSalamanderPluginEntry::LoadLanguageModule(HWND parent, const char* pluginName)
                 lang = NULL;
                 if (!Configuration.DoNotDispCantLoadPluginSLG2)
                 {
-                    MSGBOXEX_PARAMS params;
-                    memset(&params, 0, sizeof(params));
-                    params.HParent = parent;
-                    params.Flags = MB_OK | MB_ICONERROR;
-                    params.Caption = pluginName;
-                    _snprintf_s(errorText, _TRUNCATE, LoadStr(IDS_CANTLOADPLUGINSLG2), path);
-                    params.Text = errorText;
-                    params.CheckBoxText = LoadStr(IDS_DONOTSHOWCANTLOADPLUGINSLG);
-                    params.CheckBoxValue = &Configuration.DoNotDispCantLoadPluginSLG2;
-                    SalMessageBoxEx(&params);
+                    std::wstring msg = FormatStrW(LoadStrW(IDS_CANTLOADPLUGINSLG2), AnsiToWide(path).c_str());
+                    bool dontShow = Configuration.DoNotDispCantLoadPluginSLG2 != FALSE;
+                    gPrompter->ShowErrorWithCheckbox(AnsiToWide(pluginName).c_str(), msg.c_str(),
+                                                     LoadStrW(IDS_DONOTSHOWCANTLOADPLUGINSLG), &dontShow);
+                    Configuration.DoNotDispCantLoadPluginSLG2 = dontShow ? TRUE : FALSE;
                 }
             }
         }
@@ -1789,7 +1780,7 @@ CSalamanderPluginEntry::LoadLanguageModule(HWND parent, const char* pluginName)
             lstrcpyn(slgName, "*.slg", slgNameBufSize);
             slgDialog.Initialize(path, Plugin->GetPluginDLL());
             if (slgDialog.GetLanguagesCount() == 0)
-                SalMessageBox(parent, LoadStr(IDS_PLUGINSLGNOTFOUND), pluginName, MB_OK | MB_ICONERROR);
+                gPrompter->ShowError(AnsiToWide(pluginName).c_str(), LoadStrW(IDS_PLUGINSLGNOTFOUND));
             else
             {
                 if (slgDialog.GetLanguagesCount() == 1)
@@ -2150,8 +2141,8 @@ BOOL CPluginData::InitDLL(HWND parent, BOOL quiet, BOOL waitCursor, BOOL showUns
     {
         if (showUnsupOnX64) // inform the user this plugin is available only in the 32-bit version (x86)
         {
-            sprintf(bufText, LoadStr(IDS_PLUGINISX86ONLY), Name == NULL || Name[0] == 0 ? pluginNameEN : Name);
-            SalMessageBox(parent, bufText, LoadStr(IDS_INFOTITLE), MB_OK | MB_ICONINFORMATION);
+            std::wstring msg = FormatStrW(LoadStrW(IDS_PLUGINISX86ONLY), AnsiToWide(Name == NULL || Name[0] == 0 ? pluginNameEN : Name).c_str());
+            gPrompter->ShowInfo(LoadStrW(IDS_INFOTITLE), msg.c_str());
         }
         return FALSE;
     }
@@ -2184,9 +2175,11 @@ BOOL CPluginData::InitDLL(HWND parent, BOOL quiet, BOOL waitCursor, BOOL showUns
         if (DLL == NULL) // error
         {
             DWORD err = GetLastError();
-            sprintf(bufText, LoadStr(IDS_UNABLETOLOADPLUGIN), Name, s, GetErrorText(err));
             if (!quiet)
-                SalMessageBox(parent, bufText, LoadStr(IDS_ERRORTITLE), MB_OK | MB_ICONERROR);
+            {
+                std::wstring msg = FormatStrW(LoadStrW(IDS_UNABLETOLOADPLUGIN), AnsiToWide(Name).c_str(), AnsiToWide(s).c_str(), GetErrorTextW(err));
+                gPrompter->ShowError(LoadStrW(IDS_ERRORTITLE), msg.c_str());
+            }
         }
         else // connect to the DLL
         {
@@ -2297,12 +2290,15 @@ BOOL CPluginData::InitDLL(HWND parent, BOOL quiet, BOOL waitCursor, BOOL showUns
                 {
                     if (salamander.ShowError() && oldVer) // old version and it has not been reported yet...
                     {
-                        if (Name == NULL || Name[0] == 0)
-                            sprintf(bufText, LoadStr(IDS_OLDPLUGINVERSION2), s);
-                        else
-                            sprintf(bufText, LoadStr(IDS_OLDPLUGINVERSION), Name, s);
                         if (!quiet)
-                            SalMessageBox(parent, bufText, LoadStr(IDS_ERRORTITLE), MB_OK | MB_ICONERROR);
+                        {
+                            std::wstring msg;
+                            if (Name == NULL || Name[0] == 0)
+                                msg = FormatStrW(LoadStrW(IDS_OLDPLUGINVERSION2), AnsiToWide(s).c_str());
+                            else
+                                msg = FormatStrW(LoadStrW(IDS_OLDPLUGINVERSION), AnsiToWide(Name).c_str(), AnsiToWide(s).c_str());
+                            gPrompter->ShowError(LoadStrW(IDS_ERRORTITLE), msg.c_str());
+                        }
                     }
 
                     PluginIfaceForArchiver.Init(NULL);
@@ -2463,12 +2459,15 @@ BOOL CPluginData::InitDLL(HWND parent, BOOL quiet, BOOL waitCursor, BOOL showUns
 
                     if (!oldVer && salamander.ShowError())
                     { // the plugin is the correct version and did not call SetBasicPluginData successfully or unsuccessfully
-                        if (Name == NULL || Name[0] == 0)
-                            sprintf(bufText, LoadStr(IDS_PLUGININVALID2), s);
-                        else
-                            sprintf(bufText, LoadStr(IDS_PLUGININVALID), Name, s);
                         if (!quiet)
-                            SalMessageBox(parent, bufText, LoadStr(IDS_ERRORTITLE), MB_OK | MB_ICONERROR);
+                        {
+                            std::wstring msg;
+                            if (Name == NULL || Name[0] == 0)
+                                msg = FormatStrW(LoadStrW(IDS_PLUGININVALID2), AnsiToWide(s).c_str());
+                            else
+                                msg = FormatStrW(LoadStrW(IDS_PLUGININVALID), AnsiToWide(Name).c_str(), AnsiToWide(s).c_str());
+                            gPrompter->ShowError(LoadStrW(IDS_ERRORTITLE), msg.c_str());
+                        }
                     }
                 }
             }
@@ -2477,9 +2476,11 @@ BOOL CPluginData::InitDLL(HWND parent, BOOL quiet, BOOL waitCursor, BOOL showUns
                 HANDLES(FreeLibrary(DLL));
                 DLL = NULL;
 
-                sprintf(bufText, LoadStr(IDS_UNABLETOFINDPLUGINENTRY), s);
                 if (!quiet)
-                    SalMessageBox(parent, bufText, LoadStr(IDS_ERRORTITLE), MB_OK | MB_ICONERROR);
+                {
+                    std::wstring msg = FormatStrW(LoadStrW(IDS_UNABLETOFINDPLUGINENTRY), AnsiToWide(s).c_str());
+                    gPrompter->ShowError(LoadStrW(IDS_ERRORTITLE), msg.c_str());
+                }
             }
         }
         // inform the main window about the plugin load
@@ -2626,9 +2627,8 @@ BOOL CPluginData::Remove(HWND parent, int index, BOOL canDelPluginRegKey)
                 unloaded = TRUE; // will be unloaded and can be removed
             else
             {
-                char buf[MAX_PATH + 100];
-                sprintf(buf, LoadStr(IDS_PLUGINFORCEUNLOAD), Name);
-                if (SalMessageBox(parent, buf, LoadStr(IDS_QUESTION), MB_YESNO | MB_ICONQUESTION) == IDYES)
+                std::wstring msg = FormatStrW(LoadStrW(IDS_PLUGINFORCEUNLOAD), AnsiToWide(Name).c_str());
+                if (gPrompter->AskYesNo(LoadStrW(IDS_QUESTION), msg.c_str()).type == PromptResult::kYes)
                 {
                     PluginIface.Release(parent, TRUE);
                     unloaded = TRUE; // will be unloaded and can be removed
@@ -3040,8 +3040,8 @@ BOOL CPluginData::Unload(HWND parent, BOOL ask)
             BOOL skipUnload = FALSE;
             if (SupportLoadSave && ::Configuration.AutoSave)
             { // ask if the user wants to save configuration when "save on exit" is on
-                sprintf(buf, LoadStr(IDS_PLUGINSAVECONFIG), Name);
-                if (!ask || SalMessageBox(parent, buf, LoadStr(IDS_QUESTION), MB_YESNO | MB_ICONQUESTION) == IDYES)
+                std::wstring msg = FormatStrW(LoadStrW(IDS_PLUGINSAVECONFIG), AnsiToWide(Name).c_str());
+                if (!ask || gPrompter->AskYesNo(LoadStrW(IDS_QUESTION), msg.c_str()).type == PromptResult::kYes)
                 {
                     LoadSaveToRegistryMutex.Enter();
                     BOOL salKeyDoesNotExist = FALSE;
@@ -3095,9 +3095,8 @@ BOOL CPluginData::Unload(HWND parent, BOOL ask)
 
                     if (ask && salKeyDoesNotExist)
                     {
-                        sprintf(buf, LoadStr(IDS_PLUGINSAVEFAILED), Name);
-                        skipUnload = SalMessageBox(parent, buf, LoadStr(IDS_QUESTION),
-                                                   MB_YESNO | MB_ICONQUESTION | MB_DEFBUTTON2) == IDNO;
+                        std::wstring failMsg = FormatStrW(LoadStrW(IDS_PLUGINSAVEFAILED), AnsiToWide(Name).c_str());
+                        skipUnload = gPrompter->AskYesNo(LoadStrW(IDS_QUESTION), failMsg.c_str()).type == PromptResult::kNo;
                     }
                 }
                 if (GlobalSaveWaitWindow != NULL)
@@ -3114,8 +3113,8 @@ BOOL CPluginData::Unload(HWND parent, BOOL ask)
                     ret = TRUE;
                 else
                 {
-                    sprintf(buf, LoadStr(IDS_PLUGINFORCEUNLOAD), Name);
-                    if (SalMessageBox(parent, buf, LoadStr(IDS_QUESTION), MB_YESNO | MB_ICONQUESTION) == IDYES)
+                    std::wstring forceMsg = FormatStrW(LoadStrW(IDS_PLUGINFORCEUNLOAD), AnsiToWide(Name).c_str());
+                    if (gPrompter->AskYesNo(LoadStrW(IDS_QUESTION), forceMsg.c_str()).type == PromptResult::kYes)
                     {
                         PluginIface.Release(parent, TRUE);
                         ret = TRUE;

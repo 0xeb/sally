@@ -123,6 +123,27 @@ public:
             *checkboxValue = (cbVal != FALSE);
     }
 
+    void ShowErrorWithCheckbox(const wchar_t* title, const wchar_t* message,
+                               const wchar_t* checkboxText, bool* checkboxValue) override
+    {
+        std::string titleA = WideToAnsi(title);
+        std::string msgA = WideToAnsi(message);
+        std::string cbTextA = WideToAnsi(checkboxText);
+
+        MSGBOXEX_PARAMS params;
+        memset(&params, 0, sizeof(params));
+        params.HParent = MainWindow->HWindow;
+        params.Flags = MB_OK | MB_ICONERROR;
+        params.Caption = titleA.c_str();
+        params.Text = msgA.c_str();
+        params.CheckBoxText = cbTextA.c_str();
+        BOOL cbVal = checkboxValue ? (*checkboxValue ? TRUE : FALSE) : FALSE;
+        params.CheckBoxValue = &cbVal;
+        SalMessageBoxEx(&params);
+        if (checkboxValue)
+            *checkboxValue = (cbVal != FALSE);
+    }
+
     PromptResult ConfirmWithCheckbox(const wchar_t* title, const wchar_t* message,
                                      const wchar_t* checkboxText, bool* checkboxValue) override
     {
