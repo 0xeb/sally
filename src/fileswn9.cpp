@@ -5,6 +5,7 @@
 #include "precomp.h"
 
 #include "ui/IPrompter.h"
+#include "common/IClipboard.h"
 #include "common/unicode/helpers.h"
 
 #include <shlwapi.h>
@@ -543,38 +544,7 @@ BOOL CFilesWindow::ClipboardPasteLinks(BOOL onlyTest)
 BOOL CFilesWindow::IsTextOnClipboard()
 {
     CALL_STACK_MESSAGE1("CFilesWindow::IsTextOnClipboard()");
-    BOOL text = FALSE;
-
-    int attempt = 1;
-    while (1)
-    {
-        if (OpenClipboard(HWindow))
-        {
-            HANDLE handle = GetClipboardData(CF_TEXT);
-            if (handle != NULL)
-            {
-                char* path = (char*)HANDLES(GlobalLock(handle));
-                if (path != NULL)
-                {
-                    text = TRUE;
-                    HANDLES(GlobalUnlock(handle));
-                }
-            }
-            CloseClipboard();
-            break;
-        }
-        else
-        {
-            if (attempt++ <= 10)
-                Sleep(10); // wait to see if the clipboard gets released (max. 100 ms)
-            else
-            {
-                TRACE_E("OpenClipboard() has failed!");
-                break;
-            }
-        }
-    }
-    return text;
+    return gClipboard->HasText() ? TRUE : FALSE;
 }
 
 BOOL CFilesWindow::PostProcessPathFromUser(HWND parent, char (&buff)[2 * MAX_PATH])
@@ -627,49 +597,33 @@ BOOL CFilesWindow::PostProcessPathFromUser(HWND parent, char (&buff)[2 * MAX_PAT
 void CFilesWindow::ClipboardPastePath()
 {
     CALL_STACK_MESSAGE1("CFilesWindow::ClipboardPastePath()");
-    char buff[2 * MAX_PATH];
-    buff[0] = 0;
-    BOOL changePath = FALSE;
 
-    if (OpenClipboard(HWindow))
+    // Get text from clipboard using IClipboard interface
+    std::wstring pathW;
+    auto result = gClipboard->GetText(pathW);
+    if (!result.success)
     {
-        HANDLE handle = GetClipboardData(CF_UNICODETEXT);
-        if (handle != NULL)
-        {
-            WCHAR* pathW = (WCHAR*)HANDLES(GlobalLock(handle));
-            if (pathW != NULL)
-            {
-                while (*pathW != 0 && *pathW <= L' ')
-                    pathW++; // trim spaces+CR+LF before the path
-                if (ConvertU2A(pathW, -1, buff, _countof(buff)))
-                    changePath = TRUE;
-                else
-                {
-                    if (buff[0] != 0 && GetLastError() == ERROR_INSUFFICIENT_BUFFER)
-                        changePath = TRUE; // if the buffer is small, ignore it (same as ANSI version)
-                }
-                HANDLES(GlobalUnlock(handle));
-            }
-        }
-        if (!changePath) // probably not Unicode, try ANSI (when Unicode is present ANSI is usually broken - without diacritics)
-        {
-            handle = GetClipboardData(CF_TEXT);
-            char* path = (char*)HANDLES(GlobalLock(handle));
-            if (path != NULL)
-            {
-                while (*path != 0 && *path <= ' ')
-                    path++; // trim spaces+CR+LF before the path
-                lstrcpyn(buff, path, _countof(buff));
-
-                changePath = TRUE;
-                HANDLES(GlobalUnlock(handle));
-            }
-        }
-        CloseClipboard();
+        if (result.errorCode != ERROR_NOT_FOUND)
+            TRACE_E("ClipboardPastePath(): gClipboard->GetText() failed!");
+        return;
     }
-    else
-        TRACE_E("OpenClipboard() has failed!");
-    if (changePath && PostProcessPathFromUser(HWindow, buff))
+
+    // Trim leading whitespace/CR/LF
+    size_t start = 0;
+    while (start < pathW.length() && pathW[start] <= L' ')
+        start++;
+    if (start > 0)
+        pathW = pathW.substr(start);
+
+    if (pathW.empty())
+        return;
+
+    // Convert to ANSI for ChangeDir (existing code expects ANSI)
+    char buff[2 * MAX_PATH];
+    std::string ansiPath = WideToAnsi(pathW);
+    lstrcpyn(buff, ansiPath.c_str(), _countof(buff));
+
+    if (PostProcessPathFromUser(HWindow, buff))
         ChangeDir(buff); // change path
 }
 
