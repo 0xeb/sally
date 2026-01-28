@@ -108,8 +108,7 @@ void CFilesWindow::Execute(int index)
                 strcpy(fullName, GetPath());
                 if (!SalPathAppend(fullName, fileName, fullName.Size()))
                 {
-                    SalMessageBox(HWindow, LoadStr(IDS_TOOLONGNAME), LoadStr(IDS_ERRORCHANGINGDIR),
-                                  MB_OK | MB_ICONEXCLAMATION);
+                    gPrompter->ShowError(LoadStrW(IDS_ERRORCHANGINGDIR), LoadStrW(IDS_TOOLONGNAME));
                     UpdateWindow(HWindow);
                     EndStopRefresh();
                     return;
@@ -231,8 +230,7 @@ void CFilesWindow::Execute(int index)
                     strcpy(fullName, GetPath());
                     if (!SalPathAppend(fullName, fileName, fullName.Size()))
                     {
-                        SalMessageBox(HWindow, LoadStr(IDS_TOOLONGNAME), LoadStr(IDS_ERRORCHANGINGDIR),
-                                      MB_OK | MB_ICONEXCLAMATION);
+                        gPrompter->ShowError(LoadStrW(IDS_ERRORCHANGINGDIR), LoadStrW(IDS_TOOLONGNAME));
                         UpdateWindow(HWindow);
                         EndStopRefresh();
                         return;
@@ -335,8 +333,7 @@ void CFilesWindow::Execute(int index)
                 strcpy(fullName, path);
                 if (!SalPathAppend(fullName, dir->Name, fullName.Size()))
                 {
-                    SalMessageBox(HWindow, LoadStr(IDS_TOOLONGNAME), LoadStr(IDS_ERRORCHANGINGDIR),
-                                  MB_OK | MB_ICONEXCLAMATION);
+                    gPrompter->ShowError(LoadStrW(IDS_ERRORCHANGINGDIR), LoadStrW(IDS_TOOLONGNAME));
                     EndStopRefresh();
                     return;
                 }
@@ -480,8 +477,7 @@ void CFilesWindow::Execute(int index)
                     strcpy(fullName, GetZIPPath());
                     if (!SalPathAppend(fullName, dir->Name, fullName.Size()))
                     {
-                        SalMessageBox(HWindow, LoadStr(IDS_TOOLONGNAME), LoadStr(IDS_ERRORCHANGINGDIR),
-                                      MB_OK | MB_ICONEXCLAMATION);
+                        gPrompter->ShowError(LoadStrW(IDS_ERRORCHANGINGDIR), LoadStrW(IDS_TOOLONGNAME));
                     }
                     else
                     {
@@ -680,8 +676,7 @@ BOOL CFilesWindow::ChangeToRescuePathOrFixedDrive(HWND parent, BOOL* noChange, B
     {
         if (!CriticalShutdown)
         {
-            SalMessageBox(parent, LoadStr(IDS_INVALIDESCAPEPATH), LoadStr(IDS_ERRORCHANGINGDIR),
-                          MB_OK | MB_ICONEXCLAMATION);
+            gPrompter->ShowError(LoadStrW(IDS_ERRORCHANGINGDIR), LoadStrW(IDS_INVALIDESCAPEPATH));
             OpenCfgToChangeIfPathIsInaccessibleGoTo = TRUE;
         }
     }
@@ -845,8 +840,7 @@ void CFilesWindow::DisconnectNet()
     if (dlg.Execute() == IDCANCEL && dlg.NoConnection())
     {
         // dialog didn't appear because it contained zero resources -- show info
-        SalMessageBox(HWindow, LoadStr(IDS_DISCONNECT_NODRIVES),
-                      LoadStr(IDS_INFOTITLE), MB_OK | MB_ICONINFORMATION);
+        gPrompter->ShowInfo(LoadStrW(IDS_INFOTITLE), LoadStrW(IDS_DISCONNECT_NODRIVES));
     }
 
     if (releaseLeft)
@@ -1653,8 +1647,7 @@ BOOL CFilesWindow::ChangePathToDisk(HWND parent, const char* path, int suggested
 
     if (strlen(path) >= SAL_MAX_LONG_PATH - 2)
     {
-        SalMessageBox(parent, LoadStr(IDS_TOOLONGNAME), LoadStr(IDS_ERRORCHANGINGDIR),
-                      MB_OK | MB_ICONEXCLAMATION);
+        gPrompter->ShowError(LoadStrW(IDS_ERRORCHANGINGDIR), LoadStrW(IDS_TOOLONGNAME));
         if (failReason != NULL)
             *failReason = CHPPFR_INVALIDPATH;
         return FALSE;
@@ -1686,8 +1679,7 @@ BOOL CFilesWindow::ChangePathToDisk(HWND parent, const char* path, int suggested
     //                      MainWindow->GetActivePanel()->GetPath() : NULL))
     if (!SalGetFullName(backup, &errTextID, Is(ptDisk) ? GetPath() : NULL)) // for the FTP plugin - relative path in "target panel path" during connect
     {
-        SalMessageBox(parent, LoadStr(errTextID), LoadStr(IDS_ERRORCHANGINGDIR),
-                      MB_OK | MB_ICONEXCLAMATION);
+        gPrompter->ShowError(LoadStrW(IDS_ERRORCHANGINGDIR), LoadStrW(errTextID));
         if (failReason != NULL)
             *failReason = CHPPFR_INVALIDPATH;
         return FALSE;
@@ -1899,12 +1891,9 @@ BOOL CFilesWindow::ChangePathToDisk(HWND parent, const char* path, int suggested
                         RefreshListBox(0, -1, -1, FALSE, FALSE);
                     }
                     // we report the error that caused the path to be shortened
-                    char errBuf[2 * MAX_PATH + 100];
-                    sprintf(errBuf, LoadStr(IDS_PATHERRORFORMAT),
-                            openIfPathIsInaccessibleGoToCfg ? ifPathIsInaccessibleGoTo : path,
-                            GetErrorText(lastErr));
-                    SalMessageBox(parent, errBuf, LoadStr(IDS_ERRORCHANGINGDIR),
-                                  MB_OK | MB_ICONEXCLAMATION);
+                    const char* pathForMsg = openIfPathIsInaccessibleGoToCfg ? ifPathIsInaccessibleGoTo : path;
+                    std::wstring msg = FormatStrW(LoadStrW(IDS_PATHERRORFORMAT), AnsiToWide(pathForMsg).c_str(), GetErrorTextW(lastErr));
+                    gPrompter->ShowError(LoadStrW(IDS_ERRORCHANGINGDIR), msg.c_str());
                     if (openIfPathIsInaccessibleGoToCfg)
                         OpenCfgToChangeIfPathIsInaccessibleGoTo = TRUE;
                 }
@@ -2034,8 +2023,7 @@ BOOL CFilesWindow::ChangePathToArchive(const char* archive, const char* archiveP
     //                      MainWindow->GetActivePanel()->GetPath() : NULL))
     if (!SalGetFullName(backup1, &errTextID, Is(ptDisk) ? GetPath() : NULL)) // consistent with ChangePathToDisk()
     {
-        SalMessageBox(HWindow, LoadStr(errTextID), LoadStr(IDS_ERRORCHANGINGDIR),
-                      MB_OK | MB_ICONEXCLAMATION);
+        gPrompter->ShowError(LoadStrW(IDS_ERRORCHANGINGDIR), LoadStrW(errTextID));
         if (failReason != NULL)
             *failReason = CHPPFR_INVALIDPATH;
         return FALSE;
@@ -2274,9 +2262,8 @@ BOOL CFilesWindow::ChangePathToArchive(const char* archive, const char* archiveP
                         if (AssocUsed) // Is anything from the archive being edited?
                         {
                             // notify that there were changes and that editors should be closed
-                            char buf[MAX_PATH + 200];
-                            sprintf(buf, LoadStr(IDS_ARCHIVEREFRESHEDIT), GetZIPArchive());
-                            SalMessageBox(HWindow, buf, LoadStr(IDS_INFOTITLE), MB_OK | MB_ICONINFORMATION);
+                            std::wstring msg = FormatStrW(LoadStrW(IDS_ARCHIVEREFRESHEDIT), AnsiToWide(GetZIPArchive()).c_str());
+                            gPrompter->ShowInfo(LoadStrW(IDS_INFOTITLE), msg.c_str());
                         }
                         forceUpdateInt = TRUE; // nowhere to return, path change required (possibly back to disk)
                         goto _REOPEN_ARCHIVE;

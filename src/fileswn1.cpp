@@ -4,6 +4,9 @@
 
 #include "precomp.h"
 
+#include "ui/IPrompter.h"
+#include "common/unicode/helpers.h"
+
 #include "cfgdlg.h"
 #include "dialogs.h"
 #include "mainwnd.h"
@@ -1771,8 +1774,7 @@ void CFilesWindow::SelectUnselect(BOOL forceIncludeDirs, BOOL select, BOOL showM
                 RepaintListBox(DRAWFLAG_DIRTY_ONLY | DRAWFLAG_SKIP_VISTEST);
             }
             else
-                SalMessageBox(HWindow, LoadStr(IDS_NOMATCHESFOUND), LoadStr(IDS_INFOTITLE),
-                              MB_OK | MB_ICONINFORMATION);
+                gPrompter->ShowInfo(LoadStrW(IDS_INFOTITLE), LoadStrW(IDS_NOMATCHESFOUND));
         }
     }
     if (showMaskDlg)

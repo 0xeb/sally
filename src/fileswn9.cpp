@@ -4,6 +4,9 @@
 
 #include "precomp.h"
 
+#include "ui/IPrompter.h"
+#include "common/unicode/helpers.h"
+
 #include <shlwapi.h>
 #undef PathIsPrefix // otherwise collision with CSalamanderGeneral::PathIsPrefix
 
@@ -593,8 +596,7 @@ BOOL CFilesWindow::PostProcessPathFromUser(HWND parent, char (&buff)[2 * MAX_PAT
             strcpy_s(buff, path);
         else
         {
-            SalMessageBox(parent, LoadStr(IDS_THEPATHISINVALID), LoadStr(IDS_ERRORCHANGINGDIR),
-                          MB_OK | MB_ICONEXCLAMATION);
+            gPrompter->ShowError(LoadStrW(IDS_ERRORCHANGINGDIR), LoadStrW(IDS_THEPATHISINVALID));
             return FALSE;
         }
         return TRUE;
@@ -1114,10 +1116,8 @@ void CFilesWindow::OfferArchiveUpdateIfNeededAux(HWND parent, int textID, BOOL* 
     if (AssocUsed) // if the user edited files from the archive we must update them before archive operations, otherwise we would be working with outdated versions of the edited files stored directly inside the archive
     {
         // show info about the need to update the archive that contains edited files
-        char text[MAX_PATH + 500];
-        sprintf(text, LoadStr(textID), GetZIPArchive());
-        SalMessageBox(parent, text, LoadStr(IDS_INFOTITLE),
-                      MSGBOXEX_OK | MSGBOXEX_ICONINFORMATION | MSGBOXEX_SILENT);
+        std::wstring msg = FormatStrW(LoadStrW(textID), AnsiToWide(GetZIPArchive()).c_str());
+        gPrompter->ShowInfo(LoadStrW(IDS_INFOTITLE), msg.c_str());
         // package the changed files, prepare them for further use
         BOOL someFilesChanged;
         UnpackedAssocFiles.CheckAndPackAndClear(parent, &someFilesChanged, archMaybeUpdated);
@@ -1851,9 +1851,8 @@ BOOL CopyUNCPathToClipboard(const char* path, const char* name, BOOL isDir, HWND
         SalPathAddBackslash(buff, 2 * MAX_PATH);
         strcat(buff, name);
 
-        wsprintf(uncPath, LoadStr(IDS_CANNOT_CREATE_UNC_NAME), buff);
-        SalMessageBox(hMessageParent, uncPath, LoadStr(IDS_INFOTITLE),
-                      MB_OK | MB_ICONINFORMATION);
+        std::wstring msg = FormatStrW(LoadStrW(IDS_CANNOT_CREATE_UNC_NAME), AnsiToWide(buff).c_str());
+        gPrompter->ShowInfo(LoadStrW(IDS_INFOTITLE), msg.c_str());
     }
     return FALSE;
 }

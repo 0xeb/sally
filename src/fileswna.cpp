@@ -198,8 +198,7 @@ void CFilesWindow::PluginFSFilesAction(CPluginFSActionType type)
                                     if (e != mask)
                                         memmove(e, mask, strlen(mask) + 1); // move the mask if necessary
 
-                                    SalMessageBox(HWindow, LoadStr(IDS_FSCOPYMOVE_OPMASKSNOTSUP),
-                                                  errTitle, MB_OK | MB_ICONEXCLAMATION);
+                                    gPrompter->ShowError(AnsiToWide(errTitle).c_str(), LoadStrW(IDS_FSCOPYMOVE_OPMASKSNOTSUP));
                                     pathError = TRUE; // path error -> mode==4
                                 }
                             }
@@ -208,9 +207,8 @@ void CFilesWindow::PluginFSFilesAction(CPluginFSActionType type)
                         }
                         else
                         {
-                            SalMessageBox(HWindow,
-                                          LoadStr(pathType == PATH_TYPE_ARCHIVE ? IDS_FSCOPYMOVE_ONLYDISK_A : IDS_FSCOPYMOVE_ONLYDISK_FS),
-                                          errTitle, MB_OK | MB_ICONEXCLAMATION);
+                            gPrompter->ShowError(AnsiToWide(errTitle).c_str(),
+                                                 LoadStrW(pathType == PATH_TYPE_ARCHIVE ? IDS_FSCOPYMOVE_ONLYDISK_A : IDS_FSCOPYMOVE_ONLYDISK_FS));
                             if (pathType == PATH_TYPE_ARCHIVE && (backslashAtEnd || mustBePath))
                             {
                                 SalPathAddBackslash(targetPath, 2 * MAX_PATH);
@@ -222,8 +220,7 @@ void CFilesWindow::PluginFSFilesAction(CPluginFSActionType type)
                     {
                         if (error == SPP_INCOMLETEPATH) // additionally report an error for a relative path on FS
                         {
-                            SalMessageBox(HWindow, LoadStr(IDS_FSCOPYMOVE_INCOMPLETEPATH), errTitle,
-                                          MB_OK | MB_ICONEXCLAMATION);
+                            gPrompter->ShowError(AnsiToWide(errTitle).c_str(), LoadStrW(IDS_FSCOPYMOVE_INCOMPLETEPATH));
                         }
                         pathError = TRUE; // path error -> mode==4
                     }
@@ -343,8 +340,7 @@ void CFilesWindow::DragDropToArcOrFS(CTmpDragDropOperData* data)
         return; // nothing to do
     if (data->Data->SrcPath[0] == 0)
     {
-        SalMessageBox(HWindow, LoadStr(IDS_SRCPATHUNICODEONLY),
-                      LoadStr(IDS_ERRORTITLE), MB_OK | MB_ICONEXCLAMATION);
+        gPrompter->ShowError(LoadStrW(IDS_ERRORTITLE), LoadStrW(IDS_SRCPATHUNICODEONLY));
         return;
     }
     if (data->Data->Names.Count > 1) // sort file and directory names for faster array searching
@@ -637,10 +633,8 @@ void CFilesWindow::DragDropToArcOrFS(CTmpDragDropOperData* data)
                 }
                 else
                 {
-                    sprintf(text, LoadStr(IDS_FILEERRORFORMAT), data->ArchiveOrFSName, GetErrorText(err));
-                    SalMessageBox(HWindow, text,
-                                  data->Copy ? LoadStr(IDS_ERRORCOPY) : LoadStr(IDS_ERRORMOVE),
-                                  MB_OK | MB_ICONEXCLAMATION);
+                    std::wstring msg = FormatStrW(LoadStrW(IDS_FILEERRORFORMAT), AnsiToWide(data->ArchiveOrFSName).c_str(), GetErrorTextW(err));
+                    gPrompter->ShowError(LoadStrW(data->Copy ? IDS_ERRORCOPY : IDS_ERRORMOVE), msg.c_str());
                 }
             }
             else // to FS
