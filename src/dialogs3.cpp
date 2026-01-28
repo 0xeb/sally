@@ -2227,6 +2227,13 @@ CUnpackDialog::CUnpackDialog(HWND parent, char* path, const char* pathAlt, char*
     Mask = mask;
     UnpackerConfig = config;
     DelArchiveWhenDone = delArchiveWhenDone;
+    HUnicodeEdit = NULL;
+}
+
+void CUnpackDialog::SetUnicodePath(const std::wstring& pathW)
+{
+    PathW = pathW;
+    ResultW.clear();
 }
 
 void CUnpackDialog::EnableDelArcCheckbox()
@@ -2275,7 +2282,22 @@ void CUnpackDialog::Transfer(CTransferInfo& ti)
     }
     else
     {
-        ti.EditLine(IDE_PATH, Path, MAX_PATH);
+        // Get Unicode result if overlay edit exists
+        if (HUnicodeEdit != NULL)
+        {
+            int len = GetWindowTextLengthW(HUnicodeEdit);
+            if (len > 0)
+            {
+                std::vector<wchar_t> buffer(len + 1);
+                GetWindowTextW(HUnicodeEdit, buffer.data(), len + 1);
+                ResultW = buffer.data();
+            }
+            WideCharToMultiByte(CP_ACP, 0, ResultW.c_str(), -1, Path, MAX_PATH, "?", NULL);
+        }
+        else
+        {
+            ti.EditLine(IDE_PATH, Path, MAX_PATH);
+        }
         if (IsWindowEnabled(GetDlgItem(HWindow, IDC_DELETEARCHIVEFILES)))
             ti.CheckBox(IDC_DELETEARCHIVEFILES, *DelArchiveWhenDone);
         else
