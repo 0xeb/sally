@@ -771,16 +771,15 @@ void CFilesWindow::UnpackZIPArchive(CFilesWindow* target, BOOL deleteOp, const c
                             strcat(name, "\\");
                             strcat(name, Dirs->At(data.Indexes[i]).Name);
 
-                            char text[2 * MAX_PATH + 100];
-                            sprintf(text, LoadStr(IDS_NONEMPTYDIRDELCONFIRM), name);
-                            int res = SalMessageBox(HWindow, text, LoadStr(IDS_QUESTION),
-                                                    MB_YESNOCANCEL | MB_ICONQUESTION);
-                            if (res == IDCANCEL)
+                            wchar_t msgW[1024];
+                            swprintf_s(msgW, _countof(msgW), LoadStrW(IDS_NONEMPTYDIRDELCONFIRM), AnsiToWide(name).c_str());
+                            PromptResult res = gPrompter->AskYesNoCancel(LoadStrW(IDS_QUESTION), msgW);
+                            if (res.type == PromptResult::kCancel)
                             {
                                 cancel = TRUE;
                                 break;
                             }
-                            if (res == IDNO)
+                            if (res.type == PromptResult::kNo)
                             {
                                 memmove(data.Indexes + i, data.Indexes + i + 1, (data.IndexesCount - i - 1) * sizeof(int));
                                 data.IndexesCount--;

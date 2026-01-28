@@ -411,22 +411,21 @@ BOOL CFilesWindow::ReadDirectory(HWND parent, BOOL isRefresh)
                         SetCurrentDirectoryToSystem();
                         RefreshListBox(0, -1, -1, FALSE, FALSE);
 
-                        int resBut = SalMessageBox(parent, LoadStr(IDS_READDIRTERMINATED), LoadStr(IDS_QUESTION),
-                                                   MB_YESNOCANCEL | MB_ICONQUESTION);
+                        PromptResult resBut = gPrompter->AskYesNoCancel(LoadStrW(IDS_QUESTION), LoadStrW(IDS_READDIRTERMINATED));
                         UpdateWindow(MainWindow->HWindow);
 
                         WaitForESCRelease();
                         WaitForESCReleaseBeforeTestingESC = FALSE; // another waiting makes no sense
                         GetAsyncKeyState(VK_ESCAPE);               // new init GetAsyncKeyState - see help
 
-                        if (resBut == IDYES)
+                        if (resBut.type == PromptResult::kYes)
                         {
                             testFindNextErr = FALSE;
                             break; // finish reading
                         }
                         else
                         {
-                            if (resBut == IDNO)
+                            if (resBut.type == PromptResult::kNo)
                             {
                                 if (GetMonitorChanges()) // need to suppress monitoring of changes (autorefresh)
                                 {

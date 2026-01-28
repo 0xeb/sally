@@ -1291,10 +1291,9 @@ BOOL CFilesWindow::BuildScriptMain(COperations* script, CActionType type,
                 if (MyGetVolumeInformation(targetPath, NULL, NULL, NULL, NULL, 0, NULL, &dummy1, &flags, dummy2, MAX_PATH) &&
                     (flags & FS_PERSISTENT_ACLS) == 0)
                 { // wants to copy permissions, but the target path doesn't support them, so we inform the user (the API function for setting security doesn't report any errors — which is poor design)
-                    int res = SalMessageBox(HWindow, LoadStr(IDS_ACLNOTSUPPORTEDONTGTPATH), LoadStr(IDS_QUESTION),
-                                            MB_YESNO | MB_ICONQUESTION | MSGBOXEX_ESCAPEENABLED);
+                    PromptResult res = gPrompter->AskYesNo(LoadStrW(IDS_QUESTION), LoadStrW(IDS_ACLNOTSUPPORTEDONTGTPATH));
                     UpdateWindow(MainWindow->HWindow);
-                    if (res == IDNO || res == IDCANCEL) // user chose CANCEL or NO -> abort
+                    if (res.type == PromptResult::kNo) // user chose NO -> abort
                         return FALSE;
                 }
             }
@@ -1701,16 +1700,16 @@ MENU_TEMPLATE_ITEM MsgBoxButtons[] =
     if (type == atDelete && Configuration.CnfrmSHDirDel &&
         (sourceDirAttr & (FILE_ATTRIBUTE_HIDDEN | FILE_ATTRIBUTE_SYSTEM)))
     {
-        sprintf(text, LoadStr(IDS_DELETESHDIR), sourcePath);
-        int res = SalMessageBox(MainWindow->HWindow, text, LoadStr(IDS_QUESTION),
-                                MB_YESNOCANCEL | MB_ICONQUESTION);
+        wchar_t msgW[1024];
+        swprintf_s(msgW, _countof(msgW), LoadStrW(IDS_DELETESHDIR), AnsiToWide(sourcePath).c_str());
+        PromptResult res = gPrompter->AskYesNoCancel(LoadStrW(IDS_QUESTION), msgW);
         UpdateWindow(MainWindow->HWindow);
-        if (res == IDNO || res == IDCANCEL) // if CANCEL or NO was chosen, we end or skip the directory
+        if (res.type == PromptResult::kNo || res.type == PromptResult::kCancel) // if CANCEL or NO was chosen, we end or skip the directory
         {
             *sourceEnd = 0; // restoring sourcePath
             if (targetEnd != NULL)
                 *targetEnd = 0; // restoring targetPath
-            return res == IDNO;
+            return res.type == PromptResult::kNo;
         }
     }
     //---
@@ -2199,12 +2198,12 @@ MENU_TEMPLATE_ITEM MsgBoxButtons[] =
 
                 if (askDirDelete)
                 {
-                    sprintf(text, LoadStr(IDS_NONEMPTYDIRDELCONFIRM), sourcePath);
-                    int res = SalMessageBox(MainWindow->HWindow, text, LoadStr(IDS_QUESTION),
-                                            MB_YESNOCANCEL | MB_ICONQUESTION);
+                    wchar_t msgW[1024];
+                    swprintf_s(msgW, _countof(msgW), LoadStrW(IDS_NONEMPTYDIRDELCONFIRM), AnsiToWide(sourcePath).c_str());
+                    PromptResult res = gPrompter->AskYesNoCancel(LoadStrW(IDS_QUESTION), msgW);
                     UpdateWindow(MainWindow->HWindow);
-                    delDirectoryReturn = (res != IDCANCEL); // if CANCEL was not chosen, we continue
-                    delDirectory = (res == IDYES);
+                    delDirectoryReturn = (res.type != PromptResult::kCancel); // if CANCEL was not chosen, we continue
+                    delDirectory = (res.type == PromptResult::kYes);
                     if (!delDirectory)
                     {
                         testFindNextErr = FALSE;

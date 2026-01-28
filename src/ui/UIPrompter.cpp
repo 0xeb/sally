@@ -67,6 +67,16 @@ public:
         int res = MessageBoxW(MainWindow->HWindow, message, title, MB_YESNO | MB_ICONQUESTION);
         return res == IDYES ? PromptResult{PromptResult::kYes} : PromptResult{PromptResult::kNo};
     }
+
+    PromptResult AskYesNoCancel(const wchar_t* title, const wchar_t* message) override
+    {
+        int res = MessageBoxW(MainWindow->HWindow, message, title, MB_YESNOCANCEL | MB_ICONQUESTION);
+        if (res == IDYES)
+            return {PromptResult::kYes};
+        if (res == IDNO)
+            return {PromptResult::kNo};
+        return {PromptResult::kCancel};
+    }
 };
 
 IPrompter* GetUIPrompter()

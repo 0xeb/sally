@@ -48,6 +48,12 @@ public:
         return {PromptResult::kYes};
     }
 
+    PromptResult AskYesNoCancel(const wchar_t* title, const wchar_t* message) override
+    {
+        log.push_back(L"AskYesNoCancel:" + std::wstring(title ? title : L"") + L":" + std::wstring(message ? message : L""));
+        return {PromptResult::kYes};
+    }
+
     std::vector<std::wstring> log;
 };
 

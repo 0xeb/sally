@@ -516,8 +516,7 @@ void CFilesWindow::DragDropToArcOrFS(CTmpDragDropOperData* data)
     {
         if (nameFound[i] == FALSE)
         {
-            if (SalMessageBox(HWindow, LoadStr(IDS_SRCFILESNOTFOUND), LoadStr(IDS_QUESTION),
-                              MB_YESNO | MSGBOXEX_ESCAPEENABLED | MB_ICONQUESTION) == IDNO)
+            if (gPrompter->AskYesNo(LoadStrW(IDS_QUESTION), LoadStrW(IDS_SRCFILESNOTFOUND)).type == PromptResult::kNo)
             {
                 cancel = TRUE;
             }
