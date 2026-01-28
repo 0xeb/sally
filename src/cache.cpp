@@ -8,6 +8,9 @@
 #include "cache.h"
 #include "plugins.h"
 #include "dialogs.h"
+#include "common/IFileSystem.h"
+#include "ui/IPrompter.h"
+#include "common/unicode/helpers.h"
 
 CDiskCache DiskCache;
 CDeleteManager DeleteManager;
@@ -116,7 +119,7 @@ BOOL CCacheData::CleanFromDisk()
                 {
                     SetFileAttributes(TmpName, FILE_ATTRIBUTE_ARCHIVE);
                 }
-                DeleteFile(TmpName);
+                gFileSystem->DeleteFile(AnsiToWide(TmpName).c_str());
             }
             attrs = SalGetFileAttributes(TmpName); // check if the deletion was successful
             if (attrs == 0xFFFFFFFF)
