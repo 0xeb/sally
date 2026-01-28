@@ -5,6 +5,9 @@
 #include "precomp.h"
 #include <sddl.h>
 
+#include "common/IClipboard.h"
+#include "ui/IPrompter.h"
+#include "common/unicode/helpers.h"
 #include "cfgdlg.h"
 #include "mainwnd.h"
 #include "plugins.h"
@@ -845,134 +848,77 @@ BOOL CNames::LoadFromClipboard(HWND hWindow)
 
     Clear();
 
-    char buff[MAX_PATH];
-    buff[0] = 0;
-    BOOL changePath = FALSE;
-
-    if (OpenClipboard(hWindow))
+    // Get text from clipboard using IClipboard interface
+    std::wstring clipTextW;
+    auto result = gClipboard->GetText(clipTextW);
+    if (!result.success)
     {
-        const char* text = NULL;
-        BOOL textIsAlloc = FALSE;
-        HANDLE handle = GetClipboardData(CF_UNICODETEXT);
-        if (handle != NULL)
-        {
-            const WCHAR* textW = (const WCHAR*)HANDLES(GlobalLock(handle));
-            if (textW != NULL)
-            {
-                SIZE_T size = GlobalSize(handle); // size in bytes
-                if (size == 0)
-                    TRACE_E("CNames::LoadFromClipboard(): unexpected situation: size == 0!");
-
-                // for example Miranda appends additional Unicode data after the text, so we
-                // prefer to find the end of the null-terminated string ourselves, but without exceeding
-                // the end of the allocated memory block
-                const WCHAR* s = textW;
-                const WCHAR* end = textW + size / sizeof(WCHAR);
-                while (s < end && *s != 0)
-                    s++;
-                size = s - textW; // ted uz ve WCHARech
-
-                text = ConvertAllocU2A(textW, (int)size);
-                if (text != NULL)
-                    textIsAlloc = TRUE;
-                else
-                    TRACE_E("CNames::LoadFromClipboard(): unable to convert unicode from clipboard to ANSI.");
-                HANDLES(GlobalUnlock(handle));
-            }
-        }
-        if (text == NULL) // probably not Unicode, try ANSI (when Unicode is present, ANSI is usually broken — without diacritics)
-        {
-            handle = GetClipboardData(CF_TEXT);
-            if (handle != NULL)
-                text = (const char*)HANDLES(GlobalLock(handle));
-        }
-
-        if (text != NULL)
-        {
-            const char* textEnd;
-            if (textIsAlloc)
-                textEnd = text + strlen(text);
-            else
-            {
-                SIZE_T size = GlobalSize(handle);
-                if (size == 0)
-                    TRACE_E("CNames::LoadFromClipboard(): unexpected situation: size == 0!");
-
-                // for example Miranda appends additional Unicode data after the text, so we
-                // prefer to find the end of the null-terminated string ourselves, but without exceeding
-                // the end of the allocated memory block
-                textEnd = text + size;
-                const char* s = text;
-                while (s < textEnd && *s != 0)
-                    s++;
-                textEnd = s;
-            }
-
-            // search from the left for CR | LF | CRLF or the end of memory
-            // add the found file and directory names to the array
-            char name[2 * MAX_PATH];
-            const char* s = text;
-            const char* begin = s;
-            while (s <= textEnd)
-            {
-                // watch out! 's' and 'begin' will point past valid memory at the end => DO NOT READ
-                if (s >= textEnd || *s == '\r' || *s == '\n' || *s == 0)
-                {
-                    if (s - begin > 0)
-                    {
-                        if (s - begin < 2 * MAX_PATH - 1)
-                        {
-                            memcpy(name, begin, s - begin);
-                            name[s - begin] = 0;
-                            // trim the backslash at the end of the path
-                            char* end = name + (s - begin) - 1;
-                            if (*end == '\\')
-                            {
-                                *end = 0;
-                                end--;
-                            }
-                            // trim garbage at the end of the path
-                            while (end > name && *end <= ' ')
-                            {
-                                *end = 0;
-                                end--;
-                            }
-                            // trim full paths
-                            while (end > name && *end != '\\')
-                                end--;
-                            if (*end == '\\')
-                                end++;
-
-                            // trim garbage at the beginning of the path
-                            while (*end != 0 && *end <= ' ')
-                                end++;
-
-                            if (*end != 0)
-                            {
-                                if (!Add(FALSE, end))
-                                    break;
-                            }
-                        }
-                        else
-                            TRACE_E("CNames::LoadFromClipboard(): path is too long, skipping.");
-                    }
-                    begin = s + 1; // we are at the terminator, move the start past it
-                }
-                s++;
-            }
-
-            if (textIsAlloc)
-                free((void*)text); // we use an allocated ANSI copy of the Unicode clipboard text
-            else
-                HANDLES(GlobalUnlock(handle)); // we use the text directly from the clipboard (it is locked)
-        }
-        CloseClipboard();
+        if (result.errorCode != ERROR_NOT_FOUND)
+            TRACE_E("CNames::LoadFromClipboard(): gClipboard->GetText() failed!");
+        return TRUE;
     }
-    else
-        TRACE_E("CNames::LoadFromClipboard(): OpenClipboard() has failed!");
+
+    // Convert to ANSI for parsing (existing code expects ANSI)
+    std::string clipText = WideToAnsi(clipTextW);
+    const char* text = clipText.c_str();
+    const char* textEnd = text + clipText.length();
+
+    // search from the left for CR | LF | CRLF or the end of memory
+    // add the found file and directory names to the array
+    char name[2 * MAX_PATH];
+    const char* s = text;
+    const char* begin = s;
+    while (s <= textEnd)
+    {
+        // watch out! 's' and 'begin' will point past valid memory at the end => DO NOT READ
+        if (s >= textEnd || *s == '\r' || *s == '\n' || *s == 0)
+        {
+            if (s - begin > 0)
+            {
+                if (s - begin < 2 * MAX_PATH - 1)
+                {
+                    memcpy(name, begin, s - begin);
+                    name[s - begin] = 0;
+                    // trim the backslash at the end of the path
+                    char* end = name + (s - begin) - 1;
+                    if (*end == '\\')
+                    {
+                        *end = 0;
+                        end--;
+                    }
+                    // trim garbage at the end of the path
+                    while (end > name && *end <= ' ')
+                    {
+                        *end = 0;
+                        end--;
+                    }
+                    // trim full paths
+                    while (end > name && *end != '\\')
+                        end--;
+                    if (*end == '\\')
+                        end++;
+
+                    // trim garbage at the beginning of the path
+                    while (*end != 0 && *end <= ' ')
+                        end++;
+
+                    if (*end != 0)
+                    {
+                        if (!Add(FALSE, end))
+                            break;
+                    }
+                }
+                else
+                    TRACE_E("CNames::LoadFromClipboard(): path is too long, skipping.");
+            }
+            begin = s + 1; // we are at the terminator, move the start past it
+        }
+        s++;
+    }
 
     return TRUE;
 }
+
 
 //******************************************************************************
 //
