@@ -7,6 +7,7 @@
 #include "cfgdlg.h"
 #include "worker.h"
 #include "common/widepath.h"
+#include "common/IFileSystem.h"
 
 #include <aclapi.h>
 #include <ntsecapi.h>
@@ -3188,7 +3189,7 @@ HANDLE SalCreateFileEx(const char* fileName, DWORD desiredAccess,
                 *encryptionNotSupported = TRUE;
                 NOHANDLES(CloseHandle(out));
                 out = INVALID_HANDLE_VALUE;
-                if (!DeleteFile(fileName)) // XP and Vista ignore this scenario, so do the same (at worst warn user that a zero-length file was added on disk and cannot be deleted)
+                if (!DeleteFileA(gFileSystem, fileName).success) // XP and Vista ignore this scenario, so do the same (at worst warn user that a zero-length file was added on disk and cannot be deleted)
                     TRACE_I("Unable to delete testing target file: " << fileName);
             }
         }
@@ -3245,7 +3246,7 @@ HANDLE SalCreateFileEx(const char* fileName, DWORD desiredAccess,
                                         *encryptionNotSupported = TRUE;
                                         NOHANDLES(CloseHandle(out));
                                         out = INVALID_HANDLE_VALUE;
-                                        if (!DeleteFile(fileName)) // XP and Vista ignore this scenario, so do the same (at worst warn user that a zero-length file was added on disk and cannot be deleted)
+                                        if (!DeleteFileA(gFileSystem, fileName).success) // XP and Vista ignore this scenario, so do the same (at worst warn user that a zero-length file was added on disk and cannot be deleted)
                                             TRACE_E("Unable to delete testing target file: " << fileName);
                                     }
                                 }
@@ -3257,7 +3258,7 @@ HANDLE SalCreateFileEx(const char* fileName, DWORD desiredAccess,
                                     {
                                         NOHANDLES(CloseHandle(out));
                                         out = INVALID_HANDLE_VALUE;
-                                        DeleteFile(fileName);
+                                        DeleteFileA(gFileSystem, fileName);
                                         if (!SalMoveFile(tmpName, origFullName))
                                             TRACE_E("Fatal unexpected situation in SalCreateFileEx(): unable to rename file from tmp-name to original long file name! " << origFullName);
                                     }
@@ -3360,7 +3361,7 @@ void SetCompressAndEncryptedAttrs(const char* name, DWORD attr, HANDLE* out, BOO
             if (*out == INVALID_HANDLE_VALUE) // still a problem: cannot reopen; delete it + report an error
             {
                 err = GetLastError();
-                DeleteFile(name);
+                DeleteFileA(gFileSystem, name);
                 SetLastError(err);
             }
         }
@@ -4105,7 +4106,7 @@ BOOL CCopy_Context::RetryCopyReadErr(DWORD* err, BOOL* copyAgain, BOOL* errAgain
         if (WholeFileAllocated)
             SetEndOfFile(*Out); // otherwise on a floppy the remaining bytes would be written
         HANDLES(CloseHandle(*Out));
-        DeleteFile(Op->TargetName);
+        DeleteFileA(gFileSystem, Op->TargetName);
         *copyAgain = TRUE; // goto COPY_AGAIN;
         return FALSE;
     }
@@ -4230,7 +4231,7 @@ BOOL CCopy_Context::RetryCopyWriteErr(DWORD* err, BOOL* copyAgain, BOOL* errAgai
         {
             HANDLES(CloseHandle(*In));
             HANDLES(CloseHandle(*Out));
-            DeleteFile(Op->TargetName);
+            DeleteFileA(gFileSystem, Op->TargetName);
             *copyAgain = TRUE; // goto COPY_AGAIN;
             return FALSE;
         }
@@ -6317,7 +6318,7 @@ BOOL DoMoveFile(COperation* op, HWND hProgressDlg, void* buffer,
             ClearReadOnlyAttr(op->SourceName); // ensure it can be deleted
             while (1)
             {
-                if (DeleteFile(op->SourceName))
+                if (DeleteFileA(gFileSystem, op->SourceName).success)
                     break;
                 {
                     DWORD err = GetLastError();
@@ -6471,7 +6472,7 @@ BOOL DoDeleteFile(HWND hProgressDlg, char* name, const CQuadWord& size, COperati
             }
             else
             {
-                if (DeleteFile(name) == 0)
+                if (!DeleteFileA(gFileSystem, name).success)
                     err = GetLastError();
             }
         }
@@ -7455,7 +7456,7 @@ CONVERT_AGAIN:
                             {
                                 HANDLES(CloseHandle(hSource));
                                 ClearReadOnlyAttr(tmpFileName); // ensure it can be deleted
-                                DeleteFile(tmpFileName);
+                                DeleteFileA(gFileSystem, tmpFileName);
                                 return FALSE;
                             }
                         }
@@ -7490,7 +7491,7 @@ CONVERT_AGAIN:
                                     if (hTarget != NULL)
                                         HANDLES(CloseHandle(hTarget));
                                     ClearReadOnlyAttr(tmpFileName); // ensure it can be deleted
-                                    DeleteFile(tmpFileName);
+                                    DeleteFileA(gFileSystem, tmpFileName);
                                     return FALSE;
                                 }
 
@@ -7589,7 +7590,7 @@ CONVERT_AGAIN:
                                         if (hSource == NULL && hTarget == NULL)
                                         {
                                             ClearReadOnlyAttr(tmpFileName); // ensure it can be deleted
-                                            DeleteFile(tmpFileName);
+                                            DeleteFileA(gFileSystem, tmpFileName);
                                             SetProgress(hProgressDlg, 0, CaclProg(totalDone, script->TotalSize), dlgData);
                                             goto CONVERT_AGAIN;
                                         }
@@ -7608,7 +7609,7 @@ CONVERT_AGAIN:
                                         if (hTarget != NULL)
                                             HANDLES(CloseHandle(hTarget));
                                         ClearReadOnlyAttr(tmpFileName); // ensure it can be deleted
-                                        DeleteFile(tmpFileName);
+                                        DeleteFileA(gFileSystem, tmpFileName);
                                         SetProgress(hProgressDlg, 0, CaclProg(totalDone, script->TotalSize), dlgData);
                                         return TRUE;
                                     }
@@ -7672,7 +7673,7 @@ CONVERT_AGAIN:
                         while (1)
                         {
                             ClearReadOnlyAttr(name); // ensure it can be deleted
-                            if (DeleteFile(name))
+                            if (DeleteFileA(gFileSystem, name).success)
                             {
                                 while (1)
                                 {
@@ -7722,7 +7723,7 @@ CONVERT_AGAIN:
                                 CANCEL_CONVERT:
 
                                     ClearReadOnlyAttr(tmpFileName); // ensure it can be deleted
-                                    DeleteFile(tmpFileName);
+                                    DeleteFileA(gFileSystem, tmpFileName);
                                     return FALSE;
                                 }
 
@@ -7749,7 +7750,7 @@ CONVERT_AGAIN:
                                 SKIP_OVERWRITE_ERROR:
 
                                     ClearReadOnlyAttr(tmpFileName); // ensure it can be deleted
-                                    DeleteFile(tmpFileName);
+                                    DeleteFileA(gFileSystem, tmpFileName);
                                     return TRUE;
                                 }
 
@@ -7773,7 +7774,7 @@ CONVERT_AGAIN:
                     {
                         strcpy(fakeName, tmpFileName);
                         ClearReadOnlyAttr(tmpFileName); // ensure it can be deleted
-                        DeleteFile(tmpFileName);        // the temp file exists, try to remove it
+                        DeleteFileA(gFileSystem, tmpFileName);        // the temp file exists, try to remove it
                         tmpFileExists = FALSE;
                     }
                     else

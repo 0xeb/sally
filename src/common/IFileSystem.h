@@ -1,4 +1,4 @@
-// SPDX-FileCopyrightText: 2026 Open Salamander Authors
+﻿// SPDX-FileCopyrightText: 2026 Open Salamander Authors
 // SPDX-License-Identifier: GPL-2.0-or-later
 #pragma once
 
@@ -59,3 +59,17 @@ extern IFileSystem* gFileSystem;
 
 // Returns the default Win32 implementation
 IFileSystem* GetWin32FileSystem();
+
+// ANSI helper - converts ANSI path to wide and calls wide version
+// Use when migrating ANSI code to IFileSystem
+inline FileResult DeleteFileA(IFileSystem* fs, const char* path)
+{
+    // Convert ANSI to wide using MultiByteToWideChar
+    int len = MultiByteToWideChar(CP_ACP, 0, path, -1, nullptr, 0);
+    if (len == 0) return FileResult::Error(GetLastError());
+    std::wstring widePath;
+    widePath.resize(len);
+    MultiByteToWideChar(CP_ACP, 0, path, -1, &widePath[0], len);
+    widePath.resize(len - 1);  // Remove null terminator from string length
+    return fs->DeleteFile(widePath.c_str());
+}

@@ -6,6 +6,7 @@
 
 #include "ui/IPrompter.h"
 #include "common/unicode/helpers.h"
+#include "common/IFileSystem.h"
 #include "menu.h"
 #include "cfgdlg.h"
 #include "dialogs.h"
@@ -2464,7 +2465,7 @@ BOOL ViewFileInPluginViewer(const char* pluginSPL,
         {
             TRACE_E("Unexpected value of 'fileNameInCache' in CSalamanderGeneral::ViewFileInPluginViewer!");
             error = 3;
-            ::DeleteFile(pluginData->FileName);
+            DeleteFileA(gFileSystem, pluginData->FileName);
             return FALSE;
         }
 
@@ -2481,7 +2482,7 @@ BOOL ViewFileInPluginViewer(const char* pluginSPL,
                 else            // fatal error
                 {
                     error = 3;
-                    ::DeleteFile(pluginData->FileName);
+                    DeleteFileA(gFileSystem, pluginData->FileName);
                     return FALSE; // fatal error
                 }
             }
@@ -2492,7 +2493,7 @@ BOOL ViewFileInPluginViewer(const char* pluginSPL,
         {
             DWORD err = GetLastError();
             TRACE_E("Unable to move file to disk cache! (error " << ::GetErrorText(err) << ")");
-            ::DeleteFile(pluginData->FileName);
+            DeleteFileA(gFileSystem, pluginData->FileName);
             DiskCache.ReleaseName(viewUniqueName, FALSE);
             error = 3;
             return FALSE;
@@ -2616,7 +2617,7 @@ BOOL ViewFileInPluginViewer(const char* pluginSPL,
     if (useCache && !diskCacheNameClosed)
     {
         DiskCache.ReleaseName(viewUniqueName, FALSE);
-        //    ::DeleteFile(fileName);   // the cache already removed the file and deallocated fileName
+        //    DeleteFileA(gFileSystem, fileName);   // the cache already removed the file and deallocated fileName
     }
     return error == 0; // returning success?
 }

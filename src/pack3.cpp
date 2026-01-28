@@ -11,6 +11,7 @@
 #include "execute.h"
 #include "plugins.h"
 #include "pack.h"
+#include "common/IFileSystem.h"
 #include "fileswnd.h"
 
 //
@@ -1285,7 +1286,7 @@ const char* WINAPI PackExpArcDosName(HWND msgParent, void* param)
                     HANDLES(CloseHandle(h));
                     strcpy(data->DOSTmpFile, path);
                     BOOL ok = GetShortPathName(data->DOSTmpFile, buff2, MAX_PATH);
-                    DeleteFile(data->DOSTmpFile); // we no longer need the file (let the archiver create it)
+                    DeleteFileA(gFileSystem, data->DOSTmpFile); // we no longer need the file (let the archiver create it)
                     if (!ok)
                     {
                         TRACE_E("Error (2) in GetShortPathName() in PackExpArcDosName().");

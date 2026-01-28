@@ -16,6 +16,7 @@
 #include "pack.h"
 #include "ui/IPrompter.h"
 #include "common/unicode/helpers.h"
+#include "common/IFileSystem.h"
 
 void CFilesWindow::PluginFSFilesAction(CPluginFSActionType type)
 {
@@ -565,7 +566,7 @@ void CFilesWindow::DragDropToArcOrFS(CTmpDragDropOperData* data)
                     {
                         nullFileAttrs = SalGetFileAttributes(data->ArchiveOrFSName);
                         ClearReadOnlyAttr(data->ArchiveOrFSName, nullFileAttrs); // to allow deletion even if read-only
-                        DeleteFile(data->ArchiveOrFSName);
+                        DeleteFileA(gFileSystem, data->ArchiveOrFSName);
                     }
                     //---  actual packing
                     SetCurrentDirectory(data->Data->SrcPath);

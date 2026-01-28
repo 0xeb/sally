@@ -11,6 +11,7 @@
 #include "fileswnd.h"
 #include "zip.h"
 #include "pack.h"
+#include "common/IFileSystem.h"
 
 //
 // ****************************************************************************
@@ -1012,7 +1013,7 @@ BOOL PackUC2List(const char* archiveFileName, CPackLineArray& lineArray,
     strncpy(arcPath, archiveFileName, arcName - archiveFileName);
     arcPath[arcName - archiveFileName] = '\0';
     strcat(arcPath, "U$~RESLT.OK");
-    DeleteFile(arcPath);
+    DeleteFileA(gFileSystem, arcPath);
 
     char* txtPtr;         // pointer to the current position in the read line
     char currentDir[256]; // current directory we are exploring
@@ -1476,7 +1477,7 @@ BOOL PackUniversalUncompress(HWND parent, const char* command, TPackErrorTable* 
     if ((listFile = fopen(tmpListNameBuf, "w")) == NULL)
     {
         RemoveDirectory(tmpDirNameBuf);
-        DeleteFile(tmpListNameBuf);
+        DeleteFileA(gFileSystem, tmpListNameBuf);
         return (*PackErrorHandlerPtr)(parent, IDS_PACKERR_FILE);
     }
 
@@ -1505,7 +1506,7 @@ BOOL PackUniversalUncompress(HWND parent, const char* command, TPackErrorTable* 
             if (fprintf(listFile, "%s%s\n", rootPath, namecnv) <= 0)
             {
                 fclose(listFile);
-                DeleteFile(tmpListNameBuf);
+                DeleteFileA(gFileSystem, tmpListNameBuf);
                 RemoveDirectory(tmpDirNameBuf);
                 return (*PackErrorHandlerPtr)(parent, IDS_PACKERR_FILE);
             }
@@ -1519,7 +1520,7 @@ BOOL PackUniversalUncompress(HWND parent, const char* command, TPackErrorTable* 
     if (errorOccured == SALENUM_CANCEL ||
         !TestFreeSpace(parent, tmpDirNameBuf, totalSize, LoadStr(IDS_PACKERR_TITLE)))
     {
-        DeleteFile(tmpListNameBuf);
+        DeleteFileA(gFileSystem, tmpListNameBuf);
         RemoveDirectory(tmpDirNameBuf);
         return FALSE;
     }
@@ -1532,7 +1533,7 @@ BOOL PackUniversalUncompress(HWND parent, const char* command, TPackErrorTable* 
     if (!PackExpandCmdLine(archiveFileName, tmpDirNameBuf, tmpListNameBuf, NULL,
                            command, cmdLine, PACK_CMDLINE_MAXLEN, NULL))
     {
-        DeleteFile(tmpListNameBuf);
+        DeleteFileA(gFileSystem, tmpListNameBuf);
         RemoveDirectory(tmpDirNameBuf);
         return (*PackErrorHandlerPtr)(parent, IDS_PACKERR_CMDLNERR);
     }
@@ -1541,7 +1542,7 @@ BOOL PackUniversalUncompress(HWND parent, const char* command, TPackErrorTable* 
     if (!supportLongNames && strlen(cmdLine) >= 128)
     {
         char buffer[1000];
-        DeleteFile(tmpListNameBuf);
+        DeleteFileA(gFileSystem, tmpListNameBuf);
         RemoveDirectory(tmpDirNameBuf);
         strcpy(buffer, cmdLine);
         return (*PackErrorHandlerPtr)(parent, IDS_PACKERR_CMDLNLEN, buffer);
@@ -1555,7 +1556,7 @@ BOOL PackUniversalUncompress(HWND parent, const char* command, TPackErrorTable* 
             strcpy(currentDir, initDir);
         else
         {
-            DeleteFile(tmpListNameBuf);
+            DeleteFileA(gFileSystem, tmpListNameBuf);
             RemoveDirectory(tmpDirNameBuf);
             return (*PackErrorHandlerPtr)(parent, IDS_PACKERR_IDIRERR);
         }
@@ -1564,7 +1565,7 @@ BOOL PackUniversalUncompress(HWND parent, const char* command, TPackErrorTable* 
     {
         if (!PackExpandInitDir(archiveFileName, NULL, tmpDirNameBuf, initDir, currentDir, MAX_PATH))
         {
-            DeleteFile(tmpListNameBuf);
+            DeleteFileA(gFileSystem, tmpListNameBuf);
             RemoveDirectory(tmpDirNameBuf);
             return (*PackErrorHandlerPtr)(parent, IDS_PACKERR_IDIRERR);
         }
@@ -1573,12 +1574,12 @@ BOOL PackUniversalUncompress(HWND parent, const char* command, TPackErrorTable* 
     // and run the external program
     if (!PackExecute(NULL, cmdLine, currentDir, errorTable))
     {
-        DeleteFile(tmpListNameBuf);
+        DeleteFileA(gFileSystem, tmpListNameBuf);
         RemoveTemporaryDir(tmpDirNameBuf);
         return FALSE; // the error message has already been shown
     }
     // the file list is no longer needed
-    DeleteFile(tmpListNameBuf);
+    DeleteFileA(gFileSystem, tmpListNameBuf);
 
     // and now finally move the files where they belong
     char srcDir[MAX_PATH];
