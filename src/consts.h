@@ -298,6 +298,9 @@ void SalPathAddBackslashW(std::wstring& path);
 void SalPathRemoveBackslashW(std::wstring& path);
 void SalPathStripPathW(std::wstring& path);
 const wchar_t* SalPathFindFileNameW(const wchar_t* path);
+void SalPathRemoveExtensionW(std::wstring& path);
+bool SalPathAddExtensionW(std::wstring& path, const wchar_t* extension);
+bool SalPathRenameExtensionW(std::wstring& path, const wchar_t* extension);
 
 // If 'path' ends with backslash, removes it
 void SalPathRemoveBackslash(char* path);

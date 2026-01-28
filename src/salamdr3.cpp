@@ -139,6 +139,64 @@ const wchar_t* SalPathFindFileNameW(const wchar_t* path)
     return result;
 }
 
+// Wide version - removes extension from path
+// "C:ooar.txt" -> "C:ooar"
+void SalPathRemoveExtensionW(std::wstring& path)
+{
+    size_t len = path.length();
+    for (size_t i = len; i > 0; i--)
+    {
+        if (path[i - 1] == L'.')
+        {
+            path.resize(i - 1);
+            return;
+        }
+        if (path[i - 1] == L'\\')
+            return;  // No extension found
+    }
+}
+
+// Wide version - adds extension if not already present
+// Returns true if extension was added or already exists
+bool SalPathAddExtensionW(std::wstring& path, const wchar_t* extension)
+{
+    if (extension == nullptr)
+        return false;
+
+    size_t len = path.length();
+    for (size_t i = len; i > 0; i--)
+    {
+        if (path[i - 1] == L'.')
+            return true;  // Extension already exists
+        if (path[i - 1] == L'\\')
+            break;  // No extension, add it
+    }
+    path += extension;
+    return true;
+}
+
+// Wide version - replaces extension (or adds if none)
+// "C:ooar.txt" + ".bak" -> "C:ooar.bak"
+bool SalPathRenameExtensionW(std::wstring& path, const wchar_t* extension)
+{
+    if (extension == nullptr)
+        return false;
+
+    size_t len = path.length();
+    for (size_t i = len; i > 0; i--)
+    {
+        if (path[i - 1] == L'.')
+        {
+            path.resize(i - 1);
+            break;
+        }
+        if (path[i - 1] == L'\\')
+            break;  // No existing extension
+    }
+    path += extension;
+    return true;
+}
+
 
 // ****************************************************************************
 
