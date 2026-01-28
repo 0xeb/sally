@@ -14,6 +14,7 @@
 #include "pack.h"
 #include "mapi.h"
 #include "ui/IPrompter.h"
+#include "common/IFileSystem.h"
 #include "common/unicode/helpers.h"
 
 //
@@ -634,7 +635,7 @@ void CFilesWindow::FilesAction(CActionType type, CFilesWindow* target, int count
                                 {
                                     nullFileAttrs = SalGetFileAttributes(path);
                                     ClearReadOnlyAttr(path, nullFileAttrs); // so it's possible to delete even read-only files
-                                    DeleteFile(path);
+                                    gFileSystem->DeleteFile(AnsiToWide(path).c_str());
                                 }
                                 //---  custom packing
                                 SetCurrentDirectory(GetPath());

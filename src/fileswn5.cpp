@@ -23,6 +23,7 @@
 #include "common/widepath.h"
 #include "common/fsutil.h"
 #include "ui/IPrompter.h"
+#include "common/IFileSystem.h"
 #include "common/unicode/helpers.h"
 
 //
@@ -2252,7 +2253,7 @@ void CFilesWindow::RenameFileInternal(CFileData* f, const char* formatedFileName
                             case IDYES:
                             {
                                 ClearReadOnlyAttr(tgtPath); // so it can be deleted ...
-                                if (!DeleteFile(tgtPath) || !SalMoveFile(path, tgtPath))
+                                if (!gFileSystem->DeleteFile(AnsiToWide(tgtPath).c_str()).success || !SalMoveFile(path, tgtPath))
                                     err = GetLastError();
                                 else
                                 {

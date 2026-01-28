@@ -12,6 +12,7 @@
 #include "zip.h"
 #include "pack.h"
 #include "ui/IPrompter.h"
+#include "common/IFileSystem.h"
 #include "common/unicode/helpers.h"
 
 //
@@ -1602,7 +1603,7 @@ _PACK_AGAIN:
                 if (msgBoxRed == IDNO) // OVERWRITE
                 {
                     ClearReadOnlyAttr(fileBuf); // so it can be deleted...
-                    if (!DeleteFile(fileBuf))
+                    if (!gFileSystem->DeleteFile(AnsiToWide(fileBuf).c_str()).success)
                     {
                         DWORD err = GetLastError();
                         gPrompter->ShowError(LoadStrW(IDS_ERROROVERWRITINGFILE), GetErrorTextW(err));
@@ -1827,7 +1828,7 @@ void CFilesWindow::Unpack(CFilesWindow* target, int pluginIndex, const char* plu
                                     while (1)
                                     {
                                         ClearReadOnlyAttr(name); // allow deletion of read-only files too
-                                        if (!DeleteFile(name) && !skipAll)
+                                        if (!gFileSystem->DeleteFile(AnsiToWide(name).c_str()).success && !skipAll)
                                         {
                                             DWORD err = GetLastError();
                                             if (err == ERROR_FILE_NOT_FOUND)

@@ -11,6 +11,7 @@
 #include "mainwnd.h"
 #include "codetbl.h"
 #include "ui/IPrompter.h"
+#include "common/IFileSystem.h"
 #include "common/unicode/helpers.h"
 
 BOOL ViewerActive(HWND hwnd)
@@ -1618,13 +1619,13 @@ CViewerWindow::WindowProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
                                 }
                                 HANDLES(CloseHandle(file));
                                 if (fatalErr || off != end)
-                                    DeleteFile(tmpFile); // delete it if an error occurs
+                                    gFileSystem->DeleteFile(AnsiToWide(tmpFile).c_str()); // delete it if an error occurs
                                 else
                                 {
                                     if (attr != 0xFFFFFFFF) // overwrite: tmp -> fileName
                                     {
                                         BOOL setAttr = ClearReadOnlyAttr(fileName, attr); // for the case of a read-only file
-                                        if (DeleteFile(fileName))
+                                        if (gFileSystem->DeleteFile(AnsiToWide(fileName).c_str()).success)
                                         {
                                             if (!SalMoveFile(tmpFile, fileName))
                                             {
@@ -1638,7 +1639,7 @@ CViewerWindow::WindowProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
                                             DWORD err = GetLastError();
                                             if (setAttr)
                                                 SetFileAttributes(fileName, attr); // restore the original attributes
-                                            DeleteFile(tmpFile);                   // the file cannot be overwritten; delete the temp file (it's useless)
+                                            gFileSystem->DeleteFile(AnsiToWide(tmpFile).c_str());                   // the file cannot be overwritten; delete the temp file (it's useless)
                                             SetCursor(oldCur);
                                             gPrompter->ShowError(LoadStrW(IDS_ERRORTITLE), GetErrorTextW(err));
                                         }
@@ -1658,7 +1659,7 @@ CViewerWindow::WindowProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
                             {
                                 DWORD err = GetLastError();
                                 if (attr != 0xFFFFFFFF)
-                                    DeleteFile(tmpFile);
+                                    gFileSystem->DeleteFile(AnsiToWide(tmpFile).c_str());
                                 SetCursor(oldCur);
                                 gPrompter->ShowError(LoadStrW(IDS_ERRORTITLE), GetErrorTextW(err));
                             }

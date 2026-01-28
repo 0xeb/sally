@@ -16,6 +16,7 @@
 #include "menu.h"
 #include "common/widepath.h"
 #include "ui/IPrompter.h"
+#include "common/IFileSystem.h"
 #include "common/unicode/helpers.h"
 
 CUserMenuIconBkgndReader UserMenuIconBkgndReader;
@@ -1149,7 +1150,7 @@ void _RemoveTemporaryDir(const char* dir)
                 if (file.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY)
                     _RemoveTemporaryDir(path);
                 else
-                    DeleteFile(path);
+                    gFileSystem->DeleteFile(AnsiToWide(path).c_str());
             }
         } while (FindNextFile(find, &file));
         HANDLES(FindClose(find));
