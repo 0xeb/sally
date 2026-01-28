@@ -49,6 +49,9 @@ public:
 
     // Path too long dialog - returns kSkip, kSkipAll, or kFocus
     virtual PromptResult AskSkipSkipAllFocus(const wchar_t* title, const wchar_t* message) = 0;
+
+    // Error with Skip/Skip All/Cancel - returns kSkip, kSkipAll, or kCancel
+    virtual PromptResult AskSkipSkipAllCancel(const wchar_t* title, const wchar_t* message) = 0;
 };
 
 // Global prompter used by UI and worker code. Default is UI-backed.

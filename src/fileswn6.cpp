@@ -1559,41 +1559,21 @@ BOOL CFilesWindow::BuildScriptDir(COperations* script, CActionType type, char* s
     // With wide path support (\\?\), we can handle paths up to SAL_MAX_LONG_PATH (32767)
     if (st - sourcePath + strlen(dirName) >= SAL_MAX_LONG_PATH - 2)
     {
-        *sourceEnd = 0;                                    // restoring original sourcePath
-        _snprintf_s(text, _TRUNCATE, LoadStr(IDS_NAMEISTOOLONG), dirName, sourcePath);
+        *sourceEnd = 0; // restoring original sourcePath
+        std::wstring msg = FormatStrW(LoadStrW(IDS_NAMEISTOOLONG), AnsiToWide(dirName).c_str(), AnsiToWide(sourcePath).c_str());
         BOOL skip = TRUE;
         if (!ErrTooLongSrcDirNameSkipAll)
         {
-            MSGBOXEX_PARAMS params;
-            memset(&params, 0, sizeof(params));
-            params.HParent = HWindow;
-            params.Flags = MSGBOXEX_YESNOOKCANCEL | MB_ICONEXCLAMATION | MSGBOXEX_DEFBUTTON3 | MSGBOXEX_SILENT;
-            params.Caption = LoadStr(IDS_ERRORBUILDINGSCRIPT);
-            params.Text = text;
-            char aliasBtnNames[200];
-            /* used by export_mnu.py script that generates salmenu.mnu for the Translator
-               we let the msgbox buttons resolve hotkey collisions by simulating that it is a menu
-MENU_TEMPLATE_ITEM MsgBoxButtons[] = 
-{
-{MNTT_PB, 0
-{MNTT_IT, IDS_MSGBOXBTN_SKIP
-{MNTT_IT, IDS_MSGBOXBTN_SKIPALL
-{MNTT_IT, IDS_MSGBOXBTN_FOCUS
-{MNTT_PE, 0
-};
-*/
-            sprintf(aliasBtnNames, "%d\t%s\t%d\t%s\t%d\t%s",
-                    DIALOG_YES, LoadStr(IDS_MSGBOXBTN_SKIP),
-                    DIALOG_NO, LoadStr(IDS_MSGBOXBTN_SKIPALL),
-                    DIALOG_OK, LoadStr(IDS_MSGBOXBTN_FOCUS));
-            params.AliasBtnNames = aliasBtnNames;
-            int msgRes = SalMessageBoxEx(&params);
-            if (msgRes != DIALOG_YES /* Skip */ && msgRes != DIALOG_NO /* Skip All */)
+            PromptResult res = gPrompter->AskSkipSkipAllFocus(LoadStrW(IDS_ERRORBUILDINGSCRIPT), msg.c_str());
+            if (res.type == PromptResult::kFocus)
+            {
                 skip = FALSE;
-            if (msgRes == DIALOG_NO /* Skip All */)
-                ErrTooLongSrcDirNameSkipAll = TRUE;
-            if (msgRes == DIALOG_OK /* Focus */)
                 MainWindow->PostFocusNameInPanel(PANEL_SOURCE, sourcePath, dirName);
+            }
+            else if (res.type == PromptResult::kSkipAll)
+            {
+                ErrTooLongSrcDirNameSkipAll = TRUE;
+            }
         }
         return skip;
     }
@@ -1630,40 +1610,20 @@ MENU_TEMPLATE_ITEM MsgBoxButtons[] =
         {
             *sourceEnd = 0; // restoring sourcePath
             *targetEnd = 0; // restoring targetPath
-            _snprintf_s(text, _TRUNCATE, LoadStr(IDS_TOOLONGNAME2), targetPath, s2);
+            std::wstring msg = FormatStrW(LoadStrW(IDS_TOOLONGNAME2), AnsiToWide(targetPath).c_str(), AnsiToWide(s2).c_str());
             BOOL skip = TRUE;
             if (!ErrTooLongTgtDirNameSkipAll)
             {
-                MSGBOXEX_PARAMS params;
-                memset(&params, 0, sizeof(params));
-                params.HParent = HWindow;
-                params.Flags = MSGBOXEX_YESNOOKCANCEL | MB_ICONEXCLAMATION | MSGBOXEX_DEFBUTTON3 | MSGBOXEX_SILENT;
-                params.Caption = LoadStr(IDS_ERRORBUILDINGSCRIPT);
-                params.Text = text;
-                char aliasBtnNames[200];
-                /* used by export_mnu.py script that generates salmenu.mnu for the Translator
-                   we let the msgbox buttons resolve hotkey collisions by simulating that it is a menu
-MENU_TEMPLATE_ITEM MsgBoxButtons[] = 
-{
-  {MNTT_PB, 0
-  {MNTT_IT, IDS_MSGBOXBTN_SKIP
-  {MNTT_IT, IDS_MSGBOXBTN_SKIPALL
-  {MNTT_IT, IDS_MSGBOXBTN_FOCUS
-  {MNTT_PE, 0
-};
-*/
-                sprintf(aliasBtnNames, "%d\t%s\t%d\t%s\t%d\t%s",
-                        DIALOG_YES, LoadStr(IDS_MSGBOXBTN_SKIP),
-                        DIALOG_NO, LoadStr(IDS_MSGBOXBTN_SKIPALL),
-                        DIALOG_OK, LoadStr(IDS_MSGBOXBTN_FOCUS));
-                params.AliasBtnNames = aliasBtnNames;
-                int msgRes = SalMessageBoxEx(&params);
-                if (msgRes != DIALOG_YES /* Skip */ && msgRes != DIALOG_NO /* Skip All */)
+                PromptResult res = gPrompter->AskSkipSkipAllFocus(LoadStrW(IDS_ERRORBUILDINGSCRIPT), msg.c_str());
+                if (res.type == PromptResult::kFocus)
+                {
                     skip = FALSE;
-                if (msgRes == DIALOG_NO /* Skip All */)
-                    ErrTooLongTgtDirNameSkipAll = TRUE;
-                if (msgRes == DIALOG_OK /* Focus */)
                     MainWindow->PostFocusNameInPanel(PANEL_SOURCE, sourcePath, sourceEnd + 1);
+                }
+                else if (res.type == PromptResult::kSkipAll)
+                {
+                    ErrTooLongTgtDirNameSkipAll = TRUE;
+                }
             }
             return skip;
         }
@@ -1911,35 +1871,14 @@ MENU_TEMPLATE_ITEM MsgBoxButtons[] =
                                     DWORD err = GetLastError();
                                     if (err != ERROR_FILE_NOT_FOUND && err != ERROR_NO_MORE_FILES)
                                     {
-                                        sprintf(text, LoadStr(IDS_CANNOTREADDIR), sourcePath, GetErrorText(err));
+                                        std::wstring msg = FormatStrW(LoadStrW(IDS_CANNOTREADDIR), AnsiToWide(sourcePath).c_str(), GetErrorTextW(err));
                                         BOOL skip = TRUE;
                                         if (!ErrListDirSkipAll)
                                         {
-                                            MSGBOXEX_PARAMS params;
-                                            memset(&params, 0, sizeof(params));
-                                            params.HParent = MainWindow->HWindow;
-                                            params.Flags = MB_YESNOCANCEL | MB_ICONEXCLAMATION | MSGBOXEX_DEFBUTTON3 | MSGBOXEX_SILENT;
-                                            params.Caption = LoadStr(IDS_ERRORTITLE);
-                                            params.Text = text;
-                                            char aliasBtnNames[200];
-                                            /* used by export_mnu.py script that generates salmenu.mnu for the Translator
-                                               we let the msgbox buttons resolve hotkey collisions by simulating that it is a menu
-MENU_TEMPLATE_ITEM MsgBoxButtons[] = 
-{
-  {MNTT_PB, 0
-  {MNTT_IT, IDS_MSGBOXBTN_SKIP
-  {MNTT_IT, IDS_MSGBOXBTN_SKIPALL
-  {MNTT_PE, 0
-};
-*/
-                                            sprintf(aliasBtnNames, "%d\t%s\t%d\t%s",
-                                                    DIALOG_YES, LoadStr(IDS_MSGBOXBTN_SKIP),
-                                                    DIALOG_NO, LoadStr(IDS_MSGBOXBTN_SKIPALL));
-                                            params.AliasBtnNames = aliasBtnNames;
-                                            int msgRes = SalMessageBoxEx(&params);
-                                            if (msgRes != DIALOG_YES /* Skip */ && msgRes != DIALOG_NO /* Skip All */)
+                                            PromptResult res = gPrompter->AskSkipSkipAllCancel(LoadStrW(IDS_ERRORTITLE), msg.c_str());
+                                            if (res.type == PromptResult::kCancel)
                                                 skip = FALSE;
-                                            if (msgRes == DIALOG_NO /* Skip All */)
+                                            else if (res.type == PromptResult::kSkipAll)
                                                 ErrListDirSkipAll = TRUE;
                                         }
                                         *sourceEnd = 0; // restoring sourcePath
@@ -2134,38 +2073,17 @@ MENU_TEMPLATE_ITEM MsgBoxButtons[] =
             }
             if (err != ERROR_FILE_NOT_FOUND && err != ERROR_NO_MORE_FILES)
             {
-                sprintf(text, LoadStr(IDS_CANNOTREADDIR), sourcePath, GetErrorText(err));
+                std::wstring msg = FormatStrW(LoadStrW(IDS_CANNOTREADDIR), AnsiToWide(sourcePath).c_str(), GetErrorTextW(err));
                 *sourceEnd = 0; // restoring sourcePath
                 if (targetEnd != NULL)
                     *targetEnd = 0; // restoring targetPath
                 BOOL skip = TRUE;
                 if (!ErrListDirSkipAll)
                 {
-                    MSGBOXEX_PARAMS params;
-                    memset(&params, 0, sizeof(params));
-                    params.HParent = MainWindow->HWindow;
-                    params.Flags = MB_YESNOCANCEL | MB_ICONEXCLAMATION | MSGBOXEX_DEFBUTTON3 | MSGBOXEX_SILENT;
-                    params.Caption = LoadStr(IDS_ERRORTITLE);
-                    params.Text = text;
-                    char aliasBtnNames[200];
-                    /* used by export_mnu.py script that generates salmenu.mnu for the Translator
-                       we let the msgbox buttons resolve hotkey collisions by simulating that it is a menu
-MENU_TEMPLATE_ITEM MsgBoxButtons[] = 
-{
-  {MNTT_PB, 0
-  {MNTT_IT, IDS_MSGBOXBTN_SKIP
-  {MNTT_IT, IDS_MSGBOXBTN_SKIPALL
-  {MNTT_PE, 0
-};
-*/
-                    sprintf(aliasBtnNames, "%d\t%s\t%d\t%s",
-                            DIALOG_YES, LoadStr(IDS_MSGBOXBTN_SKIP),
-                            DIALOG_NO, LoadStr(IDS_MSGBOXBTN_SKIPALL));
-                    params.AliasBtnNames = aliasBtnNames;
-                    int msgRes = SalMessageBoxEx(&params);
-                    if (msgRes != DIALOG_YES /* Skip */ && msgRes != DIALOG_NO /* Skip All */)
+                    PromptResult res = gPrompter->AskSkipSkipAllCancel(LoadStrW(IDS_ERRORTITLE), msg.c_str());
+                    if (res.type == PromptResult::kCancel)
                         skip = FALSE;
-                    if (msgRes == DIALOG_NO /* Skip All */)
+                    else if (res.type == PromptResult::kSkipAll)
                         ErrListDirSkipAll = TRUE;
                 }
                 if (!skip)
@@ -2273,35 +2191,14 @@ MENU_TEMPLATE_ITEM MsgBoxButtons[] =
 
             if (testFindNextErr && err != ERROR_NO_MORE_FILES)
             {
-                sprintf(text, LoadStr(IDS_CANNOTREADDIR), sourcePath, GetErrorText(err));
+                std::wstring msg = FormatStrW(LoadStrW(IDS_CANNOTREADDIR), AnsiToWide(sourcePath).c_str(), GetErrorTextW(err));
                 BOOL skip = TRUE;
                 if (!ErrListDirSkipAll)
                 {
-                    MSGBOXEX_PARAMS params;
-                    memset(&params, 0, sizeof(params));
-                    params.HParent = MainWindow->HWindow;
-                    params.Flags = MB_YESNOCANCEL | MB_ICONEXCLAMATION | MSGBOXEX_DEFBUTTON3 | MSGBOXEX_SILENT;
-                    params.Caption = LoadStr(IDS_ERRORTITLE);
-                    params.Text = text;
-                    char aliasBtnNames[200];
-                    /* used by export_mnu.py script that generates salmenu.mnu for the Translator
-                       we let the msgbox buttons resolve hotkey collisions by simulating that it is a menu
-MENU_TEMPLATE_ITEM MsgBoxButtons[] = 
-{
-  {MNTT_PB, 0
-  {MNTT_IT, IDS_MSGBOXBTN_SKIP
-  {MNTT_IT, IDS_MSGBOXBTN_SKIPALL
-  {MNTT_PE, 0
-};
-*/
-                    sprintf(aliasBtnNames, "%d\t%s\t%d\t%s",
-                            DIALOG_YES, LoadStr(IDS_MSGBOXBTN_SKIP),
-                            DIALOG_NO, LoadStr(IDS_MSGBOXBTN_SKIPALL));
-                    params.AliasBtnNames = aliasBtnNames;
-                    int msgRes = SalMessageBoxEx(&params);
-                    if (msgRes != DIALOG_YES /* Skip */ && msgRes != DIALOG_NO /* Skip All */)
+                    PromptResult res = gPrompter->AskSkipSkipAllCancel(LoadStrW(IDS_ERRORTITLE), msg.c_str());
+                    if (res.type == PromptResult::kCancel)
                         skip = FALSE;
-                    if (msgRes == DIALOG_NO /* Skip All */)
+                    else if (res.type == PromptResult::kSkipAll)
                         ErrListDirSkipAll = TRUE;
                 }
                 if (!skip)
@@ -2554,38 +2451,18 @@ BOOL CFilesWindow::BuildScriptFile(COperations* script, CActionType type, char* 
 
         FAT_TOO_BIG_FILE:
 
-            int msgRes = DIALOG_YES /* Skip */;
+            PromptResult::Type resType = PromptResult::kSkip;
             if (!ErrTooBigFileFAT32SkipAll)
             {
-                _snprintf_s(message, _TRUNCATE, LoadStr(IDS_FILEISTOOBIGFORFAT32), op.SourceName);
-                MSGBOXEX_PARAMS params;
-                memset(&params, 0, sizeof(params));
-                params.HParent = MainWindow->HWindow;
-                params.Flags = MB_YESNOCANCEL | MB_ICONEXCLAMATION | MSGBOXEX_SILENT;
-                params.Caption = LoadStr(IDS_ERRORTITLE);
-                params.Text = message;
-                char aliasBtnNames[200];
-                /* used by export_mnu.py script that generates salmenu.mnu for the Translator
-                   we let the msgbox buttons resolve hotkey collisions by simulating that it is a menu
-MENU_TEMPLATE_ITEM MsgBoxButtons[] = 
-{
-  {MNTT_PB, 0
-  {MNTT_IT, IDS_MSGBOXBTN_SKIP
-  {MNTT_IT, IDS_MSGBOXBTN_SKIPALL
-  {MNTT_PE, 0
-};
-*/
-                sprintf(aliasBtnNames, "%d\t%s\t%d\t%s",
-                        DIALOG_YES, LoadStr(IDS_MSGBOXBTN_SKIP),
-                        DIALOG_NO, LoadStr(IDS_MSGBOXBTN_SKIPALL));
-                params.AliasBtnNames = aliasBtnNames;
-                msgRes = SalMessageBoxEx(&params);
-                if (msgRes == DIALOG_NO /* Skip All */)
+                std::wstring msg = FormatStrW(LoadStrW(IDS_FILEISTOOBIGFORFAT32), AnsiToWide(op.SourceName).c_str());
+                PromptResult res = gPrompter->AskSkipSkipAllCancel(LoadStrW(IDS_ERRORTITLE), msg.c_str());
+                resType = res.type;
+                if (res.type == PromptResult::kSkipAll)
                     ErrTooBigFileFAT32SkipAll = TRUE;
             }
             free(op.SourceName);
             op.SourceName = NULL;
-            return (msgRes == DIALOG_YES /* Skip */ || msgRes == DIALOG_NO /* Skip All */);
+            return (resType == PromptResult::kSkip || resType == PromptResult::kSkipAll);
         }
         char finalName[2 * MAX_PATH + 200]; // +200 is a reserve (Windows creates paths longer than MAX_PATH)
         if (mapName == NULL)

@@ -558,18 +558,11 @@ void CFilesWindow::UnpackZIPArchive(CFilesWindow* target, BOOL deleteOp, const c
 
                             if (Configuration.CnfrmCreatePath) // ask whether the path should be created
                             {
-                                BOOL dontShow = FALSE;
-                                sprintf(textBuf, LoadStr(IDS_MOVECOPY_CREATEPATH), newDirs.Get());
-
-                                MSGBOXEX_PARAMS params;
-                                memset(&params, 0, sizeof(params));
-                                params.HParent = HWindow;
-                                params.Flags = MSGBOXEX_YESNO | MSGBOXEX_ICONQUESTION | MSGBOXEX_SILENT | MSGBOXEX_ESCAPEENABLED | MSGBOXEX_HINT;
-                                params.Caption = LoadStr(IDS_UNPACKCOPY);
-                                params.Text = textBuf;
-                                params.CheckBoxText = LoadStr(IDS_MOVECOPY_CREATEPATH_CNFRM);
-                                params.CheckBoxValue = &dontShow;
-                                BOOL cont = (SalMessageBoxEx(&params) != IDYES);
+                                bool dontShow = false;
+                                std::wstring msg = FormatStrW(LoadStrW(IDS_MOVECOPY_CREATEPATH), AnsiToWide(newDirs.Get()).c_str());
+                                PromptResult res = gPrompter->AskYesNoWithCheckbox(LoadStrW(IDS_UNPACKCOPY), msg.c_str(),
+                                                                                   LoadStrW(IDS_MOVECOPY_CREATEPATH_CNFRM), &dontShow);
+                                BOOL cont = (res.type != PromptResult::kYes);
                                 Configuration.CnfrmCreatePath = !dontShow;
                                 if (cont)
                                 {

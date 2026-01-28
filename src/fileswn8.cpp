@@ -550,16 +550,9 @@ void CFilesWindow::FilesAction(CActionType type, CFilesWindow* target, int count
 
                             if (criteriaPtr != NULL && Configuration.CnfrmCopyMoveOptionsNS) // archives do not support options from the Copy/Move dialog
                             {
-                                MSGBOXEX_PARAMS params;
-                                memset(&params, 0, sizeof(params));
-                                params.HParent = HWindow;
-                                params.Flags = MB_OK | MB_ICONINFORMATION | MSGBOXEX_HINT;
-                                params.Caption = LoadStr(IDS_INFOTITLE);
-                                params.Text = LoadStr(IDS_MOVECOPY_OPTIONS_NOTSUPPORTED);
-                                params.CheckBoxText = LoadStr(IDS_MOVECOPY_OPTIONS_NOTSUPPORTED_AGAIN);
-                                int dontShow = !Configuration.CnfrmCopyMoveOptionsNS;
-                                params.CheckBoxValue = &dontShow;
-                                SalMessageBoxEx(&params);
+                                bool dontShow = !Configuration.CnfrmCopyMoveOptionsNS;
+                                gPrompter->ShowInfoWithCheckbox(LoadStrW(IDS_INFOTITLE), LoadStrW(IDS_MOVECOPY_OPTIONS_NOTSUPPORTED),
+                                                                LoadStrW(IDS_MOVECOPY_OPTIONS_NOTSUPPORTED_AGAIN), &dontShow);
                                 Configuration.CnfrmCopyMoveOptionsNS = !dontShow;
                             }
 
@@ -715,16 +708,9 @@ void CFilesWindow::FilesAction(CActionType type, CFilesWindow* target, int count
 
                                 if (criteriaPtr != NULL && Configuration.CnfrmCopyMoveOptionsNS) // file systems do not support options from the Copy/Move dialog
                                 {
-                                    MSGBOXEX_PARAMS params;
-                                    memset(&params, 0, sizeof(params));
-                                    params.HParent = HWindow;
-                                    params.Flags = MB_OK | MB_ICONINFORMATION | MSGBOXEX_HINT;
-                                    params.Caption = LoadStr(IDS_INFOTITLE);
-                                    params.Text = LoadStr(IDS_MOVECOPY_OPTIONS_NOTSUPPORTED);
-                                    params.CheckBoxText = LoadStr(IDS_MOVECOPY_OPTIONS_NOTSUPPORTED_AGAIN);
-                                    int dontShow = !Configuration.CnfrmCopyMoveOptionsNS;
-                                    params.CheckBoxValue = &dontShow;
-                                    SalMessageBoxEx(&params);
+                                    bool dontShow = !Configuration.CnfrmCopyMoveOptionsNS;
+                                    gPrompter->ShowInfoWithCheckbox(LoadStrW(IDS_INFOTITLE), LoadStrW(IDS_MOVECOPY_OPTIONS_NOTSUPPORTED),
+                                                                    LoadStrW(IDS_MOVECOPY_OPTIONS_NOTSUPPORTED_AGAIN), &dontShow);
                                     Configuration.CnfrmCopyMoveOptionsNS = !dontShow;
                                 }
 
@@ -1360,31 +1346,23 @@ void CFilesWindow::EmailFiles()
                 }
                 if (send)
                 {
-                    int ret = IDYES;
-                    BOOL dontShow = !Configuration.CnfrmSendEmail;
+                    bool confirmed = true;
+                    bool dontShow = !Configuration.CnfrmSendEmail;
                     if (!dontShow)
                     {
                         char expanded[200];
                         char totalSize[100];
-                        char text[300];
                         ExpandPluralFilesDirs(expanded, 200, mapi->GetFilesCount(), 0, epfdmNormal, FALSE);
                         CQuadWord size;
                         mapi->GetTotalSize(&size);
                         PrintDiskSize(totalSize, size, 0);
-                        sprintf(text, LoadStr(IDS_CONFIRM_EMAIL), expanded, totalSize);
-
-                        MSGBOXEX_PARAMS params;
-                        memset(&params, 0, sizeof(params));
-                        params.HParent = HWindow;
-                        params.Flags = MSGBOXEX_YESNO | MSGBOXEX_ESCAPEENABLED | MSGBOXEX_ICONQUESTION | MSGBOXEX_SILENT | MSGBOXEX_HINT;
-                        params.Caption = LoadStr(IDS_QUESTION);
-                        params.Text = text;
-                        params.CheckBoxText = LoadStr(IDS_DONTSHOWAGAINSE);
-                        params.CheckBoxValue = &dontShow;
-                        ret = SalMessageBoxEx(&params);
+                        std::wstring msg = FormatStrW(LoadStrW(IDS_CONFIRM_EMAIL), AnsiToWide(expanded).c_str(), AnsiToWide(totalSize).c_str());
+                        PromptResult res = gPrompter->AskYesNoWithCheckbox(LoadStrW(IDS_QUESTION), msg.c_str(),
+                                                                           LoadStrW(IDS_DONTSHOWAGAINSE), &dontShow);
+                        confirmed = (res.type == PromptResult::kYes);
                         Configuration.CnfrmSendEmail = !dontShow;
                     }
-                    if (ret == IDYES)
+                    if (confirmed)
                     {
                         SimpleMAPISendMail(mapi); // own thread; handles destruction of the 'mapi' object
                     }

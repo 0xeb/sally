@@ -147,6 +147,30 @@ public:
             return {PromptResult::kSkipAll};
         return {PromptResult::kFocus};
     }
+
+    PromptResult AskSkipSkipAllCancel(const wchar_t* title, const wchar_t* message) override
+    {
+        std::string titleA = WideToAnsi(title);
+        std::string msgA = WideToAnsi(message);
+
+        MSGBOXEX_PARAMS params;
+        memset(&params, 0, sizeof(params));
+        params.HParent = MainWindow->HWindow;
+        params.Flags = MB_YESNOCANCEL | MB_ICONEXCLAMATION | MSGBOXEX_DEFBUTTON3 | MSGBOXEX_SILENT;
+        params.Caption = titleA.c_str();
+        params.Text = msgA.c_str();
+        char aliasBtnNames[200];
+        sprintf(aliasBtnNames, "%d\t%s\t%d\t%s",
+                DIALOG_YES, LoadStr(IDS_MSGBOXBTN_SKIP),
+                DIALOG_NO, LoadStr(IDS_MSGBOXBTN_SKIPALL));
+        params.AliasBtnNames = aliasBtnNames;
+        int res = SalMessageBoxEx(&params);
+        if (res == DIALOG_YES)
+            return {PromptResult::kSkip};
+        if (res == DIALOG_NO)
+            return {PromptResult::kSkipAll};
+        return {PromptResult::kCancel};
+    }
 };
 
 IPrompter* GetUIPrompter()

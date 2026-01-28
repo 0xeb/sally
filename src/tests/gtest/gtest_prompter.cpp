@@ -77,6 +77,12 @@ public:
         return {PromptResult::kSkip};
     }
 
+    PromptResult AskSkipSkipAllCancel(const wchar_t* title, const wchar_t* message) override
+    {
+        log.push_back(L"AskSkipSkipAllCancel:" + std::wstring(title ? title : L"") + L":" + std::wstring(message ? message : L""));
+        return {PromptResult::kSkip};
+    }
+
     std::vector<std::wstring> log;
 };
 
