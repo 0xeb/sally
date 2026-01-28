@@ -12,6 +12,8 @@
 #include "codetbl.h"
 #include "dialogs.h"
 #include "common/widepath.h"
+#include "ui/IPrompter.h"
+#include "common/unicode/helpers.h"
 
 CSystemPolicies SystemPolicies;
 
@@ -454,9 +456,8 @@ RETRY:
                     while (PeekMessage(&msg, NULL, WM_KEYFIRST, WM_KEYLAST, PM_REMOVE))
                         ;
 
-                    char buf[MAX_PATH + 200];
-                    sprintf(buf, LoadStr(IDS_TERMINATEDBYUSER), path);
-                    SalMessageBox(parent, buf, LoadStr(IDS_INFOTITLE), MB_OK | MB_ICONINFORMATION);
+                    std::wstring infoMsg = FormatStrW(LoadStrW(IDS_TERMINATEDBYUSER), AnsiToWide(path).c_str());
+                    gPrompter->ShowInfo(LoadStrW(IDS_INFOTITLE), infoMsg.c_str());
                 }
             }
         }
@@ -517,16 +518,14 @@ RETRY:
         case ERROR_PATH_NOT_FOUND:
         case ERROR_BAD_PATHNAME:
         {
-            char text[MAX_PATH + 100];
-            sprintf(text, LoadStr(IDS_DIRNAMEINVALID), path);
-            SalMessageBox(parent, text, LoadStr(IDS_ERRORTITLE), MB_OK | MB_ICONEXCLAMATION);
+            std::wstring msg = FormatStrW(LoadStrW(IDS_DIRNAMEINVALID), AnsiToWide(path).c_str());
+            gPrompter->ShowError(LoadStrW(IDS_ERRORTITLE), msg.c_str());
             break;
         }
 
         default:
         {
-            SalMessageBox(parent, GetErrorText(lastError), LoadStr(IDS_ERRORTITLE),
-                          MB_OK | MB_ICONEXCLAMATION);
+            gPrompter->ShowError(LoadStrW(IDS_ERRORTITLE), GetErrorTextW(lastError));
             break;
         }
         }
@@ -685,8 +684,8 @@ PARSE_AGAIN:
         int fsNameIndex;
         if (!Plugins.IsPluginFS(fsName, index, fsNameIndex))
         {
-            sprintf(errBuf, LoadStr(IDS_PATHERRORFORMAT), path, LoadStr(IDS_NOTPLUGINFS));
-            SalMessageBox(parent, errBuf, errorTitle, MB_OK | MB_ICONEXCLAMATION);
+            std::wstring msg = FormatStrW(LoadStrW(IDS_PATHERRORFORMAT), AnsiToWide(path).c_str(), LoadStrW(IDS_NOTPLUGINFS));
+            gPrompter->ShowError(AnsiToWide(errorTitle).c_str(), msg.c_str());
             if (error != NULL)
                 *error = SPP_NOTPLUGINFS;
             return FALSE;
@@ -905,8 +904,8 @@ PARSE_AGAIN:
             }
         }
 
-        sprintf(errBuf, LoadStr(IDS_PATHERRORFORMAT), path, text);
-        SalMessageBox(parent, errBuf, errorTitle, MB_OK | MB_ICONEXCLAMATION);
+        std::wstring msg = FormatStrW(LoadStrW(IDS_PATHERRORFORMAT), AnsiToWide(path).c_str(), AnsiToWide(text).c_str());
+        gPrompter->ShowError(AnsiToWide(errorTitle).c_str(), msg.c_str());
         if (backslashAtEnd || mustBePath)
             SalPathAddBackslash(path, pathBufSize);
         return FALSE;
@@ -969,8 +968,8 @@ BOOL SalSplitWindowsPath(HWND parent, const char* title, const char* errorTitle,
                     // ERROR_ALREADY_EXISTS is not a failure - the directory is there, which is what we want
                     if (lastErr != ERROR_ALREADY_EXISTS)
                     {
-                        _snprintf_s(textBuf.Get(), textBuf.Size(), _TRUNCATE, LoadStr(IDS_CREATEDIRFAILED), newDirs.Get());
-                        SalMessageBox(parent, textBuf, errorTitle, MB_OK | MB_ICONEXCLAMATION);
+                        std::wstring msg = FormatStrW(LoadStrW(IDS_CREATEDIRFAILED), AnsiToWide(newDirs.Get()).c_str());
+                        gPrompter->ShowError(AnsiToWide(errorTitle).c_str(), msg.c_str());
                         ok = FALSE;
                         break;
                     }
@@ -1059,8 +1058,7 @@ BOOL SalSplitGeneralPath(HWND parent, const char* title, const char* errorTitle,
                 if (!backslashAtEnd) // just name (mask without '*' and '?')
                 {
                     if (selCount > 1 &&
-                        SalMessageBox(parent, LoadStr(IDS_MOVECOPY_NONSENSE), title,
-                                      MB_YESNO | MB_DEFBUTTON2 | MB_ICONQUESTION) != IDYES)
+                        gPrompter->AskYesNo(AnsiToWide(title).c_str(), LoadStrW(IDS_MOVECOPY_NONSENSE)).type != PromptResult::kYes)
                     {
                         return FALSE; // back to copy/move dialog
                     }
@@ -1092,20 +1090,12 @@ BOOL SalSplitGeneralPath(HWND parent, const char* title, const char* errorTitle,
 
                     if (Configuration.CnfrmCreatePath) // ask if path should be created
                     {
-                        BOOL dontShow = FALSE;
-                        _snprintf_s(textBuf.Get(), textBuf.Size(), _TRUNCATE, LoadStr(IDS_MOVECOPY_CREATEPATH), tmpNewDirs.Get());
-
-                        MSGBOXEX_PARAMS params;
-                        memset(&params, 0, sizeof(params));
-                        params.HParent = parent;
-                        params.Flags = MSGBOXEX_YESNO | MSGBOXEX_ICONQUESTION | MSGBOXEX_SILENT | MSGBOXEX_ESCAPEENABLED | MSGBOXEX_HINT;
-                        params.Caption = title;
-                        params.Text = textBuf.Get();
-                        params.CheckBoxText = LoadStr(IDS_MOVECOPY_CREATEPATH_CNFRM);
-                        params.CheckBoxValue = &dontShow;
-                        BOOL cont = (SalMessageBoxEx(&params) != IDYES);
+                        std::wstring msg = FormatStrW(LoadStrW(IDS_MOVECOPY_CREATEPATH), AnsiToWide(tmpNewDirs.Get()).c_str());
+                        bool dontShow = false;
+                        PromptResult res = gPrompter->AskYesNoWithCheckbox(AnsiToWide(title).c_str(), msg.c_str(),
+                                                                           LoadStrW(IDS_MOVECOPY_CREATEPATH_CNFRM), &dontShow);
                         Configuration.CnfrmCreatePath = !dontShow;
-                        if (cont)
+                        if (res.type != PromptResult::kYes)
                         {
                             char* e = path + strlen(path); // fix 'path' (join 'path' and 'mask')
                             if (e > path && *(e - 1) != '\\')
@@ -1118,7 +1108,7 @@ BOOL SalSplitGeneralPath(HWND parent, const char* title, const char* errorTitle,
                 }
                 else
                 {
-                    SalMessageBox(parent, LoadStr(IDS_TARGETPATHMUSTEXIST), errorTitle, MB_OK | MB_ICONEXCLAMATION);
+                    gPrompter->ShowError(AnsiToWide(errorTitle).c_str(), LoadStrW(IDS_TARGETPATHMUSTEXIST));
                     char* e = path + strlen(path); // fix 'path' (join 'path' and 'mask')
                     if (e > path && *(e - 1) != '\\')
                         *e++ = '\\';
@@ -1172,8 +1162,7 @@ BOOL SalSplitGeneralPath(HWND parent, const char* title, const char* errorTitle,
         if (*nameEnd == 0 && !backslashAtEnd) // renaming/overwriting existing file
         {
             if (selCount > 1 &&
-                SalMessageBox(parent, LoadStr(IDS_MOVECOPY_NONSENSE), title,
-                              MB_YESNO | MB_DEFBUTTON2 | MB_ICONQUESTION) != IDYES)
+                gPrompter->AskYesNo(AnsiToWide(title).c_str(), LoadStrW(IDS_MOVECOPY_NONSENSE)).type != PromptResult::kYes)
             {
                 return FALSE; // back to copy/move dialog
             }
@@ -1188,7 +1177,7 @@ BOOL SalSplitGeneralPath(HWND parent, const char* title, const char* errorTitle,
         }
         else // path into archive? not possible here...
         {
-            SalMessageBox(parent, LoadStr(IDS_ARCPATHNOTSUPPORTED), errorTitle, MB_OK | MB_ICONEXCLAMATION);
+            gPrompter->ShowError(AnsiToWide(errorTitle).c_str(), LoadStrW(IDS_ARCPATHNOTSUPPORTED));
             if (backslashAtEnd)
                 SalPathAddBackslash(path, 2 * MAX_PATH); // if '\\' was trimmed, add it back
             return FALSE;                                // back to copy/move dialog

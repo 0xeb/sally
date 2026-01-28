@@ -9,6 +9,8 @@
 #include "fileswnd.h"
 #include "mainwnd.h"
 #include "salinflt.h"
+#include "ui/IPrompter.h"
+#include "common/unicode/helpers.h"
 
 //****************************************************************************
 //
@@ -1068,11 +1070,9 @@ BOOL CopyTextToClipboardW(const wchar_t* text, int textLen, BOOL showEcho, HWND 
     if (showEcho)
     {
         if (err != ERROR_SUCCESS)
-            SalMessageBox(hEchoParent, GetErrorText(err), LoadStr(IDS_COPYTOCLIPBOARD),
-                          MB_OK | MB_ICONEXCLAMATION);
+            gPrompter->ShowError(LoadStrW(IDS_COPYTOCLIPBOARD), GetErrorTextW(err));
         else
-            SalMessageBox(hEchoParent, LoadStr(IDS_TEXTCOPIED), LoadStr(IDS_INFOTITLE),
-                          MB_OK | MB_ICONINFORMATION);
+            gPrompter->ShowInfo(LoadStrW(IDS_INFOTITLE), LoadStrW(IDS_TEXTCOPIED));
     }
     return err == ERROR_SUCCESS;
 }
@@ -1113,11 +1113,9 @@ BOOL CopyTextToClipboard(const char* text, int textLen, BOOL showEcho, HWND hEch
     if (showEcho)
     {
         if (err != ERROR_SUCCESS)
-            SalMessageBox(hEchoParent, GetErrorText(err), LoadStr(IDS_COPYTOCLIPBOARD),
-                          MB_OK | MB_ICONEXCLAMATION);
+            gPrompter->ShowError(LoadStrW(IDS_COPYTOCLIPBOARD), GetErrorTextW(err));
         else
-            SalMessageBox(hEchoParent, LoadStr(IDS_TEXTCOPIED), LoadStr(IDS_INFOTITLE),
-                          MB_OK | MB_ICONINFORMATION);
+            gPrompter->ShowInfo(LoadStrW(IDS_INFOTITLE), LoadStrW(IDS_TEXTCOPIED));
     }
     return err == ERROR_SUCCESS;
 }
@@ -1168,11 +1166,9 @@ BOOL CopyHTextToClipboard(HGLOBAL hGlobalText, int textLen, BOOL showEcho, HWND 
     if (showEcho)
     {
         if (err != ERROR_SUCCESS)
-            SalMessageBox(hEchoParent, GetErrorText(err), LoadStr(IDS_COPYTOCLIPBOARD),
-                          MB_OK | MB_ICONEXCLAMATION);
+            gPrompter->ShowError(LoadStrW(IDS_COPYTOCLIPBOARD), GetErrorTextW(err));
         else
-            SalMessageBox(hEchoParent, LoadStr(IDS_TEXTCOPIED), LoadStr(IDS_INFOTITLE),
-                          MB_OK | MB_ICONINFORMATION);
+            gPrompter->ShowInfo(LoadStrW(IDS_INFOTITLE), LoadStrW(IDS_TEXTCOPIED));
     }
     return err == ERROR_SUCCESS;
 }
