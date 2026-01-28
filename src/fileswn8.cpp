@@ -685,9 +685,8 @@ void CFilesWindow::FilesAction(CActionType type, CFilesWindow* target, int count
                             }
                             else
                             {
-                                wchar_t msgW[1024];
-                                swprintf_s(msgW, _countof(msgW), LoadStrW(IDS_FILEERRORFORMAT), AnsiToWide(path).c_str(), GetErrorTextW(err));
-                                gPrompter->ShowError((type == atCopy) ? LoadStrW(IDS_ERRORCOPY) : LoadStrW(IDS_ERRORMOVE), msgW);
+                                std::wstring msg = FormatStrW(LoadStrW(IDS_FILEERRORFORMAT), AnsiToWide(path).c_str(), GetErrorTextW(err));
+                                gPrompter->ShowError((type == atCopy) ? LoadStrW(IDS_ERRORCOPY) : LoadStrW(IDS_ERRORMOVE), msg.c_str());
                                 if (hasPath)
                                     *secondPart = '\\'; // restore the path - we will edit it in the Copy/Move dialog
                                 if (backslashAtEnd || mustBePath)
@@ -1107,11 +1106,10 @@ void CFilesWindow::FilesAction(CActionType type, CFilesWindow* target, int count
                         {
                             char buf1[50];
                             char buf2[50];
-                            wchar_t msgW[200];
-                            swprintf_s(msgW, _countof(msgW), LoadStrW(IDS_NOTENOUGHSPACE),
-                                       AnsiToWide(NumberToStr(buf1, occupiedSpTooBig ? script->OccupiedSpace : script->TotalFileSize)).c_str(),
-                                       AnsiToWide(NumberToStr(buf2, script->FreeSpace)).c_str());
-                            cancel = gPrompter->AskYesNo(captionW, msgW).type != PromptResult::kYes;
+                            std::wstring msg = FormatStrW(LoadStrW(IDS_NOTENOUGHSPACE),
+                                                          AnsiToWide(NumberToStr(buf1, occupiedSpTooBig ? script->OccupiedSpace : script->TotalFileSize)).c_str(),
+                                                          AnsiToWide(NumberToStr(buf2, script->FreeSpace)).c_str());
+                            cancel = gPrompter->AskYesNo(captionW, msg.c_str()).type != PromptResult::kYes;
                         }
                     }
 

@@ -1286,10 +1286,9 @@ BOOL CFilesWindow::PrepareCloseCurrentPath(HWND parent, BOOL canForce, BOOL canD
                             canclose = FALSE;
                             if (canForce) // we can ask the user whether to force it
                             {
-                                wchar_t msgW[1024];
-                                swprintf_s(msgW, _countof(msgW), LoadStrW(IDS_ARCHIVEFORCECLOSE), AnsiToWide(GetZIPArchive()).c_str());
+                                std::wstring msg = FormatStrW(LoadStrW(IDS_ARCHIVEFORCECLOSE), AnsiToWide(GetZIPArchive()).c_str());
                                 userAsked = TRUE;
-                                if (gPrompter->AskYesNo(LoadStrW(IDS_QUESTION), msgW).type == PromptResult::kYes) // user chooses "Close"
+                                if (gPrompter->AskYesNo(LoadStrW(IDS_QUESTION), msg.c_str()).type == PromptResult::kYes) // user chooses "Close"
                                 {
                                     userForce = TRUE;
                                     plugin->CanCloseArchive(this, GetZIPArchive(), TRUE); // force==TRUE
@@ -1314,9 +1313,8 @@ BOOL CFilesWindow::PrepareCloseCurrentPath(HWND parent, BOOL canForce, BOOL canD
                                     canclose = FALSE;
                                     if (canForce && !userAsked) // we can ask the user whether to force it
                                     {
-                                        wchar_t msgW[1024];
-                                        swprintf_s(msgW, _countof(msgW), LoadStrW(IDS_ARCHIVEFORCECLOSE), AnsiToWide(GetZIPArchive()).c_str());
-                                        if (gPrompter->AskYesNo(LoadStrW(IDS_QUESTION), msgW).type == PromptResult::kYes) // user chooses "Close"
+                                        std::wstring msg = FormatStrW(LoadStrW(IDS_ARCHIVEFORCECLOSE), AnsiToWide(GetZIPArchive()).c_str());
+                                        if (gPrompter->AskYesNo(LoadStrW(IDS_QUESTION), msg.c_str()).type == PromptResult::kYes) // user chooses "Close"
                                         {
                                             plugin->CanCloseArchive(this, GetZIPArchive(), TRUE);
                                             canclose = TRUE;
@@ -1355,9 +1353,8 @@ BOOL CFilesWindow::PrepareCloseCurrentPath(HWND parent, BOOL canForce, BOOL canD
                     {
                         char path[2 * MAX_PATH];
                         GetGeneralPath(path, 2 * MAX_PATH);
-                        wchar_t msgW[1024];
-                        swprintf_s(msgW, _countof(msgW), LoadStrW(IDS_FSFORCECLOSE), AnsiToWide(path).c_str());
-                        if (gPrompter->AskYesNo(LoadStrW(IDS_QUESTION), msgW).type == PromptResult::kYes) // user chooses "Close"
+                        std::wstring msg = FormatStrW(LoadStrW(IDS_FSFORCECLOSE), AnsiToWide(path).c_str());
+                        if (gPrompter->AskYesNo(LoadStrW(IDS_QUESTION), msg.c_str()).type == PromptResult::kYes) // user chooses "Close"
                         {
                             GetPluginFS()->TryCloseOrDetach(TRUE, FALSE, detachFS, tryCloseReason);
                             detachFS = FALSE;

@@ -36,6 +36,18 @@ inline std::string WideToAnsi(const std::wstring& s)
     return WideToAnsi(s.c_str());
 }
 
+// Format a wide string using printf-style formatting, returns std::wstring
+template <typename... Args>
+inline std::wstring FormatStrW(const wchar_t* format, Args... args)
+{
+    int len = _scwprintf(format, args...);
+    if (len <= 0)
+        return std::wstring();
+    std::wstring out(len, L'\0');
+    swprintf_s(out.data(), len + 1, format, args...);
+    return out;
+}
+
 // Helper to show an error/info via gPrompter if available, otherwise fallback MessageBox.
 // The HWND parameter is optional - if omitted (or NULL), uses GetActiveWindow() for fallback.
 inline void ShowErrorViaPrompter(const wchar_t* title, const wchar_t* message, HWND hwndFallback = NULL)

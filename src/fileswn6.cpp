@@ -1091,11 +1091,10 @@ void CFilesWindow::DropCopyMove(BOOL copy, char* targetPath, CCopyMoveData* data
                 {
                     char buf1[50];
                     char buf2[50];
-                    wchar_t msgW[200];
-                    swprintf_s(msgW, _countof(msgW), LoadStrW(IDS_NOTENOUGHSPACE),
-                               AnsiToWide(NumberToStr(buf1, occupiedSpTooBig ? script->OccupiedSpace : script->TotalFileSize)).c_str(),
-                               AnsiToWide(NumberToStr(buf2, script->FreeSpace)).c_str());
-                    cancel = gPrompter->AskYesNo(captionW, msgW).type != PromptResult::kYes;
+                    std::wstring msg = FormatStrW(LoadStrW(IDS_NOTENOUGHSPACE),
+                                                  AnsiToWide(NumberToStr(buf1, occupiedSpTooBig ? script->OccupiedSpace : script->TotalFileSize)).c_str(),
+                                                  AnsiToWide(NumberToStr(buf2, script->FreeSpace)).c_str());
+                    cancel = gPrompter->AskYesNo(captionW, msg.c_str()).type != PromptResult::kYes;
                 }
             }
 
@@ -1700,9 +1699,8 @@ MENU_TEMPLATE_ITEM MsgBoxButtons[] =
     if (type == atDelete && Configuration.CnfrmSHDirDel &&
         (sourceDirAttr & (FILE_ATTRIBUTE_HIDDEN | FILE_ATTRIBUTE_SYSTEM)))
     {
-        wchar_t msgW[1024];
-        swprintf_s(msgW, _countof(msgW), LoadStrW(IDS_DELETESHDIR), AnsiToWide(sourcePath).c_str());
-        PromptResult res = gPrompter->AskYesNoCancel(LoadStrW(IDS_QUESTION), msgW);
+        std::wstring msg = FormatStrW(LoadStrW(IDS_DELETESHDIR), AnsiToWide(sourcePath).c_str());
+        PromptResult res = gPrompter->AskYesNoCancel(LoadStrW(IDS_QUESTION), msg.c_str());
         UpdateWindow(MainWindow->HWindow);
         if (res.type == PromptResult::kNo || res.type == PromptResult::kCancel) // if CANCEL or NO was chosen, we end or skip the directory
         {
@@ -2198,9 +2196,8 @@ MENU_TEMPLATE_ITEM MsgBoxButtons[] =
 
                 if (askDirDelete)
                 {
-                    wchar_t msgW[1024];
-                    swprintf_s(msgW, _countof(msgW), LoadStrW(IDS_NONEMPTYDIRDELCONFIRM), AnsiToWide(sourcePath).c_str());
-                    PromptResult res = gPrompter->AskYesNoCancel(LoadStrW(IDS_QUESTION), msgW);
+                    std::wstring msg = FormatStrW(LoadStrW(IDS_NONEMPTYDIRDELCONFIRM), AnsiToWide(sourcePath).c_str());
+                    PromptResult res = gPrompter->AskYesNoCancel(LoadStrW(IDS_QUESTION), msg.c_str());
                     UpdateWindow(MainWindow->HWindow);
                     delDirectoryReturn = (res.type != PromptResult::kCancel); // if CANCEL was not chosen, we continue
                     delDirectory = (res.type == PromptResult::kYes);

@@ -615,9 +615,8 @@ void CFilesWindow::UnpackZIPArchive(CFilesWindow* target, BOOL deleteOp, const c
                                     // ERROR_ALREADY_EXISTS is not a failure - the directory is there, which is what we want
                                     if (lastErr != ERROR_ALREADY_EXISTS)
                                     {
-                                        wchar_t msgW[1024];
-                                        swprintf_s(msgW, _countof(msgW), LoadStrW(IDS_CREATEDIRFAILED), AnsiToWide(newDirs.Get()).c_str());
-                                        gPrompter->ShowError(LoadStrW(IDS_ERRORCOPY), msgW);
+                                        std::wstring msg = FormatStrW(LoadStrW(IDS_CREATEDIRFAILED), AnsiToWide(newDirs.Get()).c_str());
+                                        gPrompter->ShowError(LoadStrW(IDS_ERRORCOPY), msg.c_str());
                                         ok = FALSE;
                                         break;
                                     }
@@ -769,9 +768,8 @@ void CFilesWindow::UnpackZIPArchive(CFilesWindow* target, BOOL deleteOp, const c
                             strcat(name, "\\");
                             strcat(name, Dirs->At(data.Indexes[i]).Name);
 
-                            wchar_t msgW[1024];
-                            swprintf_s(msgW, _countof(msgW), LoadStrW(IDS_NONEMPTYDIRDELCONFIRM), AnsiToWide(name).c_str());
-                            PromptResult res = gPrompter->AskYesNoCancel(LoadStrW(IDS_QUESTION), msgW);
+                            std::wstring msg = FormatStrW(LoadStrW(IDS_NONEMPTYDIRDELCONFIRM), AnsiToWide(name).c_str());
+                            PromptResult res = gPrompter->AskYesNoCancel(LoadStrW(IDS_QUESTION), msg.c_str());
                             if (res.type == PromptResult::kCancel)
                             {
                                 cancel = TRUE;
@@ -1451,9 +1449,8 @@ void CFilesWindow::Pack(CFilesWindow* target, int pluginIndex, const char* plugi
         }
         if (i == PackerConfig.GetPackersCount()) // the requested plugin was not found
         {
-            wchar_t msgW[1024];
-            swprintf_s(msgW, _countof(msgW), LoadStrW(IDS_PLUGINPACKERNOTFOUND), AnsiToWide(pluginName).c_str());
-            gPrompter->ShowError(LoadStrW(IDS_PACKTITLE), msgW);
+            std::wstring msg = FormatStrW(LoadStrW(IDS_PLUGINPACKERNOTFOUND), AnsiToWide(pluginName).c_str());
+            gPrompter->ShowError(LoadStrW(IDS_PACKTITLE), msg.c_str());
             delete[] (data.Indexes);
             EndStopRefresh(); // the snooper resumes now
             return;
@@ -1562,9 +1559,8 @@ _PACK_AGAIN:
                 // because it alters the original directory content, which users report as a bug since it's unexpected.
                 if (containsDirLinks == 1)
                 {
-                    wchar_t msgW[1024];
-                    swprintf_s(msgW, _countof(msgW), LoadStrW(IDS_DELFILESAFTERPACKINGNOLINKS), AnsiToWide(linkName).c_str());
-                    gPrompter->ShowError(LoadStrW(IDS_PACKTITLE), msgW);
+                    std::wstring msg = FormatStrW(LoadStrW(IDS_DELFILESAFTERPACKINGNOLINKS), AnsiToWide(linkName).c_str());
+                    gPrompter->ShowError(LoadStrW(IDS_PACKTITLE), msg.c_str());
                     PackerConfig.Move = FALSE;
                     goto _PACK_AGAIN;
                 }
@@ -1736,9 +1732,8 @@ void CFilesWindow::Unpack(CFilesWindow* target, int pluginIndex, const char* plu
             }
             if (i2 == UnpackerConfig.GetUnpackersCount()) // requested plugin not found
             {
-                wchar_t msgW[1024];
-                swprintf_s(msgW, _countof(msgW), LoadStrW(IDS_PLUGINUNPACKERNOTFOUND), AnsiToWide(pluginName).c_str());
-                gPrompter->ShowError(LoadStrW(IDS_ERRORUNPACK), msgW);
+                std::wstring msg = FormatStrW(LoadStrW(IDS_PLUGINUNPACKERNOTFOUND), AnsiToWide(pluginName).c_str());
+                gPrompter->ShowError(LoadStrW(IDS_ERRORUNPACK), msg.c_str());
                 EndStopRefresh(); // the snooper resumes now
                 return;
             }

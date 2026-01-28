@@ -2003,9 +2003,8 @@ CHANGE_AGAIN:
         {
             if (strlen(fsUserPart) >= MAX_PATH) // plugins do not count with longer path
             {
-                _snprintf_s(errBuf, errBuf.Size(), _TRUNCATE, LoadStr(IDS_PATHERRORFORMAT), (const char*)path, LoadStr(IDS_TOOLONGPATH));
-                SalMessageBox(HWindow, errBuf, LoadStr(IDS_ERRORCHANGINGDIR),
-                              MB_OK | MB_ICONEXCLAMATION);
+                std::wstring msg = FormatStrW(LoadStrW(IDS_PATHERRORFORMAT), AnsiToWide(path).c_str(), LoadStrW(IDS_TOOLONGPATH));
+                gPrompter->ShowError(LoadStrW(IDS_ERRORCHANGINGDIR), msg.c_str());
                 if (newDir != NULL)
                 {
                     if (useStopRefresh)
@@ -2099,9 +2098,8 @@ CHANGE_AGAIN:
             }
             else
             {
-                _snprintf_s(errBuf, errBuf.Size(), _TRUNCATE, LoadStr(IDS_PATHERRORFORMAT), (const char*)path, LoadStr(IDS_NOTPLUGINFS));
-                SalMessageBox(HWindow, errBuf, LoadStr(IDS_ERRORCHANGINGDIR),
-                              MB_OK | MB_ICONEXCLAMATION);
+                std::wstring msg = FormatStrW(LoadStrW(IDS_PATHERRORFORMAT), AnsiToWide(path).c_str(), LoadStrW(IDS_NOTPLUGINFS));
+                gPrompter->ShowError(LoadStrW(IDS_ERRORCHANGINGDIR), msg.c_str());
                 if (newDir != NULL)
                 {
                     if (useStopRefresh)
@@ -2177,9 +2175,8 @@ CHANGE_AGAIN:
                             strcpy(absFSPath, path);
                         else
                         {
-                            _snprintf_s(errBuf, errBuf.Size(), _TRUNCATE, LoadStr(IDS_PATHERRORFORMAT), (const char*)path, LoadStr(IDS_TOOLONGPATH));
-                            SalMessageBox(HWindow, errBuf, LoadStr(IDS_ERRORCHANGINGDIR),
-                                          MB_OK | MB_ICONEXCLAMATION);
+                            std::wstring msg = FormatStrW(LoadStrW(IDS_PATHERRORFORMAT), AnsiToWide(path).c_str(), LoadStrW(IDS_TOOLONGPATH));
+                            gPrompter->ShowError(LoadStrW(IDS_ERRORCHANGINGDIR), msg.c_str());
                             success = FALSE;
                         }
                         if (!success ||
@@ -2394,9 +2391,8 @@ CHANGE_AGAIN:
                                                                        FALSE, NULL, TRUE, &localFailReason, FALSE, TRUE);
                                         if (!ret && localFailReason == CHPPFR_SHORTERPATH)
                                         {
-                                            _snprintf_s(errBuf, errBuf.Size(), _TRUNCATE, LoadStr(IDS_PATHINARCHIVENOTFOUND), end);
-                                            SalMessageBox(HWindow, errBuf, LoadStr(IDS_ERRORCHANGINGDIR),
-                                                          MB_OK | MB_ICONEXCLAMATION);
+                                            std::wstring msg = FormatStrW(LoadStrW(IDS_PATHINARCHIVENOTFOUND), AnsiToWide(end).c_str());
+                                            gPrompter->ShowError(LoadStrW(IDS_ERRORCHANGINGDIR), msg.c_str());
                                         }
                                         if (failReason != NULL)
                                             *failReason = localFailReason;
@@ -2497,9 +2493,9 @@ CHANGE_AGAIN:
             {
                 if (showErr)
                 {
-                    _snprintf_s(errBuf, errBuf.Size(), _TRUNCATE, LoadStr(IDS_PATHERRORFORMAT), showNewDirPathInErrBoxes && newDir != NULL ? newDir : (const char*)path, text);
-                    SalMessageBox(HWindow, errBuf, LoadStr(IDS_ERRORCHANGINGDIR),
-                                  MB_OK | MB_ICONEXCLAMATION);
+                    const char* pathForMsg = showNewDirPathInErrBoxes && newDir != NULL ? newDir : (const char*)path;
+                    std::wstring msg = FormatStrW(LoadStrW(IDS_PATHERRORFORMAT), AnsiToWide(pathForMsg).c_str(), AnsiToWide(text).c_str());
+                    gPrompter->ShowError(LoadStrW(IDS_ERRORCHANGINGDIR), msg.c_str());
                 }
                 if (newDir != NULL)
                 {
