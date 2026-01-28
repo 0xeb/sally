@@ -4,6 +4,8 @@
 #include "precomp.h"
 #include "ui/IPrompter.h"
 #include "mainwnd.h"
+#include "dialogs.h"
+#include "common/unicode/helpers.h"
 
 IPrompter* gPrompter = nullptr;
 
@@ -76,6 +78,74 @@ public:
         if (res == IDNO)
             return {PromptResult::kNo};
         return {PromptResult::kCancel};
+    }
+
+    PromptResult AskYesNoWithCheckbox(const wchar_t* title, const wchar_t* message,
+                                      const wchar_t* checkboxText, bool* checkboxValue) override
+    {
+        std::string titleA = WideToAnsi(title);
+        std::string msgA = WideToAnsi(message);
+        std::string cbTextA = WideToAnsi(checkboxText);
+
+        MSGBOXEX_PARAMS params;
+        memset(&params, 0, sizeof(params));
+        params.HParent = MainWindow->HWindow;
+        params.Flags = MSGBOXEX_YESNO | MSGBOXEX_ESCAPEENABLED | MSGBOXEX_ICONQUESTION | MSGBOXEX_SILENT | MSGBOXEX_HINT;
+        params.Caption = titleA.c_str();
+        params.Text = msgA.c_str();
+        params.CheckBoxText = cbTextA.c_str();
+        BOOL cbVal = checkboxValue ? (*checkboxValue ? TRUE : FALSE) : FALSE;
+        params.CheckBoxValue = &cbVal;
+        int res = SalMessageBoxEx(&params);
+        if (checkboxValue)
+            *checkboxValue = (cbVal != FALSE);
+        return res == IDYES ? PromptResult{PromptResult::kYes} : PromptResult{PromptResult::kNo};
+    }
+
+    void ShowInfoWithCheckbox(const wchar_t* title, const wchar_t* message,
+                              const wchar_t* checkboxText, bool* checkboxValue) override
+    {
+        std::string titleA = WideToAnsi(title);
+        std::string msgA = WideToAnsi(message);
+        std::string cbTextA = WideToAnsi(checkboxText);
+
+        MSGBOXEX_PARAMS params;
+        memset(&params, 0, sizeof(params));
+        params.HParent = MainWindow->HWindow;
+        params.Flags = MB_OK | MB_ICONINFORMATION | MSGBOXEX_HINT;
+        params.Caption = titleA.c_str();
+        params.Text = msgA.c_str();
+        params.CheckBoxText = cbTextA.c_str();
+        BOOL cbVal = checkboxValue ? (*checkboxValue ? TRUE : FALSE) : FALSE;
+        params.CheckBoxValue = &cbVal;
+        SalMessageBoxEx(&params);
+        if (checkboxValue)
+            *checkboxValue = (cbVal != FALSE);
+    }
+
+    PromptResult AskSkipSkipAllFocus(const wchar_t* title, const wchar_t* message) override
+    {
+        std::string titleA = WideToAnsi(title);
+        std::string msgA = WideToAnsi(message);
+
+        MSGBOXEX_PARAMS params;
+        memset(&params, 0, sizeof(params));
+        params.HParent = MainWindow->HWindow;
+        params.Flags = MSGBOXEX_YESNOOKCANCEL | MB_ICONEXCLAMATION | MSGBOXEX_DEFBUTTON3 | MSGBOXEX_SILENT;
+        params.Caption = titleA.c_str();
+        params.Text = msgA.c_str();
+        char aliasBtnNames[200];
+        sprintf(aliasBtnNames, "%d\t%s\t%d\t%s\t%d\t%s",
+                DIALOG_YES, LoadStr(IDS_MSGBOXBTN_SKIP),
+                DIALOG_NO, LoadStr(IDS_MSGBOXBTN_SKIPALL),
+                DIALOG_OK, LoadStr(IDS_MSGBOXBTN_FOCUS));
+        params.AliasBtnNames = aliasBtnNames;
+        int res = SalMessageBoxEx(&params);
+        if (res == DIALOG_YES)
+            return {PromptResult::kSkip};
+        if (res == DIALOG_NO)
+            return {PromptResult::kSkipAll};
+        return {PromptResult::kFocus};
     }
 };
 

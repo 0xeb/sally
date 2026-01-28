@@ -54,6 +54,29 @@ public:
         return {PromptResult::kYes};
     }
 
+    PromptResult AskYesNoWithCheckbox(const wchar_t* title, const wchar_t* message,
+                                      const wchar_t* checkboxText, bool* checkboxValue) override
+    {
+        log.push_back(L"AskYesNoWithCheckbox:" + std::wstring(title ? title : L"") + L":" + std::wstring(message ? message : L""));
+        if (checkboxValue)
+            *checkboxValue = true; // simulate "don't show again" checked
+        return {PromptResult::kYes};
+    }
+
+    void ShowInfoWithCheckbox(const wchar_t* title, const wchar_t* message,
+                              const wchar_t* checkboxText, bool* checkboxValue) override
+    {
+        log.push_back(L"ShowInfoWithCheckbox:" + std::wstring(title ? title : L"") + L":" + std::wstring(message ? message : L""));
+        if (checkboxValue)
+            *checkboxValue = true;
+    }
+
+    PromptResult AskSkipSkipAllFocus(const wchar_t* title, const wchar_t* message) override
+    {
+        log.push_back(L"AskSkipSkipAllFocus:" + std::wstring(title ? title : L"") + L":" + std::wstring(message ? message : L""));
+        return {PromptResult::kSkip};
+    }
+
     std::vector<std::wstring> log;
 };
 

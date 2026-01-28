@@ -13,7 +13,10 @@ struct PromptResult
         kYes,
         kNo,
         kRetry,
-        kIgnore
+        kIgnore,
+        kSkip,
+        kSkipAll,
+        kFocus
     } type;
 };
 
@@ -35,6 +38,17 @@ public:
     virtual PromptResult AskYesNo(const wchar_t* title, const wchar_t* message) = 0;
     // Question with Yes/No/Cancel - returns kYes, kNo, or kCancel
     virtual PromptResult AskYesNoCancel(const wchar_t* title, const wchar_t* message) = 0;
+
+    // Question with Yes/No and "don't show again" checkbox - returns kYes or kNo
+    virtual PromptResult AskYesNoWithCheckbox(const wchar_t* title, const wchar_t* message,
+                                              const wchar_t* checkboxText, bool* checkboxValue) = 0;
+
+    // Info with OK and "don't show again" checkbox
+    virtual void ShowInfoWithCheckbox(const wchar_t* title, const wchar_t* message,
+                                      const wchar_t* checkboxText, bool* checkboxValue) = 0;
+
+    // Path too long dialog - returns kSkip, kSkipAll, or kFocus
+    virtual PromptResult AskSkipSkipAllFocus(const wchar_t* title, const wchar_t* message) = 0;
 };
 
 // Global prompter used by UI and worker code. Default is UI-backed.
