@@ -210,6 +210,8 @@ void MakeCopyWithBackslashIfNeeded(const char*& name, char (&nameCopy)[3 * MAX_P
 
 // Returns TRUE if name ends with backslash ('\\' added at end solves invalid names)
 BOOL NameEndsWithBackslash(const char* name);
+std::wstring MakeCopyWithBackslashIfNeededW(const wchar_t* name);
+BOOL NameEndsWithBackslashW(const wchar_t* name);
 
 // If 'name' ends with space/dot or contains ':' (collision with ADS), returns TRUE, otherwise FALSE,
 // if 'ignInvalidName' is TRUE, returns TRUE only if 'name' contains ':' (collision with ADS)

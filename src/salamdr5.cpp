@@ -1204,6 +1204,34 @@ BOOL NameEndsWithBackslash(const char* name)
     return nameLen > 0 && name[nameLen - 1] == '\\';
 }
 
+// Wide version - returns path with trailing backslash added if needed
+// (to prevent Windows from trimming trailing spaces/dots)
+std::wstring MakeCopyWithBackslashIfNeededW(const wchar_t* name)
+{
+    if (name == nullptr || *name == L'\0')
+        return std::wstring();
+    
+    std::wstring result(name);
+    size_t len = result.length();
+    
+    // If name ends with space or dot, append backslash
+    if (len > 0 && (result[len - 1] <= L' ' || result[len - 1] == L'.'))
+    {
+        result += L'\\';
+    }
+    
+    return result;
+}
+
+// Wide version of NameEndsWithBackslash
+BOOL NameEndsWithBackslashW(const wchar_t* name)
+{
+    if (name == nullptr || *name == L'\0')
+        return FALSE;
+    size_t len = wcslen(name);
+    return len > 0 && name[len - 1] == L'\\';
+}
+
 BOOL FileNameIsInvalid(const char* name, BOOL isFullName, BOOL ignInvalidName)
 {
     const char* s = name;
