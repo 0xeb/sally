@@ -14,6 +14,8 @@
 #include "zip.h"
 #include "shellib.h"
 #include "pack.h"
+#include "ui/IPrompter.h"
+#include "common/unicode/helpers.h"
 
 void CFilesWindow::PluginFSFilesAction(CPluginFSActionType type)
 {
@@ -380,8 +382,8 @@ void CFilesWindow::DragDropToArcOrFS(CTmpDragDropOperData* data)
         DWORD err = GetLastError();
         if (err != ERROR_FILE_NOT_FOUND && err != ERROR_NO_MORE_FILES)
         {
-            sprintf(text, LoadStr(IDS_CANNOTREADDIR), path, GetErrorText(err));
-            SalMessageBox(HWindow, text, LoadStr(IDS_ERRORTITLE), MB_OK | MB_ICONEXCLAMATION);
+            std::wstring pathW = AnsiToWide(path);
+            gPrompter->ShowError(LoadStrW(IDS_ERRORTITLE), (pathW + L": " + GetErrorTextW(err)).c_str());
             if (nameFound != NULL)
                 free(nameFound);
             delete baseDir;
@@ -490,8 +492,8 @@ void CFilesWindow::DragDropToArcOrFS(CTmpDragDropOperData* data)
 
         if (testFindNextErr && err != ERROR_NO_MORE_FILES)
         {
-            sprintf(text, LoadStr(IDS_CANNOTREADDIR), path, GetErrorText(err));
-            SalMessageBox(HWindow, text, LoadStr(IDS_ERRORTITLE), MB_OK | MB_ICONEXCLAMATION);
+            std::wstring pathW = AnsiToWide(path);
+            gPrompter->ShowError(LoadStrW(IDS_ERRORTITLE), (pathW + L": " + GetErrorTextW(err)).c_str());
             if (nameFound != NULL)
                 free(nameFound);
             delete baseDir;

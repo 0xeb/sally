@@ -14,6 +14,8 @@
 #include "zip.h"
 #include "shellib.h"
 #include "toolbar.h"
+#include "ui/IPrompter.h"
+#include "common/unicode/helpers.h"
 
 //*****************************************************************************
 //
@@ -218,8 +220,7 @@ void CFilesWindow::FocusShortcutTarget(CFilesWindow* panel)
     strcpy(fullName, GetPath());
     if (!SalPathAppend(fullName, file->Name, MAX_PATH))
     {
-        SalMessageBox(HWindow, LoadStr(IDS_TOOLONGNAME), LoadStr(IDS_ERRORTITLE),
-                      MB_OK | MB_ICONEXCLAMATION);
+        gPrompter->ShowError(LoadStrW(IDS_ERRORTITLE), LoadStrW(IDS_TOOLONGNAME));
         return;
     }
 
@@ -329,15 +330,15 @@ void CFilesWindow::FocusShortcutTarget(CFilesWindow* panel)
     }
     if (mountPoint || invalid)
     {
-        char errBuf[MAX_PATH + 300];
-        sprintf(errBuf, LoadStr(mountPoint ? IDS_DIRLINK_MOUNT_POINT : IDS_SHORTCUT_INVALID),
-                mountPoint ? junctionOrSymlinkTgt : shortName);
-        SalMessageBox(HWindow, errBuf, LoadStr(IDS_ERRORTITLE), MB_OK | MB_ICONEXCLAMATION);
+        // TODO: Use wide format string when available
+        std::wstring pathW = AnsiToWide(mountPoint ? junctionOrSymlinkTgt : shortName);
+        gPrompter->ShowError(LoadStrW(IDS_ERRORTITLE),
+            (pathW + L" - " + LoadStrW(mountPoint ? IDS_DIRLINK_MOUNT_POINT : IDS_SHORTCUT_INVALID)).c_str());
     }
     if (wrongPath)
     {
-        SalMessageBox(HWindow, LoadStr(isDir ? IDS_DIRLINK_WRONG_PATH : IDS_SHORTCUT_WRONG_PATH),
-                      LoadStr(IDS_ERRORTITLE), MB_OK | MB_ICONEXCLAMATION);
+        gPrompter->ShowError(LoadStrW(IDS_ERRORTITLE),
+            LoadStrW(isDir ? IDS_DIRLINK_WRONG_PATH : IDS_SHORTCUT_WRONG_PATH));
     }
 }
 

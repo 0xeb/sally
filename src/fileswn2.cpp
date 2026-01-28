@@ -2115,8 +2115,8 @@ BOOL CFilesWindow::ChangePathToArchive(const char* archive, const char* archiveP
                     tryPathWithArchiveOnError = (err == ERROR_SUCCESS && !pathInvalid); // shorter path is accessible, we'll try it
                 if (!isRefresh)                                                         // during refresh path-shortening messages are not displayed
                 {
-                    sprintf(text, LoadStr(IDS_FILEERRORFORMAT), archive, GetErrorText(lastErr));
-                    SalMessageBox(HWindow, text, LoadStr(IDS_ERRORTITLE), MB_OK | MB_ICONEXCLAMATION);
+                    std::wstring archiveW = AnsiToWide(archive);
+                    gPrompter->ShowError(LoadStrW(IDS_ERRORTITLE), (archiveW + L": " + GetErrorTextW(lastErr)).c_str());
                 }
                 goto ERROR_1;
             }
@@ -2290,8 +2290,8 @@ BOOL CFilesWindow::ChangePathToArchive(const char* archive, const char* archiveP
                     err = GetLastError(); // unable to open the archive file
                     if (!isRefresh)       // during refresh missing-path messages are not displayed
                     {
-                        sprintf(text, LoadStr(IDS_FILEERRORFORMAT), archive, GetErrorText(err));
-                        SalMessageBox(HWindow, text, LoadStr(IDS_ERRORTITLE), MB_OK | MB_ICONEXCLAMATION);
+                        std::wstring archiveW = AnsiToWide(archive);
+                        gPrompter->ShowError(LoadStrW(IDS_ERRORTITLE), (archiveW + L": " + GetErrorTextW(err)).c_str());
                     }
                 }
             }
@@ -2686,9 +2686,9 @@ BOOL CFilesWindow::ChangeAndListPathOnFS(const char* fsName, int fsNameIndex, co
         }
         if (i == count) // report error (the file to focus was not found)
         {
-            char errText[MAX_PATH + 200];
-            sprintf(errText, LoadStr(IDS_UNABLETOFOCUSFILEONFS), cutFileName);
-            SalMessageBox(HWindow, errText, LoadStr(IDS_ERRORTITLE), MB_OK | MB_ICONEXCLAMATION);
+            // TODO: Use wide format string when IDS_UNABLETOFOCUSFILEONFS supports %ls
+            std::wstring fileW = AnsiToWide(cutFileName);
+            gPrompter->ShowError(LoadStrW(IDS_ERRORTITLE), (fileW + L" - " + LoadStrW(IDS_UNABLETOFOCUSFILEONFS)).c_str());
             *cutFileName = 0;
         }
     }

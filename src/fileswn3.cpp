@@ -18,6 +18,8 @@
 #include "zip.h"
 #include "shiconov.h"
 #include "common/widepath.h"
+#include "ui/IPrompter.h"
+#include "common/unicode/helpers.h"
 
 //
 // ****************************************************************************
@@ -384,7 +386,7 @@ BOOL CFilesWindow::ReadDirectory(HWND parent, BOOL isRefresh)
                     showErr = FALSE;
                 }
                 if (showErr)
-                    SalMessageBox(parent, GetErrorText(err), LoadStr(IDS_ERRORTITLE), MB_OK | MB_ICONEXCLAMATION);
+                    gPrompter->ShowError(LoadStrW(IDS_ERRORTITLE), GetErrorTextW(err));
                 //        TRACE_I("ReadDirectory: end");
                 return FALSE;
             }
@@ -886,8 +888,9 @@ BOOL CFilesWindow::ReadDirectory(HWND parent, BOOL isRefresh)
                 SetCurrentDirectoryToSystem();
                 RefreshListBox(0, -1, -1, FALSE, FALSE);
 
-                sprintf(buf, LoadStr(IDS_CANNOTREADDIR), GetPath(), GetErrorText(err));
-                SalMessageBox(parent, buf, LoadStr(IDS_ERRORTITLE), MB_OK | MB_ICONEXCLAMATION);
+                // TODO: Use wide format string when available
+                std::wstring pathW = AnsiToWide(GetPath());
+                gPrompter->ShowError(LoadStrW(IDS_ERRORTITLE), (pathW + L": " + GetErrorTextW(err)).c_str());
             }
         }
 

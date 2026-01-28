@@ -2471,15 +2471,8 @@ void CFilesWindow::RenameFile(int specialIndex)
             pathW.Append(f->Name);
             if (IsWin64RedirectedDir(pathW, NULL, FALSE))
             {
-                wchar_t msg[400];
-                _snwprintf_s(msg, _TRUNCATE, LoadStrW(IDS_ERRRENAMINGW64ALIAS), pathW.Get());
-                if (gPrompter != NULL)
-                    ShowErrorViaPrompter(LoadStrW(IDS_ERRORTITLE), msg);
-                else
-                    if (gPrompter != NULL)
-                        ShowErrorViaPrompter(LoadStrW(IDS_ERRORTITLE), LoadStrW(IDS_ERRRENAMINGW64ALIAS));
-                    else
-                        SalMessageBox(MainWindow->HWindow, LoadStr(IDS_ERRRENAMINGW64ALIAS), LoadStr(IDS_ERRORTITLE), MB_OK | MB_ICONEXCLAMATION);
+                // TODO: Use wide format string when IDS_ERRRENAMINGW64ALIAS supports %ls
+                gPrompter->ShowError(LoadStrW(IDS_ERRORTITLE), (std::wstring(pathW.Get()) + L" - " + LoadStrW(IDS_ERRRENAMINGW64ALIAS)).c_str());
                 return;
             }
         }
