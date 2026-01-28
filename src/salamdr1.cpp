@@ -19,6 +19,8 @@
 #include "snooper.h"
 #include "viewer.h"
 #include "ui/IPrompter.h"
+#include "common/unicode/helpers.h"
+#include "ui/IPrompter.h"
 #include "editwnd.h"
 #include "find.h"
 #include "zip.h"
@@ -1027,35 +1029,12 @@ char* BuildName(char* path, char* name, char* dosName, BOOL* skip, BOOL* skipAll
             {
                 if (skipAll == NULL || !*skipAll)
                 {
-                    MSGBOXEX_PARAMS params;
-                    memset(&params, 0, sizeof(params));
-                    params.HParent = MainWindow->HWindow;
-                    params.Flags = MSGBOXEX_YESNOOKCANCEL | MB_ICONEXCLAMATION | MSGBOXEX_DEFBUTTON3 | MSGBOXEX_SILENT;
-                    params.Caption = LoadStr(IDS_ERRORTITLE);
-                    params.Text = text;
-                    char aliasBtnNames[200];
-                    /* serves for script export_mnu.py, which generates salmenu.mnu for Translator
-       we let msgbox buttons resolve hotkey collisions by simulating it's a menu
-    MENU_TEMPLATE_ITEM MsgBoxButtons[] =
-    {
-      {MNTT_PB, 0
-      {MNTT_IT, IDS_MSGBOXBTN_SKIP
-      {MNTT_IT, IDS_MSGBOXBTN_SKIPALL
-      {MNTT_IT, IDS_MSGBOXBTN_FOCUS
-      {MNTT_PE, 0
-    };
-    */
-                    sprintf(aliasBtnNames, "%d\t%s\t%d\t%s\t%d\t%s",
-                            DIALOG_YES, LoadStr(IDS_MSGBOXBTN_SKIP),
-                            DIALOG_NO, LoadStr(IDS_MSGBOXBTN_SKIPALL),
-                            DIALOG_OK, LoadStr(IDS_MSGBOXBTN_FOCUS));
-                    params.AliasBtnNames = aliasBtnNames;
-                    int msgRes = SalMessageBoxEx(&params);
-                    if (msgRes == DIALOG_YES /* Skip */ || msgRes == DIALOG_NO /* Skip All */)
+                    PromptResult res = gPrompter->AskSkipSkipAllFocus(LoadStrW(IDS_ERRORTITLE), AnsiToWide(text).c_str());
+                    if (res.type == PromptResult::kSkip || res.type == PromptResult::kSkipAll)
                         *skip = TRUE;
-                    if (msgRes == DIALOG_NO /* Skip All */ && skipAll != NULL)
+                    if (res.type == PromptResult::kSkipAll && skipAll != NULL)
                         *skipAll = TRUE;
-                    if (msgRes == DIALOG_OK /* Focus */)
+                    if (res.type == PromptResult::kFocus)
                         MainWindow->PostFocusNameInPanel(PANEL_SOURCE, sourcePath, name);
                 }
                 else
@@ -1063,8 +1042,7 @@ char* BuildName(char* path, char* name, char* dosName, BOOL* skip, BOOL* skipAll
             }
             else
             {
-                SalMessageBox(MainWindow->HWindow, text, LoadStr(IDS_ERRORTITLE),
-                              MB_OK | MB_ICONEXCLAMATION);
+                gPrompter->ShowError(LoadStrW(IDS_ERRORTITLE), AnsiToWide(text).c_str());
             }
             free(text);
         }
@@ -2995,9 +2973,9 @@ BOOL PackErrorHandler(HWND parent, const WORD err, ...)
     va_start(argList, err);
     FormatMessage(FORMAT_MESSAGE_FROM_STRING, LoadStr(err), 0, 0, buff, 1000, &argList);
     if (err < IDS_PACKQRY_PREFIX)
-        SalMessageBox(parent, buff, LoadStr(IDS_PACKERR_TITLE), MB_OK | MB_ICONEXCLAMATION);
+        gPrompter->ShowError(LoadStrW(IDS_PACKERR_TITLE), AnsiToWide(buff).c_str());
     else
-        ret = SalMessageBox(parent, buff, LoadStr(IDS_PACKERR_TITLE), MB_OKCANCEL | MB_ICONQUESTION) == IDOK;
+        ret = gPrompter->ConfirmError(LoadStrW(IDS_PACKERR_TITLE), AnsiToWide(buff).c_str()).type == PromptResult::kOk;
     va_end(argList);
     return ret;
 }
@@ -3260,34 +3238,13 @@ BOOL FindPluginsWithoutImportedCfg(BOOL* doNotDeleteImportedCfg)
     if (names[0] != 0)
     {
         *doNotDeleteImportedCfg = TRUE;
-        MSGBOXEX_PARAMS params;
-        memset(&params, 0, sizeof(params));
-        params.HParent = MainWindow->HWindow;
-        params.Flags = MB_OKCANCEL | MB_ICONQUESTION;
-        params.Caption = SALAMANDER_TEXT_VERSION;
         char skippedNames[200];
         skippedNames[0] = 0;
         if (skipped > 0)
             sprintf(skippedNames, LoadStr(IDS_NUMOFSKIPPEDPLUGINNAMES), skipped);
-        char msg[2000];
-        sprintf(msg, LoadStr(IDS_NOTALLPLUGINSCFGIMPORTED), names, skippedNames);
-        params.Text = msg;
-        char aliasBtnNames[200];
-        /* serves for script export_mnu.py, which generates salmenu.mnu for Translator
-   we let msgbox buttons resolve hotkey collisions by simulating it's a menu
-MENU_TEMPLATE_ITEM MsgBoxButtons[] =
-{
-  {MNTT_PB, 0
-  {MNTT_IT, IDS_STARTWITHOUTMISSINGPLUGINS
-  {MNTT_IT, IDS_SELLANGEXITBUTTON
-  {MNTT_PE, 0
-};
-*/
-        sprintf(aliasBtnNames, "%d\t%s\t%d\t%s",
-                DIALOG_OK, LoadStr(IDS_STARTWITHOUTMISSINGPLUGINS),
-                DIALOG_CANCEL, LoadStr(IDS_SELLANGEXITBUTTON));
-        params.AliasBtnNames = aliasBtnNames;
-        return SalMessageBoxEx(&params) == IDCANCEL;
+        std::wstring msg = FormatStrW(LoadStrW(IDS_NOTALLPLUGINSCFGIMPORTED), AnsiToWide(names).c_str(), AnsiToWide(skippedNames).c_str());
+        // OK = start without missing plugins, Cancel = exit
+        return gPrompter->ConfirmError(AnsiToWide(SALAMANDER_TEXT_VERSION).c_str(), msg.c_str()).type == PromptResult::kCancel;
     }
     return FALSE;
 }
@@ -3897,7 +3854,7 @@ FIND_NEW_SLG_FILE:
     CCommandLineParams cmdLineParams;
     if (!ParseCommandLineParameters(cmdLine, &cmdLineParams))
     {
-        SalMessageBox(NULL, LoadStr(IDS_INVALIDCMDLINE), SALAMANDER_TEXT_VERSION, MB_OK | MB_ICONERROR);
+        gPrompter->ShowError(AnsiToWide(SALAMANDER_TEXT_VERSION).c_str(), LoadStrW(IDS_INVALIDCMDLINE));
 
     EXIT_2:
         if (HLanguage != NULL)
@@ -4357,25 +4314,7 @@ FIND_NEW_SLG_FILE:
 
                         if (importCfgFromFileWasSkipped) // if we skipped config.reg or other .reg file import (parameter -C)
                         {                                // inform user about need for new Salamander start and let them exit the software
-                            MSGBOXEX_PARAMS params;
-                            memset(&params, 0, sizeof(params));
-                            params.HParent = MainWindow->HWindow;
-                            params.Flags = MB_OK | MB_ICONINFORMATION;
-                            params.Caption = SALAMANDER_TEXT_VERSION;
-                            params.Text = LoadStr(IDS_IMPORTCFGFROMFILESKIPPED);
-                            char aliasBtnNames[200];
-                            /* serves for script export_mnu.py, which generates salmenu.mnu for Translator
-   we let msgbox buttons resolve hotkey collisions by simulating it's a menu
-MENU_TEMPLATE_ITEM MsgBoxButtons[] =
-{
-  {MNTT_PB, 0
-  {MNTT_IT, IDS_SELLANGEXITBUTTON
-  {MNTT_PE, 0
-};
-*/
-                            sprintf(aliasBtnNames, "%d\t%s", DIALOG_OK, LoadStr(IDS_SELLANGEXITBUTTON));
-                            params.AliasBtnNames = aliasBtnNames;
-                            SalMessageBoxEx(&params);
+                            gPrompter->ShowInfo(AnsiToWide(SALAMANDER_TEXT_VERSION).c_str(), LoadStrW(IDS_IMPORTCFGFROMFILESKIPPED));
                             PostMessage(MainWindow->HWindow, WM_USER_FORCECLOSE_MAINWND, 0, 0);
                         }
                         /*

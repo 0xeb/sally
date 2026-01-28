@@ -11,6 +11,8 @@
 #include "versinfo.h"
 #include "logo.h"
 #include "reglib\src\regparse.h"
+#include "ui/IPrompter.h"
+#include "common/unicode/helpers.h"
 
 // ****************************************************************************
 
@@ -700,8 +702,7 @@ BOOL DoExpandVarString(HWND msgParent, const char* varText, BOOL validateOnly, i
                             TRACE_I(text);
                         else
                         {
-                            SalMessageBox(msgParent, text,
-                                          LoadStr(IDS_ERRORTITLE), MB_OK | MB_ICONEXCLAMATION);
+                            gPrompter->ShowError(LoadStrW(IDS_ERRORTITLE), AnsiToWide(text).c_str());
                         }
                         errorPos1 = (int)(var - varText - 2);
                         errorPos2 = (int)(s - varText);
@@ -746,8 +747,7 @@ BOOL DoExpandVarString(HWND msgParent, const char* varText, BOOL validateOnly, i
                                             TRACE_I(text);
                                         else
                                         {
-                                            SalMessageBox(msgParent, text,
-                                                          LoadStr(IDS_ERRORTITLE), MB_OK | MB_ICONEXCLAMATION);
+                                            gPrompter->ShowError(LoadStrW(IDS_ERRORTITLE), AnsiToWide(text).c_str());
                                         }
                                         errorPos1 = (int)(s2 - varText);
                                         errorPos2 = (int)(s - varText);
@@ -790,8 +790,7 @@ BOOL DoExpandVarString(HWND msgParent, const char* varText, BOOL validateOnly, i
                                             TRACE_I(text);
                                         else
                                         {
-                                            SalMessageBox(msgParent, text,
-                                                          LoadStr(IDS_ERRORTITLE), MB_OK | MB_ICONEXCLAMATION);
+                                            gPrompter->ShowError(LoadStrW(IDS_ERRORTITLE), AnsiToWide(text).c_str());
                                         }
                                         errorPos1 = (int)(var - varText - 2);
                                         errorPos2 = (int)(s - varText + 1);
@@ -816,8 +815,7 @@ BOOL DoExpandVarString(HWND msgParent, const char* varText, BOOL validateOnly, i
                                 TRACE_I(text);
                             else
                             {
-                                SalMessageBox(msgParent, text,
-                                              LoadStr(IDS_ERRORTITLE), MB_OK | MB_ICONEXCLAMATION);
+                                gPrompter->ShowError(LoadStrW(IDS_ERRORTITLE), AnsiToWide(text).c_str());
                             }
                             errorPos1 = (int)(var - varText - 2);
                             errorPos2 = (int)(s - varText + 1);
@@ -840,8 +838,7 @@ BOOL DoExpandVarString(HWND msgParent, const char* varText, BOOL validateOnly, i
                             TRACE_I(text);
                         else
                         {
-                            SalMessageBox(msgParent, text,
-                                          LoadStr(IDS_ERRORTITLE), MB_OK | MB_ICONEXCLAMATION);
+                            gPrompter->ShowError(LoadStrW(IDS_ERRORTITLE), AnsiToWide(text).c_str());
                         }
                         errorPos1 = (int)(var - varText - 2);
                         errorPos2 = (int)(s - varText);
@@ -871,25 +868,8 @@ BOOL DoExpandVarString(HWND msgParent, const char* varText, BOOL validateOnly, i
                                 {
                                     if (!ignoreEnvVarNotFoundOrTooLong)
                                     {
-                                        MSGBOXEX_PARAMS params;
-                                        memset(&params, 0, sizeof(params));
-                                        params.HParent = msgParent;
-                                        params.Flags = MSGBOXEX_OKCANCEL | MB_ICONEXCLAMATION | MSGBOXEX_SILENT;
-                                        params.Caption = LoadStr(IDS_ERRORTITLE);
-                                        params.Text = text;
-                                        char aliasBtnNames[100];
-                                        /* serves the export_mnu.py script that generates salmenu.mnu for Translator
-   let the message box buttons handle hotkey collisions by pretending it is a menu
-MENU_TEMPLATE_ITEM MsgBoxButtons[] = 
-{
-  {MNTT_PB, 0
-  {MNTT_IT, IDS_BUTTON_IGNORE
-  {MNTT_PE, 0
-};
-*/
-                                        sprintf(aliasBtnNames, "%d\t%s", DIALOG_OK, LoadStr(IDS_BUTTON_IGNORE));
-                                        params.AliasBtnNames = aliasBtnNames;
-                                        if (SalMessageBoxEx(&params) == DIALOG_CANCEL)
+                                        // OK = Ignore the error and continue, Cancel = abort
+                                        if (gPrompter->ConfirmError(LoadStrW(IDS_ERRORTITLE), AnsiToWide(text).c_str()).type == PromptResult::kCancel)
                                         {
                                             errorPos1 = (int)(var - varText);
                                             errorPos2 = (int)(s - varText);
@@ -913,8 +893,7 @@ MENU_TEMPLATE_ITEM MsgBoxButtons[] =
                         TRACE_I(text);
                     else
                     {
-                        SalMessageBox(msgParent, text,
-                                      LoadStr(IDS_ERRORTITLE), MB_OK | MB_ICONEXCLAMATION);
+                        gPrompter->ShowError(LoadStrW(IDS_ERRORTITLE), AnsiToWide(text).c_str());
                     }
                     errorPos1 = (int)(s - varText);
                     errorPos2 = (int)(s - varText + 1);
@@ -963,8 +942,7 @@ MENU_TEMPLATE_ITEM MsgBoxButtons[] =
                                 TRACE_I(text);
                             else
                             {
-                                SalMessageBox(msgParent, text,
-                                              LoadStr(IDS_ERRORTITLE), MB_OK | MB_ICONEXCLAMATION);
+                                gPrompter->ShowError(LoadStrW(IDS_ERRORTITLE), AnsiToWide(text).c_str());
                             }
                             errorPos1 = (int)(s - varText);
                             errorPos2 = (int)(s - varText);
@@ -980,8 +958,7 @@ MENU_TEMPLATE_ITEM MsgBoxButtons[] =
                     TRACE_I(text);
                 else
                 {
-                    SalMessageBox(msgParent, text,
-                                  LoadStr(IDS_ERRORTITLE), MB_OK | MB_ICONEXCLAMATION);
+                    gPrompter->ShowError(LoadStrW(IDS_ERRORTITLE), AnsiToWide(text).c_str());
                 }
                 errorPos1 = (int)(s - varText - 1);
                 errorPos2 = (int)(s - varText);
@@ -1001,8 +978,7 @@ MENU_TEMPLATE_ITEM MsgBoxButtons[] =
                         TRACE_I(text);
                     else
                     {
-                        SalMessageBox(msgParent, text,
-                                      LoadStr(IDS_ERRORTITLE), MB_OK | MB_ICONEXCLAMATION);
+                        gPrompter->ShowError(LoadStrW(IDS_ERRORTITLE), AnsiToWide(text).c_str());
                     }
                     errorPos1 = (int)(s - varText);
                     errorPos2 = (int)(s - varText + 1);
@@ -1023,8 +999,7 @@ MENU_TEMPLATE_ITEM MsgBoxButtons[] =
                 TRACE_I(text);
             else
             {
-                SalMessageBox(msgParent, text,
-                              LoadStr(IDS_ERRORTITLE), MB_OK | MB_ICONEXCLAMATION);
+                gPrompter->ShowError(LoadStrW(IDS_ERRORTITLE), AnsiToWide(text).c_str());
             }
             errorPos1 = (int)(s - varText);
             errorPos2 = (int)(s - varText);
@@ -2656,9 +2631,8 @@ BOOL SaveEditors(HKEY hKey, const char* name, CEditorMasks* editorMasks)
 
 void ShowFileError(HWND hParent, int errTextID, const char* fileName, DWORD err)
 {
-    char text[MAX_PATH + 300];
-    _snprintf_s(text, _TRUNCATE, LoadStr(errTextID), fileName, GetErrorText(err));
-    SalMessageBox(hParent, text, LoadStr(IDS_ERRORTITLE), MB_OK | MB_ICONEXCLAMATION);
+    std::wstring msg = FormatStrW(LoadStrW(errTextID), AnsiToWide(fileName).c_str(), GetErrorTextW(err));
+    gPrompter->ShowError(LoadStrW(IDS_ERRORTITLE), msg.c_str());
 }
 
 BOOL ExportConfiguration(HWND hParent, const char* fileName, BOOL clearKeyBeforeImport)
@@ -2788,10 +2762,8 @@ BOOL ImportConfiguration(HWND hParent, const char* fileName, BOOL ignoreIfNotExi
                 memReg->CloseKey(key);
             else
             {
-                char text[MAX_PATH + 300];
-                _snprintf_s(text, _TRUNCATE, LoadStr(IDS_IMPORTCFG_NOTOURVER), fileName);
-                if (SalMessageBox(hParent, text, LoadStr(IDS_QUESTION),
-                                  MB_YESNO | MSGBOXEX_ESCAPEENABLED | MB_ICONQUESTION | MB_DEFBUTTON2) != IDYES)
+                std::wstring msg = FormatStrW(LoadStrW(IDS_IMPORTCFG_NOTOURVER), AnsiToWide(fileName).c_str());
+                if (gPrompter->AskYesNo(LoadStrW(IDS_QUESTION), msg.c_str()).type != PromptResult::kYes)
                 {
                     verIsOK = FALSE;
                 }
