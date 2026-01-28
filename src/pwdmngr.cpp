@@ -6,6 +6,7 @@
 #include <time.h>
 
 #include "cfgdlg.h"
+#include "ui/IPrompter.h"
 #include "pwdmngr.h"
 #include "plugins.h"
 #include "spl_crypt.h"
@@ -189,7 +190,7 @@ void CChangeMasterPassword::Validate(CTransferInfo& ti)
         GetDlgItemText(HWindow, IDC_CHMP_CURRENTPWD, curPwd, SAL_AES_MAX_PWD_LENGTH);
         if (!PwdManager->VerifyMasterPassword(curPwd))
         {
-            SalMessageBox(HWindow, LoadStr(IDS_WRONG_MASTERPASSWORD), LoadStr(IDS_WARNINGTITLE), MB_OK | MB_ICONEXCLAMATION);
+            gPrompter->ShowError(LoadStrW(IDS_WARNINGTITLE), LoadStrW(IDS_WRONG_MASTERPASSWORD));
             SetDlgItemText(HWindow, IDC_CHMP_CURRENTPWD, "");
             ti.ErrorOn(IDC_CHMP_CURRENTPWD);
             return;
@@ -202,8 +203,7 @@ void CChangeMasterPassword::Validate(CTransferInfo& ti)
         GetDlgItemText(HWindow, IDC_CHMP_NEWPWD, newPwd, SAL_AES_MAX_PWD_LENGTH);
         if (newPwd[0] != 0 && !PwdManager->IsPasswordSecure(newPwd))
         {
-            if (SalMessageBox(HWindow, LoadStr(IDS_INSECUREPASSWORD), LoadStr(IDS_WARNINGTITLE),
-                              MB_YESNO | MB_ICONWARNING) == IDNO)
+            if (gPrompter->AskYesNo(LoadStrW(IDS_WARNINGTITLE), LoadStrW(IDS_INSECUREPASSWORD)).type == PromptResult::kNo)
             {
                 ti.ErrorOn(IDC_CHMP_NEWPWD);
                 return;
@@ -301,7 +301,7 @@ void CEnterMasterPassword::Validate(CTransferInfo& ti)
         GetDlgItemText(HWindow, IDC_MPR_PASSWORD, curPwd, SAL_AES_MAX_PWD_LENGTH);
         if (!PwdManager->VerifyMasterPassword(curPwd))
         {
-            SalMessageBox(HWindow, LoadStr(IDS_WRONG_MASTERPASSWORD), LoadStr(IDS_WARNINGTITLE), MB_OK | MB_ICONEXCLAMATION);
+            gPrompter->ShowError(LoadStrW(IDS_WARNINGTITLE), LoadStrW(IDS_WRONG_MASTERPASSWORD));
             SetDlgItemText(HWindow, IDC_MPR_PASSWORD, "");
             ti.ErrorOn(IDC_MPR_PASSWORD);
             return;
@@ -348,7 +348,7 @@ void CRemoveMasterPassword::Validate(CTransferInfo& ti)
         GetDlgItemText(HWindow, IDC_RMP_CURRENTPWD, curPwd, SAL_AES_MAX_PWD_LENGTH);
         if (!PwdManager->VerifyMasterPassword(curPwd))
         {
-            SalMessageBox(HWindow, LoadStr(IDS_WRONG_MASTERPASSWORD), LoadStr(IDS_WARNINGTITLE), MB_OK | MB_ICONEXCLAMATION);
+            gPrompter->ShowError(LoadStrW(IDS_WARNINGTITLE), LoadStrW(IDS_WRONG_MASTERPASSWORD));
             SetDlgItemText(HWindow, IDC_RMP_CURRENTPWD, "");
             ti.ErrorOn(IDC_RMP_CURRENTPWD);
             return;
@@ -813,8 +813,10 @@ BOOL CPasswordManager::VerifyMasterPassword(const char* password)
 void CPasswordManager::NotifyAboutMasterPasswordChange(HWND hParent)
 {
     BOOL set = IsUsingMasterPassword();
-    SalMessageBox(hParent, LoadStr(set ? IDS_MASTERPASSWORD_SET : IDS_MASTERPASSWORD_REMOVED), LoadStr(IDS_MASTERPASSWORD_CHANGED_TITLE),
-                  MB_OK | (set ? MB_ICONINFORMATION : MB_ICONWARNING));
+    if (set)
+        gPrompter->ShowInfo(LoadStrW(IDS_MASTERPASSWORD_CHANGED_TITLE), LoadStrW(IDS_MASTERPASSWORD_SET));
+    else
+        gPrompter->ShowError(LoadStrW(IDS_MASTERPASSWORD_CHANGED_TITLE), LoadStrW(IDS_MASTERPASSWORD_REMOVED));
 }
 
 BOOL CPasswordManager::Save(HKEY hKey)
