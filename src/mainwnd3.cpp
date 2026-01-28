@@ -2634,19 +2634,11 @@ MENU_TEMPLATE_ITEM AddToSystemMenu[] =
         {
             if (!Configuration.AlwaysOnTop && Configuration.CnfrmAlwaysOnTop)
             {
-                BOOL dontShow = !Configuration.CnfrmAlwaysOnTop;
-
-                MSGBOXEX_PARAMS params;
-                memset(&params, 0, sizeof(params));
-                params.HParent = HWindow;
-                params.Flags = MSGBOXEX_OKCANCEL | MSGBOXEX_ICONINFORMATION | MSGBOXEX_SILENT | MSGBOXEX_HINT;
-                params.Caption = LoadStr(IDS_INFOTITLE);
-                params.Text = LoadStr(IDS_WANTALWAYSONTOP);
-                params.CheckBoxText = LoadStr(IDS_DONTSHOWAGAINAT);
-                params.CheckBoxValue = &dontShow;
-                int ret = SalMessageBoxEx(&params);
+                bool dontShow = !Configuration.CnfrmAlwaysOnTop;
+                PromptResult res = gPrompter->ConfirmWithCheckbox(LoadStrW(IDS_INFOTITLE), LoadStrW(IDS_WANTALWAYSONTOP),
+                                                                  LoadStrW(IDS_DONTSHOWAGAINAT), &dontShow);
                 Configuration.CnfrmAlwaysOnTop = !dontShow;
-                if (ret == IDCANCEL)
+                if (res.type == PromptResult::kCancel)
                     return 0;
             }
 
@@ -2807,17 +2799,10 @@ MENU_TEMPLATE_ITEM AddToSystemMenu[] =
             char defDir[MAX_PATH];
             strcpy(file, "config_.reg");
 
-            BOOL clearKeyBeforeImport = TRUE;
-
-            MSGBOXEX_PARAMS params;
-            memset(&params, 0, sizeof(params));
-            params.HParent = HWindow;
-            params.Flags = MSGBOXEX_OK | MSGBOXEX_ICONINFORMATION | MSGBOXEX_SILENT;
-            params.Caption = LoadStr(IDS_INFOTITLE);
-            params.Text = LoadStr(WindowsVistaAndLater ? IDS_CONFIGEXPVISTA : IDS_CONFIGEXPUPTOXP);
-            params.CheckBoxText = LoadStr(IDS_CONFIGEXPCLEARKEY);
-            params.CheckBoxValue = &clearKeyBeforeImport;
-            SalMessageBoxEx(&params);
+            bool clearKeyBeforeImport = true;
+            gPrompter->ShowInfoWithCheckbox(LoadStrW(IDS_INFOTITLE),
+                                            LoadStrW(WindowsVistaAndLater ? IDS_CONFIGEXPVISTA : IDS_CONFIGEXPUPTOXP),
+                                            LoadStrW(IDS_CONFIGEXPCLEARKEY), &clearKeyBeforeImport);
 
             if (WindowsVistaAndLater)
             {
@@ -3940,15 +3925,7 @@ MENU_TEMPLATE_ITEM AddToSystemMenu[] =
         {
             if (SystemPolicies.GetNoRun())
             {
-                MSGBOXEX_PARAMS params;
-                memset(&params, 0, sizeof(params));
-                params.HParent = HWindow;
-                params.Flags = MSGBOXEX_OK | MSGBOXEX_HELP | MSGBOXEX_ICONEXCLAMATION;
-                params.Caption = LoadStr(IDS_POLICIESRESTRICTION_TITLE);
-                params.Text = LoadStr(IDS_POLICIESRESTRICTION);
-                params.ContextHelpId = IDH_GROUPPOLICY;
-                params.HelpCallback = MessageBoxHelpCallback;
-                SalMessageBoxEx(&params);
+                gPrompter->ShowErrorWithHelp(LoadStrW(IDS_POLICIESRESTRICTION_TITLE), LoadStrW(IDS_POLICIESRESTRICTION), IDH_GROUPPOLICY);
                 return 0;
             }
             if (EditWindow->HWindow != NULL)
@@ -3968,15 +3945,7 @@ MENU_TEMPLATE_ITEM AddToSystemMenu[] =
         {
             if (SystemPolicies.GetNoRun())
             {
-                MSGBOXEX_PARAMS params;
-                memset(&params, 0, sizeof(params));
-                params.HParent = HWindow;
-                params.Flags = MSGBOXEX_OK | MSGBOXEX_HELP | MSGBOXEX_ICONEXCLAMATION;
-                params.Caption = LoadStr(IDS_POLICIESRESTRICTION_TITLE);
-                params.Text = LoadStr(IDS_POLICIESRESTRICTION);
-                params.ContextHelpId = IDH_GROUPPOLICY;
-                params.HelpCallback = MessageBoxHelpCallback;
-                SalMessageBoxEx(&params);
+                gPrompter->ShowErrorWithHelp(LoadStrW(IDS_POLICIESRESTRICTION_TITLE), LoadStrW(IDS_POLICIESRESTRICTION), IDH_GROUPPOLICY);
                 return 0;
             }
             EditPermanentVisible = !EditPermanentVisible;
@@ -4156,15 +4125,7 @@ MENU_TEMPLATE_ITEM AddToSystemMenu[] =
             if (SystemPolicies.GetNoRun() ||
                 (SystemPolicies.GetMyRunRestricted() && !SystemPolicies.GetMyCanRun(cmd)))
             {
-                MSGBOXEX_PARAMS params;
-                memset(&params, 0, sizeof(params));
-                params.HParent = HWindow;
-                params.Flags = MSGBOXEX_OK | MSGBOXEX_HELP | MSGBOXEX_ICONEXCLAMATION;
-                params.Caption = LoadStr(IDS_POLICIESRESTRICTION_TITLE);
-                params.Text = LoadStr(IDS_POLICIESRESTRICTION);
-                params.ContextHelpId = IDH_GROUPPOLICY;
-                params.HelpCallback = MessageBoxHelpCallback;
-                SalMessageBoxEx(&params);
+                gPrompter->ShowErrorWithHelp(LoadStrW(IDS_POLICIESRESTRICTION_TITLE), LoadStrW(IDS_POLICIESRESTRICTION), IDH_GROUPPOLICY);
                 return 0;
             }
 
@@ -6215,19 +6176,12 @@ MENU_TEMPLATE_ITEM AddToSystemMenu[] =
         // if OnClose confirmation is enabled, ask the user to confirm closing the program
         if (uMsg == WM_USER_CLOSE_MAINWND && Configuration.CnfrmOnSalClose)
         {
-            MSGBOXEX_PARAMS params;
-            memset(&params, 0, sizeof(params));
-            params.HParent = HWindow;
-            params.Flags = MSGBOXEX_YESNO | MSGBOXEX_ESCAPEENABLED | MSGBOXEX_ICONQUESTION | MSGBOXEX_SILENT | MSGBOXEX_HINT;
-            params.Caption = LoadStr(IDS_QUESTION);
-            params.Text = LoadStr(IDS_CANCLOSESALAMANDER);
-            params.CheckBoxText = LoadStr(IDS_DONTSHOWAGAINCS);
-            BOOL dontShow = !Configuration.CnfrmOnSalClose;
-            params.CheckBoxValue = &dontShow;
-            int ret = SalMessageBoxEx(&params);
+            bool dontShow = !Configuration.CnfrmOnSalClose;
+            PromptResult res = gPrompter->AskYesNoWithCheckbox(LoadStrW(IDS_QUESTION), LoadStrW(IDS_CANCLOSESALAMANDER),
+                                                               LoadStrW(IDS_DONTSHOWAGAINCS), &dontShow);
             Configuration.CnfrmOnSalClose = !dontShow;
 
-            if (ret != IDYES)
+            if (res.type != PromptResult::kYes)
                 return 0;
         }
 
