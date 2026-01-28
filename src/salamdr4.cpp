@@ -10,6 +10,7 @@
 #include "mainwnd.h"
 #include "salinflt.h"
 #include "ui/IPrompter.h"
+#include "common/IClipboard.h"
 #include "common/unicode/helpers.h"
 
 //****************************************************************************
@@ -1043,38 +1044,25 @@ BOOL CopyTextToClipboardW(const wchar_t* text, int textLen, BOOL showEcho, HWND 
         return FALSE;
     }
 
-    DWORD err = ERROR_SUCCESS;
+    // Create null-terminated string of specified length
+    std::wstring textStr(text, textLen == -1 ? wcslen(text) : textLen);
 
-    if (textLen == -1)
-        textLen = (int)wcslen(text);
+    auto result = gClipboard->SetText(textStr.c_str());
 
-    HGLOBAL hglbCopy = NOHANDLES(GlobalAlloc(GMEM_MOVEABLE | GMEM_DDESHARE, sizeof(wchar_t) * (textLen + 1)));
-    if (hglbCopy != NULL)
+    if (result.success)
     {
-        wchar_t* lptstrCopy = (wchar_t*)HANDLES(GlobalLock(hglbCopy));
-        if (lptstrCopy != NULL)
-        {
-            memcpy(lptstrCopy, text, sizeof(wchar_t) * textLen);
-            lptstrCopy[textLen] = 0;
-            HANDLES(GlobalUnlock(hglbCopy));
-
-            if (!CopyHTextToClipboardW(hglbCopy, textLen))
-                return FALSE;
-        }
-        else
-            err = GetLastError();
+        IdleRefreshStates = TRUE;  // force state variable check on next Idle
+        IdleCheckClipboard = TRUE; // also enable clipboard checking
     }
-    else
-        err = GetLastError();
 
     if (showEcho)
     {
-        if (err != ERROR_SUCCESS)
-            gPrompter->ShowError(LoadStrW(IDS_COPYTOCLIPBOARD), GetErrorTextW(err));
+        if (!result.success)
+            gPrompter->ShowError(LoadStrW(IDS_COPYTOCLIPBOARD), GetErrorTextW(result.errorCode));
         else
             gPrompter->ShowInfo(LoadStrW(IDS_INFOTITLE), LoadStrW(IDS_TEXTCOPIED));
     }
-    return err == ERROR_SUCCESS;
+    return result.success ? TRUE : FALSE;
 }
 
 // ****************************************************************************
@@ -1086,38 +1074,10 @@ BOOL CopyTextToClipboard(const char* text, int textLen, BOOL showEcho, HWND hEch
         TRACE_E("text == NULL");
         return FALSE;
     }
-
-    DWORD err = ERROR_SUCCESS;
-
-    if (textLen == -1)
-        textLen = lstrlen(text);
-
-    HGLOBAL hglbCopy = NOHANDLES(GlobalAlloc(GMEM_MOVEABLE | GMEM_DDESHARE, textLen + 1));
-    if (hglbCopy != NULL)
-    {
-        char* lptstrCopy = (char*)HANDLES(GlobalLock(hglbCopy));
-        if (lptstrCopy != NULL)
-        {
-            memcpy(lptstrCopy, text, textLen);
-            lptstrCopy[textLen] = 0;
-            HANDLES(GlobalUnlock(hglbCopy));
-            if (!CopyHTextToClipboard(hglbCopy, textLen, NULL, FALSE))
-                return FALSE;
-        }
-        else
-            err = GetLastError();
-    }
-    else
-        err = GetLastError();
-
-    if (showEcho)
-    {
-        if (err != ERROR_SUCCESS)
-            gPrompter->ShowError(LoadStrW(IDS_COPYTOCLIPBOARD), GetErrorTextW(err));
-        else
-            gPrompter->ShowInfo(LoadStrW(IDS_INFOTITLE), LoadStrW(IDS_TEXTCOPIED));
-    }
-    return err == ERROR_SUCCESS;
+    // Convert ANSI to Wide and delegate to wide version
+    std::string ansiText(text, textLen == -1 ? strlen(text) : textLen);
+    std::wstring wideText = AnsiToWide(ansiText.c_str());
+    return CopyTextToClipboardW(wideText.c_str(), -1, showEcho, hEchoParent);
 }
 
 // ****************************************************************************
