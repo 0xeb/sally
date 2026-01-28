@@ -49,6 +49,10 @@ public:
     virtual void ShowInfoWithCheckbox(const wchar_t* title, const wchar_t* message,
                                       const wchar_t* checkboxText, bool* checkboxValue) = 0;
 
+    // Confirmation with OK/Cancel and "don't show again" checkbox - returns kOk or kCancel
+    virtual PromptResult ConfirmWithCheckbox(const wchar_t* title, const wchar_t* message,
+                                             const wchar_t* checkboxText, bool* checkboxValue) = 0;
+
     // Path too long dialog - returns kSkip, kSkipAll, or kFocus
     virtual PromptResult AskSkipSkipAllFocus(const wchar_t* title, const wchar_t* message) = 0;
 

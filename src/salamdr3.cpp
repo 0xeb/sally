@@ -15,6 +15,8 @@
 #include "shellib.h"
 #include "menu.h"
 #include "common/widepath.h"
+#include "ui/IPrompter.h"
+#include "common/unicode/helpers.h"
 
 CUserMenuIconBkgndReader UserMenuIconBkgndReader;
 
@@ -229,7 +231,7 @@ BOOL SalGetTempFileName(const char* path, const char* prefix, char* tmpName, BOO
         }
         if (SalGetFileAttributes(tmpDir) == 0xFFFFFFFF)
         {
-            SalMessageBox(NULL, LoadStr(IDS_TMPDIRERROR), LoadStr(IDS_ERRORTITLE), MB_OK | MB_ICONEXCLAMATION);
+            gPrompter->ShowError(LoadStrW(IDS_ERRORTITLE), LoadStrW(IDS_TMPDIRERROR));
             if (GetSystemDirectory(tmpDir, MAX_PATH) == 0)
             {
                 DWORD err = GetLastError();
@@ -1074,7 +1076,7 @@ AGAIN:
         if (errBuf != NULL)
             strncpy_s(errBuf, errBufSize, LoadStr(IDS_TOOLONGNAME), _TRUNCATE);
         else
-            SalMessageBox(parent, LoadStr(IDS_TOOLONGNAME), LoadStr(IDS_ERRORTITLE), MB_OK | MB_ICONEXCLAMATION);
+            gPrompter->ShowError(LoadStrW(IDS_ERRORTITLE), LoadStrW(IDS_TOOLONGNAME));
         return FALSE;
     }
     DWORD attrs = SalGetFileAttributes(dir);
@@ -1090,7 +1092,7 @@ AGAIN:
             if (errBuf != NULL)
                 strncpy_s(errBuf, errBufSize, buf, _TRUNCATE);
             else
-                SalMessageBox(parent, buf, LoadStr(IDS_ERRORTITLE), MB_OK | MB_ICONEXCLAMATION);
+                gPrompter->ShowError(LoadStrW(IDS_ERRORTITLE), AnsiToWide(buf).c_str());
             return FALSE;
         }
         int msgBoxRet = IDCANCEL;
@@ -1099,24 +1101,11 @@ AGAIN:
             // if user hasn't suppressed it, show info about directory non-existence
             if (Configuration.CnfrmCreateDir)
             {
-                char title[100];
-                char text[MAX_PATH + 500];
-                char checkText[200];
-                sprintf(title, LoadStr(IDS_QUESTION));
-                sprintf(text, LoadStr(IDS_CREATEDIRECTORY), dir);
-                sprintf(checkText, LoadStr(IDS_DONTSHOWAGAINCD));
-                BOOL dontShow = !Configuration.CnfrmCreateDir;
-
-                MSGBOXEX_PARAMS params;
-                memset(&params, 0, sizeof(params));
-                params.HParent = parent;
-                params.Flags = MSGBOXEX_OKCANCEL | MSGBOXEX_ICONQUESTION | MSGBOXEX_HINT;
-                params.Caption = title;
-                params.Text = text;
-                params.CheckBoxText = checkText;
-                params.CheckBoxValue = &dontShow;
-                msgBoxRet = SalMessageBoxEx(&params);
-
+                std::wstring msg = FormatStrW(LoadStrW(IDS_CREATEDIRECTORY), AnsiToWide(dir).c_str());
+                bool dontShow = !Configuration.CnfrmCreateDir;
+                PromptResult res = gPrompter->ConfirmWithCheckbox(LoadStrW(IDS_QUESTION), msg.c_str(),
+                                                                  LoadStrW(IDS_DONTSHOWAGAINCD), &dontShow);
+                msgBoxRet = (res.type == PromptResult::kOk) ? IDOK : IDCANCEL;
                 Configuration.CnfrmCreateDir = !dontShow;
             }
             else
@@ -1135,7 +1124,7 @@ AGAIN:
                     if (errBuf != NULL)
                         strncpy_s(errBuf, errBufSize, buf, _TRUNCATE);
                     else
-                        SalMessageBox(parent, buf, LoadStr(IDS_ERRORTITLE), MB_OK | MB_ICONEXCLAMATION);
+                        gPrompter->ShowError(LoadStrW(IDS_ERRORTITLE), AnsiToWide(buf).c_str());
                     return FALSE;
                 }
                 if (s - name > (int)strlen(root))
@@ -1529,9 +1518,8 @@ BOOL CPathHistoryItem::Execute(CFilesWindow* panel)
                     {
                         if (failReason == CHPPFR_SHORTERPATH || failReason == CHPPFR_FILENAMEFOCUSED)
                         {
-                            sprintf(errBuf, LoadStr(IDS_PATHINARCHIVENOTFOUND), ArchivePathOrFSUserPart);
-                            SalMessageBox(panel->HWindow, errBuf, LoadStr(IDS_ERRORCHANGINGDIR),
-                                          MB_OK | MB_ICONEXCLAMATION);
+                            std::wstring msg = FormatStrW(LoadStrW(IDS_PATHINARCHIVENOTFOUND), AnsiToWide(ArchivePathOrFSUserPart).c_str());
+                            gPrompter->ShowError(LoadStrW(IDS_ERRORCHANGINGDIR), msg.c_str());
                         }
                     }
                 }
@@ -3246,7 +3234,7 @@ void CFileTimeStamps::CopyFilesTo(HWND parent, int* indexes, int count, const ch
         {
             if (tooLongName)
             {
-                SalMessageBox(parent, LoadStr(IDS_TOOLONGNAME), LoadStr(IDS_ERRORTITLE), MB_OK | MB_ICONEXCLAMATION);
+                gPrompter->ShowError(LoadStrW(IDS_ERRORTITLE), LoadStrW(IDS_TOOLONGNAME));
             }
         }
     }
@@ -3346,8 +3334,7 @@ void CFileTimeStamps::CheckAndPackAndClear(HWND parent, BOOL* someFilesChanged, 
                                 loop = FALSE;
                             else
                             {
-                                loop = SalMessageBox(parent, LoadStr(IDS_UPDATEFAILED),
-                                                     LoadStr(IDS_QUESTION), MB_YESNO | MB_ICONQUESTION) == IDYES;
+                                loop = gPrompter->AskYesNo(LoadStrW(IDS_QUESTION), LoadStrW(IDS_UPDATEFAILED)).type == PromptResult::kYes;
                                 if (!loop) // "cancel", detach files from disk-cache, otherwise it deletes them
                                 {
                                     List.Add(packList.GetData(), packList.Count);

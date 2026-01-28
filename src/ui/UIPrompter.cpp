@@ -123,6 +123,28 @@ public:
             *checkboxValue = (cbVal != FALSE);
     }
 
+    PromptResult ConfirmWithCheckbox(const wchar_t* title, const wchar_t* message,
+                                     const wchar_t* checkboxText, bool* checkboxValue) override
+    {
+        std::string titleA = WideToAnsi(title);
+        std::string msgA = WideToAnsi(message);
+        std::string cbTextA = WideToAnsi(checkboxText);
+
+        MSGBOXEX_PARAMS params;
+        memset(&params, 0, sizeof(params));
+        params.HParent = MainWindow->HWindow;
+        params.Flags = MSGBOXEX_OKCANCEL | MSGBOXEX_ICONQUESTION | MSGBOXEX_HINT;
+        params.Caption = titleA.c_str();
+        params.Text = msgA.c_str();
+        params.CheckBoxText = cbTextA.c_str();
+        BOOL cbVal = checkboxValue ? (*checkboxValue ? TRUE : FALSE) : FALSE;
+        params.CheckBoxValue = &cbVal;
+        int res = SalMessageBoxEx(&params);
+        if (checkboxValue)
+            *checkboxValue = (cbVal != FALSE);
+        return res == IDOK ? PromptResult{PromptResult::kOk} : PromptResult{PromptResult::kCancel};
+    }
+
     PromptResult AskSkipSkipAllFocus(const wchar_t* title, const wchar_t* message) override
     {
         std::string titleA = WideToAnsi(title);
