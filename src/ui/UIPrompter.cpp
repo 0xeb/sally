@@ -171,6 +171,22 @@ public:
             return {PromptResult::kSkipAll};
         return {PromptResult::kCancel};
     }
+
+    void ShowErrorWithHelp(const wchar_t* title, const wchar_t* message, DWORD helpId) override
+    {
+        std::string titleA = WideToAnsi(title);
+        std::string msgA = WideToAnsi(message);
+
+        MSGBOXEX_PARAMS params;
+        memset(&params, 0, sizeof(params));
+        params.HParent = MainWindow->HWindow;
+        params.Flags = MSGBOXEX_OK | MSGBOXEX_HELP | MSGBOXEX_ICONEXCLAMATION;
+        params.Caption = titleA.c_str();
+        params.Text = msgA.c_str();
+        params.ContextHelpId = helpId;
+        params.HelpCallback = MessageBoxHelpCallback;
+        SalMessageBoxEx(&params);
+    }
 };
 
 IPrompter* GetUIPrompter()

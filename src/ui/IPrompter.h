@@ -52,6 +52,9 @@ public:
 
     // Error with Skip/Skip All/Cancel - returns kSkip, kSkipAll, or kCancel
     virtual PromptResult AskSkipSkipAllCancel(const wchar_t* title, const wchar_t* message) = 0;
+
+    // Error with OK and Help button - helpId is for context-sensitive help
+    virtual void ShowErrorWithHelp(const wchar_t* title, const wchar_t* message, DWORD helpId) = 0;
 };
 
 // Global prompter used by UI and worker code. Default is UI-backed.

@@ -681,15 +681,8 @@ void CFilesWindow::FindFile()
 
     if (SystemPolicies.GetNoFind() || SystemPolicies.GetNoShellSearchButton())
     {
-        MSGBOXEX_PARAMS params;
-        memset(&params, 0, sizeof(params));
-        params.HParent = HWindow;
-        params.Flags = MSGBOXEX_OK | MSGBOXEX_HELP | MSGBOXEX_ICONEXCLAMATION;
-        params.Caption = LoadStr(IDS_POLICIESRESTRICTION_TITLE);
-        params.Text = LoadStr(IDS_POLICIESRESTRICTION);
-        params.ContextHelpId = IDH_GROUPPOLICY;
-        params.HelpCallback = MessageBoxHelpCallback;
-        SalMessageBoxEx(&params);
+        gPrompter->ShowErrorWithHelp(LoadStrW(IDS_POLICIESRESTRICTION_TITLE),
+                                     LoadStrW(IDS_POLICIESRESTRICTION), IDH_GROUPPOLICY);
         return;
     }
 
@@ -1051,15 +1044,8 @@ BOOL ViewFileInt(HWND parent, const char* name, BOOL altView, DWORD handlerID, B
                 if (SystemPolicies.GetMyRunRestricted() &&
                     !SystemPolicies.GetMyCanRun(expCommand))
                 {
-                    MSGBOXEX_PARAMS params;
-                    memset(&params, 0, sizeof(params));
-                    params.HParent = parent;
-                    params.Flags = MSGBOXEX_OK | MSGBOXEX_HELP | MSGBOXEX_ICONEXCLAMATION;
-                    params.Caption = LoadStr(IDS_POLICIESRESTRICTION_TITLE);
-                    params.Text = LoadStr(IDS_POLICIESRESTRICTION);
-                    params.ContextHelpId = IDH_GROUPPOLICY;
-                    params.HelpCallback = MessageBoxHelpCallback;
-                    SalMessageBoxEx(&params);
+                    gPrompter->ShowErrorWithHelp(LoadStrW(IDS_POLICIESRESTRICTION_TITLE),
+                                                 LoadStrW(IDS_POLICIESRESTRICTION), IDH_GROUPPOLICY);
                     break;
                 }
 
@@ -1378,15 +1364,8 @@ void CFilesWindow::EditFile(char* name, DWORD handlerID)
             if (SystemPolicies.GetMyRunRestricted() &&
                 !SystemPolicies.GetMyCanRun(expCommand))
             {
-                MSGBOXEX_PARAMS params;
-                memset(&params, 0, sizeof(params));
-                params.HParent = HWindow;
-                params.Flags = MSGBOXEX_OK | MSGBOXEX_HELP | MSGBOXEX_ICONEXCLAMATION;
-                params.Caption = LoadStr(IDS_POLICIESRESTRICTION_TITLE);
-                params.Text = LoadStr(IDS_POLICIESRESTRICTION);
-                params.ContextHelpId = IDH_GROUPPOLICY;
-                params.HelpCallback = MessageBoxHelpCallback;
-                SalMessageBoxEx(&params);
+                gPrompter->ShowErrorWithHelp(LoadStrW(IDS_POLICIESRESTRICTION_TITLE),
+                                             LoadStrW(IDS_POLICIESRESTRICTION), IDH_GROUPPOLICY);
                 return;
             }
 

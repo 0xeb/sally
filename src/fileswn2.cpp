@@ -736,15 +736,8 @@ void CFilesWindow::ConnectNet(BOOL readOnlyUNC, const char* netRootPath, BOOL ch
 
     if (SystemPolicies.GetNoNetConnectDisconnect())
     {
-        MSGBOXEX_PARAMS params;
-        memset(&params, 0, sizeof(params));
-        params.HParent = HWindow;
-        params.Flags = MSGBOXEX_OK | MSGBOXEX_HELP | MSGBOXEX_ICONEXCLAMATION;
-        params.Caption = LoadStr(IDS_POLICIESRESTRICTION_TITLE);
-        params.Text = LoadStr(IDS_POLICIESRESTRICTION);
-        params.ContextHelpId = IDH_GROUPPOLICY;
-        params.HelpCallback = MessageBoxHelpCallback;
-        SalMessageBoxEx(&params);
+        gPrompter->ShowErrorWithHelp(LoadStrW(IDS_POLICIESRESTRICTION_TITLE),
+                                     LoadStrW(IDS_POLICIESRESTRICTION), IDH_GROUPPOLICY);
         return;
     }
 
@@ -805,15 +798,8 @@ void CFilesWindow::DisconnectNet()
 
     if (SystemPolicies.GetNoNetConnectDisconnect())
     {
-        MSGBOXEX_PARAMS params;
-        memset(&params, 0, sizeof(params));
-        params.HParent = HWindow;
-        params.Flags = MSGBOXEX_OK | MSGBOXEX_HELP | MSGBOXEX_ICONEXCLAMATION;
-        params.Caption = LoadStr(IDS_POLICIESRESTRICTION_TITLE);
-        params.Text = LoadStr(IDS_POLICIESRESTRICTION);
-        params.ContextHelpId = IDH_GROUPPOLICY;
-        params.HelpCallback = MessageBoxHelpCallback;
-        SalMessageBoxEx(&params);
+        gPrompter->ShowErrorWithHelp(LoadStrW(IDS_POLICIESRESTRICTION_TITLE),
+                                     LoadStrW(IDS_POLICIESRESTRICTION), IDH_GROUPPOLICY);
         return;
     }
 
@@ -1219,21 +1205,10 @@ BOOL CFilesWindow::PrepareCloseCurrentPath(HWND parent, BOOL canForce, BOOL canD
                     char title[100];
                     char text[MAX_PATH + 500];
                     char checkText[200];
-                    sprintf(title, LoadStr(IDS_INFOTITLE));
-                    sprintf(text, LoadStr(IDS_ARCHIVECLOSEEDIT), GetZIPArchive());
-                    sprintf(checkText, LoadStr(IDS_DONTSHOWAGAIN));
-                    BOOL dontShow = !Configuration.CnfrmCloseArchive;
-
-                    MSGBOXEX_PARAMS params;
-                    memset(&params, 0, sizeof(params));
-                    params.HParent = parent;
-                    params.Flags = MSGBOXEX_OK | MSGBOXEX_ICONINFORMATION | MSGBOXEX_SILENT | MSGBOXEX_HINT;
-                    params.Caption = title;
-                    params.Text = text;
-                    params.CheckBoxText = checkText;
-                    params.CheckBoxValue = &dontShow;
-                    SalMessageBoxEx(&params);
-
+                    bool dontShow = !Configuration.CnfrmCloseArchive;
+                    std::wstring msg = FormatStrW(LoadStrW(IDS_ARCHIVECLOSEEDIT), AnsiToWide(GetZIPArchive()).c_str());
+                    gPrompter->ShowInfoWithCheckbox(LoadStrW(IDS_INFOTITLE), msg.c_str(),
+                                                    LoadStrW(IDS_DONTSHOWAGAIN), &dontShow);
                     Configuration.CnfrmCloseArchive = !dontShow;
                 }
                 // pack modified files again (only if it's not a critical shutdown) we prepare them for next use

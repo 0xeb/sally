@@ -1317,15 +1317,8 @@ BOOL CFilesWindow::OnSysKeyDown(UINT uMsg, WPARAM wParam, LPARAM lParam, LRESULT
             {
                 if (SystemPolicies.GetNoNetHood())
                 {
-                    MSGBOXEX_PARAMS params;
-                    memset(&params, 0, sizeof(params));
-                    params.HParent = HWindow;
-                    params.Flags = MSGBOXEX_OK | MSGBOXEX_HELP | MSGBOXEX_ICONEXCLAMATION;
-                    params.Caption = LoadStr(IDS_POLICIESRESTRICTION_TITLE);
-                    params.Text = LoadStr(IDS_POLICIESRESTRICTION);
-                    params.ContextHelpId = IDH_GROUPPOLICY;
-                    params.HelpCallback = MessageBoxHelpCallback;
-                    SalMessageBoxEx(&params);
+                    gPrompter->ShowErrorWithHelp(LoadStrW(IDS_POLICIESRESTRICTION_TITLE),
+                                                 LoadStrW(IDS_POLICIESRESTRICTION), IDH_GROUPPOLICY);
                     return TRUE;
                 }
 
