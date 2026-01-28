@@ -9,6 +9,8 @@
 #include "execute.h"
 #include "cfgdlg.h"
 #include "shellib.h"
+#include "ui/IPrompter.h"
+#include "common/unicode/helpers.h"
 
 //******************************************************************************
 //
@@ -1733,22 +1735,19 @@ BOOL ValidateUserMenuArguments(HWND msgParent, const char* varText, int& errorPo
     if (userMenuValidationData->MustHandleItemsAsGroup &&
         userMenuValidationData->MustHandleItemsOneByOne)
     { // incompatible work with selection
-        SalMessageBox(msgParent, LoadStr(IDS_INCOMPATIBLEARGS),
-                      LoadStr(IDS_ERRORTITLE), MB_OK | MB_ICONEXCLAMATION);
+        gPrompter->ShowError(LoadStrW(IDS_ERRORTITLE), LoadStrW(IDS_INCOMPATIBLEARGS));
         return FALSE;
     }
     if (userMenuValidationData->UsedCompareType == 5)
     { // collision of multiple Compare parameter types
-        SalMessageBox(msgParent, LoadStr(IDS_COMPAREARGSCOLISION),
-                      LoadStr(IDS_ERRORTITLE), MB_OK | MB_ICONEXCLAMATION);
+        gPrompter->ShowError(LoadStrW(IDS_ERRORTITLE), LoadStrW(IDS_COMPAREARGSCOLISION));
         return FALSE;
     }
     if (userMenuValidationData->UsedCompareType != 0 &&
         (!userMenuValidationData->UsedCompareLeftOrActive ||
          !userMenuValidationData->UsedCompareRightOrInactive))
     { // both Compare parameters are not used together -> nonsense
-        SalMessageBox(msgParent, LoadStr(IDS_COMPARENEEDSBOTHARGS),
-                      LoadStr(IDS_ERRORTITLE), MB_OK | MB_ICONEXCLAMATION);
+        gPrompter->ShowError(LoadStrW(IDS_ERRORTITLE), LoadStrW(IDS_COMPARENEEDSBOTHARGS));
         return FALSE;
     }
     return TRUE;
@@ -1823,7 +1822,7 @@ BOOL ValidateInitDir(HWND msgParent, const char* varText, int& errorPos1, int& e
     CALL_STACK_MESSAGE2("ValidateInitDir(, %s, ,)", varText);
     if (*varText == 0)
     {
-        SalMessageBox(msgParent, LoadStr(IDS_EXP_EMPTYSTR), LoadStr(IDS_ERRORTITLE), MB_OK | MB_ICONEXCLAMATION);
+        gPrompter->ShowError(LoadStrW(IDS_ERRORTITLE), LoadStrW(IDS_EXP_EMPTYSTR));
         errorPos1 = errorPos2 = 0;
         return FALSE;
     }
@@ -2163,9 +2162,8 @@ BOOL BrowseCommand(HWND hParent, int editlineResID, int filterResID)
         DWORD error = CommDlgExtendedError();
         if (error == FNERR_INVALIDFILENAME)
         {
-            char buff[MAX_PATH + 100];
-            sprintf(buff, LoadStr(IDS_COMDLG_INVALIDFILENAME), file);
-            SalMessageBox(hParent, buff, LoadStr(IDS_ERRORTITLE), MB_OK | MB_ICONEXCLAMATION);
+            std::wstring msg = FormatStrW(LoadStrW(IDS_COMDLG_INVALIDFILENAME), AnsiToWide(file).c_str());
+            gPrompter->ShowError(LoadStrW(IDS_ERRORTITLE), msg.c_str());
         }
     }
     return FALSE;

@@ -6,6 +6,7 @@
 
 #include "cfgdlg.h"
 #include "mainwnd.h"
+#include "ui/IPrompter.h"
 #include "plugins.h"
 #include "fileswnd.h"
 #include "editwnd.h"
@@ -391,17 +392,9 @@ CEditLine::WindowProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
                     {
                         if (Configuration.CnfrmChangeDirTC)
                         {
-                            BOOL dontShow = !Configuration.CnfrmChangeDirTC;
-
-                            MSGBOXEX_PARAMS params;
-                            memset(&params, 0, sizeof(params));
-                            params.HParent = HWindow;
-                            params.Flags = MB_OK | MB_ICONINFORMATION;
-                            params.Caption = LoadStr(IDS_INFOTITLE);
-                            params.Text = LoadStr(IDS_CHANGEDIR_TC_HINT);
-                            params.CheckBoxText = LoadStr(IDS_DONTSHOWAGAIN2);
-                            params.CheckBoxValue = &dontShow;
-                            SalMessageBoxEx(&params);
+                            bool dontShow = !Configuration.CnfrmChangeDirTC;
+                            gPrompter->ShowInfoWithCheckbox(LoadStrW(IDS_INFOTITLE), LoadStrW(IDS_CHANGEDIR_TC_HINT),
+                                                            LoadStrW(IDS_DONTSHOWAGAIN2), &dontShow);
                             Configuration.CnfrmChangeDirTC = !dontShow;
                         }
                         // let the command fall through to the shell so the message box text stays simple
@@ -415,15 +408,7 @@ CEditLine::WindowProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
                     if (SystemPolicies.GetMyRunRestricted() &&
                         (!SystemPolicies.GetMyCanRun(cmd) || !SystemPolicies.GetMyCanRun(cmdLine)))
                     {
-                        MSGBOXEX_PARAMS params;
-                        memset(&params, 0, sizeof(params));
-                        params.HParent = HWindow;
-                        params.Flags = MSGBOXEX_OK | MSGBOXEX_HELP | MSGBOXEX_ICONEXCLAMATION;
-                        params.Caption = LoadStr(IDS_POLICIESRESTRICTION_TITLE);
-                        params.Text = LoadStr(IDS_POLICIESRESTRICTION);
-                        params.ContextHelpId = IDH_GROUPPOLICY;
-                        params.HelpCallback = MessageBoxHelpCallback;
-                        SalMessageBoxEx(&params);
+                        gPrompter->ShowErrorWithHelp(LoadStrW(IDS_POLICIESRESTRICTION_TITLE), LoadStrW(IDS_POLICIESRESTRICTION), IDH_GROUPPOLICY);
                         return 0;
                     }
 
@@ -485,8 +470,8 @@ CEditLine::WindowProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
                     }
                     if (cmdTooLong || !proc_ret)
                     {
-                        SalMessageBox(HWindow, cmdTooLong ? LoadStr(IDS_TOOLONGPATH) : GetErrorText(err),
-                                      LoadStr(IDS_ERROREXECCMDLINE), MB_OK | MB_ICONEXCLAMATION);
+                        gPrompter->ShowError(LoadStrW(IDS_ERROREXECCMDLINE),
+                                             cmdTooLong ? LoadStrW(IDS_TOOLONGPATH) : GetErrorTextW(err));
                     }
                     else
                     {
