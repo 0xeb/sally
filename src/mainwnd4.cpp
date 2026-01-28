@@ -5,6 +5,7 @@
 #include "precomp.h"
 
 #include "ui/IPrompter.h"
+#include "common/IFileSystem.h"
 #include "common/unicode/helpers.h"
 #include "stswnd.h"
 #include "editwnd.h"
@@ -327,7 +328,7 @@ void CMainWindow::MakeFileList()
 
                 // if the destination was the clipboard, delete the temporary file
                 if (deleteFile || Configuration.FileListDestination == 0) // clipboard
-                    DeleteFile(fileName);
+                    gFileSystem->DeleteFile(AnsiToWide(fileName).c_str());
                 else
                 {
                     if (Configuration.FileListDestination == 1) // viewer

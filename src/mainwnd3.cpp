@@ -5,6 +5,7 @@
 #include "precomp.h"
 
 #include "ui/IPrompter.h"
+#include "common/IFileSystem.h"
 #include "common/unicode/helpers.h"
 #include <shlwapi.h>
 #undef PathIsPrefix // otherwise conflicts with CSalamanderGeneral::PathIsPrefix
@@ -2847,7 +2848,7 @@ MENU_TEMPLATE_ITEM AddToSystemMenu[] =
                         gPrompter->ShowInfo(LoadStrW(IDS_INFOTITLE), LoadStrW(IDS_CONFIGEXPORTED));
                     }
                     else
-                        DeleteFile(file);
+                        gFileSystem->DeleteFile(AnsiToWide(file).c_str());
                 }
             }
             return 0;
