@@ -2511,9 +2511,7 @@ void CFilesWindow::RenameFile(int specialIndex)
                     else
                     {
                         // Convert ANSI filename to Unicode for long path handling
-                        wchar_t wideBuffer[MAX_PATH];
-                        MultiByteToWideChar(CP_ACP, 0, formatedFileName, -1, wideBuffer, MAX_PATH);
-                        newNameW = wideBuffer;
+                        newNameW = AnsiToWide(formatedFileName);
                     }
                     RenameFileInternalW(f, newNameW, &mayChange, &tryAgain);
                 }
