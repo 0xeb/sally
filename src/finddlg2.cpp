@@ -1534,8 +1534,7 @@ BOOL CFindDialog::InvokeContextMenu(const char* lpVerb)
                 gPrompter->ShowError(LoadStrW(IDS_ERRORTITLE), LoadStrW(IDS_FOUNDITEMNOTFOUND));
         }
         else
-            SalMessageBox(HWindow, LoadStr(IDS_COMMONPREFIXNOTFOUND), LoadStr(IDS_ERRORTITLE),
-                          MB_ICONEXCLAMATION | MB_OK);
+            gPrompter->ShowError(LoadStrW(IDS_ERRORTITLE), LoadStrW(IDS_COMMONPREFIXNOTFOUND));
     }
     SetCursor(hOldCursor);
     return TRUE;

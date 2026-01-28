@@ -1138,8 +1138,7 @@ void CFilterCriteriaDialog::Validate(CTransferInfo& ti)
             Data->PrepareForTest();
             if (!Data->UseMinTime)
             {
-                SalMessageBox(HWindow, LoadStr(IDS_INVALIDDATE), LoadStr(IDS_ERRORTITLE),
-                              MB_ICONEXCLAMATION | MB_OK);
+                gPrompter->ShowError(LoadStrW(IDS_ERRORTITLE), LoadStrW(IDS_INVALIDDATE));
                 ti.ErrorOn(IDC_FFA_TIMEDURING_VALUE);
             }
         }

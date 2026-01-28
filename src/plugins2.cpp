@@ -4,6 +4,7 @@
 
 #include "precomp.h"
 
+#include "ui/IPrompter.h"
 #include "menu.h"
 #include "drivelst.h"
 #include "cfgdlg.h"
@@ -3043,8 +3044,7 @@ BOOL CPlugins::TestAll(HWND parent)
 
     if (!err)
     {
-        SalMessageBox(parent, LoadStr(IDS_PLUGINTESTALLOK), LoadStr(IDS_INFOTITLE),
-                      MB_OK | MB_ICONINFORMATION);
+        gPrompter->ShowInfo(LoadStrW(IDS_INFOTITLE), LoadStrW(IDS_PLUGINTESTALLOK));
     }
     return ret;
 }

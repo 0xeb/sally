@@ -1980,8 +1980,7 @@ void ShellAction(CFilesWindow* panel, CShellAction action, BOOL useSelection,
 #ifndef _WIN64
                         if (IsWin64RedirectedDir(panel->GetPath(), NULL, TRUE))
                         {
-                            SalMessageBox(MainWindow->HWindow, LoadStr(IDS_ERROPENMENUFORW64ALIAS),
-                                          LoadStr(IDS_ERRORTITLE), MB_OK | MB_ICONEXCLAMATION);
+                            gPrompter->ShowError(LoadStrW(IDS_ERRORTITLE), LoadStrW(IDS_ERROPENMENUFORW64ALIAS));
                         }
                         else
                         {

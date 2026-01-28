@@ -36,8 +36,7 @@ BOOL CSimpleMAPI::Init(HWND hParent)
             HLibrary = HANDLES_Q(LoadLibrary("msoemapi.dll"));
             if (HLibrary == NULL)
             {
-                SalMessageBox(hParent, LoadStr(IDS_EMAILFILES_MAPIERROR), LoadStr(IDS_ERRORTITLE),
-                              MB_OK | MB_ICONEXCLAMATION);
+                gPrompter->ShowError(LoadStrW(IDS_ERRORTITLE), LoadStrW(IDS_EMAILFILES_MAPIERROR));
                 return FALSE;
             }
         }

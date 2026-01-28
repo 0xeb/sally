@@ -4,6 +4,7 @@
 
 #include "precomp.h"
 
+#include "ui/IPrompter.h"
 #include "cfgdlg.h"
 #include "edtlbwnd.h"
 #include "usermenu.h"
@@ -546,8 +547,7 @@ void CCfgPageUnpackers::Validate(CTransferInfo& ti)
         if (strlen(masksStr) == 0)
         {
             EditLB->SetCurSel(i);
-            SalMessageBox(HWindow, LoadStr(IDS_INCORRECTSYNTAX), LoadStr(IDS_ERRORTITLE),
-                          MB_OK | MB_ICONEXCLAMATION);
+            gPrompter->ShowError(LoadStrW(IDS_ERRORTITLE), LoadStrW(IDS_INCORRECTSYNTAX));
             ti.ErrorOn(IDC_P2_EXT);
             return;
         }
@@ -557,8 +557,7 @@ void CCfgPageUnpackers::Validate(CTransferInfo& ti)
         if (!masks.PrepareMasks(errorPos))
         {
             EditLB->SetCurSel(i);
-            SalMessageBox(HWindow, LoadStr(IDS_INCORRECTSYNTAX), LoadStr(IDS_ERRORTITLE),
-                          MB_OK | MB_ICONEXCLAMATION);
+            gPrompter->ShowError(LoadStrW(IDS_ERRORTITLE), LoadStrW(IDS_INCORRECTSYNTAX));
             SendMessage(GetDlgItem(HWindow, IDC_P2_EXT), EM_SETSEL, errorPos, errorPos + 1);
             ti.ErrorOn(IDC_P2_EXT);
             return;

@@ -4,6 +4,7 @@
 
 #include "precomp.h"
 
+#include "ui/IPrompter.h"
 #include "viewer.h"
 
 #include "cfgdlg.h"
@@ -94,8 +95,7 @@ void HistoryComboBox(HWND hWindow, CTransferInfo& ti, int ctrlID, char* Text,
                 {
                     if (!changeOnlyHistory)
                     {
-                        SalMessageBox(hWindow, LoadStr(IDS_STRINGISNOTHEX), LoadStr(IDS_ERRORTITLE),
-                                      MB_OK | MB_ICONEXCLAMATION);
+                        gPrompter->ShowError(LoadStrW(IDS_ERRORTITLE), LoadStrW(IDS_STRINGISNOTHEX));
                         SetFocus(hwnd);
                         SendMessage(hwnd, CB_SETEDITSEL, 0, MAKELPARAM(s - Text, 1 + (s - Text)));
                     }
@@ -1239,8 +1239,7 @@ void CViewerWindow::Paint(HDC dc)
                             if (!CanSwitchQuietlyToHex)
                                 CanSwitchToHex = FALSE;
                             if (CanSwitchQuietlyToHex ||
-                                SalMessageBox(HWindow, LoadStr(IDS_VIEWER_BINFILE), LoadStr(IDS_VIEWERTITLE),
-                                              MB_YESNO | MB_ICONQUESTION) == IDYES)
+                                gPrompter->AskYesNo(LoadStrW(IDS_VIEWERTITLE), LoadStrW(IDS_VIEWER_BINFILE)).type == PromptResult::kYes)
                             {
                                 CanSwitchQuietlyToHex = FALSE;
                                 ExitTextMode = TRUE;

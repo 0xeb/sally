@@ -2489,8 +2489,7 @@ void CFindDialog::OnViewFileWith()
                         // the menu's message queue might still be running
             if (SalamanderBusy)
             {
-                SalMessageBox(HWindow, LoadStr(IDS_SALAMANDBUSY2),
-                              LoadStr(IDS_INFOTITLE), MB_OK | MB_ICONINFORMATION);
+                gPrompter->ShowInfo(LoadStrW(IDS_INFOTITLE), LoadStrW(IDS_SALAMANDBUSY2));
                 return;
             }
         }
@@ -2535,8 +2534,7 @@ void CFindDialog::OnEditFileWith()
                         // the menu's message queue might still be running
             if (SalamanderBusy)
             {
-                SalMessageBox(HWindow, LoadStr(IDS_SALAMANDBUSY2),
-                              LoadStr(IDS_INFOTITLE), MB_OK | MB_ICONINFORMATION);
+                gPrompter->ShowInfo(LoadStrW(IDS_INFOTITLE), LoadStrW(IDS_SALAMANDBUSY2));
                 return;
             }
         }
