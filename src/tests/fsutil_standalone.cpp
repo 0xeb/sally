@@ -361,3 +361,45 @@ void AddTrailingBackslashW(std::wstring& path)
     if (!path.empty() && path.back() != L'\\')
         path += L'\\';
 }
+
+void RemoveExtensionW(std::wstring& path)
+{
+    if (path.empty())
+        return;
+
+    // Find the filename part (after last backslash)
+    size_t lastSlash = path.rfind(L'\\');
+    size_t searchStart = (lastSlash == std::wstring::npos) ? 0 : lastSlash + 1;
+
+    // Find the last dot in the filename part
+    size_t lastDot = path.rfind(L'.');
+    if (lastDot != std::wstring::npos && lastDot >= searchStart)
+        path.resize(lastDot);
+}
+
+void SetExtensionW(std::wstring& path, const wchar_t* extension)
+{
+    if (path.empty())
+        return;
+
+    // Remove existing extension first
+    RemoveExtensionW(path);
+
+    // Add new extension
+    if (extension != NULL && extension[0] != L'\0')
+        path += extension;
+}
+
+std::wstring GetFileNameWithoutExtensionW(const wchar_t* path)
+{
+    if (path == NULL || path[0] == L'\0')
+        return std::wstring();
+
+    // Get filename first
+    std::wstring filename = GetFileNameW(path);
+
+    // Remove extension
+    RemoveExtensionW(filename);
+
+    return filename;
+}

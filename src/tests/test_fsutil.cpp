@@ -537,7 +537,55 @@ void TestTrailingBackslash()
 }
 
 //
-// Test 20: RemoveDoubleBackslashesW - backslash cleanup
+// Test 20: Extension manipulation helpers
+//
+void TestExtensionHelpers()
+{
+    printf("\n=== Test: Extension helpers ===\n");
+
+    // RemoveExtensionW
+    std::wstring path = L"test.txt";
+    RemoveExtensionW(path);
+    TEST_ASSERT(path == L"test", "RemoveExtensionW basic");
+
+    path = L"C:\\Users\\file.doc";
+    RemoveExtensionW(path);
+    TEST_ASSERT(path == L"C:\\Users\\file", "RemoveExtensionW with path");
+
+    path = L"archive.tar.gz";
+    RemoveExtensionW(path);
+    TEST_ASSERT(path == L"archive.tar", "RemoveExtensionW double ext");
+
+    path = L"noextension";
+    RemoveExtensionW(path);
+    TEST_ASSERT(path == L"noextension", "RemoveExtensionW no ext unchanged");
+
+    path = L"C:\\folder.name\\file";
+    RemoveExtensionW(path);
+    TEST_ASSERT(path == L"C:\\folder.name\\file", "RemoveExtensionW ignores dir dot");
+
+    // SetExtensionW
+    path = L"test.txt";
+    SetExtensionW(path, L".doc");
+    TEST_ASSERT(path == L"test.doc", "SetExtensionW replaces");
+
+    path = L"test";
+    SetExtensionW(path, L".doc");
+    TEST_ASSERT(path == L"test.doc", "SetExtensionW adds");
+
+    path = L"C:\\Users\\file.old";
+    SetExtensionW(path, L".new");
+    TEST_ASSERT(path == L"C:\\Users\\file.new", "SetExtensionW with path");
+
+    // GetFileNameWithoutExtensionW
+    TEST_ASSERT(GetFileNameWithoutExtensionW(L"C:\\Users\\test.txt") == L"test", "GetFileNameWithoutExtW basic");
+    TEST_ASSERT(GetFileNameWithoutExtensionW(L"test.txt") == L"test", "GetFileNameWithoutExtW no path");
+    TEST_ASSERT(GetFileNameWithoutExtensionW(L"noext") == L"noext", "GetFileNameWithoutExtW no ext");
+    TEST_ASSERT(GetFileNameWithoutExtensionW(NULL) == L"", "GetFileNameWithoutExtW NULL");
+}
+
+//
+// Test 21: RemoveDoubleBackslashesW - backslash cleanup
 //
 void TestRemoveDoubleBackslashesW()
 {
@@ -620,6 +668,7 @@ int main()
     TestIsUNCRootPathW();
     TestIsUNCPathW();
     TestTrailingBackslash();
+    TestExtensionHelpers();
     TestRemoveDoubleBackslashesW();
 
     // Cleanup

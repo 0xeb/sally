@@ -210,3 +210,33 @@ void RemoveTrailingBackslashW(std::wstring& path);
 //   path - Path to modify
 //
 void AddTrailingBackslashW(std::wstring& path);
+
+// Removes the extension from a path/filename.
+// Example: "test.txt" => "test", "archive.tar.gz" => "archive.tar"
+//
+// Parameters:
+//   path - Path or filename to modify
+//
+void RemoveExtensionW(std::wstring& path);
+
+// Sets or replaces the extension of a path/filename.
+// Example: SetExtensionW("test.txt", L".doc") => "test.doc"
+//          SetExtensionW("test", L".doc") => "test.doc"
+// Note: extension should include the dot.
+//
+// Parameters:
+//   path - Path or filename to modify
+//   extension - New extension (including dot)
+//
+void SetExtensionW(std::wstring& path, const wchar_t* extension);
+
+// Extracts the filename without extension from a path.
+// Example: "C:\\Users\\test.txt" => "test"
+//
+// Parameters:
+//   path - Full path (wide string)
+//
+// Returns:
+//   Filename without extension
+//
+std::wstring GetFileNameWithoutExtensionW(const wchar_t* path);
