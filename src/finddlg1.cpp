@@ -5,6 +5,8 @@
 #include "precomp.h"
 
 #include "menu.h"
+#include "ui/IPrompter.h"
+#include "common/unicode/helpers.h"
 #include "cfgdlg.h"
 #include "mainwnd.h"
 #include "plugins.h"
@@ -1692,8 +1694,7 @@ void CFindDialog::Validate(CTransferInfo& ti)
         int errorPos;
         if (!mask.PrepareMasks(errorPos))
         {
-            SalMessageBox(HWindow, LoadStr(IDS_INCORRECTSYNTAX), LoadStr(IDS_ERRORTITLE),
-                          MB_OK | MB_ICONEXCLAMATION);
+            gPrompter->ShowError(LoadStrW(IDS_ERRORTITLE), LoadStrW(IDS_INCORRECTSYNTAX));
             SetFocus(hNamesWnd); // ensure the CB_SETEDITSEL message works correctly
             SendMessage(hNamesWnd, CB_SETEDITSEL, 0, MAKELPARAM(errorPos, errorPos + 1));
             ti.ErrorOn(IDC_FIND_NAMED);
@@ -1706,8 +1707,7 @@ void CFindDialog::Validate(CTransferInfo& ti)
             BuildSerchForData();
             if (SearchForData.Count == 0)
             {
-                SalMessageBox(HWindow, LoadStr(IDS_FF_EMPTYSTRING), LoadStr(IDS_ERRORTITLE),
-                              MB_OK | MB_ICONEXCLAMATION);
+                gPrompter->ShowError(LoadStrW(IDS_ERRORTITLE), LoadStrW(IDS_FF_EMPTYSTRING));
                 ti.ErrorOn(IDC_FIND_LOOKIN);
             }
         }
@@ -2001,12 +2001,12 @@ void CFindDialog::StartSearch(WORD command)
             if (!GrepData.RegExp.Set(Data.GrepText, (WORD)(sfForward |
                                                            (Data.CaseSensitive ? sfCaseSensitive : 0))))
             {
-                char buf[500];
+                std::wstring msg;
                 if (GrepData.RegExp.GetPattern() != NULL)
-                    sprintf(buf, LoadStr(IDS_INVALIDREGEXP), GrepData.RegExp.GetPattern(), GrepData.RegExp.GetLastErrorText());
+                    msg = FormatStrW(LoadStrW(IDS_INVALIDREGEXP), AnsiToWide(GrepData.RegExp.GetPattern()).c_str(), AnsiToWide(GrepData.RegExp.GetLastErrorText()).c_str());
                 else
-                    strcpy(buf, GrepData.RegExp.GetLastErrorText());
-                SalMessageBox(HWindow, buf, LoadStr(IDS_ERRORFINDINGFILE), MB_OK | MB_ICONEXCLAMATION);
+                    msg = AnsiToWide(GrepData.RegExp.GetLastErrorText());
+                gPrompter->ShowError(LoadStrW(IDS_ERRORFINDINGFILE), msg.c_str());
                 if (GrepData.Refine != 0)
                     FoundFilesListView->DestroyDataForRefine();
                 return; // error
@@ -2353,8 +2353,7 @@ void CFindDialog::OnFocusFile()
         Sleep(200); // give Salamander time-if we switched from the main window the menu's message queue might still be running
         if (SalamanderBusy)
         {
-            SalMessageBox(HWindow, LoadStr(IDS_SALAMANDBUSY2),
-                          LoadStr(IDS_INFOTITLE), MB_OK | MB_ICONINFORMATION);
+            gPrompter->ShowInfo(LoadStrW(IDS_INFOTITLE), LoadStrW(IDS_SALAMANDBUSY2));
             return;
         }
     }
@@ -2424,8 +2423,7 @@ void CFindDialog::OnViewFile(BOOL alternate)
                     // the menu's message queue might still be running
         if (SalamanderBusy)
         {
-            SalMessageBox(HWindow, LoadStr(IDS_SALAMANDBUSY2),
-                          LoadStr(IDS_INFOTITLE), MB_OK | MB_ICONINFORMATION);
+            gPrompter->ShowInfo(LoadStrW(IDS_INFOTITLE), LoadStrW(IDS_SALAMANDBUSY2));
             return;
         }
     }
@@ -2450,8 +2448,7 @@ void CFindDialog::OnEditFile()
                     // the menu's message queue might still be running
         if (SalamanderBusy)
         {
-            SalMessageBox(HWindow, LoadStr(IDS_SALAMANDBUSY2),
-                          LoadStr(IDS_INFOTITLE), MB_OK | MB_ICONINFORMATION);
+            gPrompter->ShowInfo(LoadStrW(IDS_INFOTITLE), LoadStrW(IDS_SALAMANDBUSY2));
             return;
         }
     }
@@ -2472,8 +2469,7 @@ void CFindDialog::OnViewFileWith()
                     // the menu's message queue might still be running
         if (SalamanderBusy)
         {
-            SalMessageBox(HWindow, LoadStr(IDS_SALAMANDBUSY2),
-                          LoadStr(IDS_INFOTITLE), MB_OK | MB_ICONINFORMATION);
+            gPrompter->ShowInfo(LoadStrW(IDS_INFOTITLE), LoadStrW(IDS_SALAMANDBUSY2));
             return;
         }
     }
@@ -2520,8 +2516,7 @@ void CFindDialog::OnEditFileWith()
                     // the menu's message queue might still be running
         if (SalamanderBusy)
         {
-            SalMessageBox(HWindow, LoadStr(IDS_SALAMANDBUSY2),
-                          LoadStr(IDS_INFOTITLE), MB_OK | MB_ICONINFORMATION);
+            gPrompter->ShowInfo(LoadStrW(IDS_INFOTITLE), LoadStrW(IDS_SALAMANDBUSY2));
             return;
         }
     }
@@ -2801,23 +2796,15 @@ BOOL CFindDialog::CanCloseWindow()
 
 BOOL CFindDialog::DoYouWantToStopSearching()
 {
-    int ret = IDYES;
+    PromptResult::Type ret = PromptResult::kYes;
     if (Configuration.CnfrmStopFind)
     {
-        BOOL dontShow = !Configuration.CnfrmStopFind;
-
-        MSGBOXEX_PARAMS params;
-        memset(&params, 0, sizeof(params));
-        params.HParent = HWindow;
-        params.Flags = MSGBOXEX_YESNO | MSGBOXEX_ESCAPEENABLED | MSGBOXEX_ICONQUESTION | MSGBOXEX_SETFOREGROUND | MSGBOXEX_HINT;
-        params.Caption = LoadStr(IDS_WANTTOSTOPTITLE);
-        params.Text = LoadStr(IDS_WANTTOSTOP);
-        params.CheckBoxText = LoadStr(IDS_DONTSHOWAGAINSS);
-        params.CheckBoxValue = &dontShow;
-        ret = SalMessageBoxEx(&params);
+        bool dontShow = !Configuration.CnfrmStopFind;
+        ret = gPrompter->AskYesNoWithCheckbox(LoadStrW(IDS_WANTTOSTOPTITLE), LoadStrW(IDS_WANTTOSTOP),
+                                              LoadStrW(IDS_DONTSHOWAGAINSS), &dontShow).type;
         Configuration.CnfrmStopFind = !dontShow;
     }
-    return (ret == IDYES);
+    return (ret == PromptResult::kYes);
 }
 
 // pull the text from the control and search for a hot key;
@@ -3353,19 +3340,11 @@ CFindDialog::DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
             {
                 if (ProcessingEscape && Configuration.CnfrmCloseFind)
                 {
-                    BOOL dontShow = !Configuration.CnfrmCloseFind;
-
-                    MSGBOXEX_PARAMS params;
-                    memset(&params, 0, sizeof(params));
-                    params.HParent = HWindow;
-                    params.Flags = MSGBOXEX_YESNO | MSGBOXEX_ESCAPEENABLED | MSGBOXEX_ICONQUESTION | MSGBOXEX_SILENT | MSGBOXEX_HINT;
-                    params.Caption = LoadStr(IDS_WANTTOSTOPTITLE);
-                    params.Text = LoadStr(IDS_WANTTOCLOSEFIND);
-                    params.CheckBoxText = LoadStr(IDS_DONTSHOWAGAINCF);
-                    params.CheckBoxValue = &dontShow;
-                    int ret = SalMessageBoxEx(&params);
+                    bool dontShow = !Configuration.CnfrmCloseFind;
+                    PromptResult res = gPrompter->AskYesNoWithCheckbox(LoadStrW(IDS_WANTTOSTOPTITLE), LoadStrW(IDS_WANTTOCLOSEFIND),
+                                                                       LoadStrW(IDS_DONTSHOWAGAINCF), &dontShow);
                     Configuration.CnfrmCloseFind = !dontShow;
-                    if (ret != IDYES)
+                    if (res.type != PromptResult::kYes)
                         return 0;
                 }
             }
