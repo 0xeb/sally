@@ -37,3 +37,18 @@ add_test(NAME gtest_filesystem COMMAND gtest_filesystem)
 set_target_properties(gtest_filesystem PROPERTIES
     RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/tests"
 )
+
+add_executable(gtest_clipboard
+    gtest_clipboard.cpp
+)
+
+target_link_libraries(gtest_clipboard
+    GTest::gtest
+    GTest::gtest_main
+)
+
+add_test(NAME gtest_clipboard COMMAND gtest_clipboard)
+
+set_target_properties(gtest_clipboard PROPERTIES
+    RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/tests"
+)
