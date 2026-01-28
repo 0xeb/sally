@@ -56,6 +56,28 @@ BOOL PathContainsValidComponents(char* path, BOOL cutPath)
     return TRUE;
 }
 
+// Wide version - checks if path contains components ending with space or dot
+// Returns FALSE if invalid component found (and optionally truncates at that point)
+BOOL PathContainsValidComponentsW(const wchar_t* path)
+{
+    const wchar_t* s = path;
+    while (*s != 0)
+    {
+        const wchar_t* slash = wcschr(s, L'\\');
+        if (slash == NULL)
+            s += wcslen(s);
+        else
+            s = slash;
+        if (s > path && (*(s - 1) <= L' ' || *(s - 1) == L'.'))
+        {
+            return FALSE;
+        }
+        if (slash != NULL)
+            s++;
+    }
+    return TRUE;
+}
+
 BOOL CFilesWindow::DeleteThroughRecycleBin(int* selection, int selCount, CFileData* oneFile)
 {
     CALL_STACK_MESSAGE2("CFilesWindow::DeleteThroughRecycleBin(, %d,)", selCount);
@@ -69,11 +91,7 @@ BOOL CFilesWindow::DeleteThroughRecycleBin(int* selection, int selCount, CFileDa
     // Verify that the path does not contain components ending with a space or dot;
     // as this can confuse the Recycle Bin and cause it to delete from a different path (it quietly trims
     // those spaces or dots)
-    // Note: PathContainsValidComponents uses ANSI, but GetPath() is ANSI-safe so this check is still valid
-    char pathAnsi[MAX_PATH];
-    lstrcpynA(pathAnsi, GetPath(), MAX_PATH);
-    SalPathAddBackslash(pathAnsi, MAX_PATH);
-    if (!PathContainsValidComponents(pathAnsi, TRUE))
+    if (!PathContainsValidComponentsW(pathW.c_str()))
     {
         // TODO: Use wide format string once IDS_RECYCLEBINERROR supports wide
         gPrompter->ShowError(LoadStrW(IDS_ERRORTITLE), (pathW + L" - invalid path component").c_str());
