@@ -5,6 +5,7 @@
 #include "precomp.h"
 
 #include "svg.h"
+#include "ui/IPrompter.h"
 #include "gui.h"
 #include "toolbar.h"
 #include "menu.h"
@@ -1269,7 +1270,7 @@ BOOL CHyperLink::ExecuteIt()
         if (err <= 32)
         {
             ret = FALSE;
-            SalMessageBox(HDialog, GetErrorText(err), LoadStr(IDS_ERRORTITLE), MB_OK | MB_ICONEXCLAMATION);
+            gPrompter->ShowError(LoadStrW(IDS_ERRORTITLE), GetErrorTextW(err));
         }
     }
     if (Command != 0)

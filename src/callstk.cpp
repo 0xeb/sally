@@ -5,6 +5,8 @@
 #include "precomp.h"
 
 #include "mainwnd.h"
+#include "ui/IPrompter.h"
+#include "common/unicode/helpers.h"
 #include "usermenu.h"
 #include "snooper.h"
 #include "cfgdlg.h"
@@ -696,13 +698,7 @@ CCallStack::ThreadBugReportF(void* param)
                 if (data->ShellExtCrashID != -1)
                 {
                     // crash shell extension
-                    MSGBOXEX_PARAMS params;
-                    memset(&params, 0, sizeof(params));
-                    params.HParent = NULL;
-                    params.Flags = MSGBOXEX_OK | MSGBOXEX_ICONINFORMATION | MB_SETFOREGROUND;
-                    params.Caption = SALAMANDER_TEXT_VERSION;
-                    params.Text = LoadStr(IDS_SHELLEXTCRASH);
-                    SalMessageBoxEx(&params);
+                    gPrompter->ShowInfo(AnsiToWide(SALAMANDER_TEXT_VERSION).c_str(), LoadStrW(IDS_SHELLEXTCRASH));
                 }
             }
             data->ExitProcess = TRUE; // terminate the thread
