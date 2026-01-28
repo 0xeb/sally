@@ -27,6 +27,7 @@ set(SALAMANDER_SOURCES
   "${SAL_SRC}/common/trace.cpp"
   "${SAL_SRC}/common/widepath.cpp"
   "${SAL_SRC}/common/fsutil.cpp"
+  "${SAL_SRC}/common/Win32FileSystem.cpp"
   "${SAL_SRC}/common/winlib.cpp"
   "${SAL_SRC}/common/dep/crypt/aescrypt.c"
   "${SAL_SRC}/common/dep/crypt/aeskey.c"
