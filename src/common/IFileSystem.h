@@ -60,16 +60,43 @@ extern IFileSystem* gFileSystem;
 // Returns the default Win32 implementation
 IFileSystem* GetWin32FileSystem();
 
-// ANSI helper - converts ANSI path to wide and calls wide version
-// Use when migrating ANSI code to IFileSystem
-inline FileResult DeleteFileA(IFileSystem* fs, const char* path)
+// Helper to convert ANSI path to wide string
+inline std::wstring AnsiPathToWide(const char* path)
 {
-    // Convert ANSI to wide using MultiByteToWideChar
+    if (!path) return L"";
     int len = MultiByteToWideChar(CP_ACP, 0, path, -1, nullptr, 0);
-    if (len == 0) return FileResult::Error(GetLastError());
+    if (len == 0) return L"";
     std::wstring widePath;
     widePath.resize(len);
     MultiByteToWideChar(CP_ACP, 0, path, -1, &widePath[0], len);
     widePath.resize(len - 1);  // Remove null terminator from string length
+    return widePath;
+}
+
+// ANSI helpers - convert ANSI paths to wide and call wide versions
+// Use when migrating ANSI code to IFileSystem
+
+inline FileResult DeleteFileA(IFileSystem* fs, const char* path)
+{
+    std::wstring widePath = AnsiPathToWide(path);
+    if (widePath.empty() && path && *path) return FileResult::Error(GetLastError());
     return fs->DeleteFile(widePath.c_str());
+}
+
+inline FileResult MoveFileA(IFileSystem* fs, const char* source, const char* target)
+{
+    std::wstring wideSource = AnsiPathToWide(source);
+    std::wstring wideTarget = AnsiPathToWide(target);
+    if ((wideSource.empty() && source && *source) || (wideTarget.empty() && target && *target))
+        return FileResult::Error(GetLastError());
+    return fs->MoveFile(wideSource.c_str(), wideTarget.c_str());
+}
+
+inline FileResult CopyFileA(IFileSystem* fs, const char* source, const char* target, bool failIfExists)
+{
+    std::wstring wideSource = AnsiPathToWide(source);
+    std::wstring wideTarget = AnsiPathToWide(target);
+    if ((wideSource.empty() && source && *source) || (wideTarget.empty() && target && *target))
+        return FileResult::Error(GetLastError());
+    return fs->CopyFile(wideSource.c_str(), wideTarget.c_str(), failIfExists);
 }

@@ -14,6 +14,7 @@
 #include "common/widepath.h"
 #include "ui/IPrompter.h"
 #include "common/unicode/helpers.h"
+#include "common/IFileSystem.h"
 
 CSystemPolicies SystemPolicies;
 
@@ -1256,7 +1257,7 @@ BOOL SalMoveFile(const char* srcName, const char* destName)
     char destNameCopy[3 * MAX_PATH];
     MakeCopyWithBackslashIfNeeded(destName, destNameCopy);
 
-    if (!MoveFile(srcName, destName))
+    if (!MoveFileA(gFileSystem, srcName, destName).success)
     {
         DWORD err = GetLastError();
         if (err == ERROR_ACCESS_DENIED)
@@ -1265,7 +1266,7 @@ BOOL SalMoveFile(const char* srcName, const char* destName)
             if (attr != 0xFFFFFFFF && (attr & FILE_ATTRIBUTE_READONLY))
             {
                 SetFileAttributes(srcName, FILE_ATTRIBUTE_ARCHIVE);
-                if (MoveFile(srcName, destName))
+                if (MoveFileA(gFileSystem, srcName, destName).success)
                 {
                     SetFileAttributes(destName, attr);
                     return TRUE;

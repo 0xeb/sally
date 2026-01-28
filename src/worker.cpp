@@ -5855,7 +5855,7 @@ BOOL DoMoveFile(COperation* op, HWND hProgressDlg, void* buffer,
             dirTimeModifiedIsValid = GetDirTime(sourceNameMvDir, &dirTimeModified);
         while (1)
         {
-            if (!invalidName && !*novellRenamePatch && MoveFile(sourceNameMvDir, targetNameMvDir))
+            if (!invalidName && !*novellRenamePatch && MoveFileA(gFileSystem, sourceNameMvDir, targetNameMvDir).success)
             {
                 if (script->CopyAttrs && (op->Attr & FILE_ATTRIBUTE_ARCHIVE) == 0) // Archive attribute was not set, MoveFile turned it on, clear it again
                     SetFileAttributes(targetNameMvDir, op->Attr);                  // leave without handling or retry, not important (it normally toggles chaotically)
@@ -5972,7 +5972,7 @@ BOOL DoMoveFile(COperation* op, HWND hProgressDlg, void* buffer,
                 {
                     DWORD attr = SalGetFileAttributes(sourceNameMvDir);
                     BOOL setAttr = ClearReadOnlyAttr(sourceNameMvDir, attr);
-                    if (MoveFile(sourceNameMvDir, targetNameMvDir))
+                    if (MoveFileA(gFileSystem, sourceNameMvDir, targetNameMvDir).success)
                     {
                         if (!*novellRenamePatch)
                             *novellRenamePatch = TRUE; // the next operations will go straight through here
