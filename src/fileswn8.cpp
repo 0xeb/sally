@@ -543,9 +543,8 @@ void CFilesWindow::FilesAction(CActionType type, CFilesWindow* target, int count
                         {
                             if (strlen(secondPart) >= MAX_PATH) // isn't the path inside the archive too long?
                             {
-                                SalMessageBox(HWindow, LoadStr(IDS_TOOLONGPATH),
-                                              (type == atCopy) ? LoadStr(IDS_ERRORCOPY) : LoadStr(IDS_ERRORMOVE),
-                                              MB_OK | MB_ICONEXCLAMATION);
+                                gPrompter->ShowError((type == atCopy) ? LoadStrW(IDS_ERRORCOPY) : LoadStrW(IDS_ERRORMOVE),
+                                                     LoadStrW(IDS_TOOLONGPATH));
                                 continue;
                             }
 
@@ -591,9 +590,8 @@ void CFilesWindow::FilesAction(CActionType type, CFilesWindow* target, int count
                             BOOL hasPath = *secondPart != 0;
                             if (hasPath && !backslashAtEnd && !mustBePath) // check whether they used an operational mask -> we are not able to handle that
                             {
-                                SalMessageBox(HWindow, LoadStr(IDS_MOVECOPY_OPMASKSNOTSUP),
-                                              (type == atCopy) ? LoadStr(IDS_ERRORCOPY) : LoadStr(IDS_ERRORMOVE),
-                                              MB_OK | MB_ICONEXCLAMATION);
+                                gPrompter->ShowError((type == atCopy) ? LoadStrW(IDS_ERRORCOPY) : LoadStrW(IDS_ERRORMOVE),
+                                                     LoadStrW(IDS_MOVECOPY_OPMASKSNOTSUP));
                                 continue; // back to the copy/move dialog
                             }
 
@@ -687,10 +685,9 @@ void CFilesWindow::FilesAction(CActionType type, CFilesWindow* target, int count
                             }
                             else
                             {
-                                sprintf(textBuf, LoadStr(IDS_FILEERRORFORMAT), path, GetErrorText(err));
-                                SalMessageBox(HWindow, textBuf,
-                                              (type == atCopy) ? LoadStr(IDS_ERRORCOPY) : LoadStr(IDS_ERRORMOVE),
-                                              MB_OK | MB_ICONEXCLAMATION);
+                                wchar_t msgW[1024];
+                                swprintf_s(msgW, _countof(msgW), LoadStrW(IDS_FILEERRORFORMAT), AnsiToWide(path).c_str(), GetErrorTextW(err));
+                                gPrompter->ShowError((type == atCopy) ? LoadStrW(IDS_ERRORCOPY) : LoadStrW(IDS_ERRORMOVE), msgW);
                                 if (hasPath)
                                     *secondPart = '\\'; // restore the path - we will edit it in the Copy/Move dialog
                                 if (backslashAtEnd || mustBePath)
@@ -712,9 +709,8 @@ void CFilesWindow::FilesAction(CActionType type, CFilesWindow* target, int count
                             {
                                 if (strlen(secondPart) >= MAX_PATH) // is the user's part of the FS path too long?
                                 {
-                                    SalMessageBox(HWindow, LoadStr(IDS_TOOLONGPATH),
-                                                  (type == atCopy) ? LoadStr(IDS_ERRORCOPY) : LoadStr(IDS_ERRORMOVE),
-                                                  MB_OK | MB_ICONEXCLAMATION);
+                                    gPrompter->ShowError((type == atCopy) ? LoadStrW(IDS_ERRORCOPY) : LoadStrW(IDS_ERRORMOVE),
+                                                         LoadStrW(IDS_TOOLONGPATH));
                                     continue;
                                 }
 
@@ -1033,6 +1029,24 @@ void CFilesWindow::FilesAction(CActionType type, CFilesWindow* target, int count
                     char captionBuf[50];
                     lstrcpyn(captionBuf, caption, 50); // otherwise the LoadStr buffer gets overwritten before being copied to the dialog's local buffer
                     caption = captionBuf;
+                    const wchar_t* captionW = nullptr;
+                    switch (type)
+                    {
+                    case atCopy:
+                        captionW = LoadStrW(IDS_COPY);
+                        break;
+                    case atMove:
+                        captionW = LoadStrW(IDS_MOVE);
+                        break;
+                    case atDelete:
+                        captionW = LoadStrW(IDS_DELETE);
+                        break;
+                    case atChangeCase:
+                        captionW = LoadStrW(IDS_CHANGECASE);
+                        break;
+                    default:
+                        captionW = L"";
+                    }
                     HWND hFocusedWnd = GetFocus();
                     CreateSafeWaitWindow(LoadStr(IDS_ANALYSINGDIRTREEESC), NULL, 1000, TRUE, MainWindow->HWindow);
                     MainWindow->StartAnimate(); // example of  its usage
@@ -1093,12 +1107,11 @@ void CFilesWindow::FilesAction(CActionType type, CFilesWindow* target, int count
                         {
                             char buf1[50];
                             char buf2[50];
-                            char buf3[200];
-                            sprintf(buf3, LoadStr(IDS_NOTENOUGHSPACE),
-                                    NumberToStr(buf1, occupiedSpTooBig ? script->OccupiedSpace : script->TotalFileSize),
-                                    NumberToStr(buf2, script->FreeSpace));
-                            cancel = SalMessageBox(HWindow, buf3,
-                                                   caption, MB_YESNO | MB_ICONQUESTION | MSGBOXEX_ESCAPEENABLED) != IDYES;
+                            wchar_t msgW[200];
+                            swprintf_s(msgW, _countof(msgW), LoadStrW(IDS_NOTENOUGHSPACE),
+                                       AnsiToWide(NumberToStr(buf1, occupiedSpTooBig ? script->OccupiedSpace : script->TotalFileSize)).c_str(),
+                                       AnsiToWide(NumberToStr(buf2, script->FreeSpace)).c_str());
+                            cancel = gPrompter->AskYesNo(captionW, msgW).type != PromptResult::kYes;
                         }
                     }
 
@@ -1344,8 +1357,7 @@ void CFilesWindow::EmailFiles()
                 if (send && mapi->GetFilesCount() == 0)
                 {
                     // no file to send; display information and exit
-                    SalMessageBox(HWindow, LoadStr(IDS_WANTEMAIL_NOFILE), LoadStr(IDS_INFOTITLE),
-                                  MB_OK | MB_ICONINFORMATION);
+                    gPrompter->ShowInfo(LoadStrW(IDS_INFOTITLE), LoadStrW(IDS_WANTEMAIL_NOFILE));
                     send = FALSE;
                 }
                 if (send)
