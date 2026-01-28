@@ -99,6 +99,11 @@ protected:
 
     CButton* MoreButton;
 
+    // Unicode support for filenames that cannot be represented in ANSI
+    std::wstring PathW;         // Unicode input path (set via SetUnicodePath)
+    std::wstring ResultW;       // Unicode result (populated on OK)
+    HWND HUnicodeEdit;          // Overlay Unicode edit control (when PathW is set)
+
 public:
     // 'history' determines whether the dialog will contain a combobox (TRUE) or an editline (FALSE)
     // 'directoryHelper' specifies if a resource with a button behind the editline will be used to select a directory
@@ -107,6 +112,10 @@ public:
                         char* history[], int historyCount, CCriteriaData* criteriaInOut,
                         BOOL havePermissions, BOOL supportsADS);
     ~CCopyMoveMoreDialog();
+
+    void SetUnicodePath(const std::wstring& pathW);
+    const std::wstring& GetUnicodeResult() const { return ResultW; }
+    BOOL IsUnicodeMode() const { return !PathW.empty(); }
 
     virtual void Validate(CTransferInfo& ti);
     virtual void Transfer(CTransferInfo& ti);

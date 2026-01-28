@@ -742,6 +742,13 @@ CCopyMoveMoreDialog::CCopyMoveMoreDialog(HWND parent, char* path, int pathBufSiz
     HavePermissions = havePermissions;
     SupportsADS = supportsADS;
     MoreButton = NULL;
+    HUnicodeEdit = NULL;
+}
+
+void CCopyMoveMoreDialog::SetUnicodePath(const std::wstring& pathW)
+{
+    PathW = pathW;
+    ResultW.clear();
 }
 
 CCopyMoveMoreDialog::~CCopyMoveMoreDialog()
@@ -769,13 +776,40 @@ void CCopyMoveMoreDialog::Transfer(CTransferInfo& ti)
             }
             else
             {
-                SendMessage(hWnd, WM_GETTEXT, PathBufSize, (LPARAM)Path);
+                // Get Unicode result if Unicode edit control is present
+                if (HUnicodeEdit != NULL)
+                {
+                    int len = GetWindowTextLengthW(HUnicodeEdit);
+                    if (len > 0)
+                    {
+                        std::vector<wchar_t> buffer(len + 1);
+                        GetWindowTextW(HUnicodeEdit, buffer.data(), len + 1);
+                        ResultW = buffer.data();
+                    }
+                    // Also convert to ANSI for the Path buffer (fallback)
+                    WideCharToMultiByte(CP_ACP, 0, ResultW.c_str(), -1, Path, PathBufSize, "?", NULL);
+                }
+                else
+                {
+                    SendMessage(hWnd, WM_GETTEXT, PathBufSize, (LPARAM)Path);
+                }
                 AddValueToStdHistoryValues(History, HistoryCount, Path, FALSE);
             }
         }
     }
     else
     {
+        // Get Unicode result from overlay edit if present
+        if (ti.Type == ttDataFromWindow && HUnicodeEdit != NULL)
+        {
+            int len = GetWindowTextLengthW(HUnicodeEdit);
+            if (len > 0)
+            {
+                std::vector<wchar_t> buffer(len + 1);
+                GetWindowTextW(HUnicodeEdit, buffer.data(), len + 1);
+                ResultW = buffer.data();
+            }
+        }
         ti.EditLine(IDE_PATH, Path, PathBufSize);
     }
     TransferCriteriaControls(ti);
