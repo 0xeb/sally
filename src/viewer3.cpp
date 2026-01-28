@@ -10,6 +10,8 @@
 #include "shellib.h"
 #include "mainwnd.h"
 #include "codetbl.h"
+#include "ui/IPrompter.h"
+#include "common/unicode/helpers.h"
 
 BOOL ViewerActive(HWND hwnd)
 {
@@ -1107,9 +1109,7 @@ CViewerWindow::WindowProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
                                             {
                                                 if (foundLen == 0)
                                                 {
-                                                    SalMessageBox(HWindow, LoadStr(IDS_EMPTYMATCH),
-                                                                  LoadStr(IDS_FINDTITLE),
-                                                                  MB_OK | MB_ICONINFORMATION);
+                                                    gPrompter->ShowInfo(LoadStrW(IDS_FINDTITLE), LoadStrW(IDS_EMPTYMATCH));
                                                     noNotFound = TRUE;
                                                     break;
                                                 }
@@ -1121,8 +1121,7 @@ CViewerWindow::WindowProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
                                         }
                                         else // error - low memory
                                         {
-                                            SalMessageBox(HWindow, RegExp.GetLastErrorText(), LoadStr(IDS_FINDTITLE),
-                                                          MB_OK | MB_ICONEXCLAMATION);
+                                            gPrompter->ShowError(LoadStrW(IDS_FINDTITLE), AnsiToWide(RegExp.GetLastErrorText()).c_str());
                                             noNotFound = TRUE;
                                             break;
                                         }
@@ -1220,9 +1219,7 @@ CViewerWindow::WindowProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
                                             {
                                                 if (foundLen == 0)
                                                 {
-                                                    SalMessageBox(HWindow, LoadStr(IDS_EMPTYMATCH),
-                                                                  LoadStr(IDS_FINDTITLE),
-                                                                  MB_OK | MB_ICONINFORMATION);
+                                                    gPrompter->ShowInfo(LoadStrW(IDS_FINDTITLE), LoadStrW(IDS_EMPTYMATCH));
                                                     noNotFound = TRUE;
                                                     break;
                                                 }
@@ -1234,8 +1231,7 @@ CViewerWindow::WindowProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
                                         }
                                         else // error - low memory
                                         {
-                                            SalMessageBox(HWindow, RegExp.GetLastErrorText(), LoadStr(IDS_FINDTITLE),
-                                                          MB_OK | MB_ICONEXCLAMATION);
+                                            gPrompter->ShowError(LoadStrW(IDS_FINDTITLE), AnsiToWide(RegExp.GetLastErrorText()).c_str());
                                             noNotFound = TRUE;
                                             break;
                                         }
@@ -1261,12 +1257,12 @@ CViewerWindow::WindowProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
                 }
                 else
                 {
-                    char buf[500];
+                    std::wstring msg;
                     if (RegExp.GetPattern() != NULL)
-                        sprintf(buf, LoadStr(IDS_INVALIDREGEXP), RegExp.GetPattern(), RegExp.GetLastErrorText());
+                        msg = FormatStrW(LoadStrW(IDS_INVALIDREGEXP), AnsiToWide(RegExp.GetPattern()).c_str(), AnsiToWide(RegExp.GetLastErrorText()).c_str());
                     else
-                        strcpy(buf, RegExp.GetLastErrorText());
-                    SalMessageBox(HWindow, buf, LoadStr(IDS_FINDTITLE), MB_OK | MB_ICONEXCLAMATION);
+                        msg = AnsiToWide(RegExp.GetLastErrorText());
+                    gPrompter->ShowError(LoadStrW(IDS_FINDTITLE), msg.c_str());
                     noNotFound = TRUE;
                 }
             }
@@ -1431,8 +1427,7 @@ CViewerWindow::WindowProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
                 MSG msg; // discard the buffered ESC
                 while (PeekMessage(&msg, NULL, WM_KEYFIRST, WM_KEYLAST, PM_REMOVE))
                     ;
-                SalMessageBox(HWindow, LoadStr(IDS_FINDTERMINATEDBYUSER),
-                              LoadStr(IDS_INFOTITLE), MB_OK | MB_ICONINFORMATION | MSGBOXEX_SILENT);
+                gPrompter->ShowInfo(LoadStrW(IDS_INFOTITLE), LoadStrW(IDS_FINDTERMINATEDBYUSER));
                 found = -1;
                 noNotFound = TRUE;
             }
@@ -1443,9 +1438,8 @@ CViewerWindow::WindowProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
                 FindOffset = oldFindOffset;
                 if (!noNotFound)
                 {
-                    char buff[5000];
-                    sprintf(buff, LoadStr(FindDialog.Regular ? IDS_FIND_NOREGEXPMATCH : IDS_FIND_NOMATCH), FindDialog.Text);
-                    SalMessageBox(HWindow, buff, LoadStr(IDS_FINDTITLE), MB_OK | MB_ICONINFORMATION | MSGBOXEX_SILENT);
+                    std::wstring msg = FormatStrW(LoadStrW(FindDialog.Regular ? IDS_FIND_NOREGEXPMATCH : IDS_FIND_NOMATCH), AnsiToWide(FindDialog.Text).c_str());
+                    gPrompter->ShowInfo(LoadStrW(IDS_FINDTITLE), msg.c_str());
                 }
             }
             else
@@ -1557,8 +1551,7 @@ CViewerWindow::WindowProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
                     int errTextID;
                     if (!SalGetFullName(fileName, &errTextID))
                     {
-                        SalMessageBox(HWindow, LoadStr(errTextID), LoadStr(IDS_ERRORTITLE),
-                                      MB_OK | MB_ICONEXCLAMATION);
+                        gPrompter->ShowError(LoadStrW(IDS_ERRORTITLE), LoadStrW(errTextID));
                         goto ENTER_AGAIN;
                     }
 
@@ -1567,19 +1560,16 @@ CViewerWindow::WindowProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
 
                     if (attr != 0xFFFFFFFF && (attr & FILE_ATTRIBUTE_DIRECTORY))
                     {
-                        SalMessageBox(HWindow, LoadStr(IDS_NAMEALREADYUSEDFORDIR),
-                                      LoadStr(IDS_ERRORTITLE), MB_OK | MB_ICONEXCLAMATION);
+                        gPrompter->ShowError(LoadStrW(IDS_ERRORTITLE), LoadStrW(IDS_NAMEALREADYUSEDFORDIR));
                         goto ENTER_AGAIN;
                     }
                     if (attr != 0xFFFFFFFF)
                     {
-                        char text[300];
-                        sprintf(text, LoadStr(IDS_FILEALREADYEXIST), fileName);
-                        int res = SalMessageBox(HWindow, text, LoadStr(IDS_VIEWERTITLE),
-                                                MB_YESNOCANCEL | MB_ICONQUESTION | MB_DEFBUTTON2);
-                        if (res == IDNO)
+                        std::wstring msg = FormatStrW(LoadStrW(IDS_FILEALREADYEXIST), AnsiToWide(fileName).c_str());
+                        PromptResult res = gPrompter->AskYesNoCancel(LoadStrW(IDS_VIEWERTITLE), msg.c_str());
+                        if (res.type == PromptResult::kNo)
                             goto ENTER_AGAIN;
-                        if (res == IDCANCEL)
+                        if (res.type == PromptResult::kCancel)
                             return 0;
                     }
 
@@ -1621,8 +1611,7 @@ CViewerWindow::WindowProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
                                     {
                                         DWORD err = GetLastError();
                                         SetCursor(oldCur);
-                                        SalMessageBox(HWindow, GetErrorText(err),
-                                                      LoadStr(IDS_ERRORTITLE), MB_OK | MB_ICONEXCLAMATION);
+                                        gPrompter->ShowError(LoadStrW(IDS_ERRORTITLE), GetErrorTextW(err));
                                         break;
                                     }
                                     off += len;
@@ -1641,8 +1630,7 @@ CViewerWindow::WindowProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
                                             {
                                                 DWORD err = GetLastError();
                                                 SetCursor(oldCur);
-                                                SalMessageBox(HWindow, GetErrorText(err),
-                                                              LoadStr(IDS_ERRORTITLE), MB_OK | MB_ICONEXCLAMATION);
+                                                gPrompter->ShowError(LoadStrW(IDS_ERRORTITLE), GetErrorTextW(err));
                                             }
                                         }
                                         else
@@ -1652,8 +1640,7 @@ CViewerWindow::WindowProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
                                                 SetFileAttributes(fileName, attr); // restore the original attributes
                                             DeleteFile(tmpFile);                   // the file cannot be overwritten; delete the temp file (it's useless)
                                             SetCursor(oldCur);
-                                            SalMessageBox(HWindow, GetErrorText(err),
-                                                          LoadStr(IDS_ERRORTITLE), MB_OK | MB_ICONEXCLAMATION);
+                                            gPrompter->ShowError(LoadStrW(IDS_ERRORTITLE), GetErrorTextW(err));
                                         }
                                     }
                                 }
@@ -1673,8 +1660,7 @@ CViewerWindow::WindowProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
                                 if (attr != 0xFFFFFFFF)
                                     DeleteFile(tmpFile);
                                 SetCursor(oldCur);
-                                SalMessageBox(HWindow, GetErrorText(err),
-                                              LoadStr(IDS_ERRORTITLE), MB_OK | MB_ICONEXCLAMATION);
+                                gPrompter->ShowError(LoadStrW(IDS_ERRORTITLE), GetErrorTextW(err));
                             }
                             SetCursor(oldCur);
                         }
@@ -1682,8 +1668,7 @@ CViewerWindow::WindowProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
                         {
                             DWORD err = GetLastError();
                             SetCursor(oldCur);
-                            SalMessageBox(HWindow, GetErrorText(err),
-                                          LoadStr(IDS_ERRORTITLE), MB_OK | MB_ICONEXCLAMATION);
+                            gPrompter->ShowError(LoadStrW(IDS_ERRORTITLE), GetErrorTextW(err));
                         }
                     }
                 }

@@ -172,6 +172,15 @@ public:
         return {PromptResult::kCancel};
     }
 
+    PromptResult AskRetryCancel(const wchar_t* title, const wchar_t* message) override
+    {
+        std::string titleA = WideToAnsi(title);
+        std::string msgA = WideToAnsi(message);
+        int res = SalMessageBox(MainWindow->HWindow, msgA.c_str(), titleA.c_str(),
+                                MB_RETRYCANCEL | MB_ICONEXCLAMATION);
+        return {res == IDRETRY ? PromptResult::kRetry : PromptResult::kCancel};
+    }
+
     void ShowErrorWithHelp(const wchar_t* title, const wchar_t* message, uint32_t helpId) override
     {
         std::string titleA = WideToAnsi(title);

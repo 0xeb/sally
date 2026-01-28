@@ -9,6 +9,8 @@
 
 #include "cfgdlg.h"
 #include "dialogs.h"
+#include "ui/IPrompter.h"
+#include "common/unicode/helpers.h"
 
 // ****************************************************************************
 
@@ -733,7 +735,40 @@ int CViewerWindow::SalMessageBoxViewerPaintBlocked(HWND hParent, LPCTSTR lpText,
     // showing a message box triggers Paint = reading the file = more errors,
     // therefore disable Paint = only the viewer background will be cleared (e.g., parts of the file already displayed)
     EnablePaint = FALSE;
-    int res = SalMessageBox(hParent, lpText, lpCaption, uType);
+
+    int res;
+    std::wstring textW = AnsiToWide(lpText);
+    std::wstring captionW = AnsiToWide(lpCaption);
+
+    UINT buttons = uType & MB_TYPEMASK;
+    if (buttons == MB_RETRYCANCEL)
+    {
+        res = gPrompter->AskRetryCancel(captionW.c_str(), textW.c_str()).type == PromptResult::kCancel
+                  ? IDCANCEL
+                  : IDRETRY;
+    }
+    else if (buttons == MB_OKCANCEL)
+    {
+        res = gPrompter->ConfirmError(captionW.c_str(), textW.c_str()).type == PromptResult::kCancel
+                  ? IDCANCEL
+                  : IDOK;
+    }
+    else if (buttons == MB_YESNOCANCEL)
+    {
+        auto r = gPrompter->AskYesNoCancel(captionW.c_str(), textW.c_str());
+        if (r.type == PromptResult::kYes)
+            res = IDYES;
+        else if (r.type == PromptResult::kNo)
+            res = IDNO;
+        else
+            res = IDCANCEL;
+    }
+    else // MB_OK or default
+    {
+        gPrompter->ShowError(captionW.c_str(), textW.c_str());
+        res = IDOK;
+    }
+
     EnablePaint = oldEnablePaint;
     return res;
 }
@@ -1680,13 +1715,12 @@ BOOL CViewerWindow::CheckSelectionIsNotTooBig(HWND parent, BOOL* msgBoxDisplayed
 
         if (msgBoxDisplayed != NULL)
             *msgBoxDisplayed = TRUE;
-        int res = SalMessageBox(parent, LoadStr(IDS_VIEWER_BLOCKTOOBIG), LoadStr(IDS_VIEWERTITLE),
-                                MB_YESNOCANCEL | MB_ICONQUESTION);
-        if (res == IDYES)
+        PromptResult res = gPrompter->AskYesNoCancel(LoadStrW(IDS_VIEWERTITLE), LoadStrW(IDS_VIEWER_BLOCKTOOBIG));
+        if (res.type == PromptResult::kYes)
             TooBigSelAction = 2 /* NO */; // is the question skipped? YES = do not copy/do not drag
-        if (res == IDNO)
+        if (res.type == PromptResult::kNo)
             TooBigSelAction = 1 /* YES */;
-        return res == IDNO;
+        return res.type == PromptResult::kNo;
     }
     return TRUE; // less than 100MB = YES
 }

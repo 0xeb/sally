@@ -55,6 +55,9 @@ public:
     // Error with Skip/Skip All/Cancel - returns kSkip, kSkipAll, or kCancel
     virtual PromptResult AskSkipSkipAllCancel(const wchar_t* title, const wchar_t* message) = 0;
 
+    // Error with Retry/Cancel - returns kRetry or kCancel
+    virtual PromptResult AskRetryCancel(const wchar_t* title, const wchar_t* message) = 0;
+
     // Error with OK and Help button - helpId is for context-sensitive help
     virtual void ShowErrorWithHelp(const wchar_t* title, const wchar_t* message, uint32_t helpId) = 0;
 };

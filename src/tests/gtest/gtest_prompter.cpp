@@ -83,6 +83,12 @@ public:
         return {PromptResult::kSkip};
     }
 
+    PromptResult AskRetryCancel(const wchar_t* title, const wchar_t* message) override
+    {
+        log.push_back(L"AskRetryCancel:" + std::wstring(title ? title : L"") + L":" + std::wstring(message ? message : L""));
+        return {PromptResult::kRetry};
+    }
+
     void ShowErrorWithHelp(const wchar_t* title, const wchar_t* message, uint32_t helpId) override
     {
         log.push_back(L"ShowErrorWithHelp:" + std::wstring(title ? title : L"") + L":" + std::wstring(message ? message : L""));
