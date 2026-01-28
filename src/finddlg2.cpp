@@ -5,6 +5,7 @@
 #include "precomp.h"
 
 #include "cfgdlg.h"
+#include "ui/IPrompter.h"
 #include "edtlbwnd.h"
 #include "mainwnd.h"
 #include "find.h"
@@ -964,8 +965,7 @@ void CFindIgnoreDialog::Validate(CTransferInfo& ti)
         CFindIgnoreItem* item = IgnoreList->At(i);
         if (item->Enabled && !IsIgnorePathValid(item->Path))
         {
-            SalMessageBox(HWindow, LoadStr(IDS_ACBADDRIVE), LoadStr(IDS_ERRORTITLE),
-                          MB_OK | MB_ICONEXCLAMATION);
+            gPrompter->ShowError(LoadStrW(IDS_ERRORTITLE), LoadStrW(IDS_ACBADDRIVE));
             ti.ErrorOn(IDC_FFI_NAMES);
             EditLB->SetCurSel(i);
             PostMessage(HWindow, WM_USER_EDIT, 0, 0);
@@ -1033,8 +1033,7 @@ CFindIgnoreDialog::DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
         {
         case IDC_FFI_RESET:
         {
-            if (SalMessageBox(HWindow, LoadStr(IDS_FINDIGNORE_RESET), LoadStr(IDS_QUESTION),
-                              MB_OKCANCEL | MB_ICONQUESTION) == IDOK)
+            if (gPrompter->ConfirmError(LoadStrW(IDS_QUESTION), LoadStrW(IDS_FINDIGNORE_RESET)).type == PromptResult::kOk)
             {
                 IgnoreList->Reset();
                 FillList();
@@ -1348,8 +1347,7 @@ void CFindDialog::OnDrag(BOOL rightMouseButton)
     int commonPrefixChars;
     if (!GetCommonPrefixPath(commonPrefixPath, MAX_PATH, commonPrefixChars))
     {
-        SalMessageBox(HWindow, LoadStr(IDS_COMMONPREFIXNOTFOUND), LoadStr(IDS_ERRORTITLE),
-                      MB_ICONEXCLAMATION | MB_OK);
+        gPrompter->ShowError(LoadStrW(IDS_ERRORTITLE), LoadStrW(IDS_COMMONPREFIXNOTFOUND));
         return;
     }
 
@@ -1379,8 +1377,7 @@ void CFindDialog::OnDrag(BOOL rightMouseButton)
                                                 selCount, MyEnumFileNames, &data);
     if (dataObject == NULL)
     {
-        SalMessageBox(HWindow, LoadStr(IDS_FOUNDITEMNOTFOUND), LoadStr(IDS_ERRORTITLE),
-                      MB_ICONEXCLAMATION | MB_OK);
+        gPrompter->ShowError(LoadStrW(IDS_ERRORTITLE), LoadStrW(IDS_FOUNDITEMNOTFOUND));
         dropSource->Release();
         return;
     }
@@ -1425,8 +1422,7 @@ void CFindDialog::OnContextMenu(int x, int y)
     int commonPrefixChars;
     if (!GetCommonPrefixPath(commonPrefixPath, MAX_PATH, commonPrefixChars))
     {
-        SalMessageBox(HWindow, LoadStr(IDS_COMMONPREFIXNOTFOUND), LoadStr(IDS_ERRORTITLE),
-                      MB_ICONEXCLAMATION | MB_OK);
+        gPrompter->ShowError(LoadStrW(IDS_ERRORTITLE), LoadStrW(IDS_COMMONPREFIXNOTFOUND));
         return;
     }
     CMyEnumFileNamesData data;
@@ -1492,8 +1488,7 @@ void CFindDialog::OnContextMenu(int x, int y)
         DestroyMenu(hMenu);
     }
     else
-        SalMessageBox(HWindow, LoadStr(IDS_FOUNDITEMNOTFOUND), LoadStr(IDS_ERRORTITLE),
-                      MB_ICONEXCLAMATION | MB_OK);
+        gPrompter->ShowError(LoadStrW(IDS_ERRORTITLE), LoadStrW(IDS_FOUNDITEMNOTFOUND));
 }
 
 BOOL CFindDialog::InvokeContextMenu(const char* lpVerb)
@@ -1536,8 +1531,7 @@ BOOL CFindDialog::InvokeContextMenu(const char* lpVerb)
                 ret = TRUE;
             }
             else
-                SalMessageBox(HWindow, LoadStr(IDS_FOUNDITEMNOTFOUND), LoadStr(IDS_ERRORTITLE),
-                              MB_ICONEXCLAMATION | MB_OK);
+                gPrompter->ShowError(LoadStrW(IDS_ERRORTITLE), LoadStrW(IDS_FOUNDITEMNOTFOUND));
         }
         else
             SalMessageBox(HWindow, LoadStr(IDS_COMMONPREFIXNOTFOUND), LoadStr(IDS_ERRORTITLE),
@@ -1623,8 +1617,7 @@ void CFindDuplicatesDialog::Validate(CTransferInfo& ti)
     BOOL sameSize = IsDlgButtonChecked(HWindow, IDC_FD_SAME_SIZE);
     if (!sameName && !sameSize)
     {
-        SalMessageBox(HWindow, LoadStr(IDS_FIND_DUPS_NO_OPTION), LoadStr(IDS_ERRORTITLE),
-                      MB_OK | MB_ICONEXCLAMATION);
+        gPrompter->ShowError(LoadStrW(IDS_ERRORTITLE), LoadStrW(IDS_FIND_DUPS_NO_OPTION));
         ti.ErrorOn(IDC_FD_SAME_NAME);
     }
 }
@@ -1867,8 +1860,7 @@ void CFindLogDialog::OnFocusFile()
                     // the menu message queue might still be processing
         if (SalamanderBusy)
         {
-            SalMessageBox(HWindow, LoadStr(IDS_SALAMANDBUSY2),
-                          LoadStr(IDS_INFOTITLE), MB_OK | MB_ICONINFORMATION);
+            gPrompter->ShowInfo(LoadStrW(IDS_INFOTITLE), LoadStrW(IDS_SALAMANDBUSY2));
             return;
         }
     }
