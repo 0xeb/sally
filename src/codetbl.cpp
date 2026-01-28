@@ -5,6 +5,8 @@
 #include "precomp.h"
 
 #include "codetbl.h"
+#include "ui/IPrompter.h"
+#include "common/unicode/helpers.h"
 #include "cfgdlg.h"
 
 CCodeTables CodeTables;
@@ -49,6 +51,18 @@ char* ReadTable(const char* fileName, char* table)
         text = GetErrorText(GetLastError());
     }
     return text;
+}
+
+// Helper functions to avoid std::wstring in SEH blocks
+static void ShowCodeTableError(const char* text)
+{
+    gPrompter->ShowError(LoadStrW(IDS_ERRORTITLE), AnsiToWide(text).c_str());
+}
+
+static void ShowFileReadError(const char* fileName)
+{
+    std::wstring msg = FormatStrW(LoadStrW(IDS_FILEREADERROR), AnsiToWide(fileName).c_str());
+    gPrompter->ShowError(LoadStrW(IDS_ERRORTITLE), msg.c_str());
 }
 
 void InitAux(HWND hWindow, TIndirectArray<CCodeTablesData>& Data,
@@ -287,7 +301,7 @@ void InitAux(HWND hWindow, TIndirectArray<CCodeTablesData>& Data,
 
             if (text != NULL)
             {
-                SalMessageBox(hWindow, text, LoadStr(IDS_ERRORTITLE), MB_OK | MB_ICONEXCLAMATION);
+                ShowCodeTableError(text);
             }
         }
         if (winCodePage[0] == 0)
@@ -300,9 +314,7 @@ void InitAux(HWND hWindow, TIndirectArray<CCodeTablesData>& Data,
     __except (HandleFileException(GetExceptionInformation(), fileMem, fileSize))
     {
         // file error
-        char buf[MAX_PATH + 100];
-        sprintf(buf, LoadStr(IDS_FILEREADERROR), fileName);
-        SalMessageBox(hWindow, buf, LoadStr(IDS_ERRORTITLE), MB_OK | MB_ICONEXCLAMATION);
+        ShowFileReadError(fileName);
     }
 }
 
@@ -361,8 +373,8 @@ CCodeTable::CCodeTable(HWND hWindow, const char* dirName)
 
         if (err != NO_ERROR)
         {
-            sprintf(textBuf, LoadStr(IDS_VIEWERERROPENCODES), fileName, GetErrorText(err));
-            SalMessageBox(hWindow, textBuf, LoadStr(IDS_ERRORTITLE), MB_OK | MB_ICONEXCLAMATION);
+            std::wstring msg = FormatStrW(LoadStrW(IDS_VIEWERERROPENCODES), AnsiToWide(fileName).c_str(), GetErrorTextW(err));
+            gPrompter->ShowError(LoadStrW(IDS_ERRORTITLE), msg.c_str());
         }
     }
     else // if convert\\xxx\\convert.cfg is missing, "load" the default configuration

@@ -5,6 +5,8 @@
 #include "precomp.h"
 
 #include "cfgdlg.h"
+#include "ui/IPrompter.h"
+#include "common/unicode/helpers.h"
 #include "dialogs.h"
 #include "mainwnd.h"
 #include "plugins.h"
@@ -1237,8 +1239,8 @@ void CAssociations::ReadAssociations(BOOL showWaitWnd)
                 // Standard Edition Service Pack 2 (Build 3790), increasing buffer to 10000 doesn't help, must
                 // terminate enumeration on first error, otherwise starts to cycle and eat memory (apparently
                 // an internal Windows error), nobody else reported it, so we don't deal with it further
-                _snprintf_s(errBuf, _TRUNCATE, LoadStr(IDS_UNABLETOGETASSOC), GetErrorText(enumRet));
-                SalMessageBox(parent, errBuf, LoadStr(IDS_UNABLETOGETASSOCTITLE), MB_OK | MB_ICONEXCLAMATION);
+                std::wstring msg = FormatStrW(LoadStrW(IDS_UNABLETOGETASSOC), GetErrorTextW(enumRet));
+                gPrompter->ShowError(LoadStrW(IDS_UNABLETOGETASSOCTITLE), msg.c_str());
             }
             break; // end of enumeration
         }
