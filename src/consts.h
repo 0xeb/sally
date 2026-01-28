@@ -284,6 +284,7 @@ const char* SkipRoot(const char* path);
 // 'cutDir' returns pointer to the last directory (the cut part)
 // replacement for PathRemoveFileSpec
 BOOL CutDirectory(char* path, char** cutDir = NULL);
+bool CutDirectoryW(std::wstring& path, std::wstring* cutDir = nullptr);
 
 // Joins 'path' and 'name' into 'path', ensures joining with backslash, 'path' is buffer of at least 'pathSize' chars
 // returns TRUE if 'name' fits after 'path'; if 'path' or 'name' is empty,
