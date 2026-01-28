@@ -4,6 +4,8 @@
 
 #include "precomp.h"
 
+#include "ui/IPrompter.h"
+
 //#include "mainwnd.h"
 //#include "cfgdlg.h"
 //#include "dialogs.h"
@@ -71,8 +73,7 @@ CCfgPageShellExt::Validate(CTransferInfo &ti)
     ti.EditLine(IDC_SE_SUBMENUNAME, buff, SEC_SUBMENUNAME_MAX);
     if (strlen(buff) == 0)
     {
-      SalMessageBox(HWindow, LoadStr(IDS_SE_INVALIDSUBMENUNAME), LoadStr(IDS_ERRORTITLE),
-                    MB_OK | MB_ICONEXCLAMATION);
+      gPrompter->ShowError(LoadStrW(IDS_ERRORTITLE), LoadStrW(IDS_SE_INVALIDSUBMENUNAME));
       ti.ErrorOn(IDC_SE_SUBMENUNAME);
       return;
     }
@@ -92,8 +93,7 @@ CCfgPageShellExt::Validate(CTransferInfo &ti)
 
     if (!file)
     {
-      SalMessageBox(HWindow, LoadStr(IDS_SE_INVALIDOPTIONS), LoadStr(IDS_ERRORTITLE),
-                    MB_OK | MB_ICONEXCLAMATION);
+      gPrompter->ShowError(LoadStrW(IDS_ERRORTITLE), LoadStrW(IDS_SE_INVALIDOPTIONS));
       EditLB->SetCurSel(i);
       ti.ErrorOn(IDC_SE_OF);
       return;
@@ -102,16 +102,14 @@ CCfgPageShellExt::Validate(CTransferInfo &ti)
     {
       if (item->OneFile && item->MoreFiles)
       {
-        SalMessageBox(HWindow, LoadStr(IDS_SE_INVALIDOPTIONSCOMB), LoadStr(IDS_ERRORTITLE),
-                      MB_OK | MB_ICONEXCLAMATION);
+        gPrompter->ShowError(LoadStrW(IDS_ERRORTITLE), LoadStrW(IDS_SE_INVALIDOPTIONSCOMB));
         EditLB->SetCurSel(i);
         ti.ErrorOn(IDC_SE_OF);
         return;
       }
       if (item->OneDirectory && item->MoreDirectories)
       {
-        SalMessageBox(HWindow, LoadStr(IDS_SE_INVALIDOPTIONSCOMB), LoadStr(IDS_ERRORTITLE),
-                      MB_OK | MB_ICONEXCLAMATION);
+        gPrompter->ShowError(LoadStrW(IDS_ERRORTITLE), LoadStrW(IDS_SE_INVALIDOPTIONSCOMB));
         EditLB->SetCurSel(i);
         ti.ErrorOn(IDC_SE_OD);
         return;
