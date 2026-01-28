@@ -585,7 +585,33 @@ void TestExtensionHelpers()
 }
 
 //
-// Test 21: RemoveDoubleBackslashesW - backslash cleanup
+// Test 21: GetParentPathW
+//
+void TestGetParentPathW()
+{
+    printf("\n=== Test: GetParentPathW ===\n");
+
+    // Basic paths
+    TEST_ASSERT(GetParentPathW(L"C:\\Users\\Test") == L"C:\\Users", "Basic parent");
+    TEST_ASSERT(GetParentPathW(L"C:\\Users\\Test\\") == L"C:\\Users", "With trailing slash");
+    TEST_ASSERT(GetParentPathW(L"C:\\Users") == L"C:\\", "Parent is root");
+    TEST_ASSERT(GetParentPathW(L"C:\\") == L"", "Root has no parent");
+
+    // Deep paths
+    TEST_ASSERT(GetParentPathW(L"C:\\A\\B\\C\\D") == L"C:\\A\\B\\C", "Deep path");
+
+    // UNC paths
+    TEST_ASSERT(GetParentPathW(L"\\\\server\\share\\folder") == L"\\\\server\\share", "UNC parent");
+    TEST_ASSERT(GetParentPathW(L"\\\\server\\share") == L"", "UNC root no parent");
+
+    // Edge cases
+    TEST_ASSERT(GetParentPathW(NULL) == L"", "NULL");
+    TEST_ASSERT(GetParentPathW(L"") == L"", "Empty");
+    TEST_ASSERT(GetParentPathW(L"relative") == L"", "No backslash");
+}
+
+//
+// Test 22: RemoveDoubleBackslashesW - backslash cleanup
 //
 void TestRemoveDoubleBackslashesW()
 {
@@ -669,6 +695,7 @@ int main()
     TestIsUNCPathW();
     TestTrailingBackslash();
     TestExtensionHelpers();
+    TestGetParentPathW();
     TestRemoveDoubleBackslashesW();
 
     // Cleanup

@@ -403,3 +403,44 @@ std::wstring GetFileNameWithoutExtensionW(const wchar_t* path)
 
     return filename;
 }
+
+std::wstring GetParentPathW(const wchar_t* path)
+{
+    if (path == NULL || path[0] == L'\0')
+        return std::wstring();
+
+    std::wstring p(path);
+
+    // Remove trailing backslash if present (unless it's root)
+    if (p.length() > 1 && p.back() == L'\\')
+    {
+        // Check if this is a root path (C:\ or \\server\share\)
+        if (p.length() == 3 && p[1] == L':')
+            return std::wstring(); // C:\ - can't go higher
+        p.pop_back();
+    }
+
+    // Handle UNC paths
+    if (p.length() >= 2 && p[0] == L'\\' && p[1] == L'\\')
+    {
+        // Count backslashes to determine if we're at UNC root
+        int slashCount = 0;
+        for (size_t i = 0; i < p.length(); i++)
+            if (p[i] == L'\\') slashCount++;
+
+        // \\server\share has 3 slashes, can't go higher
+        if (slashCount <= 3)
+            return std::wstring();
+    }
+
+    // Find last backslash
+    size_t lastSlash = p.rfind(L'\\');
+    if (lastSlash == std::wstring::npos)
+        return std::wstring(); // No backslash
+
+    // Check if this leaves us at root (C:\ or \\server\share)
+    if (lastSlash == 2 && p[1] == L':')
+        return p.substr(0, 3); // Return "C:\"
+
+    return p.substr(0, lastSlash);
+}

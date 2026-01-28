@@ -240,3 +240,16 @@ void SetExtensionW(std::wstring& path, const wchar_t* extension);
 //   Filename without extension
 //
 std::wstring GetFileNameWithoutExtensionW(const wchar_t* path);
+
+// Gets the parent directory of a path (goes up one level).
+// Example: "C:\\Users\\Test" => "C:\\Users"
+//          "C:\\Users\\" => "C:\\"
+//          "C:\\" => "" (empty, can't go higher)
+//
+// Parameters:
+//   path - Path (wide string)
+//
+// Returns:
+//   Parent path, or empty if at root
+//
+std::wstring GetParentPathW(const wchar_t* path);
