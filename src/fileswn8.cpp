@@ -77,7 +77,10 @@ BOOL CFilesWindow::DeleteThroughRecycleBin(int* selection, int selCount, CFileDa
     {
         char textBuf[2 * MAX_PATH + 200];
         sprintf(textBuf, LoadStr(IDS_RECYCLEBINERROR), pathAnsi);
-        SalMessageBox(MainWindow->HWindow, textBuf, LoadStr(IDS_ERRORTITLE), MB_OK | MB_ICONEXCLAMATION);
+        if (gPrompter != NULL)
+            gPrompter->ShowError(LoadStrW(IDS_ERRORTITLE), AnsiToWide(textBuf).c_str());
+        else
+            SalMessageBox(MainWindow->HWindow, textBuf, LoadStr(IDS_ERRORTITLE), MB_OK | MB_ICONEXCLAMATION);
         return FALSE; // quick dirty bloody hack - Recycle Bin simply cannot handle names ending with a space or dot (it deletes a different name created by trimming those characters, which we definitely don't want)
     }
 
@@ -94,7 +97,10 @@ BOOL CFilesWindow::DeleteThroughRecycleBin(int* selection, int selCount, CFileDa
         {
             char textBuf[2 * MAX_PATH + 200];
             sprintf(textBuf, LoadStr(IDS_RECYCLEBINERROR), oneFile->Name);
-            SalMessageBox(MainWindow->HWindow, textBuf, LoadStr(IDS_ERRORTITLE), MB_OK | MB_ICONEXCLAMATION);
+            if (gPrompter != NULL)
+                gPrompter->ShowError(LoadStrW(IDS_ERRORTITLE), AnsiToWide(textBuf).c_str());
+            else
+                SalMessageBox(MainWindow->HWindow, textBuf, LoadStr(IDS_ERRORTITLE), MB_OK | MB_ICONEXCLAMATION);
             return FALSE; // quick dirty bloody hack - Recycle Bin simply cannot handle names ending with a space or dot (it deletes a different name created by trimming those characters, which we definitely do not want)
         }
         // oneFile points to the selected item or the caret item in the filebox
@@ -255,7 +261,10 @@ void CFilesWindow::FilesAction(CActionType type, CFilesWindow* target, int count
                 _snprintf_s(msg, _TRUNCATE,
                             LoadStr(type == atMove ? IDS_ERRMOVESELCONTW64ALIAS : IDS_ERRDELETESELCONTW64ALIAS),
                             redirectedDir);
-                SalMessageBox(HWindow, msg, LoadStr(IDS_ERRORTITLE), MB_OK | MB_ICONEXCLAMATION);
+                if (gPrompter != NULL)
+                    gPrompter->ShowError(LoadStrW(IDS_ERRORTITLE), AnsiToWide(msg).c_str());
+                else
+                    SalMessageBox(HWindow, msg, LoadStr(IDS_ERRORTITLE), MB_OK | MB_ICONEXCLAMATION);
 
                 if (indexes != NULL)
                     delete[] (indexes);
