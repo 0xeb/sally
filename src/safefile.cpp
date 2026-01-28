@@ -12,6 +12,9 @@
 #include "cfgdlg.h"
 #include "zip.h"
 #include "spl_file.h"
+#include "common/IFileSystem.h"
+#include "ui/IPrompter.h"
+#include "common/unicode/helpers.h"
 
 CSalamanderSafeFile SalSafeFile;
 
@@ -193,7 +196,7 @@ CSalamanderSafeFile::SafeFileCreate(const char* fileName,
                                     CloseHandle(hFile);
                                     hFile = INVALID_HANDLE_VALUE;
                                     //                  if (!isDir)
-                                    DeleteFile(fileName);
+                                    gFileSystem->DeleteFile(AnsiToWide(fileName).c_str());
                                     //                  else RemoveDirectory(fileName);
                                     if (!::SalMoveFile(tmpName, origFullName))
                                         TRACE_E("Fatal unexpected situation in CSalamanderGeneral::SafeCreateFile(): unable to rename file from tmp-name to original long file name! " << origFullName);
@@ -644,7 +647,7 @@ CREATE_FILE:
             // (on Samba it is possible to allow deleting read-only files, which allows deleting a read-only file,
             //  otherwise it cannot be deleted because Windows cannot delete a read-only file and at the same time
             //  the "read-only" attribute cannot be cleared on that file because the current user is not the owner)
-            if (DeleteFile(fileName)) // if it is read-only, it can be deleted only on Samba with "delete readonly" allowed
+            if (gFileSystem->DeleteFile(AnsiToWide(fileName).c_str()).success) // if it is read-only, it can be deleted only on Samba with "delete readonly" allowed
             {                         // add the handle to HANDLES at the end only if the SAFE_FILE structure is being filled
                 hFile = NOHANDLES(CreateFile(fileName, dwDesiredAccess, dwShareMode, NULL,
                                              CREATE_ALWAYS, dwFlagsAndAttributes, NULL));
@@ -746,7 +749,7 @@ CREATE_FILE:
 
                 CloseHandle(hFile);
                 ClearReadOnlyAttr(fileName); // in case it ended up read-only so we can handle it
-                DeleteFile(fileName);
+                gFileSystem->DeleteFile(AnsiToWide(fileName).c_str());
 
                 allocateWholeFile = NULL; // next time we will no longer try to preallocate
                 goto CREATE_FILE;
