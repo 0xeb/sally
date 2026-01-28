@@ -4,6 +4,8 @@
 
 #include "precomp.h"
 
+#include "ui/IPrompter.h"
+#include "common/unicode/helpers.h"
 #include <shlwapi.h>
 #undef PathIsPrefix // otherwise conflicts with CSalamanderGeneral::PathIsPrefix
 
@@ -222,8 +224,7 @@ BOOL OpenHtmlHelp(char* helpFileName, HWND parent, CHtmlHelpCommand command, DWO
 
             if (!quiet)
             {
-                SalMessageBox(parent, LoadStr(IDS_FAILED_TO_FIND_HELP),
-                              LoadStr(IDS_HELPERROR), MB_OK | MB_ICONEXCLAMATION);
+                gPrompter->ShowError(LoadStrW(IDS_HELPERROR), LoadStrW(IDS_FAILED_TO_FIND_HELP));
             }
             return FALSE;
         }
@@ -306,14 +307,13 @@ BOOL OpenHtmlHelp(char* helpFileName, HWND parent, CHtmlHelpCommand command, DWO
                     {
                         if (!quiet)
                         {
-                            char buff[5000];
-                            // Convert the String to ANSI
-                            WideCharToMultiByte(CP_ACP, 0, lasterror.description, -1, buff, 5000, NULL, NULL);
-                            buff[5000 - 1] = 0;
+                            // Display - lasterror.description is already wide
+                            gPrompter->ShowError(LoadStrW(IDS_HELPERROR), lasterror.description);
                             SysFreeString(lasterror.description);
-
-                            // Display
-                            SalMessageBox(parent, buff, LoadStr(IDS_HELPERROR), MB_OK);
+                        }
+                        else
+                        {
+                            SysFreeString(lasterror.description);
                         }
                         errorHandled = TRUE;
                     }
@@ -321,8 +321,7 @@ BOOL OpenHtmlHelp(char* helpFileName, HWND parent, CHtmlHelpCommand command, DWO
             }
             if (!errorHandled && !quiet)
             {
-                SalMessageBox(parent, LoadStr(IDS_FAILED_TO_LAUNCH_HELP),
-                              LoadStr(IDS_HELPERROR), MB_OK | MB_ICONEXCLAMATION);
+                gPrompter->ShowError(LoadStrW(IDS_HELPERROR), LoadStrW(IDS_FAILED_TO_LAUNCH_HELP));
             }
         }
         else
@@ -334,8 +333,7 @@ BOOL OpenHtmlHelp(char* helpFileName, HWND parent, CHtmlHelpCommand command, DWO
     {
         if (!quiet)
         {
-            SalMessageBox(parent, LoadStr(IDS_FAILED_TO_FIND_HELP),
-                          LoadStr(IDS_HELPERROR), MB_OK | MB_ICONEXCLAMATION);
+            gPrompter->ShowError(LoadStrW(IDS_HELPERROR), LoadStrW(IDS_FAILED_TO_FIND_HELP));
         }
     }
     return ret;
@@ -2774,11 +2772,9 @@ MENU_TEMPLATE_ITEM AddToSystemMenu[] =
             // if an exported configuration already exists, show a warning
             if (FileExists(ConfigurationName))
             {
-                char buff[3000];
-                _snprintf_s(buff, _TRUNCATE, LoadStr(IDS_SAVECFG_EXPFILEEXISTS), ConfigurationName);
-                int ret = SalMessageBox(HWindow, buff, LoadStr(IDS_INFOTITLE),
-                                        MB_ICONINFORMATION | MB_OKCANCEL);
-                if (ret == IDCANCEL)
+                std::wstring msg = FormatStrW(LoadStrW(IDS_SAVECFG_EXPFILEEXISTS), AnsiToWide(ConfigurationName).c_str());
+                PromptResult ret = gPrompter->ConfirmError(LoadStrW(IDS_INFOTITLE), msg.c_str());
+                if (ret.type == PromptResult::kCancel)
                 {
                     // navigate the user to the correct directory and focus the configuration file to make it easier
                     char path[MAX_PATH];
@@ -2798,12 +2794,11 @@ MENU_TEMPLATE_ITEM AddToSystemMenu[] =
 
         case CM_EXPORTCONFIG:
         {
-            int ret = SalMessageBox(HWindow, LoadStr(IDS_PREDCONFIGEXPORT),
-                                    LoadStr(IDS_QUESTION), MB_YESNOCANCEL | MB_ICONQUESTION);
-            if (ret == IDCANCEL)
+            PromptResult ret = gPrompter->AskYesNoCancel(LoadStrW(IDS_QUESTION), LoadStrW(IDS_PREDCONFIGEXPORT));
+            if (ret.type == PromptResult::kCancel)
                 return 0;
 
-            if (ret == IDYES)
+            if (ret.type == PromptResult::kYes)
             {
                 SaveConfig();
             }
@@ -2864,8 +2859,7 @@ MENU_TEMPLATE_ITEM AddToSystemMenu[] =
                     // perform the export
                     if (ExportConfiguration(HWindow, file, clearKeyBeforeImport))
                     {
-                        SalMessageBox(HWindow, LoadStr(IDS_CONFIGEXPORTED), LoadStr(IDS_INFOTITLE),
-                                      MB_OK | MB_ICONINFORMATION);
+                        gPrompter->ShowInfo(LoadStrW(IDS_INFOTITLE), LoadStrW(IDS_CONFIGEXPORTED));
                     }
                     else
                         DeleteFile(file);
@@ -2876,8 +2870,7 @@ MENU_TEMPLATE_ITEM AddToSystemMenu[] =
 
         case CM_IMPORTCONFIG:
         {
-            SalMessageBox(HWindow, LoadStr(IDS_CONFIGHOWTOIMPORT), LoadStr(IDS_INFOTITLE),
-                          MB_OK | MB_ICONINFORMATION);
+            gPrompter->ShowInfo(LoadStrW(IDS_INFOTITLE), LoadStrW(IDS_CONFIGHOWTOIMPORT));
             return 0;
         }
 
@@ -3790,7 +3783,7 @@ MENU_TEMPLATE_ITEM AddToSystemMenu[] =
             RightPanel->GetGeneralPath(rightPath, 2 * MAX_PATH);
             if (strcmp(leftPath, rightPath) == 0) // case sensitive; if this condition fails, it's fine
             {
-                SalMessageBox(HWindow, LoadStr(IDS_COMPARE_SAMEPATH), LoadStr(IDS_COMPAREDIRSTITLE), MB_OK | MB_ICONINFORMATION);
+                gPrompter->ShowInfo(LoadStrW(IDS_COMPAREDIRSTITLE), LoadStrW(IDS_COMPARE_SAMEPATH));
                 return 0;
             }
 
@@ -4208,8 +4201,7 @@ MENU_TEMPLATE_ITEM AddToSystemMenu[] =
                                        (activePanel->Is(ptDisk) || activePanel->Is(ptZIPArchive)) ? activePanel->GetPath() : NULL, &si, &pi)))
             {
                 DWORD err = GetLastError();
-                SalMessageBox(HWindow, GetErrorText(err),
-                              LoadStr(IDS_ERROREXECPROMPT), MB_OK | MB_ICONEXCLAMATION);
+                gPrompter->ShowError(LoadStrW(IDS_ERROREXECPROMPT), GetErrorTextW(err));
             }
             else
             {
@@ -6088,8 +6080,7 @@ MENU_TEMPLATE_ITEM AddToSystemMenu[] =
                     MyShutdownBlockReasonCreate(HWindow, blockReason);
                 }
 
-                if (SalMessageBox(HWindow, LoadStr(IDS_FORCEDSHUTDOWNDISKOPER),
-                                  SALAMANDER_TEXT_VERSION, MB_YESNO | MB_ICONQUESTION) == IDYES)
+                if (gPrompter->AskYesNo(AnsiToWide(SALAMANDER_TEXT_VERSION).c_str(), LoadStrW(IDS_FORCEDSHUTDOWNDISKOPER)).type == PromptResult::kYes)
                 {
                     ProgressDlgArray.PostCancelToAllDlgs(); // dialogs and workers run in their own threads, they may exit
                     while (ProgressDlgArray.RemoveFinishedDlgs() > 0)
@@ -6099,7 +6090,7 @@ MENU_TEMPLATE_ITEM AddToSystemMenu[] =
                 MyShutdownBlockReasonDestroy(HWindow);
             }
             else
-                SalMessageBox(HWindow, LoadStr(IDS_FORCEDSHUTDOWN), SALAMANDER_TEXT_VERSION, MB_OK | MB_ICONINFORMATION);
+                gPrompter->ShowInfo(AnsiToWide(SALAMANDER_TEXT_VERSION).c_str(), LoadStrW(IDS_FORCEDSHUTDOWN));
             // unfortunately there's no way to tell whether shutdown is still running or the user
             // has cancelled it (black full screen window on Win7). If not, the OS kills the app; we
             // already warned the user, nothing more to do.
@@ -6200,7 +6191,7 @@ MENU_TEMPLATE_ITEM AddToSystemMenu[] =
                 else
                 {
                     if (LockedUIReason != NULL && HasLockedUI())
-                        SalMessageBox(HWindow, LockedUIReason, SALAMANDER_TEXT_VERSION, MB_OK | MB_ICONINFORMATION);
+                        gPrompter->ShowInfo(AnsiToWide(SALAMANDER_TEXT_VERSION).c_str(), AnsiToWide(LockedUIReason).c_str());
                     else
                         TRACE_E("WM_USER_CLOSE_MAINWND: SalamanderBusy == TRUE!");
                     if (uMsg == WM_QUERYENDSESSION)
@@ -6603,9 +6594,7 @@ MENU_TEMPLATE_ITEM AddToSystemMenu[] =
         {
             // ask whether Salamander should continue or generate a bug report
             if (CriticalShutdown || // during critical shutdown there's no point in asking anything, let the system terminate us quietly
-                SalMessageBox(shutdown ? analysing.HWindow : HWindow,
-                              LoadStr(IDS_SHELLEXTBREAK3), SALAMANDER_TEXT_VERSION,
-                              MSGBOXEX_CONTINUEABORT | MB_ICONINFORMATION) != IDABORT)
+                gPrompter->AskYesNo(AnsiToWide(SALAMANDER_TEXT_VERSION).c_str(), LoadStrW(IDS_SHELLEXTBREAK3)).type == PromptResult::kYes)
             {
                 if (uMsg == WM_QUERYENDSESSION)
                     TRACE_I("WM_QUERYENDSESSION: cancelling shutdown: some faulty shell extension has locked our main window");
@@ -6820,8 +6809,7 @@ MENU_TEMPLATE_ITEM AddToSystemMenu[] =
                 ;
 
             // ask the user to send us a break report
-            SalMessageBox(HWindow, LoadStr(IDS_SHELLEXTBREAK), SALAMANDER_TEXT_VERSION,
-                          MB_OK | MB_ICONSTOP);
+            gPrompter->ShowError(AnsiToWide(SALAMANDER_TEXT_VERSION).c_str(), LoadStrW(IDS_SHELLEXTBREAK));
 
             // and break here
             strcpy(BugReportReasonBreak, "Some faulty shell extension destroyed our main window.");

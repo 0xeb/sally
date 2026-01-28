@@ -4,6 +4,8 @@
 
 #include "precomp.h"
 
+#include "ui/IPrompter.h"
+#include "common/unicode/helpers.h"
 #include "plugins.h"
 #include "fileswnd.h"
 #include "mainwnd.h"
@@ -344,10 +346,9 @@ BOOL CompareFilesByContent(HWND hWindow, CCmpDirProgressDialog* progressDlg,
                         {
                             err = GetLastError();
                             readErr = TRUE;
-                            _snprintf_s(message, _TRUNCATE, LoadStr(IDS_ERROR_READING_FILE), file1, GetErrorText(err));
+                            std::wstring msg = FormatStrW(LoadStrW(IDS_ERROR_READING_FILE), AnsiToWide(file1).c_str(), GetErrorTextW(err));
                             progressDlg->FlushDataToControls();
-                            if (SalMessageBox(hWindow, message, LoadStr(IDS_ERRORTITLE),
-                                              MB_OKCANCEL | MB_ICONEXCLAMATION) == IDCANCEL)
+                            if (gPrompter->ConfirmError(LoadStrW(IDS_ERRORTITLE), msg.c_str()).type == PromptResult::kCancel)
                             {
                                 *canceled = TRUE;
                             }
@@ -405,10 +406,9 @@ BOOL CompareFilesByContent(HWND hWindow, CCmpDirProgressDialog* progressDlg,
                         {
                             err = GetLastError();
                             readErr = TRUE;
-                            _snprintf_s(message, _TRUNCATE, LoadStr(IDS_ERROR_READING_FILE), file2, GetErrorText(err));
+                            std::wstring msg = FormatStrW(LoadStrW(IDS_ERROR_READING_FILE), AnsiToWide(file2).c_str(), GetErrorTextW(err));
                             progressDlg->FlushDataToControls();
-                            if (SalMessageBox(hWindow, message, LoadStr(IDS_ERRORTITLE),
-                                              MB_OKCANCEL | MB_ICONEXCLAMATION) == IDCANCEL)
+                            if (gPrompter->ConfirmError(LoadStrW(IDS_ERRORTITLE), msg.c_str()).type == PromptResult::kCancel)
                             {
                                 *canceled = TRUE;
                             }
@@ -505,10 +505,9 @@ BOOL CompareFilesByContent(HWND hWindow, CCmpDirProgressDialog* progressDlg,
         }
         else
         {
-            _snprintf_s(message, _TRUNCATE, LoadStr(IDS_ERROR_OPENING_FILE), file2, GetErrorText(err));
+            std::wstring msg = FormatStrW(LoadStrW(IDS_ERROR_OPENING_FILE), AnsiToWide(file2).c_str(), GetErrorTextW(err));
             progressDlg->FlushDataToControls();
-            if (SalMessageBox(hWindow, message, LoadStr(IDS_ERRORTITLE),
-                              MB_OKCANCEL | MB_ICONEXCLAMATION) == IDCANCEL)
+            if (gPrompter->ConfirmError(LoadStrW(IDS_ERRORTITLE), msg.c_str()).type == PromptResult::kCancel)
             {
                 *canceled = TRUE;
             }
@@ -517,10 +516,9 @@ BOOL CompareFilesByContent(HWND hWindow, CCmpDirProgressDialog* progressDlg,
     }
     else
     {
-        _snprintf_s(message, _TRUNCATE, LoadStr(IDS_ERROR_OPENING_FILE), file1, GetErrorText(err));
+        std::wstring msg = FormatStrW(LoadStrW(IDS_ERROR_OPENING_FILE), AnsiToWide(file1).c_str(), GetErrorTextW(err));
         progressDlg->FlushDataToControls();
-        if (SalMessageBox(hWindow, message, LoadStr(IDS_ERRORTITLE),
-                          MB_OKCANCEL | MB_ICONEXCLAMATION) == IDCANCEL)
+        if (gPrompter->ConfirmError(LoadStrW(IDS_ERRORTITLE), msg.c_str()).type == PromptResult::kCancel)
         {
             *canceled = TRUE;
         }
@@ -561,7 +559,7 @@ BOOL ReadDirsAndFilesAux(HWND hWindow, DWORD flags, CCmpDirProgressDialog* progr
         pathAppended &= SalPathAppend(path, "*", MAX_PATH);
         if (!pathAppended)
         {
-            SalMessageBox(hWindow, LoadStr(IDS_TOOLONGNAME), LoadStr(IDS_COMPAREDIRSTITLE), MB_OK | MB_ICONEXCLAMATION);
+            gPrompter->ShowError(LoadStrW(IDS_COMPAREDIRSTITLE), LoadStrW(IDS_TOOLONGNAME));
             *canceled = TRUE;
             return FALSE;
         }
@@ -579,10 +577,9 @@ BOOL ReadDirsAndFilesAux(HWND hWindow, DWORD flags, CCmpDirProgressDialog* progr
                     *canceled = FALSE; // we're only obtaining the size, no need to bother the user, skip the error
                 else
                 {
-                    _snprintf_s(message, _TRUNCATE, LoadStr(IDS_CANNOTREADDIR), path, GetErrorText(err));
+                    std::wstring msg = FormatStrW(LoadStrW(IDS_CANNOTREADDIR), AnsiToWide(path).c_str(), GetErrorTextW(err));
                     progressDlg->FlushDataToControls();
-                    *canceled = SalMessageBox(hWindow, message, LoadStr(IDS_ERRORTITLE),
-                                              MB_OKCANCEL | MB_ICONEXCLAMATION) == IDCANCEL;
+                    *canceled = gPrompter->ConfirmError(LoadStrW(IDS_ERRORTITLE), msg.c_str()).type == PromptResult::kCancel;
                 }
                 return FALSE;
             }
@@ -701,10 +698,10 @@ BOOL ReadDirsAndFilesAux(HWND hWindow, DWORD flags, CCmpDirProgressDialog* progr
                 *canceled = FALSE; // we're only obtaining the size, no need to bother the user, skip the error
             else
             {
-                _snprintf_s(message, _TRUNCATE, LoadStr(IDS_CANNOTREADDIR), path, GetErrorText(err));
+                std::wstring msg = FormatStrW(LoadStrW(IDS_CANNOTREADDIR), AnsiToWide(path).c_str(), GetErrorTextW(err));
                 progressDlg->FlushDataToControls();
-                *canceled = SalMessageBox(hWindow, message, LoadStr(IDS_ERRORTITLE),
-                                          MB_OK | MB_ICONEXCLAMATION) == IDCANCEL;
+                gPrompter->ShowError(LoadStrW(IDS_ERRORTITLE), msg.c_str());
+                *canceled = FALSE; // MB_OK always returns IDOK, not IDCANCEL
             }
             HANDLES(FindClose(hFind));
             return FALSE;
@@ -813,7 +810,7 @@ BOOL CompareDirsAux(HWND hWindow, CCmpDirProgressDialog* progressDlg,
 
         if (!pathAppended)
         {
-            SalMessageBox(hWindow, LoadStr(IDS_TOOLONGNAME), LoadStr(IDS_COMPAREDIRSTITLE), MB_OK | MB_ICONEXCLAMATION);
+            gPrompter->ShowError(LoadStrW(IDS_COMPAREDIRSTITLE), LoadStrW(IDS_TOOLONGNAME));
             *canceled = TRUE;
             return FALSE;
         }
@@ -1004,7 +1001,7 @@ BOOL CompareDirsAux(HWND hWindow, CCmpDirProgressDialog* progressDlg,
 
                             if (!pathAppended)
                             {
-                                SalMessageBox(hWindow, LoadStr(IDS_TOOLONGNAME), LoadStr(IDS_COMPAREDIRSTITLE), MB_OK | MB_ICONEXCLAMATION);
+                                gPrompter->ShowError(LoadStrW(IDS_COMPAREDIRSTITLE), LoadStrW(IDS_TOOLONGNAME));
                                 *canceled = TRUE;
                                 return FALSE;
                             }
@@ -1052,7 +1049,7 @@ BOOL CompareDirsAux(HWND hWindow, CCmpDirProgressDialog* progressDlg,
         pathAppended &= SalPathAppend(newRightSubDir, rightDirs[i].Name, MAX_PATH);
         if (!pathAppended)
         {
-            SalMessageBox(hWindow, LoadStr(IDS_TOOLONGNAME), LoadStr(IDS_COMPAREDIRSTITLE), MB_OK | MB_ICONEXCLAMATION);
+            gPrompter->ShowError(LoadStrW(IDS_COMPAREDIRSTITLE), LoadStrW(IDS_TOOLONGNAME));
             *canceled = TRUE;
             return FALSE;
         }
@@ -1370,7 +1367,7 @@ void CMainWindow::CompareDirectories(DWORD flags)
                                                 pathAppended &= SalPathAppend(rightFilePath, rightFile->Name, MAX_PATH);
                                                 if (!pathAppended)
                                                 {
-                                                    SalMessageBox(progressDlg.HWindow, LoadStr(IDS_TOOLONGNAME), LoadStr(IDS_COMPAREDIRSTITLE), MB_OK | MB_ICONEXCLAMATION);
+                                                    gPrompter->ShowError(LoadStrW(IDS_COMPAREDIRSTITLE), LoadStrW(IDS_TOOLONGNAME));
                                                     canceled = TRUE;
                                                     goto ABORT_COMPARE;
                                                 }
@@ -1546,7 +1543,7 @@ void CMainWindow::CompareDirectories(DWORD flags)
                                             BOOL pathAppended = SalPathAppend(leftSubDir, leftDir->Name, MAX_PATH);
                                             if (!pathAppended)
                                             {
-                                                SalMessageBox(progressDlg.HWindow, LoadStr(IDS_TOOLONGNAME), LoadStr(IDS_COMPAREDIRSTITLE), MB_OK | MB_ICONEXCLAMATION);
+                                                gPrompter->ShowError(LoadStrW(IDS_COMPAREDIRSTITLE), LoadStrW(IDS_TOOLONGNAME));
                                                 canceled = TRUE;
                                                 goto ABORT_COMPARE;
                                             }
@@ -1570,7 +1567,7 @@ void CMainWindow::CompareDirectories(DWORD flags)
                                             BOOL pathAppended = SalPathAppend(rightSubDir, rightDir->Name, MAX_PATH);
                                             if (!pathAppended)
                                             {
-                                                SalMessageBox(progressDlg.HWindow, LoadStr(IDS_TOOLONGNAME), LoadStr(IDS_COMPAREDIRSTITLE), MB_OK | MB_ICONEXCLAMATION);
+                                                gPrompter->ShowError(LoadStrW(IDS_COMPAREDIRSTITLE), LoadStrW(IDS_TOOLONGNAME));
                                                 canceled = TRUE;
                                                 goto ABORT_COMPARE;
                                             }
@@ -1777,16 +1774,12 @@ void CMainWindow::CompareDirectories(DWORD flags)
         }
         _snprintf_s(buf + strlen(buf), _countof(buf) - strlen(buf), _TRUNCATE, buf2, foundDSTShifts);
 
-        MSGBOXEX_PARAMS params;
-        memset(&params, 0, sizeof(params));
-        params.HParent = HWindow;
-        params.Flags = MSGBOXEX_OK | MSGBOXEX_ICONINFORMATION | MSGBOXEX_HINT;
-        params.Caption = LoadStr(IDS_COMPAREDIRSTITLE);
-        params.Text = buf;
-        params.CheckBoxText = LoadStr(!canceled && identical ? IDS_CMPDIRS_DONTSHOWNOTEAG : IDS_DONTSHOWAGAIN);
-        int dontShow = Configuration.IgnoreDSTShifts ? !Configuration.CnfrmDSTShiftsIgnored : !Configuration.CnfrmDSTShiftsOccured;
-        params.CheckBoxValue = &dontShow;
-        SalMessageBoxEx(&params);
+        bool dontShow = Configuration.IgnoreDSTShifts ? !Configuration.CnfrmDSTShiftsIgnored : !Configuration.CnfrmDSTShiftsOccured;
+        gPrompter->ShowInfoWithCheckbox(
+            LoadStrW(IDS_COMPAREDIRSTITLE),
+            AnsiToWide(buf).c_str(),
+            LoadStrW(!canceled && identical ? IDS_CMPDIRS_DONTSHOWNOTEAG : IDS_DONTSHOWAGAIN),
+            &dontShow);
 
         if (Configuration.IgnoreDSTShifts)
             Configuration.CnfrmDSTShiftsIgnored = !dontShow;
@@ -1798,7 +1791,7 @@ void CMainWindow::CompareDirectories(DWORD flags)
     if (!resultAlreadyShown && !canceled && identical)
     {
         int messageID = (flags & COMPARE_DIRECTORIES_BYCONTENT) ? IDS_COMPAREDIR_ARE_IDENTICAL : IDS_COMPAREDIR_SEEMS_IDENTICAL;
-        SalMessageBox(HWindow, LoadStr(messageID), LoadStr(IDS_COMPAREDIRSTITLE), MB_OK | MB_ICONINFORMATION);
+        gPrompter->ShowInfo(LoadStrW(IDS_COMPAREDIRSTITLE), LoadStrW(messageID));
     }
 
     // raise the thread priority again, the operation is finished

@@ -4,6 +4,8 @@
 
 #include "precomp.h"
 
+#include "ui/IPrompter.h"
+#include "common/unicode/helpers.h"
 #include "stswnd.h"
 #include "editwnd.h"
 #include "plugins.h"
@@ -138,10 +140,8 @@ BOOL CMainWindow::CloseDetachedFS(HWND parent, CPluginFSInterfaceEncapsulation* 
         if (!detachedFS->NotEmpty() || !detachedFS->GetCurrentPath(s))
             *s = 0; // cannot obtain the user portion
 
-        char buf[2 * MAX_PATH + 100];
-        sprintf(buf, LoadStr(IDS_FSFORCECLOSE), path);
-        if (SalMessageBox(parent, buf, LoadStr(IDS_QUESTION),
-                          MB_YESNO | MB_ICONQUESTION) == IDYES) // user chooses "close"
+        std::wstring msg = FormatStrW(LoadStrW(IDS_FSFORCECLOSE), AnsiToWide(path).c_str());
+        if (gPrompter->AskYesNo(LoadStrW(IDS_QUESTION), msg.c_str()).type == PromptResult::kYes) // user chooses "close"
         {
             detachedFS->TryCloseOrDetach(TRUE, FALSE, dummy, FSTRYCLOSE_UNLOADCLOSEDETACHEDFS);
         }
@@ -250,10 +250,8 @@ void CMainWindow::MakeFileList()
             if (!SalGetTempFileName(NULL, "MFL", fileName, TRUE))
             {
                 DWORD err = GetLastError();
-                char errorText[200 + 2 * MAX_PATH];
-                sprintf(errorText, "%s\n\n%s", LoadStr(IDS_ERRORCREATINGTMPFILE),
-                        GetErrorText(err));
-                SalMessageBox(HWindow, errorText, LoadStr(IDS_ERRORTITLE), MB_OK | MB_ICONEXCLAMATION);
+                std::wstring msg = FormatStrW(L"%s\n\n%s", LoadStrW(IDS_ERRORCREATINGTMPFILE), GetErrorTextW(err));
+                gPrompter->ShowError(LoadStrW(IDS_ERRORTITLE), msg.c_str());
                 fileName[0] = 0;
             }
             break;
@@ -265,7 +263,7 @@ void CMainWindow::MakeFileList()
             int errTextID;
             if (!SalGetFullName(fileName, &errTextID, GetActivePanel()->Is(ptDisk) ? GetActivePanel()->GetPath() : NULL, panel->NextFocusName))
             {
-                SalMessageBox(HWindow, LoadStr(errTextID), LoadStr(IDS_ERRORTITLE), MB_OK | MB_ICONEXCLAMATION);
+                gPrompter->ShowError(LoadStrW(IDS_ERRORTITLE), LoadStrW(errTextID));
                 fileName[0] = 0;
             }
             break;
@@ -317,7 +315,7 @@ void CMainWindow::MakeFileList()
                             else
                             {
                                 DWORD err = GetLastError();
-                                SalMessageBox(HWindow, GetErrorText(err), LoadStr(IDS_ERRORTITLE), MB_OK | MB_ICONEXCLAMATION);
+                                gPrompter->ShowError(LoadStrW(IDS_ERRORTITLE), GetErrorTextW(err));
                             }
                             free(buff);
                         }
@@ -362,9 +360,8 @@ void CMainWindow::MakeFileList()
             else
             {
                 DWORD err = GetLastError();
-                char message[MAX_PATH + 100];
-                sprintf(message, LoadStr(IDS_FILEERRORFORMAT), fileName, GetErrorText(err));
-                SalMessageBox(HWindow, message, LoadStr(IDS_ERRORTITLE), MB_OK | MB_ICONEXCLAMATION);
+                std::wstring msg = FormatStrW(LoadStrW(IDS_FILEERRORFORMAT), AnsiToWide(fileName).c_str(), GetErrorTextW(err));
+                gPrompter->ShowError(LoadStrW(IDS_ERRORTITLE), msg.c_str());
             }
         }
     }
@@ -510,8 +507,7 @@ BOOL ExpandCommand2(HWND parent,
             {
                 if (l + 1 + lstrlen(longName) > MAX_PATH - 1)
                 {
-                    SalMessageBox(parent, LoadStr(IDS_TOOLONGNAME), LoadStr(IDS_ERRORTITLE),
-                                  MB_OK | MB_ICONEXCLAMATION);
+                    gPrompter->ShowError(LoadStrW(IDS_ERRORTITLE), LoadStrW(IDS_TOOLONGNAME));
                     goto EXIT;
                 }
                 fileName[l++] = '\\';
@@ -573,8 +569,7 @@ BOOL ExpandCommand2(HWND parent,
                         }
                     }
                 }
-                SalMessageBox(parent, LoadStr(IDS_USRMNUTOOLONGCMDORARGS), LoadStr(IDS_ERRORTITLE),
-                              MB_OK | MB_ICONEXCLAMATION);
+                gPrompter->ShowError(LoadStrW(IDS_ERRORTITLE), LoadStrW(IDS_USRMNUTOOLONGCMDORARGS));
             }
         }
         else
@@ -589,8 +584,7 @@ BOOL ExpandCommand2(HWND parent,
             }
             else
             {
-                SalMessageBox(parent, LoadStr(IDS_USRMNUTOOLONGCMDORARGS), LoadStr(IDS_ERRORTITLE),
-                              MB_OK | MB_ICONEXCLAMATION);
+                gPrompter->ShowError(LoadStrW(IDS_ERRORTITLE), LoadStrW(IDS_USRMNUTOOLONGCMDORARGS));
             }
         }
     }
@@ -647,32 +641,27 @@ void CMainWindow::UserMenu(HWND parent, int itemIndex, UM_GetNextFileName getNex
         {
             if (userMenuValidationData.UsesListOfSelNames && userMenuAdvancedData->ListOfSelNames[0] == 0)
             {
-                SalMessageBox(parent, LoadStr(userMenuAdvancedData->ListOfSelNamesIsEmpty ? IDS_EMPTYLISTOFSELNAMES : IDS_TOOLONGLISTOFSELNAMES),
-                              LoadStr(IDS_USERMENUERROR), MB_OK | MB_ICONEXCLAMATION);
+                gPrompter->ShowError(LoadStrW(IDS_USERMENUERROR), LoadStrW(userMenuAdvancedData->ListOfSelNamesIsEmpty ? IDS_EMPTYLISTOFSELNAMES : IDS_TOOLONGLISTOFSELNAMES));
                 ok = FALSE;
             }
             if (ok && userMenuValidationData.UsesListOfSelFullNames && userMenuAdvancedData->ListOfSelFullNames[0] == 0)
             {
-                SalMessageBox(parent, LoadStr(userMenuAdvancedData->ListOfSelFullNamesIsEmpty ? IDS_EMPTYLISTOFSELFULLNAMES : IDS_TOOLONGLISTOFSELFULLNAMES),
-                              LoadStr(IDS_USERMENUERROR), MB_OK | MB_ICONEXCLAMATION);
+                gPrompter->ShowError(LoadStrW(IDS_USERMENUERROR), LoadStrW(userMenuAdvancedData->ListOfSelFullNamesIsEmpty ? IDS_EMPTYLISTOFSELFULLNAMES : IDS_TOOLONGLISTOFSELFULLNAMES));
                 ok = FALSE;
             }
             if (ok && userMenuValidationData.UsesFullPathLeft && userMenuAdvancedData->FullPathLeft[0] == 0)
             {
-                SalMessageBox(parent, LoadStr(IDS_NOTDEFFULLPATHLEFT),
-                              LoadStr(IDS_USERMENUERROR), MB_OK | MB_ICONEXCLAMATION);
+                gPrompter->ShowError(LoadStrW(IDS_USERMENUERROR), LoadStrW(IDS_NOTDEFFULLPATHLEFT));
                 ok = FALSE;
             }
             if (ok && userMenuValidationData.UsesFullPathRight && userMenuAdvancedData->FullPathRight[0] == 0)
             {
-                SalMessageBox(parent, LoadStr(IDS_NOTDEFFULLPATHRIGHT),
-                              LoadStr(IDS_USERMENUERROR), MB_OK | MB_ICONEXCLAMATION);
+                gPrompter->ShowError(LoadStrW(IDS_USERMENUERROR), LoadStrW(IDS_NOTDEFFULLPATHRIGHT));
                 ok = FALSE;
             }
             if (ok && userMenuValidationData.UsesFullPathInactive && userMenuAdvancedData->FullPathInactive[0] == 0)
             {
-                SalMessageBox(parent, LoadStr(IDS_NOTDEFFULLPATHINACTIVE),
-                              LoadStr(IDS_USERMENUERROR), MB_OK | MB_ICONEXCLAMATION);
+                gPrompter->ShowError(LoadStrW(IDS_USERMENUERROR), LoadStrW(IDS_NOTDEFFULLPATHINACTIVE));
                 ok = FALSE;
             }
             if (ok && userMenuValidationData.UsedCompareType != 0)
@@ -916,11 +905,10 @@ MENU_TEMPLATE_ITEM MsgBoxButtons[] =
                         if (!ShellExecuteEx(&sei))
                         {
                             DWORD err = GetLastError();
-                            char buff[4 * MAX_PATH];
                             if (strlen(cmdLine) > 2 * MAX_PATH) // "always false" (arguments are in 'arguments'): shorten overly long command lines for error display
                                 strcpy(cmdLine + 2 * MAX_PATH - 4, "...");
-                            sprintf(buff, LoadStr(IDS_EXECERROR), cmdLine, GetErrorText(err));
-                            SalMessageBox(parent, buff, LoadStr(IDS_ERRORTITLE), MB_OK | MB_ICONEXCLAMATION);
+                            std::wstring msg = FormatStrW(LoadStrW(IDS_EXECERROR), AnsiToWide(cmdLine).c_str(), GetErrorTextW(err));
+                            gPrompter->ShowError(LoadStrW(IDS_ERRORTITLE), msg.c_str());
                             break;
                         }
                     }
@@ -983,12 +971,11 @@ MENU_TEMPLATE_ITEM MsgBoxButtons[] =
                                                    NULL, NULL, &si, &pi)))
                         {
                             DWORD err = GetLastError();
-                            char buff[4 * MAX_PATH];
                             if (strlen(cmdLine) > 2 * MAX_PATH)
                                 strcpy(cmdLine + 2 * MAX_PATH, "..."); // shorten just in case (probably never needed)
-                            sprintf(buff, LoadStr(IDS_EXECERROR), cmdLine, GetErrorText(err));
+                            std::wstring msg = FormatStrW(LoadStrW(IDS_EXECERROR), AnsiToWide(cmdLine).c_str(), GetErrorTextW(err));
                             DiskCache.ReleaseName(batUniqueName, FALSE);
-                            SalMessageBox(parent, buff, LoadStr(IDS_ERRORTITLE), MB_OK | MB_ICONEXCLAMATION);
+                            gPrompter->ShowError(LoadStrW(IDS_ERRORTITLE), msg.c_str());
                         }
                         else
                         {
@@ -1009,8 +996,7 @@ MENU_TEMPLATE_ITEM MsgBoxButtons[] =
                     DiskCache.ReleaseName(batUniqueName, FALSE);
                     if (!skipErrorMessage)
                     {
-                        SalMessageBox(parent, GetErrorText(lastErr), LoadStr(IDS_ERRORTITLE),
-                                      MB_OK | MB_ICONEXCLAMATION);
+                        gPrompter->ShowError(LoadStrW(IDS_ERRORTITLE), GetErrorTextW(lastErr));
                     }
                 }
             }

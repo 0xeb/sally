@@ -4,6 +4,8 @@
 
 #include "precomp.h"
 
+#include "ui/IPrompter.h"
+#include "common/unicode/helpers.h"
 #include <shlwapi.h>
 #undef PathIsPrefix // otherwise, collision with CSalamanderGeneral::PathIsPrefix
 
@@ -1038,7 +1040,7 @@ void CheckShutdownParams()
     }
 
     if (showWarning)
-        SalMessageBox(NULL, LoadStr(IDS_CHANGEDSHUTDOWNPARS), SALAMANDER_TEXT_VERSION, MB_OK | MB_ICONWARNING);
+        gPrompter->ShowError(AnsiToWide(SALAMANDER_TEXT_VERSION).c_str(), LoadStrW(IDS_CHANGEDSHUTDOWNPARS));
 }
 
 BOOL MyRegRenameKey(HKEY key, const char* name, const char* newName)
@@ -2814,24 +2816,19 @@ BOOL CMainWindow::LoadConfig(BOOL importingOldConfig, const CCommandLineParams* 
                                     path[1] == ':' && path[2] == '\\')
                                     memmove(DefaultDir[d2 - 'a'], path, dataLen);
                                 else
-                                    SalMessageBox(HWindow, LoadStr(IDS_UNEXPECTEDVALUE),
-                                                  LoadStr(IDS_ERRORLOADCONFIG), MB_OK | MB_ICONEXCLAMATION);
+                                    gPrompter->ShowError(LoadStrW(IDS_ERRORLOADCONFIG), LoadStrW(IDS_UNEXPECTEDVALUE));
                             }
                             else
-                                SalMessageBox(HWindow, LoadStr(IDS_UNEXPECTEDVALUE),
-                                              LoadStr(IDS_ERRORLOADCONFIG), MB_OK | MB_ICONEXCLAMATION);
+                                gPrompter->ShowError(LoadStrW(IDS_ERRORLOADCONFIG), LoadStrW(IDS_UNEXPECTEDVALUE));
                         }
                         else
-                            SalMessageBox(HWindow, LoadStr(IDS_UNEXPECTEDVALUETYPE),
-                                          LoadStr(IDS_ERRORLOADCONFIG), MB_OK | MB_ICONEXCLAMATION);
+                            gPrompter->ShowError(LoadStrW(IDS_ERRORLOADCONFIG), LoadStrW(IDS_UNEXPECTEDVALUETYPE));
                     else
-                        SalMessageBox(HWindow, GetErrorText(res),
-                                      LoadStr(IDS_ERRORLOADCONFIG), MB_OK | MB_ICONEXCLAMATION);
+                        gPrompter->ShowError(LoadStrW(IDS_ERRORLOADCONFIG), GetErrorTextW(res));
                 }
             }
             else if (res != ERROR_FILE_NOT_FOUND)
-                SalMessageBox(HWindow, GetErrorText(res),
-                              LoadStr(IDS_ERRORLOADCONFIG), MB_OK | MB_ICONEXCLAMATION);
+                gPrompter->ShowError(LoadStrW(IDS_ERRORLOADCONFIG), GetErrorTextW(res));
             CloseKey(actKey);
         }
 
