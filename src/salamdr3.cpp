@@ -216,80 +216,115 @@ const char* SalPathFindFileName(const char* path)
 
 // ****************************************************************************
 
-BOOL SalGetTempFileName(const char* path, const char* prefix, char* tmpName, BOOL file)
+// Wide version - creates temp file/directory and returns its path
+// Returns empty string on failure (sets LastError)
+std::wstring SalGetTempFileNameW(const wchar_t* path, const wchar_t* prefix, bool file)
 {
-    char tmpDir[MAX_PATH + 10];
-    char* end = tmpDir + MAX_PATH + 10;
-    if (path == NULL)
+    std::wstring tmpDir;
+    tmpDir.reserve(32768); // SAL_MAX_LONG_PATH
+    
+    if (path == nullptr)
     {
-        if (!GetTempPath(MAX_PATH, tmpDir))
+        wchar_t winTempPath[MAX_PATH + 1];
+        if (!GetTempPathW(MAX_PATH, winTempPath))
         {
             DWORD err = GetLastError();
             TRACE_E("Unable to get TEMP directory.");
             SetLastError(err);
-            return FALSE;
+            return L"";
         }
-        if (SalGetFileAttributes(tmpDir) == 0xFFFFFFFF)
+        tmpDir = winTempPath;
+        
+        DWORD attrs = GetFileAttributesW(tmpDir.c_str());
+        if (attrs == INVALID_FILE_ATTRIBUTES)
         {
             gPrompter->ShowError(LoadStrW(IDS_ERRORTITLE), LoadStrW(IDS_TMPDIRERROR));
-            if (GetSystemDirectory(tmpDir, MAX_PATH) == 0)
+            wchar_t sysDir[MAX_PATH + 1];
+            if (GetSystemDirectoryW(sysDir, MAX_PATH) == 0)
             {
                 DWORD err = GetLastError();
                 TRACE_E("Unable to get system directory.");
                 SetLastError(err);
-                return FALSE;
+                return L"";
             }
+            tmpDir = sysDir;
         }
     }
     else
-        strcpy(tmpDir, path);
-
-    char* s = tmpDir + strlen(tmpDir);
-    if (s > tmpDir && *(s - 1) != '\\')
-        *s++ = '\\';
-    while (s < end && *prefix != 0)
-        *s++ = *prefix++;
-
-    if ((s - tmpDir) + 8 < MAX_PATH) // enough space to append "XXXX.tmp"
     {
-        DWORD randNum = (GetTickCount() & 0xFFF);
-        while (1)
+        tmpDir = path;
+    }
+
+    // Ensure trailing backslash
+    if (!tmpDir.empty() && tmpDir.back() != L'\\')
+        tmpDir += L'\\';
+    
+    // Append prefix
+    if (prefix != nullptr)
+        tmpDir += prefix;
+    
+    size_t baseLen = tmpDir.length();
+    
+    // Generate unique name with random suffix
+    DWORD randNum = (GetTickCount() & 0xFFF);
+    wchar_t suffix[16];
+    
+    while (true)
+    {
+        swprintf_s(suffix, L"%X.tmp", randNum++);
+        tmpDir.resize(baseLen);
+        tmpDir += suffix;
+        
+        if (file)
         {
-            sprintf(s, "%X.tmp", randNum++);
-            if (file) // file
+            HANDLE h = CreateFileW(tmpDir.c_str(), GENERIC_WRITE, 0, NULL, CREATE_NEW,
+                                   FILE_ATTRIBUTE_NORMAL, NULL);
+            if (h != INVALID_HANDLE_VALUE)
             {
-                HANDLE h = HANDLES_Q(CreateFile(tmpDir, GENERIC_WRITE, 0, NULL, CREATE_NEW,
-                                                FILE_ATTRIBUTE_NORMAL, NULL));
-                if (h != INVALID_HANDLE_VALUE)
-                {
-                    HANDLES(CloseHandle(h));
-                    strcpy(tmpName, tmpDir); // copy the result
-                    return TRUE;
-                }
-            }
-            else // directory
-            {
-                if (CreateDirectory(tmpDir, NULL))
-                {
-                    strcpy(tmpName, tmpDir); // copy the result
-                    return TRUE;
-                }
-            }
-            DWORD err = GetLastError();
-            if (err != ERROR_FILE_EXISTS && err != ERROR_ALREADY_EXISTS)
-            {
-                TRACE_E("Unable to create temporary " << (file ? "file" : "directory") << ": " << GetErrorText(err));
-                SetLastError(err);
-                return FALSE;
+                CloseHandle(h);
+                return tmpDir;
             }
         }
+        else
+        {
+            if (CreateDirectoryW(tmpDir.c_str(), NULL))
+            {
+                return tmpDir;
+            }
+        }
+        
+        DWORD err = GetLastError();
+        if (err != ERROR_FILE_EXISTS && err != ERROR_ALREADY_EXISTS)
+        {
+            TRACE_E("Unable to create temporary " << (file ? "file" : "directory") << ": " << GetErrorText(err));
+            SetLastError(err);
+            return L"";
+        }
     }
-    else
+}
+
+BOOL SalGetTempFileName(const char* path, const char* prefix, char* tmpName, BOOL file)
+{
+    // Thin wrapper - calls wide version and converts result
+    std::wstring result = SalGetTempFileNameW(
+        path ? AnsiToWide(path).c_str() : nullptr,
+        AnsiToWide(prefix).c_str(),
+        file != FALSE);
+    
+    if (result.empty())
+        return FALSE;
+    
+    // Convert result back to ANSI (truncates if > MAX_PATH)
+    std::string ansiResult = WideToAnsi(result);
+    if (ansiResult.length() >= MAX_PATH)
     {
-        TRACE_E("Too long file name in SalGetTempFileName().");
+        TRACE_E("Temp file path too long for ANSI buffer");
         SetLastError(ERROR_BUFFER_OVERFLOW);
         return FALSE;
     }
+    
+    strcpy(tmpName, ansiResult.c_str());
+    return TRUE;
 }
 
 // ****************************************************************************

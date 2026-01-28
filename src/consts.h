@@ -96,6 +96,7 @@ public:
 // with prefix 'prefix', returns the name of the created file in 'tmpName' (min size MAX_PATH),
 // returns "success?" (on failure returns Windows error code via SetLastError - for compatibility)
 BOOL SalGetTempFileName(const char* path, const char* prefix, char* tmpName, BOOL file);
+std::wstring SalGetTempFileNameW(const wchar_t* path, const wchar_t* prefix, bool file);
 
 // Because Windows MoveFile can't rename files with read-only attribute on Novell,
 // we wrote our own (if an error occurs during MoveFile, it tries to clear read-only, perform the operation,
