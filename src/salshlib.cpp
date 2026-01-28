@@ -5,6 +5,8 @@
 #include "precomp.h"
 
 #include "dialogs.h"
+#include "ui/IPrompter.h"
+#include "common/unicode/helpers.h"
 #include "cfgdlg.h"
 #include "mainwnd.h"
 #include "plugins.h"
@@ -699,8 +701,8 @@ void CSalShExtPastedData::DoPasteOperation(BOOL copy, const char* tgtPath)
 
             if (err != NO_ERROR)
             {
-                sprintf(text, LoadStr(IDS_FILEERRORFORMAT), ArchiveFileName, GetErrorText(err));
-                SalMessageBox(MainWindow->HWindow, text, LoadStr(IDS_ERRORUNPACK), MB_OK | MB_ICONEXCLAMATION);
+                std::wstring msg = FormatStrW(LoadStrW(IDS_FILEERRORFORMAT), AnsiToWide(ArchiveFileName).c_str(), GetErrorTextW(err));
+                gPrompter->ShowError(LoadStrW(IDS_ERRORUNPACK), msg.c_str());
             }
             else
             {
@@ -799,17 +801,14 @@ void CSalShExtPastedData::DoPasteOperation(BOOL copy, const char* tgtPath)
             data.IndexesCount = actIndex;
             if (data.IndexesCount == 0) // our zip-root entirely went to the eternal hunting grounds
             {
-                SalMessageBox(MainWindow->HWindow, LoadStr(IDS_ARCFILESNOTFOUND),
-                              LoadStr(IDS_ERRORUNPACK), MB_OK | MB_ICONEXCLAMATION);
+                gPrompter->ShowError(LoadStrW(IDS_ERRORUNPACK), LoadStrW(IDS_ARCFILESNOTFOUND));
             }
             else
             {
                 BOOL unpack = TRUE;
                 if (data.IndexesCount != SelFilesAndDirs.GetCount()) // didn't find all selected items from clipboard (name duplicates or deleted files from archive)
                 {
-                    unpack = SalMessageBox(MainWindow->HWindow, LoadStr(IDS_ARCFILESNOTFOUND2),
-                                           LoadStr(IDS_ERRORUNPACK),
-                                           MB_YESNO | MB_ICONQUESTION | MSGBOXEX_ESCAPEENABLED) == IDYES;
+                    unpack = gPrompter->AskYesNo(LoadStrW(IDS_ERRORUNPACK), LoadStrW(IDS_ARCFILESNOTFOUND2)).type == PromptResult::kYes;
                 }
                 if (unpack)
                 {

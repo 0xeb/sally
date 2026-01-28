@@ -5,6 +5,8 @@
 #include "precomp.h"
 
 #include "menu.h"
+#include "ui/IPrompter.h"
+#include "common/unicode/helpers.h"
 #include "cfgdlg.h"
 #include "plugins.h"
 #include "fileswnd.h"
@@ -980,8 +982,7 @@ void DoDragFromArchiveOrFS(CFilesWindow* panel, BOOL& dropDone, char* targetPath
                                     if (!dropDone &&                 // copy-hook doesn't respond or user chose Cancel in drop-menu (shown during D&D with right button)
                                         dwEffect != DROPEFFECT_NONE) // Cancel detection: since copy-hook didn't trigger, returned drop-effect is valid, so we compare it to Cancel
                                     {
-                                        SalMessageBox(MainWindow->HWindow, LoadStr(IDS_SHEXT_NOTLOADEDYET),
-                                                      LoadStr(IDS_ERRORTITLE), MB_OK | MB_ICONEXCLAMATION);
+                                        gPrompter->ShowError(LoadStrW(IDS_ERRORTITLE), LoadStrW(IDS_SHEXT_NOTLOADEDYET));
                                     }
                                 }
                                 else
@@ -1631,8 +1632,8 @@ void ShellAction(CFilesWindow* panel, CShellAction action, BOOL useSelection,
 #ifndef _WIN64
             if (ContainsWin64RedirectedDir(panel, (count == 0) ? &index : indexes, (count == 0) ? 1 : count, redirectedDir, TRUE))
             {
-                _snprintf_s(msg, _TRUNCATE, LoadStr(IDS_ERROPENPROPSELCONTW64ALIAS), redirectedDir);
-                SalMessageBox(MainWindow->HWindow, msg, LoadStr(IDS_ERRORTITLE), MB_OK | MB_ICONEXCLAMATION);
+                std::wstring errMsg = FormatStrW(LoadStrW(IDS_ERROPENPROPSELCONTW64ALIAS), AnsiToWide(redirectedDir).c_str());
+                gPrompter->ShowError(LoadStrW(IDS_ERRORTITLE), errMsg.c_str());
             }
             else
             {
@@ -1683,8 +1684,8 @@ void ShellAction(CFilesWindow* panel, CShellAction action, BOOL useSelection,
             if (action == saCutToClipboard &&
                 ContainsWin64RedirectedDir(panel, (count == 0) ? &index : indexes, (count == 0) ? 1 : count, redirectedDir, FALSE))
             {
-                _snprintf_s(msg, _TRUNCATE, LoadStr(IDS_ERRCUTSELCONTW64ALIAS), redirectedDir);
-                SalMessageBox(MainWindow->HWindow, msg, LoadStr(IDS_ERRORTITLE), MB_OK | MB_ICONEXCLAMATION);
+                std::wstring errMsg = FormatStrW(LoadStrW(IDS_ERRCUTSELCONTW64ALIAS), AnsiToWide(redirectedDir).c_str());
+                gPrompter->ShowError(LoadStrW(IDS_ERRORTITLE), errMsg.c_str());
             }
             else
             {
@@ -1921,8 +1922,7 @@ void ShellAction(CFilesWindow* panel, CShellAction action, BOOL useSelection,
 #ifndef _WIN64
                     if (IsWin64RedirectedDir(panel->GetPath(), NULL, TRUE))
                     {
-                        SalMessageBox(MainWindow->HWindow, LoadStr(IDS_ERROPENMENUFORW64ALIAS),
-                                      LoadStr(IDS_ERRORTITLE), MB_OK | MB_ICONEXCLAMATION);
+                        gPrompter->ShowError(LoadStrW(IDS_ERRORTITLE), LoadStrW(IDS_ERROPENMENUFORW64ALIAS));
                     }
                     else
                     {
@@ -1960,8 +1960,8 @@ void ShellAction(CFilesWindow* panel, CShellAction action, BOOL useSelection,
 #ifndef _WIN64
                         if (ContainsWin64RedirectedDir(panel, (count == 0) ? &index : indexes, (count == 0) ? 1 : count, redirectedDir, TRUE))
                         {
-                            _snprintf_s(msg, _TRUNCATE, LoadStr(IDS_ERROPENMENUSELCONTW64ALIAS), redirectedDir);
-                            SalMessageBox(MainWindow->HWindow, msg, LoadStr(IDS_ERRORTITLE), MB_OK | MB_ICONEXCLAMATION);
+                            std::wstring errMsg = FormatStrW(LoadStrW(IDS_ERROPENMENUSELCONTW64ALIAS), AnsiToWide(redirectedDir).c_str());
+                            gPrompter->ShowError(LoadStrW(IDS_ERRORTITLE), errMsg.c_str());
                         }
                         else
                         {

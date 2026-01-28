@@ -5,6 +5,7 @@
 #include "precomp.h"
 
 #include "mainwnd.h"
+#include "ui/IPrompter.h"
 
 CRegistryWorkerThread RegistryWorkerThread;
 
@@ -61,8 +62,7 @@ BOOL CreateKeyAux(HWND parent, HKEY hKey, const char* name, HKEY& createdKey, BO
             }
             else
             {
-                SalMessageBox(parent, GetErrorText(res), LoadStr(IDS_ERRORSAVECONFIG),
-                              MB_OK | MB_ICONEXCLAMATION);
+                gPrompter->ShowError(LoadStrW(IDS_ERRORSAVECONFIG), GetErrorTextW(res));
             }
         }
         return FALSE;
@@ -87,8 +87,7 @@ BOOL OpenKeyAux(HWND parent, HKEY hKey, const char* name, HKEY& openedKey, BOOL 
             }
             else
             {
-                SalMessageBox(parent, GetErrorText(res),
-                              LoadStr(IDS_ERRORLOADCONFIG), MB_OK | MB_ICONEXCLAMATION);
+                gPrompter->ShowError(LoadStrW(IDS_ERRORLOADCONFIG), GetErrorTextW(res));
             }
         }
         return FALSE;
@@ -129,8 +128,7 @@ BOOL GetValueAux(HWND parent, HKEY hKey, const char* name, DWORD type, void* buf
                 }
                 else
                 {
-                    SalMessageBox(parent, LoadStr(IDS_UNEXPECTEDVALUETYPE),
-                                  LoadStr(IDS_ERRORLOADCONFIG), MB_OK | MB_ICONEXCLAMATION);
+                    gPrompter->ShowError(LoadStrW(IDS_ERRORLOADCONFIG), LoadStrW(IDS_UNEXPECTEDVALUETYPE));
                 }
             }
             return FALSE;
@@ -148,8 +146,7 @@ BOOL GetValueAux(HWND parent, HKEY hKey, const char* name, DWORD type, void* buf
                 }
                 else
                 {
-                    SalMessageBox(parent, GetErrorText(res),
-                                  LoadStr(IDS_ERRORLOADCONFIG), MB_OK | MB_ICONEXCLAMATION);
+                    gPrompter->ShowError(LoadStrW(IDS_ERRORLOADCONFIG), GetErrorTextW(res));
                 }
             }
         }
@@ -176,8 +173,7 @@ BOOL GetValue2Aux(HWND parent, HKEY hKey, const char* name, DWORD type1, DWORD t
             }
             else
             {
-                SalMessageBox(parent, LoadStr(IDS_UNEXPECTEDVALUETYPE),
-                              LoadStr(IDS_ERRORLOADCONFIG), MB_OK | MB_ICONEXCLAMATION);
+                gPrompter->ShowError(LoadStrW(IDS_ERRORLOADCONFIG), LoadStrW(IDS_UNEXPECTEDVALUETYPE));
             }
             return FALSE;
         }
@@ -192,8 +188,7 @@ BOOL GetValue2Aux(HWND parent, HKEY hKey, const char* name, DWORD type1, DWORD t
             }
             else
             {
-                SalMessageBox(parent, GetErrorText(res),
-                              LoadStr(IDS_ERRORLOADCONFIG), MB_OK | MB_ICONEXCLAMATION);
+                gPrompter->ShowError(LoadStrW(IDS_ERRORLOADCONFIG), GetErrorTextW(res));
             }
         }
         return FALSE;
@@ -226,8 +221,7 @@ BOOL SetValueAux(HWND parent, HKEY hKey, const char* name, DWORD type,
             }
             else
             {
-                SalMessageBox(parent, GetErrorText(res),
-                              LoadStr(IDS_ERRORSAVECONFIG), MB_OK | MB_ICONEXCLAMATION);
+                gPrompter->ShowError(LoadStrW(IDS_ERRORSAVECONFIG), GetErrorTextW(res));
             }
         }
         return FALSE;
@@ -259,8 +253,7 @@ BOOL GetSizeAux(HWND parent, HKEY hKey, const char* name, DWORD type, DWORD& buf
             }
             else
             {
-                SalMessageBox(parent, LoadStr(IDS_UNEXPECTEDVALUETYPE),
-                              LoadStr(IDS_ERRORLOADCONFIG), MB_OK | MB_ICONEXCLAMATION);
+                gPrompter->ShowError(LoadStrW(IDS_ERRORLOADCONFIG), LoadStrW(IDS_UNEXPECTEDVALUETYPE));
             }
             return FALSE;
         }
@@ -275,8 +268,7 @@ BOOL GetSizeAux(HWND parent, HKEY hKey, const char* name, DWORD type, DWORD& buf
             }
             else
             {
-                SalMessageBox(parent, GetErrorText(res),
-                              LoadStr(IDS_ERRORLOADCONFIG), MB_OK | MB_ICONEXCLAMATION);
+                gPrompter->ShowError(LoadStrW(IDS_ERRORLOADCONFIG), GetErrorTextW(res));
             }
         }
         return FALSE;
