@@ -5,6 +5,8 @@
 #include "precomp.h"
 
 #include "menu.h"
+#include "ui/IPrompter.h"
+#include "common/unicode/helpers.h"
 #include "drivelst.h"
 #include "cfgdlg.h"
 #include "dialogs.h"
@@ -81,8 +83,7 @@ void GetNetworkDrivesBody(DWORD& netDrives, char (*netRemotePath)[MAX_PATH], cha
     else
     {
         if (err != ERROR_NO_NETWORK)
-            SalMessageBox(MainWindow->HWindow, GetErrorText(err), LoadStr(IDS_NETWORKERROR),
-                          MB_OK | MB_ICONEXCLAMATION);
+            gPrompter->ShowError(LoadStrW(IDS_NETWORKERROR), GetErrorTextW(err));
     }
 }
 
@@ -681,8 +682,7 @@ BOOL RestoreNetworkConnection(HWND parent, const char* name, const char* remoteN
         {
             if (lpNetResource == NULL) // the error will be shown in nethood, we will not show it here
             {
-                SalMessageBox(parent, LoadStr(IDS_CREDENTIALCONFLICT), LoadStr(IDS_NETWORKERROR),
-                              MB_OK | MB_ICONEXCLAMATION);
+                gPrompter->ShowError(LoadStrW(IDS_NETWORKERROR), LoadStrW(IDS_CREDENTIALCONFLICT));
             }
             ret = FALSE;
             break;
@@ -702,16 +702,15 @@ BOOL RestoreNetworkConnection(HWND parent, const char* name, const char* remoteN
         {
             if (err == ERROR_EXTENDED_ERROR && errBuf[0] != 0)
             {
-                char buf[530];
-                sprintf(buf, "%s%s(%u) %s", errProviderName, (errProviderName[0] != 0 ? ": " : ""), errProviderCode, errBuf);
-                SalMessageBox(parent, buf, LoadStr(IDS_NETWORKERROR), MB_OK | MB_ICONEXCLAMATION | (lpNetResource != NULL ? MB_SETFOREGROUND : 0));
+                std::wstring msg = FormatStrW(L"%s%s(%u) %s", AnsiToWide(errProviderName).c_str(),
+                                              (errProviderName[0] != 0 ? L": " : L""), errProviderCode, AnsiToWide(errBuf).c_str());
+                gPrompter->ShowError(LoadStrW(IDS_NETWORKERROR), msg.c_str());
             }
             else
             {
                 if (name == NULL || !IsBadUserNameOrPasswdErr(err))
                 {
-                    SalMessageBox(parent, GetErrorText(err), LoadStr(IDS_NETWORKERROR),
-                                  MB_OK | MB_ICONEXCLAMATION | (lpNetResource != NULL ? MB_SETFOREGROUND : 0));
+                    gPrompter->ShowError(LoadStrW(IDS_NETWORKERROR), GetErrorTextW(err));
                 }
             }
 
@@ -791,8 +790,7 @@ BOOL RestoreNetworkConnection(HWND parent, const char* name, const char* remoteN
         {
             if (lpNetResource == NULL) // the error will be shown in nethood, we will not show it here
             {
-                SalMessageBox(parent, GetErrorText(err), LoadStr(IDS_NETWORKERROR),
-                              MB_OK | MB_ICONEXCLAMATION);
+                gPrompter->ShowError(LoadStrW(IDS_NETWORKERROR), GetErrorTextW(err));
             }
             ret = FALSE;
             break;
