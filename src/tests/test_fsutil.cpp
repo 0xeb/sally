@@ -428,7 +428,54 @@ void TestExpandEnvironmentW()
 }
 
 //
-// Test 16: RemoveDoubleBackslashesW - backslash cleanup
+// Test 16: GetRootPathW - root path extraction
+//
+void TestGetRootPathW()
+{
+    printf("\n=== Test: GetRootPathW ===\n");
+
+    // Local paths
+    TEST_ASSERT(GetRootPathW(L"C:\\Users\\test.txt") == L"C:\\", "Local path root");
+    TEST_ASSERT(GetRootPathW(L"D:\\") == L"D:\\", "Root drive");
+    TEST_ASSERT(GetRootPathW(L"E:\\Deep\\Nested\\Path\\file.doc") == L"E:\\", "Deep path root");
+
+    // UNC paths
+    TEST_ASSERT(GetRootPathW(L"\\\\server\\share\\folder\\file.txt") == L"\\\\server\\share\\", "UNC path root");
+    TEST_ASSERT(GetRootPathW(L"\\\\server\\share") == L"\\\\server\\share\\", "UNC share root");
+    TEST_ASSERT(GetRootPathW(L"\\\\server\\share\\") == L"\\\\server\\share\\", "UNC with trailing slash");
+    TEST_ASSERT(GetRootPathW(L"\\\\myserver\\myshare\\deep\\path") == L"\\\\myserver\\myshare\\", "UNC deep path");
+
+    // Edge cases
+    TEST_ASSERT(GetRootPathW(NULL) == L"", "NULL returns empty");
+    TEST_ASSERT(GetRootPathW(L"") == L"", "Empty returns empty");
+}
+
+//
+// Test 17: IsUNCRootPathW - UNC root detection
+//
+void TestIsUNCRootPathW()
+{
+    printf("\n=== Test: IsUNCRootPathW ===\n");
+
+    // UNC roots (should return TRUE)
+    TEST_ASSERT(IsUNCRootPathW(L"\\\\server\\share"), "UNC share is root");
+    TEST_ASSERT(IsUNCRootPathW(L"\\\\server\\share\\"), "UNC share with slash is root");
+    TEST_ASSERT(IsUNCRootPathW(L"\\\\server"), "UNC server-only is root");
+
+    // Not UNC roots (should return FALSE)
+    TEST_ASSERT(!IsUNCRootPathW(L"\\\\server\\share\\folder"), "UNC with folder not root");
+    TEST_ASSERT(!IsUNCRootPathW(L"\\\\server\\share\\file.txt"), "UNC with file not root");
+    TEST_ASSERT(!IsUNCRootPathW(L"C:\\"), "Local drive not UNC");
+    TEST_ASSERT(!IsUNCRootPathW(L"C:\\Users"), "Local path not UNC");
+
+    // Edge cases
+    TEST_ASSERT(!IsUNCRootPathW(NULL), "NULL returns FALSE");
+    TEST_ASSERT(!IsUNCRootPathW(L""), "Empty returns FALSE");
+    TEST_ASSERT(!IsUNCRootPathW(L"\\single"), "Single backslash not UNC");
+}
+
+//
+// Test 18: RemoveDoubleBackslashesW - backslash cleanup
 //
 void TestRemoveDoubleBackslashesW()
 {
@@ -507,6 +554,8 @@ int main()
     TestUnicodeFilenames();
     TestBuildPathW_Unicode();
     TestExpandEnvironmentW();
+    TestGetRootPathW();
+    TestIsUNCRootPathW();
     TestRemoveDoubleBackslashesW();
 
     // Cleanup

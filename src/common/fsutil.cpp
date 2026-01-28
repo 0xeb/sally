@@ -258,3 +258,63 @@ void RemoveDoubleBackslashesW(std::wstring& path)
 
     path.resize(writePos);
 }
+
+std::wstring GetRootPathW(const wchar_t* path)
+{
+    if (path == NULL || path[0] == L'\0')
+        return std::wstring();
+
+    // UNC path: \\server\share
+    if (path[0] == L'\\' && path[1] == L'\\')
+    {
+        const wchar_t* s = path + 2;
+        // Skip server name
+        while (*s != L'\0' && *s != L'\\')
+            s++;
+        if (*s != L'\0')
+            s++; // skip backslash
+        // Skip share name
+        while (*s != L'\0' && *s != L'\\')
+            s++;
+        // Build root with trailing backslash
+        std::wstring root(path, s - path);
+        root += L'\\';
+        return root;
+    }
+    else
+    {
+        // Local path: C:\...
+        std::wstring root;
+        root += path[0];
+        root += L':';
+        root += L'\\';
+        return root;
+    }
+}
+
+BOOL IsUNCRootPathW(const wchar_t* path)
+{
+    if (path == NULL || path[0] == L'\0')
+        return FALSE;
+
+    // Must start with \\
+    if (path[0] != L'\\' || path[1] != L'\\')
+        return FALSE;
+
+    const wchar_t* s = path + 2;
+    // Skip server name
+    while (*s != L'\0' && *s != L'\\')
+        s++;
+    if (*s == L'\0')
+        return TRUE; // \\server (no share yet)
+    s++; // skip backslash
+    // Skip share name
+    while (*s != L'\0' && *s != L'\\')
+        s++;
+    // If we're at end or just trailing backslash, it's a root
+    if (*s == L'\0')
+        return TRUE;
+    if (*s == L'\\' && *(s + 1) == L'\0')
+        return TRUE;
+    return FALSE;
+}

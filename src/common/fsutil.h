@@ -153,3 +153,25 @@ std::wstring ExpandEnvironmentW(const wchar_t* input);
 //   path - Path to clean up (modified in place)
 //
 void RemoveDoubleBackslashesW(std::wstring& path);
+
+// Extracts the root path from a full path (pure string operation).
+// For UNC paths: "\\server\share\dir" => "\\server\share\"
+// For local paths: "C:\Users\test" => "C:\"
+//
+// Parameters:
+//   path - Full path (wide string)
+//
+// Returns:
+//   Root path with trailing backslash
+//
+std::wstring GetRootPathW(const wchar_t* path);
+
+// Checks if a path is a UNC root path (\\server\share with no subdirectories).
+//
+// Parameters:
+//   path - Path to check (wide string)
+//
+// Returns:
+//   TRUE if path is UNC root, FALSE otherwise
+//
+BOOL IsUNCRootPathW(const wchar_t* path);
