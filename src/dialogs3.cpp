@@ -1948,6 +1948,13 @@ CPackDialog::CPackDialog(HWND parent, char* path, const char* pathAlt,
     PathAlt = pathAlt;
     PackerConfig = config;
     SelectionEnd = -1;
+    HUnicodeEdit = NULL;
+}
+
+void CPackDialog::SetUnicodePath(const std::wstring& pathW)
+{
+    PathW = pathW;
+    ResultW.clear();
 }
 
 void CPackDialog::SetSelectionEnd(int selectionEnd)
@@ -2004,7 +2011,24 @@ void CPackDialog::Transfer(CTransferInfo& ti)
         SendMessage(combo, CB_SETCURSEL, 0, 0);
     }
     else
-        ti.EditLine(IDE_PATH, Path, MAX_PATH);
+    {
+        // Get Unicode result if overlay edit exists
+        if (HUnicodeEdit != NULL)
+        {
+            int len = GetWindowTextLengthW(HUnicodeEdit);
+            if (len > 0)
+            {
+                std::vector<wchar_t> buffer(len + 1);
+                GetWindowTextW(HUnicodeEdit, buffer.data(), len + 1);
+                ResultW = buffer.data();
+            }
+            WideCharToMultiByte(CP_ACP, 0, ResultW.c_str(), -1, Path, MAX_PATH, "?", NULL);
+        }
+        else
+        {
+            ti.EditLine(IDE_PATH, Path, MAX_PATH);
+        }
+    }
 
     if (ti.Type == ttDataFromWindow) // if the entered name lacks an extension, add it automatically
     {
@@ -2089,8 +2113,43 @@ CPackDialog::DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
             SetWindowText(hSubject, Subject->Get());
 
         INT_PTR ret = CCommonDialog::DialogProc(uMsg, wParam, lParam);
-        // we can select only the name without the dot and extension
-        PostMessage(GetDlgItem(HWindow, IDE_PATH), CB_SETEDITSEL, 0, MAKELPARAM(0, SelectionEnd));
+
+        // Create Unicode overlay edit control if needed
+        if (!PathW.empty())
+        {
+            HWND hCombo = GetDlgItem(HWindow, IDE_PATH);
+            if (hCombo != NULL)
+            {
+                COMBOBOXINFO cbi = {sizeof(COMBOBOXINFO)};
+                if (GetComboBoxInfo(hCombo, &cbi) && cbi.hwndItem != NULL)
+                {
+                    RECT rcEdit;
+                    GetWindowRect(cbi.hwndItem, &rcEdit);
+                    MapWindowPoints(NULL, hCombo, (LPPOINT)&rcEdit, 2);
+
+                    HUnicodeEdit = CreateWindowExW(
+                        0, L"EDIT", PathW.c_str(),
+                        WS_CHILD | WS_VISIBLE | ES_AUTOHSCROLL,
+                        rcEdit.left, rcEdit.top,
+                        rcEdit.right - rcEdit.left, rcEdit.bottom - rcEdit.top,
+                        hCombo, NULL, HInstance, NULL);
+
+                    if (HUnicodeEdit != NULL)
+                    {
+                        HFONT hFont = (HFONT)SendMessage(cbi.hwndItem, WM_GETFONT, 0, 0);
+                        if (hFont != NULL)
+                            SendMessage(HUnicodeEdit, WM_SETFONT, (WPARAM)hFont, TRUE);
+                        PostMessage(HUnicodeEdit, EM_SETSEL, 0, SelectionEnd);
+                        SetFocus(HUnicodeEdit);
+                    }
+                }
+            }
+        }
+        else
+        {
+            // we can select only the name without the dot and extension
+            PostMessage(GetDlgItem(HWindow, IDE_PATH), CB_SETEDITSEL, 0, MAKELPARAM(0, SelectionEnd));
+        }
         return FALSE;
     }
 

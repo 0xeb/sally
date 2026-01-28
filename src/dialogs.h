@@ -770,6 +770,9 @@ public:
     virtual void Transfer(CTransferInfo& ti);
 
     void SetSelectionEnd(int selectionEnd);
+    void SetUnicodePath(const std::wstring& pathW);
+    const std::wstring& GetUnicodeResult() const { return ResultW; }
+    BOOL IsUnicodeMode() const { return !PathW.empty(); }
 
 protected:
     virtual INT_PTR DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam);
@@ -778,6 +781,9 @@ protected:
     BOOL ChangeExtension(char* name, const char* ext);
 
     char* Path;
+    std::wstring PathW;         // Unicode input path
+    std::wstring ResultW;       // Unicode result
+    HWND HUnicodeEdit;          // Overlay Unicode edit control
     const char* PathAlt;
     CTruncatedString* Subject;
     CPackerConfig* PackerConfig;
