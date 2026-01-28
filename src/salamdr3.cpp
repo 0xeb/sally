@@ -107,6 +107,39 @@ void SalPathAddBackslashW(std::wstring& path)
         path += L'\\';
 }
 
+// Wide version - removes trailing backslash
+void SalPathRemoveBackslashW(std::wstring& path)
+{
+    if (!path.empty() && path.back() == L'\\')
+        path.pop_back();
+}
+
+// Wide version - strips path leaving just filename
+// "C:\foo\bar.txt" -> "bar.txt", "bar.txt" -> "bar.txt"
+void SalPathStripPathW(std::wstring& path)
+{
+    size_t pos = path.rfind(L'\\');
+    if (pos != std::wstring::npos)
+        path = path.substr(pos + 1);
+}
+
+// Wide version - finds filename portion of path
+// Returns pointer within the string to the filename part
+const wchar_t* SalPathFindFileNameW(const wchar_t* path)
+{
+    if (path == nullptr)
+        return nullptr;
+
+    const wchar_t* result = path;
+    for (const wchar_t* p = path; *p != L'\0'; p++)
+    {
+        if (*p == L'\\')
+            result = p + 1;
+    }
+    return result;
+}
+
+
 // ****************************************************************************
 
 void SalPathRemoveBackslash(char* path)
