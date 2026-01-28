@@ -542,8 +542,7 @@ void CFilesWindow::UnpackZIPArchive(CFilesWindow* target, BOOL deleteOp, const c
                         {
                             if (!backslashAtEnd && !mustBePath) // the new path must end with a backslash; otherwise it is an operation mask (unsupported)
                             {
-                                SalMessageBox(HWindow, LoadStr(IDS_UNPACK_OPMASKSNOTSUP), LoadStr(IDS_ERRORCOPY),
-                                              MB_OK | MB_ICONEXCLAMATION);
+                                gPrompter->ShowError(LoadStrW(IDS_ERRORCOPY), LoadStrW(IDS_UNPACK_OPMASKSNOTSUP));
                                 if (tgtPath != NULL)
                                 {
                                     UpdateWindow(MainWindow->HWindow);
@@ -616,8 +615,9 @@ void CFilesWindow::UnpackZIPArchive(CFilesWindow* target, BOOL deleteOp, const c
                                     // ERROR_ALREADY_EXISTS is not a failure - the directory is there, which is what we want
                                     if (lastErr != ERROR_ALREADY_EXISTS)
                                     {
-                                        sprintf(textBuf, LoadStr(IDS_CREATEDIRFAILED), newDirs.Get());
-                                        SalMessageBox(HWindow, textBuf, LoadStr(IDS_ERRORCOPY), MB_OK | MB_ICONEXCLAMATION);
+                                        wchar_t msgW[1024];
+                                        swprintf_s(msgW, _countof(msgW), LoadStrW(IDS_CREATEDIRFAILED), AnsiToWide(newDirs.Get()).c_str());
+                                        gPrompter->ShowError(LoadStrW(IDS_ERRORCOPY), msgW);
                                         ok = FALSE;
                                         break;
                                     }
@@ -656,8 +656,7 @@ void CFilesWindow::UnpackZIPArchive(CFilesWindow* target, BOOL deleteOp, const c
                     }
                     else // overwrite file - 'secondPart' points to the filename in 'path'
                     {
-                        SalMessageBox(HWindow, LoadStr(IDS_UNPACK_OPMASKSNOTSUP), LoadStr(IDS_ERRORCOPY),
-                                      MB_OK | MB_ICONEXCLAMATION);
+                        gPrompter->ShowError(LoadStrW(IDS_ERRORCOPY), LoadStrW(IDS_UNPACK_OPMASKSNOTSUP));
                         if (backslashAtEnd || mustBePath)
                             SalPathAddBackslash(path, MAX_PATH + 200);
                         if (tgtPath != NULL)
@@ -697,8 +696,7 @@ void CFilesWindow::UnpackZIPArchive(CFilesWindow* target, BOOL deleteOp, const c
                 }
                 else
                 {
-                    SalMessageBox(HWindow, LoadStr(IDS_UNPACK_ONLYDISK), LoadStr(IDS_ERRORCOPY),
-                                  MB_OK | MB_ICONEXCLAMATION);
+                    gPrompter->ShowError(LoadStrW(IDS_ERRORCOPY), LoadStrW(IDS_UNPACK_ONLYDISK));
                     if (pathType == PATH_TYPE_ARCHIVE && (backslashAtEnd || mustBePath))
                     {
                         SalPathAddBackslash(path, MAX_PATH + 200);
@@ -1453,8 +1451,9 @@ void CFilesWindow::Pack(CFilesWindow* target, int pluginIndex, const char* plugi
         }
         if (i == PackerConfig.GetPackersCount()) // the requested plugin was not found
         {
-            sprintf(subject, LoadStr(IDS_PLUGINPACKERNOTFOUND), pluginName);
-            SalMessageBox(HWindow, subject, LoadStr(IDS_PACKTITLE), MB_OK | MB_ICONEXCLAMATION);
+            wchar_t msgW[1024];
+            swprintf_s(msgW, _countof(msgW), LoadStrW(IDS_PLUGINPACKERNOTFOUND), AnsiToWide(pluginName).c_str());
+            gPrompter->ShowError(LoadStrW(IDS_PACKTITLE), msgW);
             delete[] (data.Indexes);
             EndStopRefresh(); // the snooper resumes now
             return;
@@ -1563,8 +1562,9 @@ _PACK_AGAIN:
                 // because it alters the original directory content, which users report as a bug since it's unexpected.
                 if (containsDirLinks == 1)
                 {
-                    _snprintf_s(text, _TRUNCATE, LoadStr(IDS_DELFILESAFTERPACKINGNOLINKS), linkName);
-                    SalMessageBox(HWindow, text, LoadStr(IDS_PACKTITLE), MB_OK | MB_ICONEXCLAMATION);
+                    wchar_t msgW[1024];
+                    swprintf_s(msgW, _countof(msgW), LoadStrW(IDS_DELFILESAFTERPACKINGNOLINKS), AnsiToWide(linkName).c_str());
+                    gPrompter->ShowError(LoadStrW(IDS_PACKTITLE), msgW);
                     PackerConfig.Move = FALSE;
                     goto _PACK_AGAIN;
                 }
@@ -1609,9 +1609,8 @@ _PACK_AGAIN:
                     ClearReadOnlyAttr(fileBuf); // so it can be deleted...
                     if (!DeleteFile(fileBuf))
                     {
-                        DWORD err;
-                        err = GetLastError();
-                        SalMessageBox(HWindow, GetErrorText(err), LoadStr(IDS_ERROROVERWRITINGFILE), MB_OK | MB_ICONEXCLAMATION);
+                        DWORD err = GetLastError();
+                        gPrompter->ShowError(LoadStrW(IDS_ERROROVERWRITINGFILE), GetErrorTextW(err));
                         // fall through to _PACK_AGAIN
                     }
                     else
@@ -1653,7 +1652,7 @@ _PACK_AGAIN:
         }
         else
         {
-            SalMessageBox(HWindow, LoadStr(errTextID), LoadStr(IDS_PACKTITLE), MB_OK | MB_ICONEXCLAMATION);
+            gPrompter->ShowError(LoadStrW(IDS_PACKTITLE), LoadStrW(errTextID));
             goto _PACK_AGAIN;
         }
     }
@@ -1737,8 +1736,9 @@ void CFilesWindow::Unpack(CFilesWindow* target, int pluginIndex, const char* plu
             }
             if (i2 == UnpackerConfig.GetUnpackersCount()) // requested plugin not found
             {
-                sprintf(subject, LoadStr(IDS_PLUGINUNPACKERNOTFOUND), pluginName);
-                SalMessageBox(HWindow, subject, LoadStr(IDS_ERRORUNPACK), MB_OK | MB_ICONEXCLAMATION);
+                wchar_t msgW[1024];
+                swprintf_s(msgW, _countof(msgW), LoadStrW(IDS_PLUGINUNPACKERNOTFOUND), AnsiToWide(pluginName).c_str());
+                gPrompter->ShowError(LoadStrW(IDS_ERRORUNPACK), msgW);
                 EndStopRefresh(); // the snooper resumes now
                 return;
             }
@@ -1891,7 +1891,7 @@ void CFilesWindow::Unpack(CFilesWindow* target, int pluginIndex, const char* plu
             }
             else
             {
-                SalMessageBox(HWindow, text, LoadStr(IDS_ERRORUNPACK), MB_OK | MB_ICONEXCLAMATION);
+                gPrompter->ShowError(LoadStrW(IDS_ERRORUNPACK), AnsiToWide(text).c_str());
                 goto DO_AGAIN;
             }
         }

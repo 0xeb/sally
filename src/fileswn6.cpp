@@ -1053,6 +1053,7 @@ void CFilesWindow::DropCopyMove(BOOL copy, char* targetPath, CCopyMoveData* data
                 lstrcpyn(caption, LoadStr(IDS_COPY), 50);
             else
                 lstrcpyn(caption, LoadStr(IDS_MOVE), 50);
+            const wchar_t* captionW = copy ? LoadStrW(IDS_COPY) : LoadStrW(IDS_MOVE);
 
             HWND hFocusedWnd = GetFocus();
             CreateSafeWaitWindow(LoadStr(IDS_ANALYSINGDIRTREEESC), NULL, 1000, TRUE, MainWindow->HWindow);
@@ -1090,12 +1091,11 @@ void CFilesWindow::DropCopyMove(BOOL copy, char* targetPath, CCopyMoveData* data
                 {
                     char buf1[50];
                     char buf2[50];
-                    char buf3[200];
-                    sprintf(buf3, LoadStr(IDS_NOTENOUGHSPACE),
-                            NumberToStr(buf1, occupiedSpTooBig ? script->OccupiedSpace : script->TotalFileSize),
-                            NumberToStr(buf2, script->FreeSpace));
-                    cancel = SalMessageBox(HWindow, buf3,
-                                           caption, MB_YESNO | MB_ICONQUESTION | MSGBOXEX_ESCAPEENABLED) != IDYES;
+                    wchar_t msgW[200];
+                    swprintf_s(msgW, _countof(msgW), LoadStrW(IDS_NOTENOUGHSPACE),
+                               AnsiToWide(NumberToStr(buf1, occupiedSpTooBig ? script->OccupiedSpace : script->TotalFileSize)).c_str(),
+                               AnsiToWide(NumberToStr(buf2, script->FreeSpace)).c_str());
+                    cancel = gPrompter->AskYesNo(captionW, msgW).type != PromptResult::kYes;
                 }
             }
 
@@ -2222,10 +2222,9 @@ MENU_TEMPLATE_ITEM MsgBoxButtons[] =
                         int topIndex = ListBox->GetTopIndex();
                         int focusIndex = GetCaretIndex();
                         RefreshListBox(-1, topIndex, focusIndex, FALSE, FALSE);
-                        int res = SalMessageBox(HWindow, LoadStr(IDS_CANCELOPERATION),
-                                                LoadStr(IDS_QUESTION), MB_YESNO | MB_ICONQUESTION);
+                        PromptResult res = gPrompter->AskYesNo(LoadStrW(IDS_QUESTION), LoadStrW(IDS_CANCELOPERATION));
                         UpdateWindow(MainWindow->HWindow);
-                        if (res == IDYES)
+                        if (res.type == PromptResult::kYes)
                             goto BUILD_ERROR;
                     }
 
@@ -3153,8 +3152,7 @@ void CFilesWindow::ExecuteFromArchive(int index, BOOL edit, HWND editWithMenuPar
         {
             if (!PackerFormatConfig.GetUsePacker(format - 1)) // no Edit?
             {
-                if (SalMessageBox(HWindow, LoadStr(IDS_EDITPACKNOTSUPPORTED),
-                                  LoadStr(IDS_QUESTION), MB_YESNO | MB_DEFBUTTON2 | MB_ICONQUESTION) != IDYES)
+                if (gPrompter->AskYesNo(LoadStrW(IDS_QUESTION), LoadStrW(IDS_EDITPACKNOTSUPPORTED)).type != PromptResult::kYes)
                 {
                     return; // action aborted (user does not want to edit if the archive cannot be updated)
                 }
@@ -3168,8 +3166,7 @@ void CFilesWindow::ExecuteFromArchive(int index, BOOL edit, HWND editWithMenuPar
 
     if (!SalIsValidFileNameComponent(f->Name))
     {
-        SalMessageBox(HWindow, LoadStr(IDS_UNABLETOEDITINVFILES),
-                      LoadStr(IDS_ERRORTITLE), MB_OK | MB_ICONEXCLAMATION);
+        gPrompter->ShowError(LoadStrW(IDS_ERRORTITLE), LoadStrW(IDS_UNABLETOEDITINVFILES));
         return;
     }
 
@@ -3183,8 +3180,7 @@ void CFilesWindow::ExecuteFromArchive(int index, BOOL edit, HWND editWithMenuPar
             if (f2->NameLen == f->NameLen &&
                 StrNICmp(f->Name, f2->Name, f2->NameLen) == 0)
             {
-                SalMessageBox(HWindow, LoadStr(IDS_UNABLETOEDITDUPFILES),
-                              LoadStr(IDS_ERRORTITLE), MB_OK | MB_ICONEXCLAMATION);
+                gPrompter->ShowError(LoadStrW(IDS_ERRORTITLE), LoadStrW(IDS_UNABLETOEDITDUPFILES));
                 return;
             }
         }
@@ -3230,8 +3226,7 @@ void CFilesWindow::ExecuteFromArchive(int index, BOOL edit, HWND editWithMenuPar
     {
         if (errorCode == DCGNE_TOOLONGNAME)
         {
-            SalMessageBox(HWindow, LoadStr(IDS_UNPACKTOOLONGNAME),
-                          LoadStr(IDS_ERRORTITLE), MB_OK | MB_ICONEXCLAMATION);
+            gPrompter->ShowError(LoadStrW(IDS_ERRORTITLE), LoadStrW(IDS_UNPACKTOOLONGNAME));
         }
         return;
     }
