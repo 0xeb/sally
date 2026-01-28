@@ -1497,6 +1497,7 @@ void CFilesWindow::Pack(CFilesWindow* target, int pluginIndex, const char* plugi
 _PACK_AGAIN:
 
     CPackDialog dlg(HWindow, fileBuf, fileBufAlt, &str, &PackerConfig);
+    dlg.SetUnicodePath(AnsiToWide(fileBuf));
 
     // Since Windows Vista Microsoft introduced an odd behavior: quick rename selects only the name without the dot and extension
     // the same code is in another place as well
@@ -1516,6 +1517,11 @@ _PACK_AGAIN:
 
     if (dlg.Execute() == IDOK)
     {
+        if (dlg.IsUnicodeMode())
+        {
+            std::string ansiPath = WideToAnsi(dlg.GetUnicodeResult());
+            lstrcpyn(fileBuf, ansiPath.c_str(), 2 * MAX_PATH);
+        }
         UpdateWindow(MainWindow->HWindow);
         //--- adjust the archive name to its full form
         int errTextID;
@@ -1766,8 +1772,15 @@ void CFilesWindow::Unpack(CFilesWindow* target, int pluginIndex, const char* plu
         BOOL delArchiveWhenDone = FALSE;
     DO_AGAIN:
 
-        if (CUnpackDialog(HWindow, path, pathAlt, mask, &str, &UnpackerConfig, &delArchiveWhenDone).Execute() == IDOK)
+        CUnpackDialog unpackDlg(HWindow, path, pathAlt, mask, &str, &UnpackerConfig, &delArchiveWhenDone);
+        unpackDlg.SetUnicodePath(AnsiToWide(path));
+        if (unpackDlg.Execute() == IDOK)
         {
+            if (unpackDlg.IsUnicodeMode())
+            {
+                std::string ansiPath = WideToAnsi(unpackDlg.GetUnicodeResult());
+                lstrcpyn(path, ansiPath.c_str(), 2 * MAX_PATH);
+            }
             UpdateWindow(MainWindow->HWindow);
             //--- adjust the archive name to its full form
             int errTextID;

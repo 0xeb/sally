@@ -492,12 +492,18 @@ void CFilesWindow::FilesAction(CActionType type, CFilesWindow* target, int count
             {
                 if (strlen(path) >= 2 * MAX_PATH)
                     path[0] = 0; // the path is too long; not an ideal solution but I'm not up for a better one now :(
-                res = (int)CCopyMoveMoreDialog(HWindow, path, 2 * MAX_PATH,
+                CCopyMoveMoreDialog copyMoveDlg(HWindow, path, 2 * MAX_PATH,
                                                (type == atCopy) ? LoadStr(IDS_COPY) : LoadStr(IDS_MOVE), &str,
                                                (type == atCopy) ? IDD_COPYDIALOG : IDD_MOVEDIALOG,
                                                Configuration.CopyHistory, COPY_HISTORY_SIZE,
-                                               &criteria, havePermissions, supportsADS)
-                          .Execute();
+                                               &criteria, havePermissions, supportsADS);
+                copyMoveDlg.SetUnicodePath(AnsiToWide(path));
+                res = (int)copyMoveDlg.Execute();
+                if (res == IDOK && copyMoveDlg.IsUnicodeMode())
+                {
+                    std::string ansiPath = WideToAnsi(copyMoveDlg.GetUnicodeResult());
+                    lstrcpyn(path, ansiPath.c_str(), 2 * MAX_PATH);
+                }
                 if (!havePermissions)
                     criteria.CopySecurity = FALSE;
                 if (res != IDOK)
