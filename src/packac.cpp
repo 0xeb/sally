@@ -5,6 +5,7 @@
 #include "precomp.h"
 
 #include "cfgdlg.h"
+#include "ui/IPrompter.h"
 #include "salamand.h"
 #include "mainwnd.h"
 #include "plugins.h"
@@ -98,8 +99,7 @@ CPackACDialog::DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
             // if we are searching, it’s the STOP button; otherwise, Rescan
             if (SearchRunning)
             {
-                if (SalMessageBox(HWindow, LoadStr(IDS_WANTTOSTOP), LoadStr(IDS_QUESTION),
-                                  MB_YESNO | MB_ICONQUESTION | MB_DEFBUTTON2) == IDNO)
+                if (gPrompter->AskYesNo(LoadStrW(IDS_QUESTION), LoadStrW(IDS_WANTTOSTOP)).type == PromptResult::kNo)
                     return TRUE;
                 // stop searching on disk
                 SetEvent(StopSearch);
@@ -151,8 +151,7 @@ CPackACDialog::DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
             // if the second thread is running, ask the user...
             if (SearchRunning)
             {
-                if (SalMessageBox(HWindow, LoadStr(IDS_CANCELOPERATION), LoadStr(IDS_QUESTION),
-                                  MB_YESNO | MB_ICONQUESTION | MB_DEFBUTTON2) == IDNO)
+                if (gPrompter->AskYesNo(LoadStrW(IDS_QUESTION), LoadStrW(IDS_CANCELOPERATION)).type == PromptResult::kNo)
                     return TRUE;
                 // stop searching on disk
                 SetEvent(StopSearch);
@@ -1852,8 +1851,7 @@ void CPackACDrives::Validate(CTransferInfo& ti)
             if (attr == -1 || (attr & FILE_ATTRIBUTE_DIRECTORY) == 0)
             {
                 EditLB->SetCurSel(i);
-                SalMessageBox(HWindow, LoadStr(IDS_ACBADDRIVE), LoadStr(IDS_ERRORTITLE),
-                              MB_OK | MB_ICONEXCLAMATION);
+                gPrompter->ShowError(LoadStrW(IDS_ERRORTITLE), LoadStrW(IDS_ACBADDRIVE));
                 ti.ErrorOn(IDC_ACDRVLIST);
                 PostMessage(HWindow, WM_USER_EDIT, 0, strlen((char*)itemID));
                 return;

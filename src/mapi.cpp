@@ -5,6 +5,8 @@
 #include "precomp.h"
 
 #include "mapi.h"
+#include "ui/IPrompter.h"
+#include "common/unicode/helpers.h"
 
 CSimpleMAPI::CSimpleMAPI()
     : FileNames(10, 50), TotalSize(0, 0)
@@ -45,8 +47,7 @@ BOOL CSimpleMAPI::Init(HWND hParent)
         if (MAPISendMail == NULL)
         {
             Release();
-            SalMessageBox(hParent, LoadStr(IDS_EMAILFILES_MAPIERROR), LoadStr(IDS_ERRORTITLE),
-                          MB_OK | MB_ICONEXCLAMATION);
+            gPrompter->ShowError(LoadStrW(IDS_ERRORTITLE), LoadStrW(IDS_EMAILFILES_MAPIERROR));
             return FALSE;
         }
     }
@@ -189,10 +190,8 @@ BOOL CSimpleMAPI::SendMail()
     /*
   if (ret != 0)
   {
-    char buff[50];
-    sprintf(buff, "error 3: %d", err);
-    SalMessageBox(hParent, buff, LoadStr(IDS_ERRORTITLE),
-                  MB_OK | MB_ICONEXCLAMATION);
+    std::wstring msg = FormatStrW(L"error 3: %d", err);
+    gPrompter->ShowError(LoadStrW(IDS_ERRORTITLE), msg.c_str());
     return FALSE;
   }
 */
