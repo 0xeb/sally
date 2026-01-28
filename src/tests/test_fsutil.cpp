@@ -475,7 +475,69 @@ void TestIsUNCRootPathW()
 }
 
 //
-// Test 18: RemoveDoubleBackslashesW - backslash cleanup
+// Test 18: IsUNCPathW - simple UNC check
+//
+void TestIsUNCPathW()
+{
+    printf("\n=== Test: IsUNCPathW ===\n");
+
+    // UNC paths (should return TRUE)
+    TEST_ASSERT(IsUNCPathW(L"\\\\server\\share"), "UNC path detected");
+    TEST_ASSERT(IsUNCPathW(L"\\\\server"), "UNC server-only detected");
+    TEST_ASSERT(IsUNCPathW(L"\\\\server\\share\\folder\\file.txt"), "Deep UNC detected");
+
+    // Non-UNC paths (should return FALSE)
+    TEST_ASSERT(!IsUNCPathW(L"C:\\Users\\test"), "Local path not UNC");
+    TEST_ASSERT(!IsUNCPathW(L"\\single"), "Single backslash not UNC");
+    TEST_ASSERT(!IsUNCPathW(L"relative\\path"), "Relative path not UNC");
+    TEST_ASSERT(!IsUNCPathW(NULL), "NULL returns FALSE");
+    TEST_ASSERT(!IsUNCPathW(L""), "Empty returns FALSE");
+}
+
+//
+// Test 19: Trailing backslash helpers
+//
+void TestTrailingBackslash()
+{
+    printf("\n=== Test: Trailing backslash helpers ===\n");
+
+    // HasTrailingBackslashW
+    TEST_ASSERT(HasTrailingBackslashW(L"C:\\Users\\"), "Has trailing backslash");
+    TEST_ASSERT(HasTrailingBackslashW(L"\\\\server\\share\\"), "UNC has trailing");
+    TEST_ASSERT(!HasTrailingBackslashW(L"C:\\Users"), "No trailing backslash");
+    TEST_ASSERT(!HasTrailingBackslashW(L"C:\\Users\\file.txt"), "File no trailing");
+    TEST_ASSERT(!HasTrailingBackslashW(NULL), "NULL returns FALSE");
+    TEST_ASSERT(!HasTrailingBackslashW(L""), "Empty returns FALSE");
+
+    // RemoveTrailingBackslashW
+    std::wstring path = L"C:\\Users\\";
+    RemoveTrailingBackslashW(path);
+    TEST_ASSERT(path == L"C:\\Users", "Removes trailing backslash");
+
+    path = L"C:\\Users";
+    RemoveTrailingBackslashW(path);
+    TEST_ASSERT(path == L"C:\\Users", "No change if no trailing");
+
+    path = L"";
+    RemoveTrailingBackslashW(path);
+    TEST_ASSERT(path == L"", "Empty stays empty");
+
+    // AddTrailingBackslashW
+    path = L"C:\\Users";
+    AddTrailingBackslashW(path);
+    TEST_ASSERT(path == L"C:\\Users\\", "Adds trailing backslash");
+
+    path = L"C:\\Users\\";
+    AddTrailingBackslashW(path);
+    TEST_ASSERT(path == L"C:\\Users\\", "No double backslash");
+
+    path = L"";
+    AddTrailingBackslashW(path);
+    TEST_ASSERT(path == L"", "Empty stays empty");
+}
+
+//
+// Test 20: RemoveDoubleBackslashesW - backslash cleanup
 //
 void TestRemoveDoubleBackslashesW()
 {
@@ -556,6 +618,8 @@ int main()
     TestExpandEnvironmentW();
     TestGetRootPathW();
     TestIsUNCRootPathW();
+    TestIsUNCPathW();
+    TestTrailingBackslash();
     TestRemoveDoubleBackslashesW();
 
     // Cleanup

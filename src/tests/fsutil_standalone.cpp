@@ -334,3 +334,30 @@ BOOL IsUNCRootPathW(const wchar_t* path)
         return TRUE;
     return FALSE;
 }
+
+BOOL IsUNCPathW(const wchar_t* path)
+{
+    if (path == NULL || path[0] == L'\0')
+        return FALSE;
+    return (path[0] == L'\\' && path[1] == L'\\');
+}
+
+BOOL HasTrailingBackslashW(const wchar_t* path)
+{
+    if (path == NULL || path[0] == L'\0')
+        return FALSE;
+    size_t len = wcslen(path);
+    return (path[len - 1] == L'\\');
+}
+
+void RemoveTrailingBackslashW(std::wstring& path)
+{
+    if (!path.empty() && path.back() == L'\\')
+        path.pop_back();
+}
+
+void AddTrailingBackslashW(std::wstring& path)
+{
+    if (!path.empty() && path.back() != L'\\')
+        path += L'\\';
+}

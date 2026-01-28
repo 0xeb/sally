@@ -175,3 +175,38 @@ std::wstring GetRootPathW(const wchar_t* path);
 //   TRUE if path is UNC root, FALSE otherwise
 //
 BOOL IsUNCRootPathW(const wchar_t* path);
+
+// Checks if a path is a UNC path (starts with \\).
+//
+// Parameters:
+//   path - Path to check (wide string)
+//
+// Returns:
+//   TRUE if path starts with \\, FALSE otherwise
+//
+BOOL IsUNCPathW(const wchar_t* path);
+
+// Checks if a path has a trailing backslash.
+//
+// Parameters:
+//   path - Path to check (wide string)
+//
+// Returns:
+//   TRUE if path ends with \, FALSE otherwise
+//
+BOOL HasTrailingBackslashW(const wchar_t* path);
+
+// Removes trailing backslash from path if present.
+// Modifies the string in place.
+//
+// Parameters:
+//   path - Path to modify
+//
+void RemoveTrailingBackslashW(std::wstring& path);
+
+// Adds trailing backslash to path if not present.
+//
+// Parameters:
+//   path - Path to modify
+//
+void AddTrailingBackslashW(std::wstring& path);
