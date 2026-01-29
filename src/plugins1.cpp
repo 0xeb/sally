@@ -1712,7 +1712,7 @@ HINSTANCE
 CSalamanderPluginEntry::LoadLanguageModule(HWND parent, const char* pluginName)
 {
     HINSTANCE lang = NULL;
-    char path[MAX_PATH];
+    CPathBuffer path; // Heap-allocated for long path support
     char errorText[MAX_PATH + 300];
 
     // obtain the path to the plugin's LANG directory
@@ -1720,17 +1720,17 @@ CSalamanderPluginEntry::LoadLanguageModule(HWND parent, const char* pluginName)
     if ((*s != '\\' || *(s + 1) != '\\') && // not UNC
         (*s == 0 || *(s + 1) != ':'))       // not "c:" -> path relative to the plugins subdirectory
     {
-        GetModuleFileName(HInstance, path, MAX_PATH);
+        GetModuleFileName(HInstance, path, path.Size());
         s = strrchr(path, '\\') + 1;
         strcpy(s, "plugins\\");
         strcat(s, Plugin->DLLName);
     }
     else
-        lstrcpyn(path, s, MAX_PATH);
+        lstrcpyn(path, s, path.Size());
     s = strrchr(path, '\\') + 1;
-    lstrcpyn(s, "lang\\", MAX_PATH - (int)(s - path));
-    char* slgName = path + strlen(path);
-    int slgNameBufSize = MAX_PATH - (int)(slgName - path);
+    lstrcpyn(s, "lang\\", path.Size() - (int)(s - path.Get()));
+    char* slgName = path.Get() + strlen(path);
+    int slgNameBufSize = path.Size() - (int)(slgName - path.Get());
 
     // first try to load the SLG of the language Salamander is currently running in
     lstrcpyn(slgName, Configuration.LoadedSLGName, slgNameBufSize);
@@ -1774,7 +1774,7 @@ CSalamanderPluginEntry::LoadLanguageModule(HWND parent, const char* pluginName)
         }
         if (lang == NULL) // find all .slg files on the disk for the plugin and let the user choose (if there's more than one .slg)
         {
-            char selSLGName[MAX_PATH];
+            CPathBuffer selSLGName; // Heap-allocated for long path support
             selSLGName[0] = 0;
             CLanguageSelectorDialog slgDialog(parent, selSLGName, pluginName);
             lstrcpyn(slgName, "*.slg", slgNameBufSize);
@@ -2153,12 +2153,12 @@ BOOL CPluginData::InitDLL(HWND parent, BOOL quiet, BOOL waitCursor, BOOL showUns
         BOOL refreshUNCRootPaths = FALSE;
 
         // obtain the full DLL name
-        char buf[MAX_PATH];
+        CPathBuffer buf; // Heap-allocated for long path support
         char* s = DLLName;
         if ((*s != '\\' || *(s + 1) != '\\') && // not UNC
             (*s == 0 || *(s + 1) != ':'))       // not "c:" -> path relative to the plugins subdirectory
         {
-            GetModuleFileName(HInstance, buf, MAX_PATH);
+            GetModuleFileName(HInstance, buf, buf.Size());
             s = strrchr(buf, '\\') + 1;
             strcpy(s, "plugins\\");
             strcat(s, DLLName);
