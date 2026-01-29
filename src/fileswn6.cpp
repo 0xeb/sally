@@ -19,6 +19,7 @@
 #include "ui/IPrompter.h"
 #include "common/unicode/helpers.h"
 #include "common/IEnvironment.h"
+#include "common/widepath.h"
 
 // helper variables for the dialogs in BuildScriptXXX()
 BOOL ConfirmADSLossAll = FALSE;
@@ -341,7 +342,7 @@ BOOL CFilesWindow::MoveFiles(const char* source, const char* target, const char*
 
             GetAsyncKeyState(VK_ESCAPE); // initialize GetAsyncKeyState - see help
 
-            char targetDir[MAX_PATH];
+            CPathBuffer targetDir; // Heap-allocated for long path support
             strcpy(targetDir, target);
 
             BOOL sourceSupADS = IsPathOnVolumeSupADS(sourceDir, NULL);
@@ -1037,8 +1038,8 @@ void CFilesWindow::DropCopyMove(BOOL copy, char* targetPath, CCopyMoveData* data
         {
             if (!copy && data->Count > 0)
             {
-                char source[MAX_PATH];
-                lstrcpyn(source, data->At(0)->FileName, MAX_PATH);
+                CPathBuffer source; // Heap-allocated for long path support
+                lstrcpyn(source, data->At(0)->FileName, source.Size());
                 CutDirectory(source);
                 BOOL sameRootPath = HasTheSameRootPath(source, targetPath);
                 script->SameRootButDiffVolume = sameRootPath && !HasTheSameRootPathAndVolume(source, targetPath);
@@ -1109,8 +1110,8 @@ void CFilesWindow::DropCopyMove(BOOL copy, char* targetPath, CCopyMoveData* data
                     char* name = data->At(0)->FileName;
                     if (name != NULL)
                     {
-                        char path[MAX_PATH];
-                        lstrcpyn(path, name, MAX_PATH);
+                        CPathBuffer path; // Heap-allocated for long path support
+                        lstrcpyn(path, name, path.Size());
                         if (CutDirectory(path)) // assume a single source directory (panel operations only, not Find)
                         {
                             // change in the source directory and its subdirectories
@@ -1287,8 +1288,8 @@ BOOL CFilesWindow::BuildScriptMain(COperations* script, CActionType type,
             if (script->CopySecurity)
             {
                 DWORD dummy1, flags;
-                char dummy2[MAX_PATH];
-                if (MyGetVolumeInformation(targetPath, NULL, NULL, NULL, NULL, 0, NULL, &dummy1, &flags, dummy2, MAX_PATH) &&
+                CPathBuffer dummy2; // Heap-allocated for long path support
+                if (MyGetVolumeInformation(targetPath, NULL, NULL, NULL, NULL, 0, NULL, &dummy1, &flags, dummy2, dummy2.Size()) &&
                     (flags & FS_PERSISTENT_ACLS) == 0)
                 { // wants to copy permissions, but the target path doesn't support them, so we inform the user (the API function for setting security doesn't report any errors — which is poor design)
                     PromptResult res = gPrompter->AskYesNo(LoadStrW(IDS_QUESTION), LoadStrW(IDS_ACLNOTSUPPORTEDONTGTPATH));
@@ -3066,7 +3067,7 @@ void CFilesWindow::ExecuteFromArchive(int index, BOOL edit, HWND editWithMenuPar
     SalPathAppend(dcFileName, f->Name, 2 * MAX_PATH);
 
     // disk-cache settings for the plugin (default values change only for plugins)
-    char arcCacheTmpPath[MAX_PATH];
+    CPathBuffer arcCacheTmpPath; // Heap-allocated for long path support
     arcCacheTmpPath[0] = 0;
     BOOL arcCacheOwnDelete = FALSE;
     BOOL arcCacheCacheCopies = TRUE;
@@ -3095,7 +3096,7 @@ void CFilesWindow::ExecuteFromArchive(int index, BOOL edit, HWND editWithMenuPar
     memset(&lastWrite, 0, sizeof(lastWrite));
     int errorCode;
     char* name = (char*)DiskCache.GetName(dcFileName, f->Name, &exists, FALSE,
-                                          arcCacheTmpPath[0] != 0 ? arcCacheTmpPath : NULL,
+                                          arcCacheTmpPath[0] != 0 ? arcCacheTmpPath.Get() : NULL,
                                           plugin != NULL, plugin, &errorCode);
     if (name == NULL)
     {
@@ -3111,7 +3112,7 @@ void CFilesWindow::ExecuteFromArchive(int index, BOOL edit, HWND editWithMenuPar
     if (!exists) // we must unpack it
     {
         char* backSlash = strrchr(name, '\\');
-        char tmpPath[MAX_PATH];
+        CPathBuffer tmpPath; // Heap-allocated for long path support
         memcpy(tmpPath, name, backSlash - name);
         tmpPath[backSlash - name] = 0;
         BeginStopRefresh(); // the snooper can take a break
@@ -3149,7 +3150,7 @@ void CFilesWindow::ExecuteFromArchive(int index, BOOL edit, HWND editWithMenuPar
     }
 
     // split the full file name into path (buf) and name (s)
-    char buf[MAX_PATH];
+    CPathBuffer buf; // Heap-allocated for long path support
     char* s = strrchr(name, '\\');
     if (s != NULL)
     {
