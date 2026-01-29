@@ -1208,12 +1208,12 @@ const char* WINAPI PackExpArcFile(HWND msgParent, void* param)
 
 const char* WINAPI PackExpArcDosName(HWND msgParent, void* param)
 {
-    char buff2[MAX_PATH];
+    CPathBuffer buff2; // Heap-allocated for long path support
     SPackExpData* data = (SPackExpData*)param;
 
     if (data->ArcNameFilePossible)
     {
-        if (!GetShortPathName(data->ArcName, buff2, MAX_PATH))
+        if (!GetShortPathName(data->ArcName, buff2, buff2.Size()))
         {
             if (!data->DOSTmpFilePossible)
             {
@@ -1323,7 +1323,7 @@ const char* WINAPI PackExpArcDosFile(HWND msgParent, void* param)
         return NULL;
     }
 
-    char buff2[MAX_PATH];
+    CPathBuffer buff2; // Heap-allocated for long path support
     SPackExpData* data = (SPackExpData*)param;
     strcpy(buff2, s);
 
@@ -1414,7 +1414,7 @@ PackExpExeName(unsigned int index, BOOL unpacker = FALSE)
 {
     // buffer for shortening the program name
     static char PackExpExeName[MAX_PATH];
-    char buff[MAX_PATH];
+    CPathBuffer buff; // Heap-allocated for long path support
     const char* exe;
     if (!unpacker)
         exe = ArchiverConfig.GetPackerExeFile(index);
@@ -1432,7 +1432,7 @@ PackExpExeName(unsigned int index, BOOL unpacker = FALSE)
         // on older Windows it was impossible to redirect output from a DOS program in a directory
         // with a long name; I no longer feel like patching and risking this that it won't work
         buff[0] = '\0';
-        DWORD len = GetShortPathName(exe, buff, MAX_PATH);
+        DWORD len = GetShortPathName(exe, buff, buff.Size());
         // if the path was shortened successfully, return the short name
         if (len == strlen(buff) && len > 0)
         {
@@ -1735,7 +1735,7 @@ BOOL PackExecute(HWND parent, char* cmdLine, const char* currentDir, TPackErrorT
 
     // Determine what we are actually running (for error reporting)
     int i = 0, j = 0;
-    char cmd[MAX_PATH];
+    CPathBuffer cmd; // Heap-allocated for long path support
     // skip leading whitespace
     while (cmdLine[i] != '\0' && (cmdLine[i] == ' ' || cmdLine[i] == '\t'))
         i++;
@@ -1743,11 +1743,11 @@ BOOL PackExecute(HWND parent, char* cmdLine, const char* currentDir, TPackErrorT
     if (cmdLine[i] == '"')
     {
         i++;
-        while (j < MAX_PATH && cmdLine[i] != '\0' && cmdLine[i] != '"')
+        while (j < cmd.Size() && cmdLine[i] != '\0' && cmdLine[i] != '"')
             cmd[j++] = cmdLine[i++];
     }
     else
-        while (j < MAX_PATH && cmdLine[i] != '\0' && cmdLine[i] != ' ' && cmdLine[i] != '\t' && cmdLine[i] != '"')
+        while (j < cmd.Size() && cmdLine[i] != '\0' && cmdLine[i] != ' ' && cmdLine[i] != '\t' && cmdLine[i] != '"')
             cmd[j++] = cmdLine[i++];
     cmd[j] = '\0';
 
@@ -1908,7 +1908,7 @@ BOOL PackExecute(HWND parent, char* cmdLine, const char* currentDir, TPackErrorT
                 return (*PackErrorHandlerPtr)(parent, IDS_PACKERR_RETURN, SPAWN_EXE_NAME, LoadStr(IDS_PACKRET_SPAWN));
             // CreateProcess error
             if (exitCode >= SPAWN_ERR_BASE * 2 && exitCode < SPAWN_ERR_BASE * 3)
-                return (*PackErrorHandlerPtr)(parent, IDS_PACKERR_PROCESS, cmd, GetErrorText(exitCode - SPAWN_ERR_BASE * 2));
+                return (*PackErrorHandlerPtr)(parent, IDS_PACKERR_PROCESS, cmd.Get(), GetErrorText(exitCode - SPAWN_ERR_BASE * 2));
             // WaitForSingleObject error
             if (exitCode >= SPAWN_ERR_BASE * 3 && exitCode < SPAWN_ERR_BASE * 4)
             {
@@ -1934,7 +1934,7 @@ BOOL PackExecute(HWND parent, char* cmdLine, const char* currentDir, TPackErrorT
         {
             char buffer[1000];
             sprintf(buffer, LoadStr(IDS_PACKRET_GENERAL), exitCode);
-            return (*PackErrorHandlerPtr)(parent, IDS_PACKERR_RETURN, cmd, buffer);
+            return (*PackErrorHandlerPtr)(parent, IDS_PACKERR_RETURN, cmd.Get(), buffer);
         }
         // find the corresponding text in the table
         for (i = 0; (*errorTable)[i][0] != -1 &&
@@ -1943,9 +1943,9 @@ BOOL PackExecute(HWND parent, char* cmdLine, const char* currentDir, TPackErrorT
             ;
         // was it found?
         if ((*errorTable)[i][0] == -1)
-            return (*PackErrorHandlerPtr)(parent, IDS_PACKERR_RETURN, cmd, LoadStr(IDS_PACKRET_UNKNOWN));
+            return (*PackErrorHandlerPtr)(parent, IDS_PACKERR_RETURN, cmd.Get(), LoadStr(IDS_PACKRET_UNKNOWN));
         else
-            return (*PackErrorHandlerPtr)(parent, IDS_PACKERR_RETURN, cmd, LoadStr((*errorTable)[i][1]));
+            return (*PackErrorHandlerPtr)(parent, IDS_PACKERR_RETURN, cmd.Get(), LoadStr((*errorTable)[i][1]));
     }
     return TRUE;
 }
