@@ -1359,13 +1359,13 @@ void CMainWindow::CompareDirectories(DWORD flags)
                                         {
                                             if (!getTotal)
                                             {
-                                                char leftFilePath[MAX_PATH];
-                                                char rightFilePath[MAX_PATH];
+                                                CPathBuffer leftFilePath;  // Heap-allocated for long path support
+                                                CPathBuffer rightFilePath; // Heap-allocated for long path support
                                                 strcpy(leftFilePath, LeftPanel->GetPath());
                                                 strcpy(rightFilePath, RightPanel->GetPath());
                                                 BOOL pathAppended = TRUE;
-                                                pathAppended &= SalPathAppend(leftFilePath, leftFile->Name, MAX_PATH);
-                                                pathAppended &= SalPathAppend(rightFilePath, rightFile->Name, MAX_PATH);
+                                                pathAppended &= SalPathAppend(leftFilePath, leftFile->Name, leftFilePath.Size());
+                                                pathAppended &= SalPathAppend(rightFilePath, rightFile->Name, rightFilePath.Size());
                                                 if (!pathAppended)
                                                 {
                                                     gPrompter->ShowError(LoadStrW(IDS_COMPAREDIRSTITLE), LoadStrW(IDS_TOOLONGNAME));
@@ -1529,8 +1529,8 @@ void CMainWindow::CompareDirectories(DWORD flags)
                                     // we insert the subpath into the left/rightSubDir variables, which is
                                     // in the case of ptDisk relative to the panel path and in the case
                                     // of ptZIPArchive relative to the path to the archive
-                                    char leftSubDir[MAX_PATH];
-                                    char rightSubDir[MAX_PATH];
+                                    CPathBuffer leftSubDir;  // Heap-allocated for long path support
+                                    CPathBuffer rightSubDir; // Heap-allocated for long path support
 
                                     if (LeftPanel->Is(ptDisk))
                                     {
@@ -1541,7 +1541,7 @@ void CMainWindow::CompareDirectories(DWORD flags)
                                         if (LeftPanel->Is(ptZIPArchive))
                                         {
                                             strcpy(leftSubDir, LeftPanel->GetZIPPath());
-                                            BOOL pathAppended = SalPathAppend(leftSubDir, leftDir->Name, MAX_PATH);
+                                            BOOL pathAppended = SalPathAppend(leftSubDir, leftDir->Name, leftSubDir.Size());
                                             if (!pathAppended)
                                             {
                                                 gPrompter->ShowError(LoadStrW(IDS_COMPAREDIRSTITLE), LoadStrW(IDS_TOOLONGNAME));
@@ -1565,7 +1565,7 @@ void CMainWindow::CompareDirectories(DWORD flags)
                                         if (RightPanel->Is(ptZIPArchive))
                                         {
                                             strcpy(rightSubDir, RightPanel->GetZIPPath());
-                                            BOOL pathAppended = SalPathAppend(rightSubDir, rightDir->Name, MAX_PATH);
+                                            BOOL pathAppended = SalPathAppend(rightSubDir, rightDir->Name, rightSubDir.Size());
                                             if (!pathAppended)
                                             {
                                                 gPrompter->ShowError(LoadStrW(IDS_COMPAREDIRSTITLE), LoadStrW(IDS_TOOLONGNAME));
