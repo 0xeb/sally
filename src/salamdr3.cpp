@@ -2797,7 +2797,7 @@ BOOL CUserMenuItem::GetIconHandle(CUserMenuIconDataArr* bkgndReaderData, BOOL ge
         return TRUE;
 
     // try to extract icon from specified file
-    char fileName[MAX_PATH];
+    CPathBuffer fileName; // Heap-allocated for long path support
     fileName[0] = 0;
     DWORD iconIndex = -1;
     if (MainWindow != NULL && Icon != NULL && Icon[0] != 0)
@@ -2826,9 +2826,9 @@ BOOL CUserMenuItem::GetIconHandle(CUserMenuIconDataArr* bkgndReaderData, BOOL ge
     }
 
     // in case previous method failed - try to get icon from system
-    char umCommand[MAX_PATH];
+    CPathBuffer umCommand; // Heap-allocated for long path support
     if (MainWindow != NULL && UMCommand != NULL && UMCommand[0] != 0 &&
-        ExpandCommand(MainWindow->HWindow, UMCommand, umCommand, MAX_PATH, TRUE))
+        ExpandCommand(MainWindow->HWindow, UMCommand, umCommand, umCommand.Size(), TRUE))
     {
         while (strlen(umCommand) > 2 && CutDoubleQuotesFromBothSides(umCommand))
             ;
@@ -3282,10 +3282,10 @@ void CFileTimeStamps::AddFilesToListBox(HWND list)
     int i;
     for (i = 0; i < List.Count; i++)
     {
-        char buf[MAX_PATH];
+        CPathBuffer buf; // Heap-allocated for long path support
         strcpy(buf, List[i]->ZIPRoot);
-        SalPathAppend(buf, List[i]->FileName, MAX_PATH);
-        SendMessage(list, LB_ADDSTRING, 0, (LPARAM)buf);
+        SalPathAppend(buf, List[i]->FileName, buf.Size());
+        SendMessage(list, LB_ADDSTRING, 0, (LPARAM)buf.Get());
     }
 }
 
@@ -3338,7 +3338,7 @@ void CDynamicStringImp::DetachData()
 void CFileTimeStamps::CopyFilesTo(HWND parent, int* indexes, int count, const char* initPath)
 {
     CALL_STACK_MESSAGE3("CFileTimeStamps::CopyFilesTo(, , %d, %s)", count, initPath);
-    char path[MAX_PATH];
+    CPathBuffer path; // Heap-allocated for long path support
     if (count > 0 &&
         GetTargetDirectory(parent, parent, LoadStr(IDS_BROWSEARCUPDATE),
                            LoadStr(IDS_BROWSEARCUPDATETEXT), path, FALSE, initPath))
@@ -3353,14 +3353,14 @@ void CFileTimeStamps::CopyFilesTo(HWND parent, int* indexes, int count, const ch
             if (index < List.Count && index >= 0) // just for safety
             {
                 CFileTimeStampsItem* item = List[index];
-                char name[MAX_PATH];
+                CPathBuffer name; // Heap-allocated for long path support
                 strcpy(name, item->SourcePath);
-                tooLongName |= !SalPathAppend(name, item->FileName, MAX_PATH);
+                tooLongName |= !SalPathAppend(name, item->FileName, name.Size());
                 ok &= fromStr.Add(name, (int)strlen(name) + 1);
 
                 strcpy(name, path);
-                tooLongName |= !SalPathAppend(name, item->ZIPRoot, MAX_PATH);
-                tooLongName |= !SalPathAppend(name, item->FileName, MAX_PATH);
+                tooLongName |= !SalPathAppend(name, item->ZIPRoot, name.Size());
+                tooLongName |= !SalPathAppend(name, item->FileName, name.Size());
                 ok &= toStr.Add(name, (int)strlen(name) + 1);
             }
         }
