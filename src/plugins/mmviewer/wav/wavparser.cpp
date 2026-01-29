@@ -223,8 +223,8 @@ CParserResultEnum
 CParserWAV::OpenFile(const char* fileName)
 {
     // mmioOpen wants a non-const char ;-0
-    char fnamecpy[MAX_PATH];
-    strcpy(fnamecpy, fileName);
+    CPathBuffer fnamecpy; // Heap-allocated for long path support
+    lstrcpyn(fnamecpy, fileName, fnamecpy.Size());
 
     if (!mmio.Open(fnamecpy))
         return preOpenError;

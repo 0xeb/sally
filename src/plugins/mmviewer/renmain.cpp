@@ -277,10 +277,10 @@ LRESULT CRendererWindow::OnCommand(WPARAM wParam, LPARAM lParam)
 
     case CM_FILES_EXPORT_HTML:
     {
-        char fname[MAX_PATH];
+        CPathBuffer fname; // Heap-allocated for long path support
         char* ext = LoadStr(IDS_HTMLEXT);
-        strcpy(fname, FileName);
-        char* b = strrchr(fname, '.'); // ".cvspass" is an extension in Windows
+        lstrcpyn(fname, FileName, fname.Size());
+        char* b = strrchr(fname.Get(), '.'); // ".cvspass" is an extension in Windows
         if (b)
             *b = 0;
         strcat(fname, ext);
@@ -313,9 +313,9 @@ LRESULT CRendererWindow::OnCommand(WPARAM wParam, LPARAM lParam)
 
     case CM_FILES_EXPORT_XML:
     {
-        char fname[MAX_PATH];
-        strcpy(fname, FileName);
-        char* b = strrchr(fname, '.'); // ".cvspass" is an extension in Windows
+        CPathBuffer fname; // Heap-allocated for long path support
+        lstrcpyn(fname, FileName, fname.Size());
+        char* b = strrchr(fname.Get(), '.'); // ".cvspass" is an extension in Windows
         if (b)
             *b = 0;
         strcat(fname, ".xml");
