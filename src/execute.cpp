@@ -852,8 +852,8 @@ const char* WINAPI ExecuteExpDOSFullPath(HWND msgParent, void* param) // DOS ful
 const char* WINAPI ExecuteExpDOSWinDir(HWND msgParent, void* param) // DOS full path to the Windows directory
 {
     CExecuteExpData* data = (CExecuteExpData*)param;
-    char path[MAX_PATH];
-    EnvGetWindowsDirectoryA(gEnvironment, path, MAX_PATH);
+    CPathBuffer path; // Heap-allocated for long path support
+    EnvGetWindowsDirectoryA(gEnvironment, path, path.Size());
     GetShortPathName(path, data->Buffer, MAX_PATH);
     char* s = data->Buffer + strlen(data->Buffer);
     if (s > data->Buffer && *(s - 1) != '\\')
@@ -864,8 +864,8 @@ const char* WINAPI ExecuteExpDOSWinDir(HWND msgParent, void* param) // DOS full 
 const char* WINAPI ExecuteExpDOSSysDir(HWND msgParent, void* param) // DOS full path to the System directory
 {
     CExecuteExpData* data = (CExecuteExpData*)param;
-    char path[MAX_PATH];
-    EnvGetSystemDirectoryA(gEnvironment, path, MAX_PATH);
+    CPathBuffer path; // Heap-allocated for long path support
+    EnvGetSystemDirectoryA(gEnvironment, path, path.Size());
     GetShortPathName(path, data->Buffer, MAX_PATH);
     char* s = data->Buffer + strlen(data->Buffer);
     if (s > data->Buffer && *(s - 1) != '\\')
@@ -1212,8 +1212,8 @@ const char* WINAPI MFLFileDataExpPath(HWND msgParent, void* param)
 const char* WINAPI MFLFileDataExpDOSPath(HWND msgParent, void* param)
 {
     CFileDataExpData* data = (CFileDataExpData*)param;
-    char dosPath[MAX_PATH];
-    if (!GetShortPathName(data->Path, dosPath, MAX_PATH))
+    CPathBuffer dosPath; // Heap-allocated for long path support
+    if (!GetShortPathName(data->Path, dosPath, dosPath.Size()))
     {
         TRACE_E("Unexpected situation in FileDataExpDOSPath().");
         return MFLFileDataExpPath(msgParent, param);
@@ -1704,15 +1704,15 @@ CSalamanderVarStrEntry MakeFileListExpArray[] =
 BOOL BrowseDirCommand(HWND hParent, int editlineResID, int filterResID)
 {
     CALL_STACK_MESSAGE2("BrowseDirCommand(, %d)", editlineResID);
-    char path[MAX_PATH];
+    CPathBuffer path; // Heap-allocated for long path support
     SendMessage(GetDlgItem(hParent, editlineResID), WM_GETTEXT,
-                MAX_PATH, (LPARAM)path);
+                path.Size(), (LPARAM)path.Get());
 
     CALL_STACK_MESSAGE1("BrowseDirCommand::GetOpenFileName");
     if (GetTargetDirectory(hParent, hParent, LoadStr(IDS_BROWSEDIRECTORY_TITLE), LoadStr(IDS_BROWSEDIRECTORY_TEXT), path, FALSE, path))
     {
-        CALL_STACK_MESSAGE2("BrowseDirCommand::SendMessage( , , ,%s)", path);
-        SendMessage(GetDlgItem(hParent, editlineResID), WM_SETTEXT, 0, (LPARAM)path);
+        CALL_STACK_MESSAGE2("BrowseDirCommand::SendMessage( , , ,%s)", path.Get());
+        SendMessage(GetDlgItem(hParent, editlineResID), WM_SETTEXT, 0, (LPARAM)path.Get());
         return TRUE;
     }
     return FALSE;
@@ -2126,9 +2126,9 @@ TrackExecuteMenu(HWND hParent, int buttonResID, int editlineResID,
 BOOL BrowseCommand(HWND hParent, int editlineResID, int filterResID)
 {
     CALL_STACK_MESSAGE2("BrowseCommand(, %d)", editlineResID);
-    char file[MAX_PATH];
+    CPathBuffer file; // Heap-allocated for long path support
     SendMessage(GetDlgItem(hParent, editlineResID), WM_GETTEXT,
-                MAX_PATH, (LPARAM)file);
+                file.Size(), (LPARAM)file.Get());
     OPENFILENAME ofn;
     memset(&ofn, 0, sizeof(OPENFILENAME));
     ofn.lStructSize = sizeof(OPENFILENAME);
@@ -2142,7 +2142,7 @@ BOOL BrowseCommand(HWND hParent, int editlineResID, int filterResID)
         s++;
     }
     ofn.lpstrFile = file;
-    ofn.nMaxFile = MAX_PATH;
+    ofn.nMaxFile = file.Size();
     ofn.nFilterIndex = 1;
     //  ofn.lpstrFileTitle = file;
     //  ofn.nMaxFileTitle = MAX_PATH;
@@ -2153,8 +2153,8 @@ BOOL BrowseCommand(HWND hParent, int editlineResID, int filterResID)
     {
         if (SalGetFullName(file))
         {
-            CALL_STACK_MESSAGE2("BrowseCommand::SendMessage( , , ,%s)", file);
-            SendMessage(GetDlgItem(hParent, editlineResID), WM_SETTEXT, 0, (LPARAM)file);
+            CALL_STACK_MESSAGE2("BrowseCommand::SendMessage( , , ,%s)", file.Get());
+            SendMessage(GetDlgItem(hParent, editlineResID), WM_SETTEXT, 0, (LPARAM)file.Get());
             return TRUE;
         }
     }
