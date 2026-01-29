@@ -495,8 +495,8 @@ void CConnectAdvancedDlg::Transfer(CTransferInfo& ti)
         ti.EditLine(IDE_TARGETPATH, HandleNULLStr(Server->TargetPanelPath), MAX_PATH);
     else
     {
-        char targetPath[MAX_PATH];
-        ti.EditLine(IDE_TARGETPATH, targetPath, MAX_PATH);
+        CPathBuffer targetPath; // Heap-allocated for long path support
+        ti.EditLine(IDE_TARGETPATH, targetPath, targetPath.Size());
         UpdateStr(Server->TargetPanelPath, targetPath);
     }
     HWND combo;
@@ -845,10 +845,9 @@ CConnectAdvancedDlg::DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
     {
         if (LOWORD(wParam) == IDB_BROWSE)
         {
-            char initDir[MAX_PATH];
-            GetDlgItemText(HWindow, IDE_TARGETPATH, initDir, MAX_PATH);
-            char path[MAX_PATH];
-            GetWindowText(HWindow, path, MAX_PATH); // will have the same caption
+            CPathBuffer initDir, path; // Heap-allocated for long path support
+            GetDlgItemText(HWindow, IDE_TARGETPATH, initDir, initDir.Size());
+            GetWindowText(HWindow, path, path.Size()); // will have the same caption
             if (SalamanderGeneral->GetTargetDirectory(HWindow, HWindow, path,
                                                       LoadStr(IDS_SELECTTARGETDIR), path,
                                                       FALSE, initDir))
