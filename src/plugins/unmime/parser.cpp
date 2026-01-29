@@ -683,16 +683,16 @@ static void SetDefaultMIMEFileName(LPCSTR pszType, LPCSTR pszSubType, BOOL bAppe
 
 static void InsertSuffix(char* filename, int suffix)
 {
-    char temp[MAX_PATH];
+    CPathBuffer temp; // Heap-allocated for long path support
     char* ext = strrchr(filename, '.');
     if (ext != NULL) // ".cvspass" is an extension in Windows
     {
         *ext++ = 0;
-        sprintf(temp, "%s(%ld).%s", filename, suffix, ext);
+        sprintf(temp.Get(), "%s(%ld).%s", filename, suffix, ext);
     }
     else
-        sprintf(temp, "%s(%ld)", filename, suffix);
-    strcpy(filename, temp);
+        sprintf(temp.Get(), "%s(%ld)", filename, suffix);
+    lstrcpyn(filename, temp, MAX_PATH); // filename buffer size is MAX_PATH
 }
 
 static int __cdecl compare_file_names(const void* elem1, const void* elem2)
@@ -817,27 +817,27 @@ static BOOL DecodeWord(const char*& p, char*& q)
 static void DecodeSpecialWords(LPSTR pszText)
 {
     CALL_STACK_MESSAGE2("DecodeSpecialWords(%s)", pszText);
-    char temp[MAX_PATH];
+    CPathBuffer temp; // Heap-allocated for long path support
     int i = 0, j = 0;
     while (pszText[i])
     {
         if (pszText[i] == '=' && pszText[i + 1] == '?')
         {
             const char* p = pszText + i + 2;
-            char* q = temp + j;
+            char* q = temp.Get() + j;
             if (!DecodeWord(p, q))
                 temp[j++] = pszText[i++];
             else
             {
                 i = (int)(p - pszText);
-                j = (int)(q - temp);
+                j = (int)(q - temp.Get());
             }
         }
         else
             temp[j++] = pszText[i++];
     }
     temp[j] = 0;
-    strcpy(pszText, temp);
+    lstrcpyn(pszText, temp, MAX_PATH); // pszText buffer size is MAX_PATH
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -945,7 +945,7 @@ static BOOL TestUUBlock(CParserOutput* pOutput, BOOL& bEnd)
     bEnd = FALSE;
     // are we on a UU header?
     char text[8];
-    char filename[MAX_PATH];
+    CPathBuffer filename; // Heap-allocated for long path support
     const char* line = cLine;
     SkipWSP(line);
     GetWord(line, text, 8, " \t");
@@ -962,7 +962,7 @@ static BOOL TestUUBlock(CParserOutput* pOutput, BOOL& bEnd)
     SkipWSP(line);
     if (!*line)
         return FALSE;
-    GetWord(line, filename, MAX_PATH, " \t"); // the file name also has to be present
+    GetWord(line, filename, filename.Size(), " \t"); // the file name also has to be present
     SkipWSP(line);
     if (*line)
         return FALSE; // and nothing more
@@ -1480,13 +1480,13 @@ BOOL ParseMailFile(LPCTSTR pszFileName, CParserOutput* pOutput, BOOL bAppendChar
                     }
                     else if (!_stricmp(cName, "Content-Location"))
                     {
-                        char cDisp[MAX_PATH];
+                        CPathBuffer cDisp; // Heap-allocated for long path support
                         char* p = cText;
-                        GetWord(p, cDisp, sizeof(cDisp), " \t();"); // Perhaps a better separators needed. Entire line needed in examined examples
+                        GetWord(p, cDisp, cDisp.Size(), " \t();"); // Perhaps a better separators needed. Entire line needed in examined examples
                         if (!_strnicmp(cDisp, "file:", 5) || !_strnicmp(cDisp, "http:", 5))
                         {
-                            char* p2 = strrchr(cDisp, '\\');
-                            p = strrchr(cDisp, '/');
+                            char* p2 = strrchr(cDisp.Get(), '\\');
+                            p = strrchr(cDisp.Get(), '/');
                             p = max(p, p2);
                             if (p && p[1])
                             { // Do not take empty fname from from e.g. http://www.altap.cz/
