@@ -243,44 +243,8 @@ wchar_t* SalAnsiName::AllocWideName() const
 }
 
 //
-// CPathBuffer class implementation
+// CPathBuffer class implementation is now inline in widepath.h
 //
-
-CPathBuffer::CPathBuffer()
-    : m_buffer(NULL)
-{
-    m_buffer = (char*)malloc(SAL_MAX_LONG_PATH);
-    if (m_buffer != NULL)
-    {
-        m_buffer[0] = '\0';
-    }
-}
-
-CPathBuffer::CPathBuffer(const char* initialPath)
-    : m_buffer(NULL)
-{
-    m_buffer = (char*)malloc(SAL_MAX_LONG_PATH);
-    if (m_buffer != NULL)
-    {
-        if (initialPath != NULL)
-        {
-            strncpy(m_buffer, initialPath, SAL_MAX_LONG_PATH - 1);
-            m_buffer[SAL_MAX_LONG_PATH - 1] = '\0';
-        }
-        else
-        {
-            m_buffer[0] = '\0';
-        }
-    }
-}
-
-CPathBuffer::~CPathBuffer()
-{
-    if (m_buffer != NULL)
-    {
-        free(m_buffer);
-    }
-}
 
 //
 // CWidePathBuffer class implementation

@@ -43,13 +43,35 @@ class CPathBuffer
 {
 public:
     // Constructs empty buffer (heap-allocated, full OS limit)
-    CPathBuffer();
+    CPathBuffer() : m_buffer(NULL)
+    {
+        m_buffer = (char*)malloc(SAL_MAX_LONG_PATH);
+        if (m_buffer != NULL)
+            m_buffer[0] = '\0';
+    }
 
     // Constructs buffer initialized with a path
-    explicit CPathBuffer(const char* initialPath);
+    explicit CPathBuffer(const char* initialPath) : m_buffer(NULL)
+    {
+        m_buffer = (char*)malloc(SAL_MAX_LONG_PATH);
+        if (m_buffer != NULL)
+        {
+            if (initialPath != NULL)
+                lstrcpyn(m_buffer, initialPath, SAL_MAX_LONG_PATH);
+            else
+                m_buffer[0] = '\0';
+        }
+    }
 
     // Destructor frees allocated memory
-    ~CPathBuffer();
+    ~CPathBuffer()
+    {
+        if (m_buffer != NULL)
+        {
+            free(m_buffer);
+            m_buffer = NULL;
+        }
+    }
 
     // Returns pointer to the buffer
     char* Get() { return m_buffer; }
