@@ -45,8 +45,8 @@ COperationDlg::DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
         if (operType == fotCopyDownload || operType == fotMoveDownload)
         {
             // start a thread to fetch the free disk space
-            char pathBuf[MAX_PATH];
-            Oper->GetTargetPath(pathBuf, MAX_PATH);
+            CPathBuffer pathBuf; // Heap-allocated for long path support
+            Oper->GetTargetPath(pathBuf, pathBuf.Size());
             GetDiskFreeSpaceThread = new CGetDiskFreeSpaceThread(pathBuf, HWindow);
             if (GetDiskFreeSpaceThread != NULL && GetDiskFreeSpaceThread->IsGood())
             {
