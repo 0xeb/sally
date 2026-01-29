@@ -194,7 +194,7 @@ BOOL ParseStorage(CSalamanderDirectoryAbstract* Dir, LPSTORAGE CF, LPMALLOC pIMa
     IEnumSTATSTG* pIEnum;
     CFileData fileData;
     char* oldPath = path + strlen(path);
-    char name[MAX_PATH];
+    CPathBuffer name; // Heap-allocated for long path support
     FILETIME* pFT;
     BOOL ret = TRUE;
     int tmp;
@@ -208,8 +208,8 @@ BOOL ParseStorage(CSalamanderDirectoryAbstract* Dir, LPSTORAGE CF, LPMALLOC pIMa
         if (FAILED(hr) || !element.pwcsName)
             break;
 
-        WideCharToMultiByte(CP_ACP, 0, element.pwcsName, -1, name, sizeof(name), NULL, NULL);
-        name[sizeof(name) - 1] = 0;
+        WideCharToMultiByte(CP_ACP, 0, element.pwcsName, -1, name, name.Size(), NULL, NULL);
+        name[name.Size() - 1] = 0;
         fileData.Name = SalamanderGeneral->DupStr(name);
         if (!fileData.Name)
         {
@@ -413,7 +413,7 @@ BOOL CPluginInterfaceForArchiver::UnpackOneFile(CSalamanderForOperationsAbstract
     {
         OLECHAR* StreamName = NULL;
         HRESULT hr;
-        char targetFileName[MAX_PATH];
+        CPathBuffer targetFileName; // Heap-allocated for long path support
         char* pBuf;
         HANDLE hFile;
         int len;
@@ -429,7 +429,7 @@ BOOL CPluginInterfaceForArchiver::UnpackOneFile(CSalamanderForOperationsAbstract
             if (SUCCEEDED(hr))
             {
                 strcpy(targetFileName, targetDir);
-                SalamanderGeneral->SalPathAddBackslash(targetFileName, MAX_PATH + 2);
+                SalamanderGeneral->SalPathAddBackslash(targetFileName, targetFileName.Size());
                 strcat(targetFileName, nameInArchive);
                 hFile = CreateFile(targetFileName, GENERIC_WRITE, FILE_SHARE_READ, NULL, CREATE_NEW, NULL, NULL);
                 if (hFile != INVALID_HANDLE_VALUE)
@@ -442,7 +442,7 @@ BOOL CPluginInterfaceForArchiver::UnpackOneFile(CSalamanderForOperationsAbstract
                         hr = pStream->Read(pBuf, BUF_SIZE, &nBytesRead);
                         if (FAILED(hr))
                         {
-                            Error(hr, IDS_CANNOT_READ, targetFileName);
+                            Error(hr, IDS_CANNOT_READ, targetFileName.Get());
                             ret = FALSE;
                             break;
                         }
@@ -463,7 +463,7 @@ BOOL CPluginInterfaceForArchiver::UnpackOneFile(CSalamanderForOperationsAbstract
                 }
                 else
                 {
-                    Error(GetLastError(), IDS_CANNOT_CREATE_FILE, targetFileName);
+                    Error(GetLastError(), IDS_CANNOT_CREATE_FILE, targetFileName.Get());
                     ret = FALSE;
                 }
                 pStream->Release();

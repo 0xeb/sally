@@ -830,9 +830,9 @@ BOOL CISOImage::Open(const char* fileName, BOOL quiet /* = FALSE*/)
     HANDLE hFile = CreateFile(fileName, GENERIC_READ, FILE_SHARE_READ, NULL, OPEN_EXISTING, 0, NULL);
     if (hFile == INVALID_HANDLE_VALUE)
     {
-        char errStr[MAX_PATH];
+        CPathBuffer errStr; // Heap-allocated for long path support
 
-        sprintf(errStr, LoadStr(IDS_CANT_OPEN_FILE), fileName);
+        sprintf(errStr.Get(), LoadStr(IDS_CANT_OPEN_FILE), fileName);
         return Error(errStr, GetLastError(), quiet);
     }
     DWORD l = 0;

@@ -439,7 +439,7 @@ BOOL CPluginInterfaceForViewer::ViewFile(const char* name, int left, int top, in
         return FALSE;
     }
     // obtain a name for the temporary text file with the results
-    char tempFileName[MAX_PATH];
+    CPathBuffer tempFileName; // Heap-allocated for long path support
     if (!SalamanderGeneral->SalGetTempFileName(NULL, "RPV", tempFileName, TRUE, NULL))
     {
         SetCursor(hOldCur);

@@ -83,16 +83,16 @@ BOOL CAudio::ListDirectory(char* path, int session, CSalamanderDirectoryAbstract
 {
     CALL_STACK_MESSAGE3("CAudio::ListDirectory(%s, %d, ,)", path, session);
 
-    char audioTrack[MAX_PATH];
+    CPathBuffer audioTrack; // Heap-allocated for long path support
     const char* label = Image->GetTrack(Track)->GetLabel();
 
     if (*label)
     {
-        sprintf(audioTrack, "%02d %s", Track + 1, label);
+        sprintf(audioTrack.Get(), "%02d %s", Track + 1, label);
     }
     else
     {
-        sprintf(audioTrack, "Audio Track %02d", Track + 1);
+        sprintf(audioTrack.Get(), "Audio Track %02d", Track + 1);
     }
 
     return AddFileDir(path, audioTrack, dir, pluginData);

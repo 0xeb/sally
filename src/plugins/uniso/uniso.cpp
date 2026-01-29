@@ -527,10 +527,10 @@ BOOL CPluginInterfaceForArchiver::UnpackArchive(CSalamanderForOperationsAbstract
         while ((name = next(NULL /* we do not print the errors a second time */, 1, &isDir, &size, &fileData, nextParam, NULL)) != NULL)
         {
             // directories do not interest us; they are created while unpacking files
-            char destPath[MAX_PATH];
-            strncpy_s(destPath, targetDir, _TRUNCATE);
+            CPathBuffer destPath; // Heap-allocated for long path support
+            lstrcpyn(destPath, targetDir, destPath.Size());
 
-            if (SalamanderGeneral->SalPathAppend(destPath, name, MAX_PATH))
+            if (SalamanderGeneral->SalPathAppend(destPath, name, destPath.Size()))
             {
                 if (isDir)
                 {
@@ -546,7 +546,7 @@ BOOL CPluginInterfaceForArchiver::UnpackArchive(CSalamanderForOperationsAbstract
                     salamander->ProgressDialogAddText(name, TRUE); // delayedPaint==TRUE, so we do not slow things down
 
                     //  if the destination path does not exist -> create it
-                    char* lastComp = strrchr(destPath, '\\');
+                    char* lastComp = strrchr(destPath.Get(), '\\');
                     if (lastComp != NULL)
                     {
                         *lastComp = '\0';
@@ -621,15 +621,15 @@ BOOL CPluginInterfaceForArchiver::UnpackOneFile(CSalamanderForOperationsAbstract
     salamander->OpenProgressDialog(LoadStr(IDS_UNPACKING_ARCHIVE), FALSE, NULL, FALSE);
     salamander->ProgressSetTotalSize(fileData->Size + CQuadWord(1, 0), CQuadWord(-1, -1));
 
-    char name[MAX_PATH];
-    strncpy_s(name, targetDir, _TRUNCATE);
+    CPathBuffer name; // Heap-allocated for long path support
+    lstrcpyn(name, targetDir, name.Size());
     const char* lastComp = strrchr(nameInArchive, '\\');
     if (lastComp != NULL)
         lastComp++;
     else
         lastComp = nameInArchive;
 
-    if (SalamanderGeneral->SalPathAppend(name, lastComp, MAX_PATH))
+    if (SalamanderGeneral->SalPathAppend(name, lastComp, name.Size()))
     {
         DWORD silent = 0;
         BOOL toSkip = FALSE;
@@ -637,9 +637,9 @@ BOOL CPluginInterfaceForArchiver::UnpackOneFile(CSalamanderForOperationsAbstract
 
         salamander->ProgressDialogAddText(name, TRUE); // delayedPaint==TRUE, so we do not slow things down
 
-        char srcPath[MAX_PATH];
+        CPathBuffer srcPath; // Heap-allocated for long path support
         strcpy(srcPath, nameInArchive);
-        char* lComp = strrchr(srcPath, '\\');
+        char* lComp = strrchr(srcPath.Get(), '\\');
         if (lComp != NULL)
             *lComp = '\0';
 
@@ -707,12 +707,12 @@ BOOL CPluginInterfaceForArchiver::UnpackWholeArchive(CSalamanderForOperationsAbs
     CPluginDataInterfaceAbstract* pluginData = NULL;
     if (ListArchive(salamander, fileName, dir, pluginData))
     {
-        char path[MAX_PATH];
+        CPathBuffer path; // Heap-allocated for long path support
         path[0] = 0;
 
         CQuadWord totalSize(0, 0);
         CQuadWord fileCount(0, 0);
-        CalcSize(dir, mask, path, MAX_PATH, totalSize, fileCount);
+        CalcSize(dir, mask, path, path.Size(), totalSize, fileCount);
 
         BOOL delTempDir = TRUE;
         if (SalamanderGeneral->TestFreeSpace(SalamanderGeneral->GetMsgBoxParent(),
@@ -733,11 +733,11 @@ BOOL CPluginInterfaceForArchiver::UnpackWholeArchive(CSalamanderForOperationsAbs
 
                 DWORD silent = 0;
                 BOOL toSkip = FALSE;
-                char strTarget[MAX_PATH];
+                CPathBuffer strTarget; // Heap-allocated for long path support
                 strcpy(strTarget, targetDir);
                 char srcPath[ISO_MAX_PATH_LEN];
                 srcPath[0] = '\0';
-                ret = isoImage.ExtractAllItems(salamander, srcPath, dir, modmask, strTarget, MAX_PATH, silent, toSkip) != UNPACK_CANCEL;
+                ret = isoImage.ExtractAllItems(salamander, srcPath, dir, modmask, strTarget, strTarget.Size(), silent, toSkip) != UNPACK_CANCEL;
             }
 
             salamander->CloseProgressDialog();
@@ -812,7 +812,7 @@ BOOL CPluginInterfaceForViewer::ViewFile(const char* name, int left, int top, in
   }
 */
 
-    char tempFileName[MAX_PATH];
+    CPathBuffer tempFileName; // Heap-allocated for long path support
     if (SalamanderGeneral->SalGetTempFileName(NULL, "ISO", tempFileName, TRUE, NULL))
     {
         char caption[2000];
