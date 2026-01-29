@@ -11,6 +11,7 @@
 #include "mainwnd.h"
 #include "cfgdlg.h"
 #include "dialogs.h"
+#include "common/widepath.h"
 
 void GetFileDateAndTimeFromPanel(DWORD validFileData, CPluginDataInterfaceEncapsulation* pluginData,
                                  const CFileData* f, BOOL isDir, SYSTEMTIME* st, BOOL* validDate,
@@ -546,7 +547,7 @@ BOOL ReadDirsAndFilesAux(HWND hWindow, DWORD flags, CCmpDirProgressDialog* progr
                          CFilesArray* dirs, CFilesArray* files, BOOL* canceled, BOOL getTotal)
 {
     char message[2 * MAX_PATH + 200];
-    char path[MAX_PATH];
+    CPathBuffer path; // Heap-allocated for long path support
 
     BOOL ignFileNames = (flags & COMPARE_DIRECTORIES_IGNFILENAMES) != 0;
     BOOL ignDirNames = (flags & COMPARE_DIRECTORIES_IGNDIRNAMES) != 0;
@@ -554,9 +555,9 @@ BOOL ReadDirsAndFilesAux(HWND hWindow, DWORD flags, CCmpDirProgressDialog* progr
     if (panel->Is(ptDisk))
     {
         BOOL pathAppended = TRUE;
-        lstrcpyn(path, panel->GetPath(), MAX_PATH);
-        pathAppended &= SalPathAppend(path, subPath, MAX_PATH);
-        pathAppended &= SalPathAppend(path, "*", MAX_PATH);
+        lstrcpyn(path, panel->GetPath(), path.Size());
+        pathAppended &= SalPathAppend(path, subPath, path.Size());
+        pathAppended &= SalPathAppend(path, "*", path.Size());
         if (!pathAppended)
         {
             gPrompter->ShowError(LoadStrW(IDS_COMPAREDIRSTITLE), LoadStrW(IDS_TOOLONGNAME));
@@ -1039,14 +1040,14 @@ BOOL CompareDirsAux(HWND hWindow, CCmpDirProgressDialog* progressDlg,
     int i;
     for (i = 0; i < leftDirs.Count; i++)
     {
-        char newLeftSubDir[MAX_PATH];
-        char newRightSubDir[MAX_PATH];
+        CPathBuffer newLeftSubDir; // Heap-allocated for long path support
+        CPathBuffer newRightSubDir; // Heap-allocated for long path support
 
         strcpy(newLeftSubDir, leftSubDir);
         BOOL pathAppended = TRUE;
-        pathAppended &= SalPathAppend(newLeftSubDir, leftDirs[i].Name, MAX_PATH);
+        pathAppended &= SalPathAppend(newLeftSubDir, leftDirs[i].Name, newLeftSubDir.Size());
         strcpy(newRightSubDir, rightSubDir);
-        pathAppended &= SalPathAppend(newRightSubDir, rightDirs[i].Name, MAX_PATH);
+        pathAppended &= SalPathAppend(newRightSubDir, rightDirs[i].Name, newRightSubDir.Size());
         if (!pathAppended)
         {
             gPrompter->ShowError(LoadStrW(IDS_COMPAREDIRSTITLE), LoadStrW(IDS_TOOLONGNAME));
