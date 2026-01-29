@@ -327,8 +327,8 @@ CCodeTable::CCodeTable(HWND hWindow, const char* dirName)
     strcpy(DirectoryName, dirName);
     State = ctsDefaultValues;
 
-    char fileName[MAX_PATH];
-    GetModuleFileName(HInstance, fileName, MAX_PATH);
+    CPathBuffer fileName; // Heap-allocated for long path support
+    GetModuleFileName(HInstance, fileName, fileName.Size());
     char* fileNameEnd = strrchr(fileName, '\\') + 1;
     sprintf(fileNameEnd, "convert\\%s\\", dirName);
     fileNameEnd += strlen(fileNameEnd);
@@ -463,8 +463,8 @@ void CCodeTables::PreloadAllConversions()
     HANDLES(EnterCriticalSection(&PreloadCS));
     Preloaded.DestroyMembers();
 
-    char path[MAX_PATH];
-    GetModuleFileName(NULL, path, MAX_PATH);
+    CPathBuffer path; // Heap-allocated for long path support
+    GetModuleFileName(NULL, path, path.Size());
     lstrcpy(strrchr(path, '\\') + 1, "convert\\*.*");
 
     WIN32_FIND_DATA find;
@@ -614,7 +614,7 @@ BOOL CCodeTables::Init(HWND hWindow)
                 Table = NULL;
             }
             PreloadAllConversions();
-            char dirName[MAX_PATH];
+            CPathBuffer dirName; // Heap-allocated for long path support
             GetBestPreloadedConversion(Configuration.ConversionTable, dirName);
             FreePreloadedConversions();
             strcpy(Configuration.ConversionTable, dirName);
