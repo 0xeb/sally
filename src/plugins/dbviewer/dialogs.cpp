@@ -854,11 +854,11 @@ CFindDialog::DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
     {
     case WM_USER_CLEARHISTORY:
     {
-        char buffer[MAX_PATH];
+        CPathBuffer buffer; // Heap-allocated for long path support
         HWND cb = GetDlgItem(HWindow, IDC_FIND_TEXT);
-        SendMessage(cb, WM_GETTEXT, MAX_PATH, (LPARAM)buffer);
+        SendMessage(cb, WM_GETTEXT, buffer.Size(), (LPARAM)buffer.Get());
         SendMessage(cb, CB_RESETCONTENT, 0, 0);
-        SendMessage(cb, WM_SETTEXT, 0, (LPARAM)buffer);
+        SendMessage(cb, WM_SETTEXT, 0, (LPARAM)buffer.Get());
         break;
     }
     }
