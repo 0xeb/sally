@@ -130,6 +130,27 @@ public:
         return FileResult::Ok();
     }
 
+    DWORD GetFileAttributes(const wchar_t* path) override
+    {
+        LongPath lp(path);
+        if (!lp.IsValid())
+        {
+            SetLastError(ERROR_NOT_ENOUGH_MEMORY);
+            return INVALID_FILE_ATTRIBUTES;
+        }
+        return ::GetFileAttributesW(lp.Get());
+    }
+
+    FileResult SetFileAttributes(const wchar_t* path, DWORD attributes) override
+    {
+        LongPath lp(path);
+        if (!lp.IsValid())
+            return FileResult::Error(ERROR_NOT_ENOUGH_MEMORY);
+        if (::SetFileAttributesW(lp.Get(), attributes))
+            return FileResult::Ok();
+        return FileResult::Error(GetLastError());
+    }
+
     FileResult DeleteFile(const wchar_t* path) override
     {
         LongPath lp(path);

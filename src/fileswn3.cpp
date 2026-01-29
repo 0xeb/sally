@@ -20,6 +20,7 @@
 #include "common/widepath.h"
 #include "ui/IPrompter.h"
 #include "common/unicode/helpers.h"
+#include "common/IEnvironment.h"
 
 //
 // ****************************************************************************
@@ -130,7 +131,7 @@ BOOL CFilesWindow::ReadDirectory(HWND parent, BOOL isRefresh)
         }
         UseThumbnails = readThumbnails;
 
-        SetCurrentDirectory(GetPath()); // so that it works better
+        EnvSetCurrentDirectoryA(gEnvironment, GetPath()); // so that it works better
 
 #ifndef _WIN64
         BOOL isWindows64BitDir = Windows64Bit && WindowsDirectory[0] != 0 && IsTheSamePath(GetPath(), WindowsDirectory);

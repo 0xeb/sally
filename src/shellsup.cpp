@@ -7,6 +7,7 @@
 #include "menu.h"
 #include "ui/IPrompter.h"
 #include "common/unicode/helpers.h"
+#include "common/IEnvironment.h"
 #include "cfgdlg.h"
 #include "plugins.h"
 #include "fileswnd.h"
@@ -2258,7 +2259,7 @@ MENU_TEMPLATE_ITEM PanelBkgndMenu[] =
                                 }
                                 else
                                 {
-                                    SetCurrentDirectory(panel->GetPath()); // for files with spaces in name: so Open With works for Microsoft Paint too (failed under W2K - wrote "d:\documents.bmp was not found" for file "D:\Documents and Settings\petr\My Documents\example.bmp")
+                                    EnvSetCurrentDirectoryA(gEnvironment, panel->GetPath()); // for files with spaces in name: so Open With works for Microsoft Paint too (failed under W2K - wrote "d:\documents.bmp was not found" for file "D:\Documents and Settings\petr\My Documents\example.bmp")
                                 }
 
                                 DWORD disks = GetLogicalDrives();

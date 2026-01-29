@@ -16,6 +16,7 @@
 #include "ui/IPrompter.h"
 #include "common/IFileSystem.h"
 #include "common/unicode/helpers.h"
+#include "common/IEnvironment.h"
 
 //
 // ****************************************************************************
@@ -638,7 +639,7 @@ void CFilesWindow::FilesAction(CActionType type, CFilesWindow* target, int count
                                     gFileSystem->DeleteFile(AnsiToWide(path).c_str());
                                 }
                                 //---  custom packing
-                                SetCurrentDirectory(GetPath());
+                                EnvSetCurrentDirectoryA(gEnvironment, GetPath());
                                 SetThreadPriority(GetCurrentThread(), THREAD_PRIORITY_NORMAL);
                                 if (PackCompress(HWindow, this, path, hasPath ? secondPart + 1 : "",
                                                  type == atMove, GetPath(), PanelEnumDiskSelection, &data))

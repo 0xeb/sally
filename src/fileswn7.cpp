@@ -14,6 +14,7 @@
 #include "ui/IPrompter.h"
 #include "common/IFileSystem.h"
 #include "common/unicode/helpers.h"
+#include "common/IEnvironment.h"
 
 //
 // ****************************************************************************
@@ -1536,7 +1537,7 @@ _PACK_AGAIN:
             if (PackerConfig.Move)
             {
                 int containsDirLinks = 0;
-                SetCurrentDirectory(GetPath());
+                EnvSetCurrentDirectoryA(gEnvironment, GetPath());
                 SetThreadPriority(GetCurrentThread(), THREAD_PRIORITY_NORMAL);
 
                 GetAsyncKeyState(VK_ESCAPE); // initialize GetAsyncKeyState - see help
@@ -1620,7 +1621,7 @@ _PACK_AGAIN:
             //---  actual packing
             if (performPack)
             {
-                SetCurrentDirectory(GetPath());
+                EnvSetCurrentDirectoryA(gEnvironment, GetPath());
                 SetThreadPriority(GetCurrentThread(), THREAD_PRIORITY_NORMAL);
                 if (PackerConfig.ExecutePacker(this, fileBuf, PackerConfig.Move, GetPath(),
                                                PanelEnumDiskSelection, &data))

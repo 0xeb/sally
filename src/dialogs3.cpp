@@ -6,6 +6,7 @@
 
 #include "ui/IPrompter.h"
 #include "common/unicode/helpers.h"
+#include "common/IEnvironment.h"
 #include "mainwnd.h"
 #include "plugins.h"
 #include "fileswnd.h"
@@ -2401,7 +2402,7 @@ CChangeIconDialog::~CChangeIconDialog()
 
 void CChangeIconDialog::GetShell32(char* fileName)
 {
-    GetSystemDirectory(fileName, MAX_PATH);
+    EnvGetSystemDirectoryA(gEnvironment, fileName, MAX_PATH);
     SalPathAppend(fileName, "SHELL32.DLL", MAX_PATH);
     SetDlgItemText(HWindow, IDE_CHI_FILENAME, fileName);
 }

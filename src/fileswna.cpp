@@ -17,6 +17,7 @@
 #include "ui/IPrompter.h"
 #include "common/unicode/helpers.h"
 #include "common/IFileSystem.h"
+#include "common/IEnvironment.h"
 
 void CFilesWindow::PluginFSFilesAction(CPluginFSActionType type)
 {
@@ -569,7 +570,7 @@ void CFilesWindow::DragDropToArcOrFS(CTmpDragDropOperData* data)
                         DeleteFileA(gFileSystem, data->ArchiveOrFSName);
                     }
                     //---  actual packing
-                    SetCurrentDirectory(data->Data->SrcPath);
+                    EnvSetCurrentDirectoryA(gEnvironment, data->Data->SrcPath);
                     SetThreadPriority(GetCurrentThread(), THREAD_PRIORITY_NORMAL);
                     if (PackCompress(HWindow, this, data->ArchiveOrFSName, data->ArchivePathOrUserPart,
                                      !data->Copy, data->Data->SrcPath, PanelEnumDiskSelection, &dataEnum))

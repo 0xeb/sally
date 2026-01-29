@@ -4,6 +4,7 @@
 
 #include "precomp.h"
 
+#include "common/IEnvironment.h"
 #include "cfgdlg.h"
 #include "mainwnd.h"
 #include "usermenu.h"
@@ -693,7 +694,7 @@ BOOL CFilesWindow::ChangeToFixedDrive(HWND parent, BOOL* noChange, BOOL refreshL
         *noChange = TRUE;
     char sysDir[MAX_PATH];
     char root[4] = " :\\";
-    if (GetWindowsDirectory(sysDir, MAX_PATH) != 0 && sysDir[0] != 0 && sysDir[1] == ':')
+    if (EnvGetWindowsDirectoryA(gEnvironment, sysDir, MAX_PATH).success && sysDir[0] != 0 && sysDir[1] == ':')
     {
         root[0] = sysDir[0];
         if (GetDriveType(root) == DRIVE_FIXED)
@@ -1803,7 +1804,7 @@ BOOL CFilesWindow::ChangePathToDisk(HWND parent, const char* path, int suggested
                         char sysDir[MAX_PATH];
                         char root[4] = " :\\";
                         BOOL done = FALSE;
-                        if (GetWindowsDirectory(sysDir, MAX_PATH) != 0 && sysDir[0] != 0 && sysDir[1] == ':')
+                        if (EnvGetWindowsDirectoryA(gEnvironment, sysDir, MAX_PATH).success && sysDir[0] != 0 && sysDir[1] == ':')
                         {
                             root[0] = sysDir[0];
                             if (GetDriveType(root) == DRIVE_FIXED)

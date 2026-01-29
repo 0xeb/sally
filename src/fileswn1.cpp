@@ -6,6 +6,7 @@
 
 #include "ui/IPrompter.h"
 #include "common/unicode/helpers.h"
+#include "common/IEnvironment.h"
 
 #include "cfgdlg.h"
 #include "dialogs.h"
@@ -51,7 +52,7 @@ CFilesWindowAncestor::CFilesWindowAncestor()
     SimplePluginIcons = NULL;
 
     char buf[MAX_PATH];
-    GetSystemDirectory(buf, MAX_PATH);
+    EnvGetSystemDirectoryA(gEnvironment, buf, MAX_PATH);
     GetRootPath(Path, buf);
 
     OnlyDetachFSListing = FALSE;

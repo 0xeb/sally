@@ -11,6 +11,7 @@
 #include "shellib.h"
 #include "ui/IPrompter.h"
 #include "common/unicode/helpers.h"
+#include "common/IEnvironment.h"
 
 //******************************************************************************
 //
@@ -807,7 +808,7 @@ const char* WINAPI ExecuteExpFullPath(HWND msgParent, void* param) // full path 
 const char* WINAPI ExecuteExpWinDir(HWND msgParent, void* param) // full path to the Windows directory
 {
     CExecuteExpData* data = (CExecuteExpData*)param;
-    GetWindowsDirectory(data->Buffer, MAX_PATH);
+    EnvGetWindowsDirectoryA(gEnvironment, data->Buffer, MAX_PATH);
     char* s = data->Buffer + strlen(data->Buffer);
     if (s > data->Buffer && *(s - 1) != '\\')
         strcat(data->Buffer, "\\");
@@ -817,7 +818,7 @@ const char* WINAPI ExecuteExpWinDir(HWND msgParent, void* param) // full path to
 const char* WINAPI ExecuteExpSysDir(HWND msgParent, void* param) // full path to the System directory
 {
     CExecuteExpData* data = (CExecuteExpData*)param;
-    GetSystemDirectory(data->Buffer, MAX_PATH);
+    EnvGetSystemDirectoryA(gEnvironment, data->Buffer, MAX_PATH);
     char* s = data->Buffer + strlen(data->Buffer);
     if (s > data->Buffer && *(s - 1) != '\\')
         strcat(data->Buffer, "\\");
@@ -852,7 +853,7 @@ const char* WINAPI ExecuteExpDOSWinDir(HWND msgParent, void* param) // DOS full 
 {
     CExecuteExpData* data = (CExecuteExpData*)param;
     char path[MAX_PATH];
-    GetWindowsDirectory(path, MAX_PATH);
+    EnvGetWindowsDirectoryA(gEnvironment, path, MAX_PATH);
     GetShortPathName(path, data->Buffer, MAX_PATH);
     char* s = data->Buffer + strlen(data->Buffer);
     if (s > data->Buffer && *(s - 1) != '\\')
@@ -864,7 +865,7 @@ const char* WINAPI ExecuteExpDOSSysDir(HWND msgParent, void* param) // DOS full 
 {
     CExecuteExpData* data = (CExecuteExpData*)param;
     char path[MAX_PATH];
-    GetSystemDirectory(path, MAX_PATH);
+    EnvGetSystemDirectoryA(gEnvironment, path, MAX_PATH);
     GetShortPathName(path, data->Buffer, MAX_PATH);
     char* s = data->Buffer + strlen(data->Buffer);
     if (s > data->Buffer && *(s - 1) != '\\')
@@ -898,7 +899,7 @@ const char* WINAPI ExecuteExpFullPath2(HWND msgParent, void* param) // full path
 const char* WINAPI ExecuteExpWinDir2(HWND msgParent, void* param) // full path to the Windows directory without trailing '\\'
 {
     CExecuteExpData* data = (CExecuteExpData*)param;
-    GetWindowsDirectory(data->Buffer, MAX_PATH);
+    EnvGetWindowsDirectoryA(gEnvironment, data->Buffer, MAX_PATH);
     char* s = data->Buffer + strlen(data->Buffer);
     if (s > data->Buffer && *(s - 1) == '\\')
         *(s - 1) = 0;
@@ -908,7 +909,7 @@ const char* WINAPI ExecuteExpWinDir2(HWND msgParent, void* param) // full path t
 const char* WINAPI ExecuteExpSysDir2(HWND msgParent, void* param) // full path to the System directory without trailing '\\'
 {
     CExecuteExpData* data = (CExecuteExpData*)param;
-    GetSystemDirectory(data->Buffer, MAX_PATH);
+    EnvGetSystemDirectoryA(gEnvironment, data->Buffer, MAX_PATH);
     char* s = data->Buffer + strlen(data->Buffer);
     if (s > data->Buffer && *(s - 1) == '\\')
         *(s - 1) = 0;

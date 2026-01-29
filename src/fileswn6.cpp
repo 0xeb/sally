@@ -18,6 +18,7 @@
 #include "filesbox.h"
 #include "ui/IPrompter.h"
 #include "common/unicode/helpers.h"
+#include "common/IEnvironment.h"
 
 // helper variables for the dialogs in BuildScriptXXX()
 BOOL ConfirmADSLossAll = FALSE;
@@ -254,7 +255,7 @@ BOOL CFilesWindow::MoveFiles(const char* source, const char* target, const char*
 
         FilesActionInProgress = TRUE;
 
-        SetCurrentDirectory(source); // for a faster move (the system prefers it)
+        EnvSetCurrentDirectoryA(gEnvironment, source); // for a faster move (the system prefers it)
 
         ConfirmADSLossAll = FALSE;
         ConfirmADSLossSkipAll = FALSE;
@@ -557,10 +558,10 @@ BOOL CFilesWindow::BuildScriptMain2(COperations* script, BOOL copy, char* target
             if (sourceType == DRIVE_REMOTE || sourceType == DRIVE_REMOVABLE)
             {
                 GetRootPath(root, name);
-                SetCurrentDirectory(root);
+                EnvSetCurrentDirectoryA(gEnvironment, root);
             }
             else
-                SetCurrentDirectory(targetDir);
+                EnvSetCurrentDirectoryA(gEnvironment, targetDir);
 
             if (fastDirectoryMove &&                   // fast-dir-move is not globally disabled
                 !copy && sourceType == DRIVE_REMOTE && // + move operation + network disk
@@ -1188,10 +1189,10 @@ BOOL CFilesWindow::BuildScriptMain(COperations* script, CActionType type,
 
         if (sourceType == DRIVE_REMOTE || sourceType == DRIVE_REMOVABLE)
         {
-            SetCurrentDirectory(GetPath());
+            EnvSetCurrentDirectoryA(gEnvironment, GetPath());
         }
         else
-            SetCurrentDirectory(targetPath);
+            EnvSetCurrentDirectoryA(gEnvironment, targetPath);
 
         if (sourceType == DRIVE_REMOVABLE)
             script->RemovableSrcDisk = TRUE;
@@ -1250,7 +1251,7 @@ BOOL CFilesWindow::BuildScriptMain(COperations* script, CActionType type,
 
     // file access is much faster in the current directory/disk
     if (type != atMove && type != atCopy)
-        SetCurrentDirectory(GetPath());
+        EnvSetCurrentDirectoryA(gEnvironment, GetPath());
 
     GetAsyncKeyState(VK_ESCAPE); // initialize GetAsyncKeyState - see help
 

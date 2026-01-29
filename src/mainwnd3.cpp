@@ -7,6 +7,7 @@
 #include "ui/IPrompter.h"
 #include "common/IFileSystem.h"
 #include "common/unicode/helpers.h"
+#include "common/IEnvironment.h"
 #include <shlwapi.h>
 #undef PathIsPrefix // otherwise conflicts with CSalamanderGeneral::PathIsPrefix
 
@@ -2435,7 +2436,7 @@ MENU_TEMPLATE_ITEM AddToSystemMenu[] =
                 }
 
                 CUMDataFromPanel data(activePanel);
-                SetCurrentDirectory(activePanel->GetPath());
+                EnvSetCurrentDirectoryA(gEnvironment, activePanel->GetPath());
                 UserMenu(HWindow, LOWORD(wParam) - CM_USERMENU_MIN, GetNextFileFromPanel,
                          &data, &userMenuAdvancedData);
                 SetCurrentDirectoryToSystem();

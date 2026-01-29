@@ -6,6 +6,7 @@
 
 #include "ui/IPrompter.h"
 #include "common/unicode/helpers.h"
+#include "common/IEnvironment.h"
 #include <shlwapi.h>
 #undef PathIsPrefix // otherwise, collision with CSalamanderGeneral::PathIsPrefix
 
@@ -3809,7 +3810,7 @@ BOOL CMainWindow::LoadConfig(BOOL importingOldConfig, const CCommandLineParams* 
 
         CPathBuffer leftPanelPath;
         CPathBuffer rightPanelPath;
-        GetSystemDirectory(leftPanelPath, leftPanelPath.Size());
+        EnvGetSystemDirectoryA(gEnvironment, leftPanelPath, leftPanelPath.Size());
         strcpy(rightPanelPath, leftPanelPath);
         CPathBuffer sysDefDir;
         lstrcpyn(sysDefDir, DefaultDir[LowerCase[leftPanelPath[0]] - 'a'], sysDefDir.Size());

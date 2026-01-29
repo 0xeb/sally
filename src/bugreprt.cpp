@@ -5,6 +5,7 @@
 #include "precomp.h"
 
 #include <tlhelp32.h>
+#include "common/IEnvironment.h"
 
 // Cross-architecture register access macros for CONTEXT structure
 #ifdef _WIN64
@@ -466,10 +467,10 @@ BOOL PrintSystemVersion(FPrintLine PrintLine, void* param, char* buf, char* avbu
         PrintLine(param, buf, TRUE);
     }
 
-    GetSystemDirectory(avbuf, MAX_PATH);
+    EnvGetSystemDirectoryA(gEnvironment, avbuf, MAX_PATH);
     sprintf(buf, "System directory: %s", avbuf);
     PrintLine(param, buf, TRUE);
-    GetWindowsDirectory(avbuf, MAX_PATH);
+    EnvGetWindowsDirectoryA(gEnvironment, avbuf, MAX_PATH);
     sprintf(buf, "Windows directory: %s", avbuf);
     PrintLine(param, buf, TRUE);
 

@@ -23,6 +23,7 @@ public:
     std::vector<Call> calls;
     bool existsResult = true;
     FileResult opResult = FileResult::Ok();
+    DWORD attributesResult = FILE_ATTRIBUTE_NORMAL;
 
     bool FileExists(const wchar_t* path) override
     {
@@ -43,6 +44,18 @@ public:
         info.size = 1234;
         info.attributes = FILE_ATTRIBUTE_NORMAL;
         info.isDirectory = false;
+        return opResult;
+    }
+
+    DWORD GetFileAttributes(const wchar_t* path) override
+    {
+        calls.push_back({L"GetFileAttributes", path ? path : L"", L""});
+        return attributesResult;
+    }
+
+    FileResult SetFileAttributes(const wchar_t* path, DWORD attributes) override
+    {
+        calls.push_back({L"SetFileAttributes", path ? path : L"", L""});
         return opResult;
     }
 
@@ -144,6 +157,22 @@ TEST(FileSystemMockTest, GetFileInfoPopulatesStruct)
     EXPECT_EQ(info.name, L"C:\\test.txt");
     EXPECT_EQ(info.size, 1234u);
     EXPECT_FALSE(info.isDirectory);
+}
+
+TEST(FileSystemMockTest, FileAttributes)
+{
+    MockFileSystem mock;
+    mock.attributesResult = FILE_ATTRIBUTE_READONLY | FILE_ATTRIBUTE_HIDDEN;
+
+    DWORD attrs = mock.GetFileAttributes(L"C:\\test.txt");
+    EXPECT_EQ(attrs, (DWORD)(FILE_ATTRIBUTE_READONLY | FILE_ATTRIBUTE_HIDDEN));
+
+    auto result = mock.SetFileAttributes(L"C:\\test.txt", FILE_ATTRIBUTE_NORMAL);
+    EXPECT_TRUE(result.success);
+
+    ASSERT_EQ(mock.calls.size(), 2u);
+    EXPECT_EQ(mock.calls[0].op, L"GetFileAttributes");
+    EXPECT_EQ(mock.calls[1].op, L"SetFileAttributes");
 }
 
 // Test that we can swap implementations at runtime

@@ -11,6 +11,7 @@
 #include "common/IFileSystem.h"
 #include "ui/IPrompter.h"
 #include "common/unicode/helpers.h"
+#include "common/IEnvironment.h"
 
 CDiskCache DiskCache;
 CDeleteManager DeleteManager;
@@ -1152,7 +1153,7 @@ CDiskCache::GetName(const char* name, const char* tmpName, BOOL* exists, BOOL on
     const char* rootTmpPathExp;
     if (rootTmpPath == NULL) // if this is TEMP, we will find out its location
     {
-        if (!GetTempPath(MAX_PATH, sysTmpDir))
+        if (!EnvGetTempPathA(gEnvironment, sysTmpDir, MAX_PATH).success)
             sysTmpDir[0] = 0;
         rootTmpPathExp = sysTmpDir;
     }
@@ -1461,7 +1462,7 @@ void CDiskCache::PrematureDeleteByPlugin(CPluginInterfaceAbstract* ownDeletePlug
 void CDiskCache::ClearTEMPIfNeeded(HWND parent, HWND hActivePanel)
 {
     char tmpDir[2 * MAX_PATH];
-    if (GetTempPath(2 * MAX_PATH, tmpDir))
+    if (EnvGetTempPathA(gEnvironment, tmpDir, 2 * MAX_PATH).success)
     {
         SalPathAddBackslash(tmpDir, 2 * MAX_PATH);
         char* tmpDirEnd = tmpDir + strlen(tmpDir);

@@ -39,6 +39,10 @@ public:
     virtual bool DirectoryExists(const wchar_t* path) = 0;
     virtual FileResult GetFileInfo(const wchar_t* path, FileInfo& info) = 0;
 
+    // File attributes
+    virtual DWORD GetFileAttributes(const wchar_t* path) = 0;  // Returns INVALID_FILE_ATTRIBUTES on error
+    virtual FileResult SetFileAttributes(const wchar_t* path, DWORD attributes) = 0;
+
     // File operations
     virtual FileResult DeleteFile(const wchar_t* path) = 0;
     virtual FileResult MoveFile(const wchar_t* source, const wchar_t* target) = 0;
@@ -99,4 +103,31 @@ inline FileResult CopyFileA(IFileSystem* fs, const char* source, const char* tar
     if ((wideSource.empty() && source && *source) || (wideTarget.empty() && target && *target))
         return FileResult::Error(GetLastError());
     return fs->CopyFile(wideSource.c_str(), wideTarget.c_str(), failIfExists);
+}
+
+inline DWORD GetFileAttributesA(IFileSystem* fs, const char* path)
+{
+    std::wstring widePath = AnsiPathToWide(path);
+    if (widePath.empty() && path && *path)
+    {
+        SetLastError(ERROR_INVALID_PARAMETER);
+        return INVALID_FILE_ATTRIBUTES;
+    }
+    return fs->GetFileAttributes(widePath.c_str());
+}
+
+inline FileResult SetFileAttributesA(IFileSystem* fs, const char* path, DWORD attributes)
+{
+    std::wstring widePath = AnsiPathToWide(path);
+    if (widePath.empty() && path && *path)
+        return FileResult::Error(GetLastError());
+    return fs->SetFileAttributes(widePath.c_str(), attributes);
+}
+
+inline FileResult GetFileInfoA(IFileSystem* fs, const char* path, FileInfo& info)
+{
+    std::wstring widePath = AnsiPathToWide(path);
+    if (widePath.empty() && path && *path)
+        return FileResult::Error(GetLastError());
+    return fs->GetFileInfo(widePath.c_str(), info);
 }

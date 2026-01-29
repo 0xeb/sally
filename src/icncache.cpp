@@ -7,6 +7,7 @@
 #include "cfgdlg.h"
 #include "ui/IPrompter.h"
 #include "common/unicode/helpers.h"
+#include "common/IEnvironment.h"
 #include "dialogs.h"
 #include "mainwnd.h"
 #include "plugins.h"
@@ -699,7 +700,7 @@ void CIconCache::SetIconSize(CIconSizeEnum iconSize)
 BOOL ReadDirectoryIconAndTypeAux(CIconList* iconList, int index, CIconSizeEnum iconSize)
 {
     char systemDir[MAX_PATH];
-    GetSystemDirectory(systemDir, MAX_PATH);
+    EnvGetSystemDirectoryA(gEnvironment, systemDir, MAX_PATH);
     SHFILEINFO shi;
     HICON hIcon;
     __try

@@ -17,6 +17,7 @@
 #include "common/widepath.h"
 #include "ui/IPrompter.h"
 #include "common/IFileSystem.h"
+#include "common/IEnvironment.h"
 #include "common/unicode/helpers.h"
 
 CUserMenuIconBkgndReader UserMenuIconBkgndReader;
@@ -348,29 +349,25 @@ std::wstring SalGetTempFileNameW(const wchar_t* path, const wchar_t* prefix, boo
     
     if (path == nullptr)
     {
-        wchar_t winTempPath[MAX_PATH + 1];
-        if (!GetTempPathW(MAX_PATH, winTempPath))
+        auto tempResult = gEnvironment->GetTempPath(tmpDir);
+        if (!tempResult.success)
         {
-            DWORD err = GetLastError();
             TRACE_E("Unable to get TEMP directory.");
-            SetLastError(err);
+            SetLastError(tempResult.errorCode);
             return L"";
         }
-        tmpDir = winTempPath;
-        
-        DWORD attrs = GetFileAttributesW(tmpDir.c_str());
+
+        DWORD attrs = gFileSystem->GetFileAttributes(tmpDir.c_str());
         if (attrs == INVALID_FILE_ATTRIBUTES)
         {
             gPrompter->ShowError(LoadStrW(IDS_ERRORTITLE), LoadStrW(IDS_TMPDIRERROR));
-            wchar_t sysDir[MAX_PATH + 1];
-            if (GetSystemDirectoryW(sysDir, MAX_PATH) == 0)
+            auto sysResult = gEnvironment->GetSystemDirectory(tmpDir);
+            if (!sysResult.success)
             {
-                DWORD err = GetLastError();
                 TRACE_E("Unable to get system directory.");
-                SetLastError(err);
+                SetLastError(sysResult.errorCode);
                 return L"";
             }
-            tmpDir = sysDir;
         }
     }
     else
@@ -1121,9 +1118,9 @@ void AllowChangeDirectory(BOOL allow)
 
 void SetCurrentDirectoryToSystem()
 {
-    char buf[MAX_PATH];
-    GetSystemDirectory(buf, MAX_PATH);
-    SetCurrentDirectory(buf);
+    std::wstring sysDir;
+    if (gEnvironment->GetSystemDirectory(sysDir).success)
+        gEnvironment->SetCurrentDirectory(sysDir.c_str());
 }
 
 // ****************************************************************************
@@ -1162,7 +1159,7 @@ void _RemoveTemporaryDir(const char* dir)
 void RemoveTemporaryDir(const char* dir)
 {
     CALL_STACK_MESSAGE2("RemoveTemporaryDir(%s)", dir);
-    SetCurrentDirectory(dir); // so it deletes better (system likes cur-dir)
+    EnvSetCurrentDirectoryA(gEnvironment, dir); // so it deletes better (system likes cur-dir)
     if (strlen(dir) < MAX_PATH)
         _RemoveTemporaryDir(dir);
     SetCurrentDirectoryToSystem(); // must leave it, otherwise it won't be deletable
@@ -1207,7 +1204,7 @@ void _RemoveEmptyDirs(const char* dir)
 void RemoveEmptyDirs(const char* dir)
 {
     CALL_STACK_MESSAGE2("RemoveEmptyDirs(%s)", dir);
-    SetCurrentDirectory(dir); // so it deletes better (system likes cur-dir)
+    EnvSetCurrentDirectoryA(gEnvironment, dir); // so it deletes better (system likes cur-dir)
     if (strlen(dir) < MAX_PATH)
         _RemoveEmptyDirs(dir);
     SetCurrentDirectoryToSystem(); // must leave it, otherwise it won't be deletable
@@ -3486,7 +3483,7 @@ void CFileTimeStamps::CheckAndPackAndClear(HWND parent, BOOL* someFilesChanged, 
                             CFileTimeStampsEnum2Info data2;
                             data2.PackList = &packList;
                             data2.Index = 0;
-                            SetCurrentDirectory(s1);
+                            EnvSetCurrentDirectoryA(gEnvironment, s1);
                             if (Panel->CheckPath(TRUE, NULL, ERROR_SUCCESS, TRUE, parent) == ERROR_SUCCESS &&
                                 PackCompress(parent, Panel, ZIPFile, r1, FALSE, s1, FileTimeStampsEnum2, &data2))
                                 loop = FALSE;
