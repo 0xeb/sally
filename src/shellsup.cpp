@@ -505,13 +505,13 @@ const char* GetCurrentDir(POINTL& pt, void* param, DWORD* effect, BOOL rButton, 
                     return panel->GetPath();
                 }
             }
-            char fullName[MAX_PATH];
+            CPathBuffer fullName; // Heap-allocated for long path support
             int l = (int)strlen(panel->GetPath());
-            memcpy(fullName, panel->GetPath(), l);
+            memcpy(fullName.Get(), panel->GetPath(), l);
             if (fullName[l - 1] != '\\')
                 fullName[l++] = '\\';
             CFileData* file = &(panel->Files->At(index - panel->Dirs->Count));
-            if (l + file->NameLen >= MAX_PATH)
+            if (l + file->NameLen >= (int)fullName.Size())
             {
                 TRACE_E("GetCurrentDir(): too long file name!");
                 panel->SetDropTarget(-1); // hide marker

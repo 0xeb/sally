@@ -1584,9 +1584,9 @@ void CFindDialog::OnOpen(BOOL onlyFocused)
             if (setWait)
                 oldCur = SetCursor(LoadCursor(NULL, IDC_WAIT));
 
-            char fullPath[MAX_PATH];
+            CPathBuffer fullPath; // Heap-allocated for long path support
             lstrcpy(fullPath, file->Path);
-            if (SalPathAppend(fullPath, file->Name, MAX_PATH))
+            if (SalPathAppend(fullPath, file->Name, fullPath.Size()))
                 MainWindow->FileHistory->AddFile(fhitOpen, 0, fullPath);
 
             ExecuteAssociation(HWindow, file->Path, file->Name);

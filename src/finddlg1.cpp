@@ -353,9 +353,9 @@ void CFoundFilesListView::CheckAndRemoveSelectedItems(BOOL forceRemove, int last
             BOOL remove = forceRemove;
             if (!forceRemove)
             {
-                char fullPath[MAX_PATH];
+                CPathBuffer fullPath; // Heap-allocated for long path support
                 int pathLen = lstrlen(ptr->Path);
-                memmove(fullPath, ptr->Path, pathLen + 1);
+                memmove(fullPath.Get(), ptr->Path, pathLen + 1);
                 if (ptr->Path[pathLen - 1] != '\\')
                 {
                     fullPath[pathLen] = '\\';
@@ -2608,9 +2608,9 @@ void CFindDialog::OnUserMenu()
                         break;
                 }
                 CFoundFilesData* file = FoundFilesListView->At(findItem);
-                char fullName[MAX_PATH];
-                lstrcpyn(fullName, file->Path, MAX_PATH);
-                if (!SalPathAppend(fullName, file->Name, MAX_PATH) ||
+                CPathBuffer fullName; // Heap-allocated for long path support
+                lstrcpyn(fullName, file->Path, fullName.Size());
+                if (!SalPathAppend(fullName, file->Name, fullName.Size()) ||
                     !AddToListOfNames(&listFull, listFullEnd, fullName, (int)strlen(fullName)))
                     break;
             }

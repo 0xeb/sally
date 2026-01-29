@@ -614,14 +614,14 @@ BOOL CPackACDialog::DirectorySearch(char* path)
                     findData.cFileName[nameLen - 4] == '.')
                 {
                     // determine the program type
-                    char fullName[MAX_PATH];
+                    CPathBuffer fullName; // Heap-allocated for long path support
                     DWORD type;
                     strcpy(fullName, path);
                     strcat(fullName, findData.cFileName);
 
                     if (!MyGetBinaryType(fullName, &type))
                     {
-                        TRACE_I("Invalid executable or error getting type: " << fullName);
+                        TRACE_I("Invalid executable or error getting type: " << fullName.Get());
                         continue;
                     }
                     // and see whether we are interested in it
