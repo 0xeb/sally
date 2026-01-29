@@ -52,3 +52,83 @@ add_test(NAME gtest_clipboard COMMAND gtest_clipboard)
 set_target_properties(gtest_clipboard PROPERTIES
     RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/tests"
 )
+
+add_executable(gtest_registry
+    gtest_registry.cpp
+)
+
+target_link_libraries(gtest_registry
+    GTest::gtest
+    GTest::gtest_main
+    GTest::gmock
+)
+
+add_test(NAME gtest_registry COMMAND gtest_registry)
+
+set_target_properties(gtest_registry PROPERTIES
+    RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/tests"
+)
+
+add_executable(gtest_fileenumerator
+    gtest_fileenumerator.cpp
+)
+
+target_link_libraries(gtest_fileenumerator
+    GTest::gtest
+    GTest::gtest_main
+    GTest::gmock
+)
+
+add_test(NAME gtest_fileenumerator COMMAND gtest_fileenumerator)
+
+set_target_properties(gtest_fileenumerator PROPERTIES
+    RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/tests"
+)
+
+add_executable(gtest_process
+    gtest_process.cpp
+)
+
+target_link_libraries(gtest_process
+    GTest::gtest
+    GTest::gtest_main
+    GTest::gmock
+)
+
+add_test(NAME gtest_process COMMAND gtest_process)
+
+set_target_properties(gtest_process PROPERTIES
+    RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/tests"
+)
+
+add_executable(gtest_shell
+    gtest_shell.cpp
+)
+
+target_link_libraries(gtest_shell
+    GTest::gtest
+    GTest::gtest_main
+    GTest::gmock
+)
+
+add_test(NAME gtest_shell COMMAND gtest_shell)
+
+set_target_properties(gtest_shell PROPERTIES
+    RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/tests"
+)
+
+add_executable(gtest_environment
+    gtest_environment.cpp
+)
+
+target_link_libraries(gtest_environment
+    GTest::gtest
+    GTest::gtest_main
+    GTest::gmock
+)
+
+add_test(NAME gtest_environment COMMAND gtest_environment)
+
+set_target_properties(gtest_environment PROPERTIES
+    RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/tests"
+)
