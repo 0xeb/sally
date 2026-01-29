@@ -51,7 +51,7 @@ BOOL CFilesWindow::QSFindNext(int currentIndex, BOOL next, BOOL skip, BOOL whole
     int delta = skip ? 1 : 0;
 
     int offset = 0;
-    char mask[MAX_PATH];
+    CPathBuffer mask; // Heap-allocated for long path support
     PrepareQSMask(mask, QuickSearchMask);
 
     int count = Dirs->Count + Files->Count;
@@ -213,7 +213,7 @@ void CFilesWindow::FocusShortcutTarget(CFilesWindow* panel)
     BOOL isDir = index < Dirs->Count;
     CFileData* file = isDir ? &Dirs->At(index) : &Files->At(index - Dirs->Count);
 
-    char shortName[MAX_PATH];  // File names are limited to MAX_PATH component
+    CPathBuffer shortName; // Heap-allocated for long path support
     strcpy(shortName, file->Name);
 
     CPathBuffer fullName;  // Heap-allocated for long path support
@@ -1334,8 +1334,8 @@ BOOL CFilesWindow::OnSysKeyDown(UINT uMsg, WPARAM wParam, LPARAM lParam, LRESULT
         }
         if (myDocuments)
         {
-            char path[MAX_PATH];
-            if (GetMyDocumentsOrDesktopPath(path, MAX_PATH))
+            CPathBuffer path; // Heap-allocated for long path support
+            if (GetMyDocumentsOrDesktopPath(path, path.Size()))
                 ChangePathToDisk(HWindow, path);
             return TRUE;
         }
@@ -2514,7 +2514,7 @@ void CFilesWindow::RefreshDirectory(BOOL probablyUselessRefresh, BOOL forceReloa
     // refresh of the path (change to the same one with forceUpdate TRUE)
     BOOL noChange;
     BOOL result;
-    char buf1[MAX_PATH];
+    CPathBuffer buf1; // Heap-allocated for long path support
     switch (GetPanelType())
     {
     case ptDisk:
@@ -3138,7 +3138,7 @@ void CFilesWindow::SetQuickSearchCaretPos()
     }
     else
         file = &Files->At(FocusedIndex - Dirs->Count);
-    char formatedFileName[MAX_PATH];
+    CPathBuffer formatedFileName; // Heap-allocated for long path support
     AlterFileName(formatedFileName, file->Name, -1,
                   Configuration.FileNameFormat, 0,
                   FocusedIndex < Dirs->Count);
