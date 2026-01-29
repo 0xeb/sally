@@ -69,9 +69,9 @@ void CCfgPagePackers::Transfer(CTransferInfo& ti)
             CPluginData* p = Plugins.Get(index);
             if (p != NULL)
             {
-                char buf[MAX_PATH];
-                p->GetDisplayName(buf, MAX_PATH);
-                SendDlgItemMessage(HWindow, IDC_P1_TYPE, CB_ADDSTRING, 0, (LPARAM)buf);
+                CPathBuffer buf; // Heap-allocated for long path support
+                p->GetDisplayName(buf, buf.Size());
+                SendDlgItemMessage(HWindow, IDC_P1_TYPE, CB_ADDSTRING, 0, (LPARAM)buf.Get());
             }
             else
                 TRACE_E("Unexpected situation in CCfgPagePackers::Transfer().");
@@ -493,9 +493,9 @@ void CCfgPageUnpackers::Transfer(CTransferInfo& ti)
             CPluginData* p = Plugins.Get(index);
             if (p != NULL)
             {
-                char buf[MAX_PATH];
-                p->GetDisplayName(buf, MAX_PATH);
-                SendDlgItemMessage(HWindow, IDC_P2_TYPE, CB_ADDSTRING, 0, (LPARAM)buf);
+                CPathBuffer buf; // Heap-allocated for long path support
+                p->GetDisplayName(buf, buf.Size());
+                SendDlgItemMessage(HWindow, IDC_P2_TYPE, CB_ADDSTRING, 0, (LPARAM)buf.Get());
             }
             else
                 TRACE_E("Unexpected situation in CCfgPageUnpackers::Transfer().");
@@ -532,7 +532,7 @@ void CCfgPageUnpackers::Validate(CTransferInfo& ti)
             }
         }
 
-        char masksStr[MAX_PATH];
+        CPathBuffer masksStr; // Heap-allocated for long path support
         strcpy(masksStr, Config->GetUnpackerExt(i));
         char* iterator;
         if (strlen(masksStr) > 0)
@@ -1119,14 +1119,14 @@ void CCfgPageArchivesAssoc::Transfer(CTransferInfo& ti)
 
         int count = 0;
         int index;
-        char buf[MAX_PATH];
+        CPathBuffer buf; // Heap-allocated for long path support
         while ((index = Plugins.GetPanelViewIndex(count++)) != -1) // while "panel view" plug-ins exist
         {
             CPluginData* p = Plugins.Get(index);
             if (p != NULL)
             {
-                p->GetDisplayName(buf, MAX_PATH);
-                SendDlgItemMessage(HWindow, IDC_P4_VIEW, CB_ADDSTRING, 0, (LPARAM)buf);
+                p->GetDisplayName(buf, buf.Size());
+                SendDlgItemMessage(HWindow, IDC_P4_VIEW, CB_ADDSTRING, 0, (LPARAM)buf.Get());
             }
             else
                 TRACE_E("Unexpected situation in CCfgPageArchivesAssoc::Transfer().");
@@ -1138,8 +1138,8 @@ void CCfgPageArchivesAssoc::Transfer(CTransferInfo& ti)
             CPluginData* p = Plugins.Get(index);
             if (p != NULL)
             {
-                p->GetDisplayName(buf, MAX_PATH);
-                SendDlgItemMessage(HWindow, IDC_P4_EDIT, CB_ADDSTRING, 0, (LPARAM)buf);
+                p->GetDisplayName(buf, buf.Size());
+                SendDlgItemMessage(HWindow, IDC_P4_EDIT, CB_ADDSTRING, 0, (LPARAM)buf.Get());
             }
             else
                 TRACE_E("Unexpected situation in CCfgPageArchivesAssoc::Transfer().");
