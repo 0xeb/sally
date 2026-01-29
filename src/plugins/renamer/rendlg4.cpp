@@ -122,10 +122,10 @@ BOOL CRenamerDialog::ExecuteCommand(const char* command)
 {
     CALL_STACK_MESSAGE2("CRenamerDialog::ExecuteCommand(%s)", command);
     // create the command line
-    char shell[MAX_PATH];
-    if (!GetEnvironmentVariable("SHELL", shell, MAX_PATH))
+    CPathBuffer shell; // Heap-allocated for long path support
+    if (!GetEnvironmentVariable("SHELL", shell, shell.Size()))
     {
-        if (!GetEnvironmentVariable("COMSPEC", shell, MAX_PATH))
+        if (!GetEnvironmentVariable("COMSPEC", shell, shell.Size()))
             return FALSE;
     }
 
@@ -137,18 +137,16 @@ BOOL CRenamerDialog::ExecuteCommand(const char* command)
         char escaped[4096];
 
         if (!EscapeQuotes(command, escaped) ||
-            !SalPrintf(cmdLine, 4096, "%s -c \"%s\"", shell, escaped))
+            !SalPrintf(cmdLine, 4096, "%s -c \"%s\"", shell.Get(), escaped))
             return Error(IDS_LONGDATA);
     }
     else
     {
-        if (!SalPrintf(cmdLine, 4096, "%s /C %s", shell, command))
+        if (!SalPrintf(cmdLine, 4096, "%s /C %s", shell.Get(), command))
             return Error(IDS_LONGDATA);
     }
 
-    char tempDir[MAX_PATH];
-    char outName[MAX_PATH];
-    char errName[MAX_PATH];
+    CPathBuffer tempDir, outName, errName; // Heap-allocated for long path support
     HANDLE inPipeWr = INVALID_HANDLE_VALUE;
     HANDLE inPipeWrDup = INVALID_HANDLE_VALUE;
     HANDLE inPipeRd = INVALID_HANDLE_VALUE;
@@ -165,9 +163,12 @@ BOOL CRenamerDialog::ExecuteCommand(const char* command)
     saAttr.bInheritHandle = TRUE;
 
     // create names for the tmp files
-    if (!SG->SalGetTempFileName(NULL, "SAL", tempDir, FALSE, NULL) ||
-        !SG->SalPathAppend(strcpy(outName, tempDir), "stdout", MAX_PATH) ||
-        !SG->SalPathAppend(strcpy(errName, tempDir), "stderr", MAX_PATH))
+    if (!SG->SalGetTempFileName(NULL, "SAL", tempDir, FALSE, NULL))
+        return Error(IDS_CREATETEMP);
+    lstrcpyn(outName, tempDir, outName.Size());
+    lstrcpyn(errName, tempDir, errName.Size());
+    if (!SG->SalPathAppend(outName, "stdout", outName.Size()) ||
+        !SG->SalPathAppend(errName, "stderr", errName.Size()))
         return Error(IDS_CREATETEMP);
 
     // create the pipe for input

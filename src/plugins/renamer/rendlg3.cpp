@@ -10,8 +10,8 @@ BOOL CRenamerDialog::MoveFile(char* sourceName, char* targetName, char* newPart,
     CALL_STACK_MESSAGE4("CRenamerDialog::MoveFile(, , , %d, %d, %d)", overwrite,
                         isDir, skip);
     // create the path
-    char dir[MAX_PATH];
-    strcpy(dir, targetName);
+    CPathBuffer dir; // Heap-allocated for long path support
+    lstrcpyn(dir, targetName, dir.Size());
     SG->CutDirectory(dir);
     if (!CheckAndCreateDirectory(dir, dir + (newPart - targetName), skip))
         return FALSE;

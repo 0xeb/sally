@@ -565,8 +565,8 @@ void CRenamerDialog::ExecuteScript(CRenameScriptEntry* script, int count)
         {
             if (RemoveSourcePath)
             {
-                char dir[MAX_PATH];
-                strcpy(dir, script[i].Source->FullName);
+                CPathBuffer dir; // Heap-allocated for long path support
+                lstrcpyn(dir, script[i].Source->FullName, dir.Size());
                 do
                 {
                     SG->CutDirectory(dir);
