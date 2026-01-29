@@ -51,8 +51,8 @@ CFilesWindowAncestor::CFilesWindowAncestor()
     PluginIconsType = pitSimple;
     SimplePluginIcons = NULL;
 
-    char buf[MAX_PATH];
-    EnvGetSystemDirectoryA(gEnvironment, buf, MAX_PATH);
+    CPathBuffer buf; // Heap-allocated for long path support
+    EnvGetSystemDirectoryA(gEnvironment, buf, buf.Size());
     GetRootPath(Path, buf);
 
     OnlyDetachFSListing = FALSE;
@@ -657,7 +657,7 @@ unsigned IconThreadThreadFBody(void* parameter)
                                 {
                                     fileData->IconOverlayDone = 1; // mark that this overlay was already retrieved so we don't repeat it in this cycle
 
-                                    char fileName[MAX_PATH];
+                                    CPathBuffer fileName; // Heap-allocated for long path support
                                     DWORD fileAttrs = fileData->Attr;
                                     memcpy(fileName, fileData->Name, fileData->NameLen + 1);
                                     int minPriority = 100;
@@ -676,7 +676,7 @@ unsigned IconThreadThreadFBody(void* parameter)
                                     *name = 0;
                                     //                    TRACE_I("Getting icon overlay index for: " << fileName << "...");
                                     SLOW_CALL_STACK_MESSAGE5("IconThreadThreadFBody::GetIconOverlayIndex(%s%s, 0x%08X, %d)",
-                                                             path.Get(), fileName, fileAttrs, isGoogleDrivePath);
+                                                             path.Get(), fileName.Get(), fileAttrs, isGoogleDrivePath);
                                     DWORD iconOverlayIndex = ShellIconOverlays.GetIconOverlayIndex(wPath, wName, path, name,
                                                                                                    fileName, fileAttrs,
                                                                                                    minPriority, iconReadersIconOverlayIds,
@@ -1625,7 +1625,7 @@ BOOL CFilesWindow::CanUnloadPlugin(HWND parent, CPluginInterfaceAbstract* plugin
         {
             if (Is(ptZIPArchive) || Is(ptPluginFS)) // archive -> just leave it; plug-in FS -> return to the last disk path
             {
-                char path[MAX_PATH];
+                CPathBuffer path; // Heap-allocated for long path support
                 strcpy(path, GetPath());
 
                 DWORD err, lastErr;
@@ -2249,19 +2249,19 @@ void CFilesWindow::OpenActiveFolder()
         // the Explorer process knows nothing about "sysnative", so let's not bother users with it,
         // also replace "C:\\Windows\\system32\\*" with "C:\\Windows\\SysWOW64\\*"
         //  (except for a group of directories excluded from the redirector that thus point back to System32)
-        char dirName[MAX_PATH];
+        CPathBuffer dirName; // Heap-allocated for long path support
         dirName[0] = 0;
         if (Windows64Bit && WindowsDirectory[0] != 0)
         {
             BOOL done = FALSE;
-            lstrcpyn(dirName, WindowsDirectory, MAX_PATH);
-            if (SalPathAppend(dirName, "Sysnative", MAX_PATH))
+            lstrcpyn(dirName, WindowsDirectory, dirName.Size());
+            if (SalPathAppend(dirName, "Sysnative", dirName.Size()))
             {
                 int len = (int)strlen(dirName);
                 if (StrNICmp(path, dirName, len) == 0 && (path[len] == '\\' || path[len] == 0))
                 {
-                    lstrcpyn(dirName, WindowsDirectory, MAX_PATH);
-                    SalPathAppend(dirName, "System32", MAX_PATH); // if Sysnative fit, System32 will fit as well
+                    lstrcpyn(dirName, WindowsDirectory, dirName.Size());
+                    SalPathAppend(dirName, "System32", dirName.Size()); // if Sysnative fit, System32 will fit as well
                     memmove(dirName + strlen(dirName), path + len, strlen(path + len) + 1);
                     path = dirName;
                     done = TRUE;
@@ -2269,8 +2269,8 @@ void CFilesWindow::OpenActiveFolder()
             }
             if (!done)
             {
-                lstrcpyn(dirName, WindowsDirectory, MAX_PATH);
-                if (SalPathAppend(dirName, "System32", MAX_PATH))
+                lstrcpyn(dirName, WindowsDirectory, dirName.Size());
+                if (SalPathAppend(dirName, "System32", dirName.Size()))
                 {
                     int len = (int)strlen(dirName);
                     if (StrNICmp(path, dirName, len) == 0 && (path[len] == '\\' || path[len] == 0))
@@ -2288,8 +2288,8 @@ void CFilesWindow::OpenActiveFolder()
                         }
                         if (!done)
                         {
-                            lstrcpyn(dirName, WindowsDirectory, MAX_PATH);
-                            SalPathAppend(dirName, "SysWOW64", MAX_PATH); // if System32 fit, SysWOW64 will fit as well
+                            lstrcpyn(dirName, WindowsDirectory, dirName.Size());
+                            SalPathAppend(dirName, "SysWOW64", dirName.Size()); // if System32 fit, SysWOW64 will fit as well
                             memmove(dirName + strlen(dirName), path + len, strlen(path + len) + 1);
                             path = dirName;
                         }
@@ -2299,7 +2299,7 @@ void CFilesWindow::OpenActiveFolder()
         }
 #endif // _WIN64
 
-        char itemName[MAX_PATH];
+        CPathBuffer itemName; // Heap-allocated for long path support
         itemName[0] = 0;
         if (FocusedIndex < Dirs->Count + Files->Count)
         {
