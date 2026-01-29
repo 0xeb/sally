@@ -1883,8 +1883,8 @@ BOOL CFilesWindow::ChangePathToDisk(HWND parent, const char* path, int suggested
         {
             if (err == ERROR_NOT_READY) // if the drive isn't ready (removable media)
             {
-                char text[100 + MAX_PATH];
-                char drive[MAX_PATH];
+                CPathBuffer text;  // Heap-allocated for long path support
+                CPathBuffer drive;  // Heap-allocated for long path support (UNC roots can exceed MAX_PATH)
                 UINT drvType;
                 if (changedPath[0] == '\\' && changedPath[1] == '\\')
                 {
@@ -1909,7 +1909,7 @@ BOOL CFilesWindow::ChangePathToDisk(HWND parent, const char* path, int suggested
                 }
                 else
                     GetRootPath(CheckPathRootWithRetryMsgBox, changedPath);
-                sprintf(text, LoadStr(IDS_NODISKINDRIVE), drive);
+                sprintf(text, LoadStr(IDS_NODISKINDRIVE), drive.Get());
                 int msgboxRes = (int)CDriveSelectErrDlg(parent, text, changedPath).Execute();
                 if (msgboxRes == IDCANCEL && CutDirectory(CheckPathRootWithRetryMsgBox))
                 { // to allow entering the root when a volume is mounted (F:\DRIVE_CD -> F:\)

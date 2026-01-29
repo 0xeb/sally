@@ -346,7 +346,7 @@ BOOL CFilesWindow::ReadDirectory(HWND parent, BOOL isRefresh)
                         (attrs & FILE_ATTRIBUTE_REPARSE_POINT))
                     {
                         showErr = FALSE;
-                        char drive[MAX_PATH];
+                        CPathBuffer drive;  // Heap-allocated for long path support (UNC roots can exceed MAX_PATH)
                         UINT drvType2;
                         if (GetPath()[0] == '\\' && GetPath()[1] == '\\')
                         {
@@ -365,13 +365,13 @@ BOOL CFilesWindow::ReadDirectory(HWND parent, BOOL isRefresh)
                             GetCurrentLocalReparsePoint(GetPath(), CheckPathRootWithRetryMsgBox);
                             if (strlen(CheckPathRootWithRetryMsgBox) > 3)
                             {
-                                lstrcpyn(drive, CheckPathRootWithRetryMsgBox, MAX_PATH);
+                                lstrcpyn(drive, CheckPathRootWithRetryMsgBox, drive.Size());
                                 SalPathRemoveBackslash(drive);
                             }
                         }
                         else
                             GetRootPath(CheckPathRootWithRetryMsgBox, GetPath());
-                        sprintf(buf, LoadStr(IDS_NODISKINDRIVE), drive);
+                        sprintf(buf, LoadStr(IDS_NODISKINDRIVE), drive.Get());
                         int msgboxRes = (int)CDriveSelectErrDlg(parent, buf, GetPath()).Execute();
                         CheckPathRootWithRetryMsgBox[0] = 0;
                         UpdateWindow(MainWindow->HWindow);
