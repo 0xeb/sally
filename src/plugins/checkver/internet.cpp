@@ -129,8 +129,8 @@ DWORD WINAPI ThreadDownload(void* param)
     data = NULL;
 
     // lock the DLL to prevent it from being unloaded while this function runs
-    char buff[MAX_PATH];
-    GetModuleFileName(DLLInstance, buff, MAX_PATH);
+    CPathBuffer buff; // Heap-allocated for long path support
+    GetModuleFileName(DLLInstance, buff, buff.Size());
     HINSTANCE hLock = LoadLibrary(buff);
 
     BOOL exit = FALSE;
