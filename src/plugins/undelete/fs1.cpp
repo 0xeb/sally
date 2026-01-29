@@ -69,7 +69,7 @@ void WINAPI CPluginInterfaceForFS::CloseFS(CPluginFSInterfaceAbstract* fs)
     ActiveFSCount--;
     if (!ActiveFSCount)
     {
-        char root[MAX_PATH];
+        CPathBuffer root; // Heap-allocated for long path support
         strcpy(root, AssignedFSName);
         strcat(root, ":");
         SalamanderGeneral->ToLowerCase(root);
@@ -105,7 +105,7 @@ CPluginInterfaceForFS::ExecuteOnFS(int panel, CPluginFSInterfaceAbstract* plugin
     CPluginFSInterface* fs = (CPluginFSInterface*)pluginFS;
     if (isDir) // sub-dir or up-dir
     {
-        char newPath[MAX_PATH];
+        CPathBuffer newPath; // Heap-allocated for long path support
         strcpy(newPath, fs->Path);
         if (isDir == 2) // up-dir
         {
@@ -124,11 +124,11 @@ CPluginInterfaceForFS::ExecuteOnFS(int panel, CPluginFSInterfaceAbstract* plugin
         else // sub-dir
         {
             // store data for TopIndexMem (backupPath + topIndex)
-            char backupPath[MAX_PATH];
+            CPathBuffer backupPath; // Heap-allocated for long path support
             strcpy(backupPath, newPath);
             int topIndex = SalamanderGeneral->GetPanelTopIndex(panel);
 
-            if (SalamanderGeneral->SalPathAppend(newPath, file.Name, MAX_PATH)) // set path
+            if (SalamanderGeneral->SalPathAppend(newPath, file.Name, newPath.Size())) // set path
             {
                 // change path in panel
                 fs = NULL; // after ChangePanelPathToXXX the pointer could be invalid

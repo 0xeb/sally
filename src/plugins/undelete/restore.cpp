@@ -315,7 +315,7 @@ BOOL RestoreEncryptedFiles(const char* targetPath, HWND parent)
     CALL_STACK_MESSAGE2("RestoreEncryptedFiles(%s, )", targetPath);
 
     // check EFS support on target path
-    char resolvedPath[MAX_PATH];
+    CPathBuffer resolvedPath; // Heap-allocated for long path support
     UndeleteGetResolvedRootPath(targetPath, resolvedPath);
 
     DWORD flags;
@@ -326,8 +326,8 @@ BOOL RestoreEncryptedFiles(const char* targetPath, HWND parent)
     }
 
     // init
-    char sourcePath[MAX_PATH];
-    SalamanderGeneral->GetPanelPath(PANEL_SOURCE, sourcePath, MAX_PATH, NULL, NULL);
+    CPathBuffer sourcePath; // Heap-allocated for long path support
+    SalamanderGeneral->GetPanelPath(PANEL_SOURCE, sourcePath, sourcePath.Size(), NULL, NULL);
     int selfiles, seldirs;
     SalamanderGeneral->GetPanelSelection(PANEL_SOURCE, &selfiles, &seldirs);
     BOOL focused = (selfiles == 0 && seldirs == 0);

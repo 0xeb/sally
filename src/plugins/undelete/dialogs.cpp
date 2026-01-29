@@ -359,11 +359,11 @@ void CConnectDialog::InitDrives()
 
     // get info about current panel and focused item
     int sourcePanelType;
-    char sourcePanelPath[MAX_PATH];
+    CPathBuffer sourcePanelPath; // Heap-allocated for long path support
     char* archiveOrFS = NULL;
-    sourcePanelPath[0] = 0;
+    *sourcePanelPath = 0;
     sourcePanelPath[1] = 0;
-    BOOL ret = SalamanderGeneral->GetPanelPath(Panel, sourcePanelPath, MAX_PATH, &sourcePanelType, &archiveOrFS);
+    BOOL ret = SalamanderGeneral->GetPanelPath(Panel, sourcePanelPath, sourcePanelPath.Size(), &sourcePanelType, &archiveOrFS);
     if (ret)
     {
         switch (sourcePanelType)
@@ -381,7 +381,7 @@ void CConnectDialog::InitDrives()
                 {
                     strcat(sourcePanelPath, "\\");
                     strncat(sourcePanelPath, data->Name, len - 1);
-                    sourcePanelPath[MAX_PATH - 1] = 0;
+                    sourcePanelPath[sourcePanelPath.Size() - 1] = 0;
                     SetDlgItemText(HWindow, IDC_EDIT_IMAGE, sourcePanelPath);
                 }
             }
@@ -402,10 +402,10 @@ void CConnectDialog::InitDrives()
         }
     }
 
-    char sourcePanelGUIDPath[MAX_PATH];
-    sourcePanelGUIDPath[0] = 0;
+    CPathBuffer sourcePanelGUIDPath; // Heap-allocated for long path support
+    *sourcePanelGUIDPath = 0;
     if (!SalamanderGeneral->GetResolvedPathMountPointAndGUID(sourcePanelPath, NULL, sourcePanelGUIDPath))
-        sourcePanelGUIDPath[0] = 0;
+        *sourcePanelGUIDPath = 0;
 
     SendMessage(hList, LVM_SETIMAGELIST, LVSIL_SMALL, (LPARAM)hDrivesImg);
 
@@ -521,14 +521,14 @@ BOOL CConnectDialog::OnDialogOK()
 
         // append current path, if current drive is selected
         int sourcePanelType;
-        char sourcePanelPath[MAX_PATH];
-        BOOL ret = SalamanderGeneral->GetPanelPath(Panel, sourcePanelPath, MAX_PATH, &sourcePanelType, NULL);
+        CPathBuffer sourcePanelPath; // Heap-allocated for long path support
+        BOOL ret = SalamanderGeneral->GetPanelPath(Panel, sourcePanelPath, sourcePanelPath.Size(), &sourcePanelType, NULL);
         if (ret && sourcePanelType == PATH_TYPE_WINDOWS)
         {
             // if mount points are supported, check if we are on the correct volume
-            char vol1[MAX_PATH], vol2[MAX_PATH];
-            if (GetVolumePathName(sourcePanelPath, vol1, MAX_PATH) &&
-                GetVolumePathName(Volume, vol2, MAX_PATH) &&
+            CPathBuffer vol1, vol2; // Heap-allocated for long path support
+            if (GetVolumePathName(sourcePanelPath, vol1, vol1.Size()) &&
+                GetVolumePathName(Volume, vol2, vol2.Size()) &&
                 !strcmp(vol1, vol2))
                 strcpy(Volume, sourcePanelPath);
         }
@@ -703,8 +703,8 @@ INT_PTR CConfigDialog::DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
         {
         case IDC_BUTTON_BROWSE:
         {
-            char path[MAX_PATH];
-            GetDlgItemText(HWindow, IDC_EDIT_TEMPPATH, path, MAX_PATH);
+            CPathBuffer path; // Heap-allocated for long path support
+            GetDlgItemText(HWindow, IDC_EDIT_TEMPPATH, path, path.Size());
             SalamanderGeneral->GetTargetDirectory(HWindow, HWindow, String<char>::LoadStr(IDS_UNDELETE),
                                                   String<char>::LoadStr(IDS_CHOOSETEMPDIR),
                                                   path, FALSE, path);
@@ -756,7 +756,7 @@ INT_PTR CRestoreDialog::DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
             char* end = strrchr(text2, '"');
             if (beg != NULL && end != NULL && beg < end && end - (beg + 1) < MAX_PATH)
             {
-                char fileName[MAX_PATH];
+                CPathBuffer fileName; // Heap-allocated for long path support
                 lstrcpyn(fileName, beg + 1, (int)(end - (beg + 1) + 1));
                 memmove(beg + 1 + 2, end, strlen(end) + 1);
                 memcpy(beg + 1, "%s", 2);

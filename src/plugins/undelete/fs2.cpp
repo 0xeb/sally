@@ -183,8 +183,8 @@ CPluginFSInterface::IsOurPath(int currentFSNameIndex, int fsNameIndex, const cha
                         currentFSNameIndex, fsNameIndex, userPart);
     if (WantReconnect)
         return FALSE; // user wants new connection
-    char buffer[MAX_PATH];
-    if (!RootPathFromFull(userPart, buffer, MAX_PATH))
+    CPathBuffer buffer; // Heap-allocated for long path support
+    if (!RootPathFromFull(userPart, buffer, buffer.Size()))
         return FALSE;
     if (SalamanderGeneral->IsTheSamePath(Root, buffer))
         return TRUE;
@@ -326,11 +326,11 @@ CPluginFSInterface::ChangePath(int currentFSNameIndex, char* fsName, int fsNameI
     // walk through all path components, also moving in directories structure
     CurrentDir = Snapshot->Root;
     // we will cut path to individual parts
-    char temp[MAX_PATH];
+    CPathBuffer temp; // Heap-allocated for long path support
     if (strlen(userPart) > strlen(Root))
-        lstrcpyn(temp, userPart + strlen(Root), MAX_PATH);
+        lstrcpyn(temp, userPart + strlen(Root), temp.Size());
     else
-        temp[0] = 0;
+        *temp = 0;
     char* component = strtok(temp, PATHSEP);
     while (component != NULL)
     {
@@ -1020,7 +1020,7 @@ BOOL CPluginFSInterface::CopyDir(FILE_RECORD_I<char>* record, char* filename, ch
         return FALSE;
 
     // make target path
-    char path[MAX_PATH];
+    CPathBuffer path; // Heap-allocated for long path support
     BOOL ret;
     if (!AppendPath(path, targetPath, name, &ret))
     {
@@ -1153,7 +1153,7 @@ void UndeleteGetResolvedRootPath(const char* path, char* resolvedPath)
 {
     strcpy(resolvedPath, path);
     SalamanderGeneral->ResolveSubsts(resolvedPath);
-    char rootPath[MAX_PATH];
+    CPathBuffer rootPath; // Heap-allocated for long path support
     SalamanderGeneral->GetRootPath(rootPath, resolvedPath);
     if (!SalamanderGeneral->IsUNCPath(rootPath) && GetDriveType(rootPath) == DRIVE_FIXED) // reparse points exist only on fixed drives
     {
@@ -1177,7 +1177,7 @@ BOOL CPluginFSInterface::PrepareRawAPI(char* targetPath, BOOL allowBackup)
 {
     CALL_STACK_MESSAGE1("CPluginFSInterface::PrepareRawAPI()");
 
-    char resolvedPath[MAX_PATH];
+    CPathBuffer resolvedPath; // Heap-allocated for long path support
     UndeleteGetResolvedRootPath(targetPath, resolvedPath);
 
     DWORD flags;
@@ -1381,8 +1381,8 @@ CPluginFSInterface::CopyOrMoveFromFS(BOOL copy, int mode, const char* fsName, HW
 BOOL CPluginFSInterface::GetTempDirOutsideRoot(HWND parent, char* buffer, char** ret)
 {
     char* tempdir = NULL; // return NULL for system TEMP
-    char path[MAX_PATH];
-    GetTempPath(MAX_PATH, path); // get system TEMP
+    CPathBuffer path; // Heap-allocated for long path support
+    GetTempPath(path.Size(), path); // get system TEMP
     if (!Volume.IsImage && SalamanderGeneral->PathsAreOnTheSameVolume(Root, path, NULL))
     {
         while (ConfigTempPath[0] == 0 || SalamanderGeneral->PathsAreOnTheSameVolume(Root, ConfigTempPath, NULL))
@@ -1409,7 +1409,7 @@ CPluginFSInterface::ViewFile(const char* fsName, HWND parent,
     CALL_STACK_MESSAGE2("CPluginFSInterface::ViewFile(%s, , , )", fsName);
 
     // chose different TEMP dir when we have opened same volume as volume where disk-cache is
-    char buff[MAX_PATH];
+    CPathBuffer buff; // Heap-allocated for long path support
     char* tempdir;
     if (!GetTempDirOutsideRoot(parent, buff, &tempdir))
         return;
@@ -1897,7 +1897,7 @@ void CPluginFSInterface::TestUndeleteOnExistingFiles(FILE* file, FILE_RECORD_I<c
 void CPluginFSInterface::DumpDebugInformation(HWND parent, const DIR_ITEM_I<char>* di, DWORD mode)
 {
     // chose different TEMP dir when we have opened same volume as volume where disk-cache is
-    char buff[MAX_PATH];
+    CPathBuffer buff; // Heap-allocated for long path support
     char* tempdir;
     if (!GetTempDirOutsideRoot(parent, buff, &tempdir))
         return;
@@ -1909,12 +1909,12 @@ void CPluginFSInterface::DumpDebugInformation(HWND parent, const DIR_ITEM_I<char
         FILE* file = fopen(fileNameBuf, "w");
         if (file != NULL)
         {
-            char path[MAX_PATH];
+            CPathBuffer path; // Heap-allocated for long path support
             if (mode == CMD_VIEWINFO)
             {
                 DumpDirItemInfo(file, di);
                 strcpy(path, Path);
-                SalamanderGeneral->SalPathAppend(path, di->FileName->FNName, sizeof(path));
+                SalamanderGeneral->SalPathAppend(path, di->FileName->FNName, path.Size());
                 DumpExistingFileLayout(file, path, &Volume);
             }
 
@@ -1922,7 +1922,7 @@ void CPluginFSInterface::DumpDebugInformation(HWND parent, const DIR_ITEM_I<char
             {
                 fprintf(file, "Existing files, see DumpSpecifiedFiles() for filter\n");
                 strcpy(path, Root);
-                DumpSpecifiedFiles(file, Snapshot->Root, path, sizeof(path));
+                DumpSpecifiedFiles(file, Snapshot->Root, path, path.Size());
             }
 
             if (mode == CMD_COMPAREFILES)
@@ -1930,7 +1930,7 @@ void CPluginFSInterface::DumpDebugInformation(HWND parent, const DIR_ITEM_I<char
                 fprintf(file, "Test Undelete on Existing files\n");
                 strcpy(path, Root);
                 DWORD totalCount = 0;
-                TestUndeleteOnExistingFiles(file, Snapshot->Root, path, sizeof(path), &totalCount);
+                TestUndeleteOnExistingFiles(file, Snapshot->Root, path, path.Size(), &totalCount);
 
                 // open progress
                 HWND mainwnd = SalamanderGeneral->GetMainWindowHWND();
@@ -1944,7 +1944,7 @@ void CPluginFSInterface::DumpDebugInformation(HWND parent, const DIR_ITEM_I<char
                 TotalProgress = FileProgress = 0;
                 GrandTotal = totalCount;
 
-                TestUndeleteOnExistingFiles(file, Snapshot->Root, path, sizeof(path), NULL);
+                TestUndeleteOnExistingFiles(file, Snapshot->Root, path, path.Size(), NULL);
 
                 // close progress
                 EnableWindow(mainwnd, TRUE);
@@ -1976,8 +1976,8 @@ void CPluginFSInterface::FragmentFile(HWND parent, const DIR_ITEM_I<char>* di, c
     HANDLE hVolume = NULL;
     HANDLE hFile = NULL;
     // get volume GUID
-    char sourcePanelGUIDPath[MAX_PATH];
-    sourcePanelGUIDPath[0] = 0;
+    CPathBuffer sourcePanelGUIDPath; // Heap-allocated for long path support
+    *sourcePanelGUIDPath = 0;
     if (!SalamanderGeneral->GetResolvedPathMountPointAndGUID(Root, NULL, sourcePanelGUIDPath))
     {
         TRACE_E("GetResolvedPathMountPointAndGUID() failed on " << Root);
