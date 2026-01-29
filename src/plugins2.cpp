@@ -1274,8 +1274,8 @@ void CPlugins::Load(HWND parent, HKEY regKey)
     DefaultConfiguration = FALSE;
     if (regKey != NULL)
     {
-        char pluginsDir[MAX_PATH];
-        GetModuleFileName(HInstance, pluginsDir, MAX_PATH);
+        CPathBuffer pluginsDir; // Heap-allocated for long path support
+        GetModuleFileName(HInstance, pluginsDir, pluginsDir.Size());
         char* s = strrchr(pluginsDir, '\\');
         if (s != NULL)
             strcpy(s + 1, "plugins");
@@ -1285,17 +1285,17 @@ void CPlugins::Load(HWND parent, HKEY regKey)
         int i = 1;
         strcpy(buf, "1");
         BOOL view, edit, pack, unpack, config, loadsave, viewer, fs, loadOnStart, dynMenuExt;
-        char name[MAX_PATH];
-        char dllName[MAX_PATH];
-        char version[MAX_PATH];
-        char copyright[MAX_PATH];
-        char extensions[MAX_PATH];
-        char description[MAX_PATH];
-        char regKeyName[MAX_PATH];
+        CPathBuffer name; // Heap-allocated for long path support
+        CPathBuffer dllName; // Heap-allocated for long path support
+        CPathBuffer version; // Heap-allocated for long path support
+        CPathBuffer copyright; // Heap-allocated for long path support
+        CPathBuffer extensions; // Heap-allocated for long path support
+        CPathBuffer description; // Heap-allocated for long path support
+        CPathBuffer regKeyName; // Heap-allocated for long path support
         TIndirectArray<char> fsNames(1, 10);
-        char fsCmdName[MAX_PATH];
-        char lastSLGName[MAX_PATH];
-        char pluginHomePageURL[MAX_PATH];
+        CPathBuffer fsCmdName; // Heap-allocated for long path support
+        CPathBuffer lastSLGName; // Heap-allocated for long path support
+        CPathBuffer pluginHomePageURL; // Heap-allocated for long path support
         char thumbnailMasks[MAX_GROUPMASK];
         CIconList* pluginIcons;
         int pluginIconIndex;
@@ -1315,13 +1315,13 @@ void CPlugins::Load(HWND parent, HKEY regKey)
             showSubmenuPluginsBar = TRUE;
             if (Configuration.ConfigVersion < 7) // old version (functions stored separately as BOOLs)
             {
-                ok = GetValue(itemKey, SALAMANDER_PLUGINS_NAME, REG_SZ, name, MAX_PATH) &&
-                     GetValue(itemKey, SALAMANDER_PLUGINS_DLLNAME, REG_SZ, dllName, MAX_PATH) &&
-                     GetValue(itemKey, SALAMANDER_PLUGINS_VERSION, REG_SZ, version, MAX_PATH) &&
-                     GetValue(itemKey, SALAMANDER_PLUGINS_COPYRIGHT, REG_SZ, copyright, MAX_PATH) &&
-                     GetValue(itemKey, SALAMANDER_PLUGINS_EXTENSIONS, REG_SZ, extensions, MAX_PATH) &&
-                     GetValue(itemKey, SALAMANDER_PLUGINS_DESCRIPTION, REG_SZ, description, MAX_PATH) &&
-                     GetValue(itemKey, SALAMANDER_PLUGINS_REGKEYNAME, REG_SZ, regKeyName, MAX_PATH) &&
+                ok = GetValue(itemKey, SALAMANDER_PLUGINS_NAME, REG_SZ, name, name.Size()) &&
+                     GetValue(itemKey, SALAMANDER_PLUGINS_DLLNAME, REG_SZ, dllName, dllName.Size()) &&
+                     GetValue(itemKey, SALAMANDER_PLUGINS_VERSION, REG_SZ, version, version.Size()) &&
+                     GetValue(itemKey, SALAMANDER_PLUGINS_COPYRIGHT, REG_SZ, copyright, copyright.Size()) &&
+                     GetValue(itemKey, SALAMANDER_PLUGINS_EXTENSIONS, REG_SZ, extensions, extensions.Size()) &&
+                     GetValue(itemKey, SALAMANDER_PLUGINS_DESCRIPTION, REG_SZ, description, description.Size()) &&
+                     GetValue(itemKey, SALAMANDER_PLUGINS_REGKEYNAME, REG_SZ, regKeyName, regKeyName.Size()) &&
                      LoadFSNames(itemKey, &fsNames) &&
                      GetValue(itemKey, SALAMANDER_PLUGINS_PANELVIEW, REG_DWORD, &view, sizeof(DWORD)) &&
                      GetValue(itemKey, SALAMANDER_PLUGINS_PANELEDIT, REG_DWORD, &edit, sizeof(DWORD)) &&
@@ -1336,13 +1336,13 @@ void CPlugins::Load(HWND parent, HKEY regKey)
             else // new version (fstores functions in a single DWORD using bit fields)
             {
                 DWORD functions = 0;
-                ok = GetValue(itemKey, SALAMANDER_PLUGINS_NAME, REG_SZ, name, MAX_PATH) &&
-                     GetValue(itemKey, SALAMANDER_PLUGINS_DLLNAME, REG_SZ, dllName, MAX_PATH) &&
-                     GetValue(itemKey, SALAMANDER_PLUGINS_VERSION, REG_SZ, version, MAX_PATH) &&
-                     GetValue(itemKey, SALAMANDER_PLUGINS_COPYRIGHT, REG_SZ, copyright, MAX_PATH) &&
-                     GetValue(itemKey, SALAMANDER_PLUGINS_EXTENSIONS, REG_SZ, extensions, MAX_PATH) &&
-                     GetValue(itemKey, SALAMANDER_PLUGINS_DESCRIPTION, REG_SZ, description, MAX_PATH) &&
-                     GetValue(itemKey, SALAMANDER_PLUGINS_REGKEYNAME, REG_SZ, regKeyName, MAX_PATH) &&
+                ok = GetValue(itemKey, SALAMANDER_PLUGINS_NAME, REG_SZ, name, name.Size()) &&
+                     GetValue(itemKey, SALAMANDER_PLUGINS_DLLNAME, REG_SZ, dllName, dllName.Size()) &&
+                     GetValue(itemKey, SALAMANDER_PLUGINS_VERSION, REG_SZ, version, version.Size()) &&
+                     GetValue(itemKey, SALAMANDER_PLUGINS_COPYRIGHT, REG_SZ, copyright, copyright.Size()) &&
+                     GetValue(itemKey, SALAMANDER_PLUGINS_EXTENSIONS, REG_SZ, extensions, extensions.Size()) &&
+                     GetValue(itemKey, SALAMANDER_PLUGINS_DESCRIPTION, REG_SZ, description, description.Size()) &&
+                     GetValue(itemKey, SALAMANDER_PLUGINS_REGKEYNAME, REG_SZ, regKeyName, regKeyName.Size()) &&
                      LoadFSNames(itemKey, &fsNames) &&
                      GetValue(itemKey, SALAMANDER_PLUGINS_FUNCTIONS, REG_DWORD, &functions, sizeof(DWORD));
 
@@ -1363,8 +1363,8 @@ void CPlugins::Load(HWND parent, HKEY regKey)
                 }
 
                 // these values don't have to be loaded (they may be missing in the configuration)
-                GetValue(itemKey, SALAMANDER_PLUGINS_LASTSLGNAME, REG_SZ, lastSLGName, MAX_PATH);
-                GetValue(itemKey, SALAMANDER_PLUGINS_HOMEPAGE, REG_SZ, pluginHomePageURL, MAX_PATH);
+                GetValue(itemKey, SALAMANDER_PLUGINS_LASTSLGNAME, REG_SZ, lastSLGName, lastSLGName.Size());
+                GetValue(itemKey, SALAMANDER_PLUGINS_HOMEPAGE, REG_SZ, pluginHomePageURL, pluginHomePageURL.Size());
                 GetValue(itemKey, SALAMANDER_PLUGINS_THUMBMASKS, REG_SZ, thumbnailMasks, MAX_GROUPMASK);
                 GetValue(itemKey, SALAMANDER_PLUGINS_PLGICONINDEX, REG_DWORD, &pluginIconIndex, sizeof(DWORD));
                 GetValue(itemKey, SALAMANDER_PLUGINS_PLGSUBMENUICONINDEX, REG_DWORD, &pluginSubmenuIconIndex, sizeof(DWORD));
@@ -1378,7 +1378,7 @@ void CPlugins::Load(HWND parent, HKEY regKey)
             }
             if (ok)
             {
-                char normalizedDLLName[MAX_PATH];
+                CPathBuffer normalizedDLLName; // Heap-allocated for long path support
                 if (StrNICmp(dllName, pluginsDir, (int)strlen(pluginsDir)) == 0 && dllName[(int)strlen(pluginsDir)] == '\\')
                 {
                     memmove(normalizedDLLName, dllName + strlen(pluginsDir) + 1, strlen(dllName) - strlen(pluginsDir) + 1 - 1);
@@ -1394,7 +1394,7 @@ void CPlugins::Load(HWND parent, HKEY regKey)
                 {
                     if (AddPlugin(name, normalizedDLLName, view, edit, pack, unpack, config, loadsave, viewer, fs,
                                   dynMenuExt, version, copyright, description, regKeyName, extensions, &fsNames,
-                                  loadOnStart, lastSLGName, pluginHomePageURL[0] != 0 ? pluginHomePageURL : NULL))
+                                  loadOnStart, lastSLGName, pluginHomePageURL[0] != 0 ? pluginHomePageURL.Get() : NULL))
                     {
                         err = FALSE;
                         CPluginData* p = Get(Data.Count - 1);
@@ -1576,7 +1576,7 @@ void CPlugins::LoadOrder(HWND parent, HKEY regKey)
 {
     if (regKey != NULL)
     {
-        char dllName[MAX_PATH];
+        CPathBuffer dllName; // Heap-allocated for long path support
         DWORD showInBar;
         HKEY itemKey;
         char buf[30];
@@ -1586,7 +1586,7 @@ void CPlugins::LoadOrder(HWND parent, HKEY regKey)
         {
             if (!GetValue(itemKey, SALAMANDER_PLUGINSORDER_SHOW, REG_DWORD, &showInBar, sizeof(DWORD)))
                 showInBar = TRUE;
-            if (GetValue(itemKey, SALAMANDER_PLUGINS_DLLNAME, REG_SZ, dllName, MAX_PATH))
+            if (GetValue(itemKey, SALAMANDER_PLUGINS_DLLNAME, REG_SZ, dllName, dllName.Size()))
             {
                 AddPluginToOrder(dllName, showInBar);
             }
@@ -1936,8 +1936,8 @@ CPlugins::GetPluginDataFromSuffix(const char* dllSuffix)
     if (dllSuffix != NULL)
     {
         // obtain the full name of the plugins directory
-        char fullDLLName[MAX_PATH];
-        GetModuleFileName(HInstance, fullDLLName, MAX_PATH);
+        CPathBuffer fullDLLName; // Heap-allocated for long path support
+        GetModuleFileName(HInstance, fullDLLName, fullDLLName.Size());
         char* name = strrchr(fullDLLName, '\\') + 1;
         strcpy(name, "plugins\\");
         name += strlen(name);
@@ -2373,7 +2373,7 @@ BOOL CPlugins::AddPlugin(const char* name, const char* dllName, BOOL supportPane
                          loadOnStart, lastSLGName, pluginHomePageURL);
     BOOL ret = FALSE;
 
-    char uniqueKeyName[MAX_PATH];
+    CPathBuffer uniqueKeyName; // Heap-allocated for long path support
     if (supportLoadSave)
         GetUniqueRegKeyName(uniqueKeyName, regKeyName);
     else
@@ -2387,7 +2387,7 @@ BOOL CPlugins::AddPlugin(const char* name, const char* dllName, BOOL supportPane
             int i;
             for (i = 0; i < fsNames->Count; i++)
             {
-                char uniqueFSName[MAX_PATH];
+                CPathBuffer uniqueFSName; // Heap-allocated for long path support
                 GetUniqueFSName(uniqueFSName, fsNames->At(i), uniqueFSNames, NULL);
 
                 char* s = DupStr(uniqueFSName);
@@ -2803,10 +2803,10 @@ BOOL SearchForAddedSPLs(char* buf, char* s, TIndirectArray<char>& foundFiles)
                 char num[20];
                 lstrcpyn(num, start, (int)min(20, sep - start + 1));
                 int ver = atoi(num);
-                char name[MAX_PATH];
+                CPathBuffer name; // Heap-allocated for long path support
                 if (sep + 1 < eol)
                 {
-                    lstrcpyn(name, sep + 1, (int)min(MAX_PATH, (eol - sep) - 1 + 1));
+                    lstrcpyn(name, sep + 1, (int)min(name.Size(), (eol - sep) - 1 + 1));
                 }
                 else
                     name[0] = 0;
@@ -2833,7 +2833,7 @@ BOOL SearchForAddedSPLs(char* buf, char* s, TIndirectArray<char>& foundFiles)
                             name[1] != ':')                         // not a normal full path
                         {                                           // path relative to the plugins directory
                             int l = (int)(s - buf + 1);
-                            memmove(name + l, name, min((int)strlen(name) + 1, MAX_PATH - l));
+                            memmove(name + l, name, min((int)strlen(name) + 1, name.Size() - l));
                             memcpy(name, buf, l); // assumes buf contains the path including backslash
                         }
                         DWORD attrs = SalGetFileAttributes(name);
@@ -2931,7 +2931,7 @@ BOOL CPlugins::ReadPluginsVer(HWND parent, BOOL importFromOldConfig)
         if (foundFiles.IsGood())
         {
             *s = 0; // correct the path in buf
-            char pluginName[MAX_PATH];
+            CPathBuffer pluginName; // Heap-allocated for long path support
             for (int i = 0; i < foundFiles.Count; i++)
             {
                 char* file = foundFiles[i];
@@ -2944,7 +2944,7 @@ BOOL CPlugins::ReadPluginsVer(HWND parent, BOOL importFromOldConfig)
                 int index;
                 if (!Plugins.FindDLL(pluginName, index))
                 {
-                    _snprintf_s(textProgress, _TRUNCATE, "%s\n%s", LoadStr(IDS_AUTOINSTALLPLUGINS), pluginName);
+                    _snprintf_s(textProgress, _TRUNCATE, "%s\n%s", LoadStr(IDS_AUTOINSTALLPLUGINS), pluginName.Get());
                     analysing.SetText(textProgress);
 
                     Plugins.AddPlugin(parent, pluginName); // whatever we add will already be loaded (loading verifies it is a plugin)
@@ -3239,15 +3239,15 @@ void CPlugins::RemoveNoLongerExistingPlugins(BOOL canDelPluginRegKey, BOOL loadA
             if (attr == INVALID_FILE_ATTRIBUTES &&
                 (err == ERROR_FILE_NOT_FOUND || err == ERROR_PATH_NOT_FOUND || err == ERROR_BAD_PATHNAME))
             {
-                char pluginName[MAX_PATH];
+                CPathBuffer pluginName; // Heap-allocated for long path support
                 pluginName[0] = 0;
                 if (notLoadedPluginNames != NULL && Data[i]->RegKeyName != NULL && Data[i]->RegKeyName[0] != 0 &&
-                    _stricmp(Data[i]->DLLName, "fsearch\\fsearch.spl") != 0 && // we want to suppress FSearch (no need to alert that it’s missing)
-                    _stricmp(Data[i]->DLLName, "eroiica\\eroiica.spl") != 0 && // we want to suppress Eroiica (no need to alert that it’s missing)
-                    _stricmp(Data[i]->DLLName, "unace\\unace.spl") != 0 &&     // we want to suppress UnACE (no need to alert that it’s missing)
-                    _stricmp(Data[i]->DLLName, "diskcopy\\diskcopy.spl") != 0) // we want to suppress DiskCopy (no need to alert that it’s missing)
+                    _stricmp(Data[i]->DLLName, "fsearch\\fsearch.spl") != 0 && // we want to suppress FSearch (no need to alert that it's missing)
+                    _stricmp(Data[i]->DLLName, "eroiica\\eroiica.spl") != 0 && // we want to suppress Eroiica (no need to alert that it's missing)
+                    _stricmp(Data[i]->DLLName, "unace\\unace.spl") != 0 &&     // we want to suppress UnACE (no need to alert that it's missing)
+                    _stricmp(Data[i]->DLLName, "diskcopy\\diskcopy.spl") != 0) // we want to suppress DiskCopy (no need to alert that it's missing)
                 {
-                    lstrcpyn(pluginName, Data[i]->Name, MAX_PATH); // if it has a registry key, store its name
+                    lstrcpyn(pluginName, Data[i]->Name, pluginName.Size()); // if it has a registry key, store its name
                 }
                 if (Remove(parent, i, canDelPluginRegKey))
                 {
@@ -3369,7 +3369,7 @@ void CPlugins::AutoInstallStdPluginsDir(HWND parent)
     if (foundFiles.IsGood())
     {
         *s = 0; // correct the path in buf
-        char pluginName[MAX_PATH];
+        CPathBuffer pluginName; // Heap-allocated for long path support
         for (int i = 0; i < foundFiles.Count; i++)
         {
             char* file = foundFiles[i];
@@ -3386,7 +3386,7 @@ void CPlugins::AutoInstallStdPluginsDir(HWND parent)
 #endif                                                   // _WIN64
             )
             {
-                _snprintf_s(textProgress, _TRUNCATE, "%s\n%s", LoadStr(IDS_AUTOINSTALLPLUGINS), pluginName);
+                _snprintf_s(textProgress, _TRUNCATE, "%s\n%s", LoadStr(IDS_AUTOINSTALLPLUGINS), pluginName.Get());
                 analysing.SetText(textProgress);
 
                 if (Plugins.AddPlugin(parent, pluginName)) // whatever we add, will already be loaded (loading verifies it is a plugin)
