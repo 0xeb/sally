@@ -1198,8 +1198,8 @@ void CRenamerDialog::ReloadSourceFiles()
     EnableWindow(HWindow, FALSE);
 
     BOOL success = TRUE;
-    char pathBuf[MAX_PATH];
-    strcpy(pathBuf, Root);
+    CPathBuffer pathBuf; // Heap-allocated for long path support
+    lstrcpyn(pathBuf, Root, pathBuf.Size());
     SkipAllLongNames = FALSE;
     SkipAllBadDirs = FALSE;
     TRACE_I("start reading files");
