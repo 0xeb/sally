@@ -42,6 +42,7 @@ extern "C"
 #include "worker.h"
 #include "find.h"
 #include "viewer.h"
+#include "common/widepath.h"
 
 // critical shutdown: the maximum time we can spend in WM_QUERYENDSESSION (after that,
 // KILL comes from Windows). It is 5s (5s with an open message box, 10s without pumping
@@ -158,12 +159,12 @@ BOOL OpenHtmlHelp(char* helpFileName, HWND parent, CHtmlHelpCommand command, DWO
     char helpPath[MAX_PATH + 50];
     if (CurrentHelpDir[0] == 0)
     {
-        char helpSubdir[MAX_PATH];
+        CPathBuffer helpSubdir; // Heap-allocated for long path support
         helpSubdir[0] = 0;
         CLanguage language;
         if (language.Init(Configuration.LoadedSLGName, NULL))
         {
-            lstrcpyn(helpSubdir, language.HelpDir, MAX_PATH);
+            lstrcpyn(helpSubdir, language.HelpDir, helpSubdir.Size());
             language.Free();
         }
         if (helpSubdir[0] == 0)
@@ -2742,8 +2743,8 @@ MENU_TEMPLATE_ITEM AddToSystemMenu[] =
             const char* focusPlugin = dlg.GetFocusPlugin();
             if (focusPlugin[0] != 0)
             {
-                char newPath[MAX_PATH];
-                lstrcpyn(newPath, focusPlugin, MAX_PATH);
+                CPathBuffer newPath; // Heap-allocated for long path support
+                lstrcpyn(newPath, focusPlugin, newPath.Size());
                 const char* newName;
                 char* p = strrchr(newPath, '\\');
                 if (p != NULL)
@@ -2754,7 +2755,7 @@ MENU_TEMPLATE_ITEM AddToSystemMenu[] =
                 }
                 else
                     newName = "";
-                SendMessage(GetActivePanel()->HWindow, WM_USER_FOCUSFILE, (WPARAM)newName, (LPARAM)newPath);
+                SendMessage(GetActivePanel()->HWindow, WM_USER_FOCUSFILE, (WPARAM)newName, (LPARAM)newPath.Get());
             }
 
             EndStopRefresh(); // snooper starts again now
@@ -2771,13 +2772,13 @@ MENU_TEMPLATE_ITEM AddToSystemMenu[] =
                 if (ret.type == PromptResult::kCancel)
                 {
                     // navigate the user to the correct directory and focus the configuration file to make it easier
-                    char path[MAX_PATH];
+                    CPathBuffer path; // Heap-allocated for long path support
                     char* s = strrchr(ConfigurationName, '\\');
                     if (s != NULL)
                     {
                         memcpy(path, ConfigurationName, s - ConfigurationName);
                         path[s - ConfigurationName] = 0;
-                        SendMessage(activePanel->HWindow, WM_USER_FOCUSFILE, (WPARAM)(s + 1), (LPARAM)path);
+                        SendMessage(activePanel->HWindow, WM_USER_FOCUSFILE, (WPARAM)(s + 1), (LPARAM)path.Get());
                     }
                     return 0;
                 }
@@ -2797,8 +2798,8 @@ MENU_TEMPLATE_ITEM AddToSystemMenu[] =
                 SaveConfig();
             }
 
-            char file[MAX_PATH];
-            char defDir[MAX_PATH];
+            CPathBuffer file; // Heap-allocated for long path support
+            CPathBuffer defDir; // Heap-allocated for long path support
             strcpy(file, "config_.reg");
 
             bool clearKeyBeforeImport = true;
@@ -2870,8 +2871,8 @@ MENU_TEMPLATE_ITEM AddToSystemMenu[] =
                 const char* path = dlg.GetFocusedPath();
                 if (path != NULL)
                 {
-                    char newPath[MAX_PATH];
-                    lstrcpyn(newPath, path, MAX_PATH);
+                    CPathBuffer newPath; // Heap-allocated for long path support
+                    lstrcpyn(newPath, path, newPath.Size());
                     const char* newName;
                     char* p = strrchr(newPath, '\\');
                     if (p != NULL)
@@ -2882,7 +2883,7 @@ MENU_TEMPLATE_ITEM AddToSystemMenu[] =
                     }
                     else
                         newName = "";
-                    SendMessage(GetActivePanel()->HWindow, WM_USER_FOCUSFILE, (WPARAM)newName, (LPARAM)newPath);
+                    SendMessage(GetActivePanel()->HWindow, WM_USER_FOCUSFILE, (WPARAM)newName, (LPARAM)newPath.Get());
                 }
             }
             break;
@@ -3243,8 +3244,8 @@ MENU_TEMPLATE_ITEM AddToSystemMenu[] =
             activePanel->StoreSelection(); // save selection for Restore Selection command
 
             // if no item is selected, select the focused one and store its name
-            char temporarySelected[MAX_PATH];
-            activePanel->SelectFocusedItemAndGetName(temporarySelected, MAX_PATH);
+            CPathBuffer temporarySelected; // Heap-allocated for long path support
+            activePanel->SelectFocusedItemAndGetName(temporarySelected, temporarySelected.Size());
 
             activePanel->EmailFiles();
 
@@ -3274,8 +3275,8 @@ MENU_TEMPLATE_ITEM AddToSystemMenu[] =
             activePanel->StoreSelection(); // save selection for Restore Selection command
 
             // if no item is selected, select the focused one and store its name
-            char temporarySelected[MAX_PATH];
-            activePanel->SelectFocusedItemAndGetName(temporarySelected, MAX_PATH);
+            CPathBuffer temporarySelected; // Heap-allocated for long path support
+            activePanel->SelectFocusedItemAndGetName(temporarySelected, temporarySelected.Size());
 
             if (activePanel->Is(ptDisk)) // source is disk - all operations go here
             {
@@ -3408,8 +3409,8 @@ MENU_TEMPLATE_ITEM AddToSystemMenu[] =
                 activePanel->StoreSelection(); // save selection for Restore Selection command
 
                 // if no item is selected, choose the one under the focus and store its name
-                char temporarySelected[MAX_PATH];
-                activePanel->SelectFocusedItemAndGetName(temporarySelected, MAX_PATH);
+                CPathBuffer temporarySelected; // Heap-allocated for long path support
+                activePanel->SelectFocusedItemAndGetName(temporarySelected, temporarySelected.Size());
 
                 activePanel->Convert();
 
@@ -4120,8 +4121,8 @@ MENU_TEMPLATE_ITEM AddToSystemMenu[] =
         {
             activePanel->UserWorkedOnThisPath = TRUE;
 
-            char cmd[MAX_PATH];
-            if (!GetEnvironmentVariable("COMSPEC", cmd, MAX_PATH))
+            CPathBuffer cmd; // Heap-allocated for long path support
+            if (!GetEnvironmentVariable("COMSPEC", cmd, cmd.Size()))
                 cmd[0] = 0;
 
             if (SystemPolicies.GetNoRun() ||
@@ -4131,7 +4132,7 @@ MENU_TEMPLATE_ITEM AddToSystemMenu[] =
                 return 0;
             }
 
-            AddDoubleQuotesIfNeeded(cmd, MAX_PATH); // CreateProcess requires the name with spaces in quotes (otherwise it tries various options; see help)
+            AddDoubleQuotesIfNeeded(cmd, cmd.Size()); // CreateProcess requires the name with spaces in quotes (otherwise it tries various options; see help)
 
             SetDefaultDirectories();
 
@@ -4451,7 +4452,7 @@ MENU_TEMPLATE_ITEM AddToSystemMenu[] =
                 NeedToResentDispachChangeNotif = TRUE;
             else
             {
-                char path[MAX_PATH];
+                CPathBuffer path; // Heap-allocated for long path support
                 BOOL includingSubdirs;
                 BOOL ok = TRUE;
                 while (1)
@@ -5635,7 +5636,7 @@ MENU_TEMPLATE_ITEM AddToSystemMenu[] =
         if (SalShExtSharedMemView != NULL) // shared memory is available (we cannot handle cut/copy&paste errors)
         {
             BOOL tmpPasteDone = FALSE;
-            char tgtPath[MAX_PATH];
+            CPathBuffer tgtPath; // Heap-allocated for long path support
             tgtPath[0] = 0;
             int operation = 0;
             DWORD dataID = -1;
@@ -5661,7 +5662,7 @@ MENU_TEMPLATE_ITEM AddToSystemMenu[] =
                         if (SalShExtSharedMemView->PasteDone) // copy hook supplied the target path for Paste and other data
                         {
                             //                TRACE_I("WM_USER_SALSHEXT_PASTE: copy hook returned: paste done!");
-                            lstrcpyn(tgtPath, SalShExtSharedMemView->TargetPath, MAX_PATH);
+                            lstrcpyn(tgtPath, SalShExtSharedMemView->TargetPath, tgtPath.Size());
                             operation = SalShExtSharedMemView->Operation;
                             dataID = SalShExtSharedMemView->PastedDataID;
                             tmpPasteDone = TRUE;
@@ -6969,7 +6970,7 @@ MENU_TEMPLATE_ITEM TaskBarIconMenu[] =
         CFileData* f;
         f = (index < GetActivePanel()->Dirs->Count) ? &GetActivePanel()->Dirs->At(index) : &GetActivePanel()->Files->At(index - GetActivePanel()->Dirs->Count);
 
-        char buff[MAX_PATH];
+        CPathBuffer buff; // Heap-allocated for long path support
         strcpy(buff, GetActivePanel()->GetPath());
         if (buff[strlen(buff) - 1] != '\\')
             strcat(buff, "\\");
