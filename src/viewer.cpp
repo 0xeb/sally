@@ -559,9 +559,9 @@ CViewerWindow::CViewerWindow(const char* fileName, CViewType type, const char* c
         FileName = NULL; // error
     else
     {
-        char name[MAX_PATH];
-        lstrcpyn(name, fileName, MAX_PATH);
-        if (SalGetFullName(name))
+        CPathBuffer name; // Heap-allocated for long path support
+        lstrcpyn(name, fileName, name.Size());
+        if (SalGetFullName(name, NULL, NULL, NULL, NULL, name.Size()))
         {
             FileName = (char*)malloc(strlen(name) + 1);
             if (FileName != NULL)
