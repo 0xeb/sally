@@ -614,23 +614,23 @@ MENU_TEMPLATE_ITEM AppendToSystemMenu[] =
     {
         if (LOWORD(wParam) == CM_OPENFILE)
         {
-            char file[MAX_PATH];
-            lstrcpy(file, "salupdate_en.txt");
+            CPathBuffer file; // Heap-allocated for long path support
+            lstrcpyn(file, "salupdate_en.txt", file.Size());
             OPENFILENAME ofn;
             memset(&ofn, 0, sizeof(OPENFILENAME));
             ofn.lStructSize = sizeof(OPENFILENAME);
             ofn.hwndOwner = hWindow;
             ofn.lpstrFilter = "*.txt\0*.txt\0*.*\0*.*\0";
             ofn.lpstrFile = file;
-            ofn.nMaxFile = MAX_PATH;
+            ofn.nMaxFile = file.Size();
             ofn.nFilterIndex = 1;
             //  ofn.lpstrFileTitle = file;
             //  ofn.nMaxFileTitle = MAX_PATH;
             ofn.Flags = OFN_HIDEREADONLY | OFN_PATHMUSTEXIST | OFN_FILEMUSTEXIST | OFN_LONGNAMES | OFN_EXPLORER;
 
-            char buf[MAX_PATH];
-            GetModuleFileName(DLLInstance, buf, MAX_PATH);
-            char* s = strrchr(buf, '\\');
+            CPathBuffer buf; // Heap-allocated for long path support
+            GetModuleFileName(DLLInstance, buf, buf.Size());
+            char* s = strrchr(buf.Get(), '\\');
             if (s != NULL)
             {
                 *s = 0;
