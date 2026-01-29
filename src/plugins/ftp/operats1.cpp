@@ -1555,9 +1555,8 @@ int CFTPQueue::SolveErrorOnItem(HWND parent, int UID, CFTPOperation* oper)
     ftpPath[0] = 0;
     char ftpName[FTP_MAX_PATH];
     ftpName[0] = 0;
-    char diskPath[MAX_PATH];
+    CPathBuffer diskPath, diskName; // Heap-allocated for long path support
     diskPath[0] = 0;
-    char diskName[MAX_PATH];
     diskName[0] = 0;
     char* newName = NULL;
     char origRightsBuf[100];
