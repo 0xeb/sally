@@ -17,13 +17,13 @@
 
 FILE* OpenMarkdownCSS()
 {
-    char path[MAX_PATH];
-    if (GetModuleFileName(DLLInstance, path, MAX_PATH) == 0)
+    CPathBuffer path; // Heap-allocated for long path support
+    if (GetModuleFileName(DLLInstance, path, path.Size()) == 0)
     {
         TRACE_E("GetModuleFileName() failed");
         return NULL;
     }
-    char* name = strrchr(path, '\\');
+    char* name = strrchr(path.Get(), '\\');
     if (name == NULL)
     {
         TRACE_E("Extension not found");
