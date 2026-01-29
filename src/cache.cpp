@@ -372,9 +372,9 @@ BOOL CCacheDirData::ContainTmpName(const char* tmpName, const char* rootTmpPath,
         {
             *canContainThisName = TRUE; // tmp-root matches, tmp-file can be placed here
 
-            char tmpFullName[MAX_PATH];
-            memcpy(tmpFullName, Path, PathLength);
-            if (PathLength + strlen(tmpName) + 1 <= MAX_PATH)
+            CPathBuffer tmpFullName; // Heap-allocated for long path support
+            memcpy(tmpFullName.Get(), Path, PathLength);
+            if (PathLength + strlen(tmpName) + 1 <= tmpFullName.Size())
             {
                 strcpy(tmpFullName + PathLength, tmpName);
                 int i;
@@ -506,9 +506,9 @@ CCacheDirData::GetName(const char* name, const char* tmpName, BOOL* exists, BOOL
     CALL_STACK_MESSAGE4("CCacheDirData::GetName(%s, %s, , %d, ,)", name, tmpName, ownDelete);
     if (errorCode != NULL)
         *errorCode = DCGNE_SUCCESS;
-    char tmpFullName[MAX_PATH];
-    memcpy(tmpFullName, Path, PathLength);
-    if (PathLength + strlen(tmpName) + 1 <= MAX_PATH)
+    CPathBuffer tmpFullName; // Heap-allocated for long path support
+    memcpy(tmpFullName.Get(), Path, PathLength);
+    if (PathLength + strlen(tmpName) + 1 <= tmpFullName.Size())
     {
         strcpy(tmpFullName + PathLength, tmpName);
         CCacheData* newName = new CCacheData(name, tmpFullName, ownDelete, ownDeletePlugin);
@@ -1149,11 +1149,11 @@ CDiskCache::GetName(const char* name, const char* tmpName, BOOL* exists, BOOL on
         return NULL;
     }
 
-    char sysTmpDir[MAX_PATH];
+    CPathBuffer sysTmpDir; // Heap-allocated for long path support
     const char* rootTmpPathExp;
     if (rootTmpPath == NULL) // if this is TEMP, we will find out its location
     {
-        if (!EnvGetTempPathA(gEnvironment, sysTmpDir, MAX_PATH).success)
+        if (!EnvGetTempPathA(gEnvironment, sysTmpDir, sysTmpDir.Size()).success)
             sysTmpDir[0] = 0;
         rootTmpPathExp = sysTmpDir;
     }
@@ -1176,7 +1176,7 @@ CDiskCache::GetName(const char* name, const char* tmpName, BOOL* exists, BOOL on
     // we need to create a new tmp-directory
     if (rootTmpPath != NULL)
         GetRootPath(sysTmpDir, rootTmpPath);
-    char newDirPath[MAX_PATH];
+    CPathBuffer newDirPath; // Heap-allocated for long path support
     if (rootTmpPath != NULL &&
             (SalCheckPath(TRUE, sysTmpDir, ERROR_SUCCESS, TRUE, MainWindow->HWindow) != ERROR_SUCCESS ||
              !CheckAndCreateDirectory(rootTmpPath, NULL, TRUE)) || // if it's not TEMP, tmp-root must be verified and created, if needed
