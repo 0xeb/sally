@@ -479,8 +479,8 @@ RETRY:
 
         case ERROR_NOT_READY:
         {
-            char text[100 + MAX_PATH];
-            char drive[MAX_PATH];
+            CPathBuffer text;  // Heap-allocated for long path support
+            CPathBuffer drive;  // Heap-allocated for long path support (UNC roots can exceed MAX_PATH)
             UINT drvType;
             if (path[0] == '\\' && path[1] == '\\')
             {
@@ -499,13 +499,13 @@ RETRY:
                 GetCurrentLocalReparsePoint(path, CheckPathRootWithRetryMsgBox);
                 if (strlen(CheckPathRootWithRetryMsgBox) > 3)
                 {
-                    lstrcpyn(drive, CheckPathRootWithRetryMsgBox, MAX_PATH);
+                    lstrcpyn(drive, CheckPathRootWithRetryMsgBox, drive.Size());
                     SalPathRemoveBackslash(drive);
                 }
             }
             else
                 GetRootPath(CheckPathRootWithRetryMsgBox, path);
-            sprintf(text, LoadStr(IDS_NODISKINDRIVE), drive);
+            sprintf(text, LoadStr(IDS_NODISKINDRIVE), drive.Get());
             int msgboxRes = (int)CDriveSelectErrDlg(parent, text, path).Execute();
             CheckPathRootWithRetryMsgBox[0] = 0;
             UpdateWindow(MainWindow->HWindow);
@@ -769,7 +769,7 @@ PARSE_AGAIN:
                 backslashAtEnd = TRUE;
             }
 
-            char root[MAX_PATH];
+            CPathBuffer root;  // Heap-allocated for long path support (UNC roots can exceed MAX_PATH)
             GetRootPath(root, path);
 
             // we won't test network paths if we just accessed them
@@ -917,7 +917,7 @@ BOOL SalSplitWindowsPath(HWND parent, const char* title, const char* errorTitle,
                          char* path, char* secondPart, BOOL pathIsDir, BOOL backslashAtEnd,
                          const char* dirName, const char* curDiskPath, char*& mask)
 {
-    char root[MAX_PATH];
+    CPathBuffer root;  // Heap-allocated for long path support (UNC roots can exceed MAX_PATH)
     GetRootPath(root, path);
     char* afterRoot = path + strlen(root) - 1;
     if (*afterRoot == '\\')
@@ -1641,7 +1641,7 @@ BOOL IsNetworkPath(const char* path)
 {
     if (path[0] != '\\' || path[1] != '\\')
     {
-        char root[MAX_PATH];
+        CPathBuffer root;  // Heap-allocated for long path support (UNC roots can exceed MAX_PATH)
         GetRootPath(root, path);
         return GetDriveType(root) == DRIVE_REMOTE;
     }
