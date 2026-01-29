@@ -196,8 +196,8 @@ CPluginFSInterface::ListCurrentPath(CSalamanderDirectoryAbstract* dir,
         {
             if (SUCCEEDED(currentFolder->GetDisplayNameOf(idList, SHGDN_INFOLDER, &str)))
             {
-                char name[MAX_PATH];
-                if (SUCCEEDED(StrRetToBuf(&str, idList, name, MAX_PATH)))
+                CPathBuffer name; // Heap-allocated for long path support
+                if (SUCCEEDED(StrRetToBuf(&str, idList, name, name.Size())))
                 {
                     file.Name = SalamanderGeneral->DupStr(name);
                     if (file.Name == NULL)
