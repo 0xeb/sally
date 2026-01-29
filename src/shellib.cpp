@@ -12,6 +12,7 @@ extern "C"
 #include "shexreg.h"
 }
 #include "salshlib.h"
+#include "common/widepath.h"
 
 // original location in fileswnd.h (here only because of MakeCopyOfName in CImpDropTarget::ProcessClipboardData)
 extern BOOL OurClipDataObject; // TRUE during "paste" of our IDataObject
@@ -437,7 +438,7 @@ BOOL IsSimpleSelection(IDataObject* pDataObject, CDragDropOperData* namesList)
                             prefixBuf[0] = 0;
                             if (data->fWide)
                             {
-                                char mulbyteName[MAX_PATH];
+                                CPathBuffer mulbyteName; // Heap-allocated for long path support
                                 wchar_t* prefix = prefixBuf;
                                 const wchar_t* fileW = (wchar_t*)(((char*)data) + data->pFiles);
                                 while (1) // double null terminated, doesn't count empty strings (at start)
@@ -446,7 +447,7 @@ BOOL IsSimpleSelection(IDataObject* pDataObject, CDragDropOperData* namesList)
                                     {
                                         if (namesList != NULL) // add common path of all names to namesList
                                         {
-                                            if (WideCharToMultiByte(CP_ACP, 0, prefix, prefixLen + 1, mulbyteName, MAX_PATH, NULL, NULL) == 0)
+                                            if (WideCharToMultiByte(CP_ACP, 0, prefix, prefixLen + 1, mulbyteName, mulbyteName.Size(), NULL, NULL) == 0)
                                             {
                                                 DWORD err = GetLastError();
                                                 TRACE_E("IsSimpleSelection(): WideCharToMultiByte: " << GetErrorText(err));
@@ -1415,7 +1416,7 @@ LPITEMIDLIST GetItemIdListForFileName(LPSHELLFOLDER folder, const char* fileName
                     {
                         if (folder->GetDisplayNameOf(idList, SHGDN_FORPARSING, &str) == NOERROR)
                         {
-                            char buf[MAX_PATH];
+                            CPathBuffer buf; // Heap-allocated for long path support
                             char* name;
                             switch (str.uType)
                             {
@@ -1427,8 +1428,8 @@ LPITEMIDLIST GetItemIdListForFileName(LPSHELLFOLDER folder, const char* fileName
                                 break;
                             case STRRET_WSTR:
                             {
-                                WideCharToMultiByte(CP_ACP, 0, str.pOleStr, -1, buf, MAX_PATH, NULL, NULL);
-                                buf[MAX_PATH - 1] = 0;
+                                WideCharToMultiByte(CP_ACP, 0, str.pOleStr, -1, buf, buf.Size(), NULL, NULL);
+                                buf[buf.Size() - 1] = 0;
                                 name = buf;
                                 if (alloc->DidAlloc(str.pOleStr) == 1)
                                     alloc->Free(str.pOleStr);
@@ -1666,7 +1667,7 @@ BOOL GetShellFolder(const char* dir, IShellFolder*& shellFolderObj, LPITEMIDLIST
                                             ret = shellFolderObj->GetDisplayNameOf(idList, SHGDN_FORPARSING, &str);
                                             if (ret == NOERROR)
                                             {
-                                                char buf[MAX_PATH];
+                                                CPathBuffer buf; // Heap-allocated for long path support
                                                 char* name;
                                                 switch (str.uType)
                                                 {
@@ -1678,8 +1679,8 @@ BOOL GetShellFolder(const char* dir, IShellFolder*& shellFolderObj, LPITEMIDLIST
                                                     break;
                                                 case STRRET_WSTR:
                                                 {
-                                                    WideCharToMultiByte(CP_ACP, 0, str.pOleStr, -1, buf, MAX_PATH, NULL, NULL);
-                                                    buf[MAX_PATH - 1] = 0;
+                                                    WideCharToMultiByte(CP_ACP, 0, str.pOleStr, -1, buf, buf.Size(), NULL, NULL);
+                                                    buf[buf.Size() - 1] = 0;
                                                     name = buf;
                                                     if (alloc->DidAlloc(str.pOleStr) == 1)
                                                         alloc->Free(str.pOleStr);
@@ -1768,7 +1769,7 @@ BOOL GetShellFolder(const char* dir, IShellFolder*& shellFolderObj, LPITEMIDLIST
                                                             ret = folder2->GetDisplayNameOf(idList, SHGDN_FORPARSING, &str);
                                                             if (ret == NOERROR)
                                                             {
-                                                                char buf[MAX_PATH];
+                                                                CPathBuffer buf; // Heap-allocated for long path support
                                                                 char* name;
                                                                 switch (str.uType)
                                                                 {
@@ -1780,8 +1781,8 @@ BOOL GetShellFolder(const char* dir, IShellFolder*& shellFolderObj, LPITEMIDLIST
                                                                     break;
                                                                 case STRRET_WSTR:
                                                                 {
-                                                                    WideCharToMultiByte(CP_ACP, 0, str.pOleStr, -1, buf, MAX_PATH, NULL, NULL);
-                                                                    buf[MAX_PATH - 1] = 0;
+                                                                    WideCharToMultiByte(CP_ACP, 0, str.pOleStr, -1, buf, buf.Size(), NULL, NULL);
+                                                                    buf[buf.Size() - 1] = 0;
                                                                     name = buf;
                                                                     if (alloc->DidAlloc(str.pOleStr) == 1)
                                                                         alloc->Free(str.pOleStr);
@@ -2311,7 +2312,7 @@ int CALLBACK DirectoryBrowse(HWND hwnd, UINT uMsg, LPARAM lParam, LPARAM lpData)
         SetWindowText(hwnd, ((CBrowseData*)lpData)->Title);
         if (((CBrowseData*)lpData)->InitDir != NULL)
         {
-            char path[MAX_PATH];
+            CPathBuffer path; // Heap-allocated for long path support
             GetRootPath(path, ((CBrowseData*)lpData)->InitDir);
             if (strlen(path) < strlen(((CBrowseData*)lpData)->InitDir)) // it's not root-dir
             {
@@ -2320,14 +2321,14 @@ int CALLBACK DirectoryBrowse(HWND hwnd, UINT uMsg, LPARAM lParam, LPARAM lpData)
                 if (ch == '\\')
                     ch = 0;
             }
-            SendMessage(hwnd, BFFM_SETSELECTION, TRUE, (LPARAM)path);
+            SendMessage(hwnd, BFFM_SETSELECTION, TRUE, (LPARAM)path.Get());
         }
     }
     if (uMsg == BFFM_SELCHANGED)
     {
         if ((ITEMIDLIST*)lParam != NULL)
         {
-            char path[MAX_PATH];
+            CPathBuffer path; // Heap-allocated for long path support
             BOOL ret = SHGetPathFromIDList((ITEMIDLIST*)lParam, path);
             SendMessage(hwnd, BFFM_ENABLEOK, 0, ret);
         }
@@ -2397,14 +2398,14 @@ void ResolveNetHoodPath(char* path)
     if (path[0] == '\\')
         return; // UNC path -> can't be NetHood
 
-    char name[MAX_PATH];
+    CPathBuffer name; // Heap-allocated for long path support
     GetRootPath(name, path);
     if (GetDriveType(name) != DRIVE_FIXED)
         return; // not a local fixed path -> can't be NetHood
 
     BOOL tryTarget = FALSE; // if TRUE, it's worth trying to find file "target.lnk"
-    lstrcpyn(name, path, MAX_PATH);
-    if (SalPathAppend(name, "desktop.ini", MAX_PATH))
+    lstrcpyn(name, path, name.Size());
+    if (SalPathAppend(name, "desktop.ini", name.Size()))
     {
         HANDLE hFile = HANDLES_Q(CreateFile(name, GENERIC_READ,
                                             FILE_SHARE_WRITE | FILE_SHARE_READ, NULL,
