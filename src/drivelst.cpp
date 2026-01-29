@@ -1332,11 +1332,11 @@ void InitDropboxPath()
     if (!alreadyCalled) // it makes sense to find the path only once, then we just ignore it
     {
         DropboxPath[0] = 0;
-        char sDbPath[MAX_PATH];
+        CPathBuffer sDbPath; // Heap-allocated for long path support
         BOOL cfgAlreadyFound = FALSE;
         if (SHGetFolderPath(NULL, CSIDL_APPDATA, NULL, 0 /* SHGFP_TYPE_CURRENT */, sDbPath) == S_OK)
         {
-            if (SalPathAppend(sDbPath, "Dropbox\\host.db", MAX_PATH) && FileExists(sDbPath))
+            if (SalPathAppend(sDbPath, "Dropbox\\host.db", sDbPath.Size()) && FileExists(sDbPath))
                 cfgAlreadyFound = TRUE;
         }
         else
@@ -1345,7 +1345,7 @@ void InitDropboxPath()
             SHGetFolderPath(NULL, CSIDL_LOCAL_APPDATA, NULL, 0 /* SHGFP_TYPE_CURRENT */, sDbPath) == S_OK)
         {
             if (cfgAlreadyFound ||
-                SalPathAppend(sDbPath, "Dropbox\\host.db", MAX_PATH) && FileExists(sDbPath))
+                SalPathAppend(sDbPath, "Dropbox\\host.db", sDbPath.Size()) && FileExists(sDbPath))
             {
                 HANDLE hFile = HANDLES_Q(CreateFile(sDbPath, GENERIC_READ,
                                                     FILE_SHARE_READ | FILE_SHARE_WRITE, NULL,
@@ -1377,10 +1377,10 @@ void InitDropboxPath()
                                 int pathLen;
                                 if (base64_decode(secRow, (int)(secRowEnd - secRow), &pathLen, "Dropbox path: "))
                                 {
-                                    WCHAR widePath[MAX_PATH]; // we can't do longer paths anyway
-                                    char mbPath[MAX_PATH];    // ANSI or UTF8 path
+                                    WCHAR widePath[SAL_MAX_LONG_PATH]; // wide path buffer for long path support
+                                    CPathBuffer mbPath; // Heap-allocated for long path support; ANSI or UTF8 path
                                     if (ConvertA2U(secRow, -1, widePath, _countof(widePath), CP_UTF8) &&
-                                        ConvertU2A(widePath, -1, mbPath, _countof(mbPath)))
+                                        ConvertU2A(widePath, -1, mbPath, mbPath.Size()))
                                     {
                                         TRACE_I("Dropbox path: " << mbPath);
                                         strcpy_s(DropboxPath, mbPath);
