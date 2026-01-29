@@ -212,7 +212,7 @@ CRendererWindow::~CRendererWindow()
 
 void CRendererWindow::OnFileOpen()
 {
-    char file[MAX_PATH];
+    CPathBuffer file; // Heap-allocated for long path support
     file[0] = 0;
     OPENFILENAME ofn;
     memset(&ofn, 0, sizeof(OPENFILENAME));
@@ -227,7 +227,7 @@ void CRendererWindow::OnFileOpen()
         s++;
     }
     ofn.lpstrFile = file;
-    ofn.nMaxFile = MAX_PATH;
+    ofn.nMaxFile = file.Size();
     ofn.nFilterIndex = 1;
     ofn.lpstrInitialDir = NULL;
     ofn.Flags = OFN_HIDEREADONLY | OFN_PATHMUSTEXIST | OFN_FILEMUSTEXIST;
@@ -243,8 +243,8 @@ void CRendererWindow::OnFileReOpen()
     if (!Database.IsOpened())
         return;
 
-    char path[MAX_PATH];
-    lstrcpy(path, Database.GetFileName());
+    CPathBuffer path; // Heap-allocated for long path support
+    lstrcpyn(path, Database.GetFileName(), path.Size());
     OpenFile(path, FALSE);
 }
 
@@ -1538,12 +1538,12 @@ CRendererWindow::WindowProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
     case WM_DROPFILES:
     {
         UINT drag;
-        char path[MAX_PATH];
+        CPathBuffer path; // Heap-allocated for long path support
 
         drag = DragQueryFile((HDROP)wParam, 0xFFFFFFFF, NULL, 0); // how many files were dropped
         if (drag > 0)
         {
-            DragQueryFile((HDROP)wParam, 0, path, MAX_PATH);
+            DragQueryFile((HDROP)wParam, 0, path, path.Size());
             OpenFile(path, TRUE);
         }
         DragFinish((HDROP)wParam);
