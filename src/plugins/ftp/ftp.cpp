@@ -400,12 +400,12 @@ BOOL CPluginInterface::Release(HWND parent, BOOL force)
         }
 
         // remove all copies of files from FTP in the disk cache (they exist because they survive connection close and are unnecessary)
-        char uniqueFileName[MAX_PATH];
-        strcpy(uniqueFileName, AssignedFSName);
-        strcat(uniqueFileName, ":");
+        CPathBuffer uniqueFileName; // Heap-allocated for long path support
+        lstrcpyn(uniqueFileName, AssignedFSName, uniqueFileName.Size());
+        lstrcat(uniqueFileName, ":");
         SalamanderGeneral->RemoveFilesFromCache(uniqueFileName);
-        strcpy(uniqueFileName, AssignedFSNameFTPS);
-        strcat(uniqueFileName, ":");
+        lstrcpyn(uniqueFileName, AssignedFSNameFTPS, uniqueFileName.Size());
+        lstrcat(uniqueFileName, ":");
         SalamanderGeneral->RemoveFilesFromCache(uniqueFileName);
 
         ReleaseSockets();
@@ -1491,7 +1491,7 @@ BOOL CFTPServer::Load(HWND parent, HKEY regKey, CSalamanderRegistryAbstract* reg
     int encryptedPasswordSize;
     int savePassword;
     int proxyServerUID;
-    char targetPanelPath[MAX_PATH];
+    CPathBuffer targetPanelPath; // Heap-allocated for long path support
     char serverType[SERVERTYPE_MAX_SIZE];
     int transferMode;
     int port;
@@ -1520,7 +1520,7 @@ BOOL CFTPServer::Load(HWND parent, HKEY regKey, CSalamanderRegistryAbstract* reg
     encryptedPasswordSize = 0;
     savePassword = SavePassword;
     proxyServerUID = ProxyServerUID;
-    strcpy(targetPanelPath, HandleNULLStr(TargetPanelPath));
+    lstrcpyn(targetPanelPath, HandleNULLStr(TargetPanelPath), targetPanelPath.Size());
     strcpy(serverType, HandleNULLStr(ServerType));
     transferMode = TransferMode;
     port = Port;
@@ -1558,7 +1558,7 @@ BOOL CFTPServer::Load(HWND parent, HKEY regKey, CSalamanderRegistryAbstract* reg
     {
         proxyServerUID = -2; // "default"
     }
-    registry->GetValue(regKey, CONFIG_FTPSRVTGTPATH, REG_SZ, targetPanelPath, MAX_PATH);
+    registry->GetValue(regKey, CONFIG_FTPSRVTGTPATH, REG_SZ, targetPanelPath, targetPanelPath.Size());
     registry->GetValue(regKey, CONFIG_FTPSRVTYPE, REG_SZ, serverType, SERVERTYPE_MAX_SIZE);
     registry->GetValue(regKey, CONFIG_FTPSRVTRANSFMODE, REG_DWORD, &transferMode, sizeof(DWORD));
     registry->GetValue(regKey, CONFIG_FTPSRVPORT, REG_DWORD, &port, sizeof(DWORD));
