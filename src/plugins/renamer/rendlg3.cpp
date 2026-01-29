@@ -127,9 +127,9 @@ BOOL CRenamerDialog::CheckAndCreateDirectory(char* directory, char* newPart, BOO
             // adjust the case of the name
             if (strcmp(start, fd.cFileName))
             {
-                char old[MAX_PATH];
-                memcpy(old, directory, start - directory);
-                strcpy(old + (start - directory), fd.cFileName);
+                CPathBuffer old; // Heap-allocated for long path support
+                memcpy(old.Get(), directory, start - directory);
+                lstrcpyn(old.Get() + (start - directory), fd.cFileName, old.Size() - (int)(start - directory));
                 while (1)
                 {
                     if (SG->SalMoveFile(old, directory, NULL))
