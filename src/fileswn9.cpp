@@ -486,7 +486,7 @@ BOOL CFilesWindow::ClipboardPasteToArcOrFS(BOOL onlyTest, DWORD* pasteDefEffect)
                         }
                         if (dropEffect != 0)
                         {
-                            char userPart[MAX_PATH];
+                            CPathBuffer userPart; // Heap-allocated for long path support
                             if (GetPluginFS()->GetCurrentPath(userPart))
                             {
                                 DoDragDropOper(dropEffect == DROPEFFECT_COPY, FALSE, GetPluginFS()->GetPluginFSName(),
@@ -560,8 +560,8 @@ BOOL CFilesWindow::PostProcessPathFromUser(HWND parent, char (&buff)[2 * MAX_PAT
 
     if (IsFileURLPath(buff)) // it is a URL: convert URL (file://) to a Windows path
     {
-        char path[MAX_PATH];
-        DWORD pathLen = _countof(path);
+        CPathBuffer path; // Heap-allocated for long path support
+        DWORD pathLen = path.Size();
         if (PathCreateFromUrl(buff, path, &pathLen, 0) == S_OK)
             strcpy_s(buff, path);
         else
@@ -1082,7 +1082,7 @@ void CFilesWindow::OfferArchiveUpdateIfNeededAux(HWND parent, int textID, BOOL* 
         // if edited files might be in the disk cache, drop them to ensure they are re-extracted when accessed again
         if (someFilesChanged)
         {
-            char buf[MAX_PATH];
+            CPathBuffer buf; // Heap-allocated for long path support
             StrICpy(buf, GetZIPArchive()); // in the disk cache the archive name is in lowercase (allows case-insensitive comparison with Windows file system name)
             DiskCache.FlushCache(buf);
         }
@@ -1502,7 +1502,7 @@ HIMAGELIST
 CFilesWindow::CreateDragImage(int cursorX, int cursorY, int& dxHotspot, int& dyHotspot, int& imgWidth, int& imgHeight)
 {
     CALL_STACK_MESSAGE3("CFilesWindow::CreateDragImage(%d, %d, , , )", cursorX, cursorY);
-    char buff[MAX_PATH];
+    CPathBuffer buff; // Heap-allocated for long path support
     int selCount = GetSelCount();
     int iconWidth = 0;
     int itemIndex = 0;
@@ -1772,10 +1772,10 @@ BOOL CopyUNCPathToClipboard(const char* path, const char* name, BOOL isDir, HWND
     // 10 levels of nesting must be enough even for extreme cases
     if (nestingLevel < 10 && buff[0] != '\\' && buff[1] == ':')
     {
-        char target[MAX_PATH];
-        if (GetSubstInformation(toupper(buff[0]) - 'A', target, MAX_PATH))
+        CPathBuffer target; // Heap-allocated for long path support
+        if (GetSubstInformation(toupper(buff[0]) - 'A', target, target.Size()))
         {
-            SalPathAddBackslash(target, MAX_PATH);
+            SalPathAddBackslash(target, target.Size());
             strcat(target, path + 3);
             if (CopyUNCPathToClipboard(target, name, isDir, hMessageParent, nestingLevel))
                 return TRUE;
@@ -1835,7 +1835,7 @@ BOOL CFilesWindow::CopyFocusedNameToClipboard(CCopyFocusedNameModeEnum mode)
             SalPathAddBackslash(buff, 2 * MAX_PATH);
 
             CFileData* item = (FocusedIndex < Dirs->Count) ? &Dirs->At(FocusedIndex) : &Files->At(FocusedIndex - Dirs->Count);
-            char itemName[MAX_PATH];
+            CPathBuffer itemName; // Heap-allocated for long path support
             AlterFileName(itemName, item->Name, -1, Configuration.FileNameFormat, 0, FocusedIndex < Dirs->Count);
 
             if (CopyUNCPathToClipboard(buff, itemName, FocusedIndex < Dirs->Count, MainWindow->HWindow))
@@ -1869,7 +1869,7 @@ BOOL CFilesWindow::CopyFocusedNameToClipboard(CCopyFocusedNameModeEnum mode)
             return CopyTextToClipboardW(buffW, -1, FALSE, NULL);
         }
 
-        char fileName[MAX_PATH];
+        CPathBuffer fileName; // Heap-allocated for long path support
         AlterFileName(fileName, file->Name, -1, Configuration.FileNameFormat, 0, FocusedIndex < Dirs->Count);
         int l = (int)strlen(buff);
         lstrcpyn(buff + l, fileName, 2 * MAX_PATH - l);
