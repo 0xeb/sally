@@ -535,7 +535,7 @@ void CSelectDialog::Validate(CTransferInfo& ti)
     {
         if (ti.Type == ttDataFromWindow)
         {
-            char buf[MAX_PATH];
+            CPathBuffer buf; // Heap-allocated for long path support
             strcpy(buf, Mask); // backup
             SendMessage(hWnd, WM_GETTEXT, MAX_PATH, (LPARAM)Mask);
             CMaskGroup mask(Mask);
@@ -791,8 +791,8 @@ int CLanguageSelectorDialog::Execute()
     {
         // load the template from the best available SLG
         int index = GetPreferredLanguageIndex(SLGName);
-        char path[MAX_PATH];
-        GetModuleFileName(HInstance, path, MAX_PATH);
+        CPathBuffer path; // Heap-allocated for long path support
+        GetModuleFileName(HInstance, path, path.Size());
         sprintf(strrchr(path, '\\') + 1, "lang\\%s", Items[index].FileName);
         hTmpLanguage = HANDLES(LoadLibrary(path));
         if (hTmpLanguage != NULL)
@@ -908,14 +908,14 @@ void CLanguageSelectorDialog::Transfer(CTransferInfo& ti)
 
 BOOL CLanguageSelectorDialog::Initialize(const char* slgSearchPath, HINSTANCE pluginDLL)
 {
-    char path[MAX_PATH];
+    CPathBuffer path; // Heap-allocated for long path support
     if (slgSearchPath == NULL)
     {
-        GetModuleFileName(NULL, path, MAX_PATH);
+        GetModuleFileName(NULL, path, path.Size());
         lstrcpy(strrchr(path, '\\') + 1, "lang\\*.slg");
     }
     else
-        lstrcpyn(path, slgSearchPath, MAX_PATH);
+        lstrcpyn(path, slgSearchPath, path.Size());
 
     WIN32_FIND_DATA file;
     HANDLE hFind = HANDLES_Q(FindFirstFile(path, &file));
@@ -1166,15 +1166,15 @@ CCompareArgsDlg::CCompareArgsDlg(HWND parent, BOOL comparingFiles, char* compare
 
 void CCompareArgsDlg::Validate(CTransferInfo& ti)
 {
-    char buf[MAX_PATH];
-    ti.EditLine(IDE_UMC_NAME1, buf, MAX_PATH);
+    CPathBuffer buf; // Heap-allocated for long path support
+    ti.EditLine(IDE_UMC_NAME1, buf, buf.Size());
     if (buf[0] == 0)
     {
         gPrompter->ShowError(LoadStrW(IDS_ERRORTITLE), LoadStrW(IDS_FF_EMPTYSTRING));
         ti.ErrorOn(IDE_UMC_NAME1);
         return;
     }
-    ti.EditLine(IDE_UMC_NAME2, buf, MAX_PATH);
+    ti.EditLine(IDE_UMC_NAME2, buf, buf.Size());
     if (buf[0] == 0)
     {
         gPrompter->ShowError(LoadStrW(IDS_ERRORTITLE), LoadStrW(IDS_FF_EMPTYSTRING));
@@ -1224,8 +1224,8 @@ CCompareArgsDlg::DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
                 BrowseCommand(HWindow, editID, IDS_ALLFILTER);
             else
             {
-                char path[MAX_PATH];
-                GetDlgItemText(HWindow, editID, path, MAX_PATH);
+                CPathBuffer path; // Heap-allocated for long path support
+                GetDlgItemText(HWindow, editID, path, path.Size());
                 if (GetTargetDirectory(HWindow, HWindow, LoadStr(IDS_BROWSEUMCDIRTITLE),
                                        LoadStr(IDS_BROWSEUMCDIRTEXT), path, FALSE, path))
                 {
