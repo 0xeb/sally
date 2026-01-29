@@ -681,7 +681,7 @@ void NextVolume(BOOL forceQuestion)
     CloseHandle(ArcFile);
     ArcFile = INVALID_HANDLE_VALUE;
 
-    char prevName[MAX_PATH];
+    CPathBuffer prevName; // Heap-allocated for long path support
     char* ptr = strrchr(ArcName, '\\');
     if (!ptr)
         ptr = ArcName;

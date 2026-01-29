@@ -26,7 +26,7 @@ LRESULT CALLBACK TextControlProc(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lPa
     {
         RECT r;
         PAINTSTRUCT ps;
-        char txt[MAX_PATH];
+        CPathBuffer txt; // Heap-allocated for long path support
 
         GetClientRect(hWnd, &r);
         BeginPaint(hWnd, &ps);
@@ -40,7 +40,7 @@ LRESULT CALLBACK TextControlProc(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lPa
         HFONT hOldFont = (HFONT)SelectObject(ps.hdc, hCurrentFont);
         SetTextColor(ps.hdc, GetSysColor(COLOR_BTNTEXT));
         int prevBkMode = SetBkMode(ps.hdc, TRANSPARENT);
-        int len = GetWindowText(hWnd, txt, MAX_PATH);
+        int len = GetWindowText(hWnd, txt, txt.Size());
         DrawText(ps.hdc, txt, lstrlen(txt), &r, DT_SINGLELINE | /*DT_VCENTER*/ DT_BOTTOM | DT_NOPREFIX | DT_PATH_ELLIPSIS);
         SetBkMode(ps.hdc, prevBkMode);
         SelectObject(ps.hdc, hOldFont);
@@ -156,7 +156,7 @@ int CALLBACK DirectoryBrowse(HWND hwnd, UINT uMsg, LPARAM lParam, LPARAM lpData)
     if (uMsg == BFFM_INITIALIZED)
     {
         SetWindowText(hwnd, LoadStr(IDS_BROWSEARCHIVETITLE));
-        char buf[MAX_PATH];
+        CPathBuffer buf; // Heap-allocated for long path support
         SalamanderGeneral->GetRootPath(buf, (char*)lpData);
         SalamanderGeneral->SalPathRemoveBackslash(buf);
         SalamanderGeneral->SalPathRemoveBackslash((char*)lpData);
@@ -171,7 +171,7 @@ BOOL CNextVolumeDialog::OnBrowse(WORD wNotifyCode, WORD wID, HWND hwndCtl)
 {
     CALL_STACK_MESSAGE3("CNextVolumeDialog::OnBrowse(0x%X, 0x%X, )", wNotifyCode,
                         wID);
-    char path[MAX_PATH];
+    CPathBuffer path; // Heap-allocated for long path support
 
     GetDlgItemText(Dlg, IDC_FILENAME, VolumePath, MAX_PATH);
 
@@ -209,9 +209,9 @@ BOOL CNextVolumeDialog::OnOK(WORD wNotifyCode, WORD wID, HWND hwndCtl)
     GetDlgItemText(Dlg, IDC_FILENAME, VolumePath, MAX_PATH);
     SalamanderGeneral->SalPathAddBackslash(VolumePath, MAX_PATH);
 
-    char fullName[MAX_PATH];
+    CPathBuffer fullName; // Heap-allocated for long path support
     strcpy(fullName, VolumePath);
-    SalamanderGeneral->SalPathAppend(fullName, VolumeName, MAX_PATH);
+    SalamanderGeneral->SalPathAppend(fullName, VolumeName, fullName.Size());
 
     SalamanderGeneral->SalUpdateDefaultDir(TRUE);
     int err;

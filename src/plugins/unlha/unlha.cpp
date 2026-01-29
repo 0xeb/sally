@@ -309,12 +309,12 @@ BOOL CPluginInterfaceForArchiver::UnpackOneFile(CSalamanderForOperationsAbstract
         return FALSE;
     }
 
-    char justName[MAX_PATH];
+    CPathBuffer justName; // Heap-allocated for long path support
     lstrcpy(justName, nameInArchive);
     SalamanderGeneral->SalPathStripPath(justName);
-    char targetName[MAX_PATH];
+    CPathBuffer targetName; // Heap-allocated for long path support
     lstrcpy(targetName, targetDir);
-    SalamanderGeneral->SalPathAppend(targetName, justName, MAX_PATH);
+    SalamanderGeneral->SalPathAppend(targetName, justName, targetName.Size());
     BOOL skip;
     DWORD silent = 0;
 
@@ -470,11 +470,11 @@ BOOL CPluginInterfaceForArchiver::UnpackWholeArchive(CSalamanderForOperationsAbs
         unpacked = FALSE;
 
         const char* name = SalamanderGeneral->SalPathFindFileName(hdr.name);
-        char nameBuf[MAX_PATH];
+        CPathBuffer nameBuf; // Heap-allocated for long path support
         int nameLen = (int)strlen(name);
         if (nameLen > 0 && name[nameLen - 1] == '\\') // due to SalPathFindFileName the '\\' can only be at the end; remove it before calling AgreeMask
         {
-            lstrcpyn(nameBuf, name, min(nameLen, MAX_PATH));
+            lstrcpyn(nameBuf, name, min(nameLen, nameBuf.Size()));
             name = nameBuf;
         }
         BOOL nameHasExt = strchr(name, '.') != NULL; // ".cvspass" is considered an extension on Windows
@@ -537,9 +537,9 @@ void CPluginInterfaceForArchiver::UnpackInnerBody(FILE* f, const char* targetDir
         return;
     }
 
-    char targetName[MAX_PATH];
-    strncpy_s(targetName, targetDir, _TRUNCATE);
-    if (!SalamanderGeneral->SalPathAppend(targetName, hdr.name + RootLen, MAX_PATH))
+    CPathBuffer targetName; // Heap-allocated for long path support
+    lstrcpyn(targetName, targetDir, targetName.Size());
+    if (!SalamanderGeneral->SalPathAppend(targetName, hdr.name + RootLen, targetName.Size()))
     {
         if (!(Silent & SF_LONGNAMES))
             switch (SalamanderGeneral->DialogError(SalamanderGeneral->GetMsgBoxParent(), BUTTONS_SKIPCANCEL,
@@ -659,14 +659,14 @@ BOOL CPluginInterfaceForArchiver::MakeFilesList(TDirectArray<int>& offsets, SalE
     const char* nextName;
     BOOL isDir;
     CQuadWord size;
-    char dir[MAX_PATH];
+    CPathBuffer dir; // Heap-allocated for long path support
     char* addDir;
     int dirLen;
     const CFileData* pfd;
     int errorOccured;
 
     lstrcpy(dir, targetDir);
-    addDir = dir + lstrlen(dir);
+    addDir = dir.Get() + lstrlen(dir);
     if (*(addDir - 1) != '\\')
     {
         *addDir++ = '\\';
@@ -723,7 +723,7 @@ BOOL CPluginInterfaceForArchiver::ConstructMaskArray(TIndirectArray<char>& maskA
     char* dest;
     char* newMask;
     int newMaskLen;
-    char buffer[MAX_PATH];
+    CPathBuffer buffer; // Heap-allocated for long path support
 
     sour = masks;
     while (*sour)

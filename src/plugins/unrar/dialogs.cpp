@@ -16,7 +16,7 @@ LRESULT CALLBACK TextControlProc(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lPa
     {
         RECT r;
         PAINTSTRUCT ps;
-        char txt[MAX_PATH];
+        CPathBuffer txt; // Heap-allocated for long path support
 
         GetClientRect(hWnd, &r);
         BeginPaint(hWnd, &ps);
@@ -30,7 +30,7 @@ LRESULT CALLBACK TextControlProc(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lPa
         HFONT hOldFont = (HFONT)SelectObject(ps.hdc, hCurrentFont);
         SetTextColor(ps.hdc, GetSysColor(COLOR_BTNTEXT));
         int prevBkMode = SetBkMode(ps.hdc, TRANSPARENT);
-        int len = GetWindowText(hWnd, txt, MAX_PATH);
+        int len = GetWindowText(hWnd, txt, txt.Size());
         DrawText(ps.hdc, txt, lstrlen(txt), &r, DT_SINGLELINE | /*DT_VCENTER*/ DT_BOTTOM | DT_NOPREFIX | DT_PATH_ELLIPSIS);
         SetBkMode(ps.hdc, prevBkMode);
         SelectObject(ps.hdc, hOldFont);

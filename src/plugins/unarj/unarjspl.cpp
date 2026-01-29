@@ -461,7 +461,7 @@ BOOL CPluginInterfaceForArchiver::UnpackOneFile(CSalamanderForOperationsAbstract
     RootLen = 0;
     AllocateWholeFile = TRUE;
     TestAllocateWholeFile = TRUE;
-    char justName[MAX_PATH];
+    CPathBuffer justName; // Heap-allocated for long path support
     lstrcpy(justName, nameInArchive);
     SalamanderGeneral->SalPathStripPath(justName);
 
@@ -874,7 +874,7 @@ void CPluginInterfaceForArchiver::SwitchToFirstVol(const char* arcName)
     if (lstrlen(ext) > 3 &&
         isdigit(ext[2]) && isdigit(ext[3]))
     {
-        char oldExt[MAX_PATH];
+        CPathBuffer oldExt; // Heap-allocated for long path support
         lstrcpy(oldExt, ext);
         lstrcpy(ext, ".arj");
         DWORD attr = SalamanderGeneral->SalGetFileAttributes(ArcFileName);
@@ -891,13 +891,13 @@ BOOL CPluginInterfaceForArchiver::MakeFilesList(TIndirectArray2<char>& files, Sa
     const char* nextName;
     BOOL isDir;
     CQuadWord size;
-    char dir[MAX_PATH];
+    CPathBuffer dir; // Heap-allocated for long path support
     char* addDir;
     int dirLen;
     int errorOccured;
 
     lstrcpy(dir, targetDir);
-    addDir = dir + lstrlen(dir);
+    addDir = dir.Get() + lstrlen(dir);
     if (*(addDir - 1) != '\\')
     {
         *addDir++ = '\\';
@@ -1049,7 +1049,7 @@ BOOL CPluginInterfaceForArchiver::ConstructMaskArray(TIndirectArray2<char>& mask
     char* dest;
     char* newMask;
     int newMaskLen;
-    char buffer[MAX_PATH];
+    CPathBuffer buffer; // Heap-allocated for long path support
 
     sour = masks;
     while (*sour)
