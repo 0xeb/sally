@@ -424,6 +424,9 @@ BOOL CPluginInterfaceForArchiver::UnpackFiles(TIndirectArray2<CFileInfo>& files,
                 lstrcpy(message, LoadStr(IDS_EXTRACTING));
                 lstrcat(message, file);
                 Salamander->ProgressDialogAddText(message, TRUE);
+                // Declare path buffers before goto block to avoid skipping initialization
+                CPathBuffer targetName; // Heap-allocated for long path support
+                char arcName[MAX_PATH + PAK_MAXPATH];
                 if (lstrlen(targetDir) + lstrlen(file) - rootLen >= MAX_PATH)
                 {
                     if (Silent & SF_LONGNAMES)
@@ -439,11 +442,9 @@ BOOL CPluginInterfaceForArchiver::UnpackFiles(TIndirectArray2<CFileInfo>& files,
                         return FALSE;
                     }
                 }
-                char targetName[MAX_PATH];
-                lstrcpy(targetName, targetDir);
-                SalamanderGeneral->SalPathAppend(targetName, file + rootLen, MAX_PATH);
+                lstrcpyn(targetName, targetDir, targetName.Size());
+                SalamanderGeneral->SalPathAppend(targetName, file + rootLen, targetName.Size());
                 IOFileName = targetName;
-                char arcName[MAX_PATH + PAK_MAXPATH];
                 lstrcpy(arcName, arcFile);
                 SalamanderGeneral->SalPathAppend(arcName, file, MAX_PATH + PAK_MAXPATH);
                 FILETIME ft;
@@ -587,7 +588,7 @@ BOOL CPluginInterfaceForArchiver::UnpackOneFile(CSalamanderForOperationsAbstract
         DWORD size;
         if (PakIFace->FindFile(nameInArchive, &size) && size != -1)
         {
-            char targetName[MAX_PATH];
+            CPathBuffer targetName; // Heap-allocated for long path support
             const char* name = strrchr(nameInArchive, '\\');
             if (name)
                 name++;
@@ -599,8 +600,8 @@ BOOL CPluginInterfaceForArchiver::UnpackOneFile(CSalamanderForOperationsAbstract
             }
             else
             {
-                lstrcpy(targetName, targetDir);
-                SalamanderGeneral->SalPathAppend(targetName, name, MAX_PATH);
+                lstrcpyn(targetName, targetDir, targetName.Size());
+                SalamanderGeneral->SalPathAppend(targetName, name, targetName.Size());
                 IOFileName = targetName;
                 IOFile = CreateFile(targetName, GENERIC_WRITE, FILE_SHARE_READ, NULL, CREATE_ALWAYS,
                                     FILE_ATTRIBUTE_NORMAL, NULL);
