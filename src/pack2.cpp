@@ -186,7 +186,7 @@ BOOL PackCompress(HWND parent, CFilesWindow* panel, const char* archiveFileName,
     //
     // If the archiver does not support packing into a directory, we must handle it
     //
-    char archiveRootPath[MAX_PATH];
+    CPathBuffer archiveRootPath; // Heap-allocated for long path support
     if (archiveRoot != NULL && *archiveRoot != '\0')
     {
         strcpy(archiveRootPath, archiveRoot);
@@ -247,7 +247,7 @@ BOOL PackUniversalCompress(HWND parent, const char* command, TPackErrorTable* co
     //
     // We must adjust the directory in the archive to the required format
     //
-    char rootPath[MAX_PATH];
+    CPathBuffer rootPath; // Heap-allocated for long path support
     rootPath[0] = '\0';
     if (archiveRoot != NULL && *archiveRoot != '\0')
     {
@@ -269,10 +269,10 @@ BOOL PackUniversalCompress(HWND parent, const char* command, TPackErrorTable* co
     }
 
     // For path length checks we need sourceDir in the "short" form
-    char sourceShortName[MAX_PATH];
+    CPathBuffer sourceShortName; // Heap-allocated for long path support
     if (!supportLongNames)
     {
-        if (!GetShortPathName(sourceDir, sourceShortName, MAX_PATH))
+        if (!GetShortPathName(sourceDir, sourceShortName, sourceShortName.Size()))
         {
             char buffer[1000];
             strcpy(buffer, "GetShortPathName: ");
@@ -288,7 +288,7 @@ BOOL PackUniversalCompress(HWND parent, const char* command, TPackErrorTable* co
     //
 
     // Create the temporary file name
-    char tmpListNameBuf[MAX_PATH];
+    CPathBuffer tmpListNameBuf; // Heap-allocated for long path support
     if (!SalGetTempFileName(NULL, "PACK", tmpListNameBuf, TRUE))
     {
         char buffer[1000];
@@ -310,11 +310,11 @@ BOOL PackUniversalCompress(HWND parent, const char* command, TPackErrorTable* co
 
     const char* name;
     unsigned int maxPath;
-    char namecnv[MAX_PATH];
+    CPathBuffer namecnv; // Heap-allocated for long path support
     if (!supportLongNames)
         maxPath = DOS_MAX_PATH;
     else
-        maxPath = MAX_PATH;
+        maxPath = namecnv.Size();
     if (!needANSIListFile)
         CharToOem(sourceShortName, sourceShortName);
     int sourceDirLen = (int)strlen(sourceShortName) + 1;
@@ -352,14 +352,14 @@ BOOL PackUniversalCompress(HWND parent, const char* command, TPackErrorTable* co
             char buffer[1000];
             fclose(listFile);
             DeleteFileA(gFileSystem, tmpListNameBuf);
-            sprintf(buffer, "%s\\%s", sourceShortName, namecnv);
+            sprintf(buffer, "%s\\%s", sourceShortName.Get(), namecnv.Get());
             return (*PackErrorHandlerPtr)(parent, IDS_PACKERR_PATH, buffer);
         }
 
         // and put it into the list
         if (!isDir)
         {
-            if (fprintf(listFile, "%s\n", namecnv) <= 0)
+            if (fprintf(listFile, "%s\n", namecnv.Get()) <= 0)
             {
                 fclose(listFile);
                 DeleteFileA(gFileSystem, tmpListNameBuf);
@@ -384,7 +384,7 @@ BOOL PackUniversalCompress(HWND parent, const char* command, TPackErrorTable* co
     char cmdLine[PACK_CMDLINE_MAXLEN];
     // buffer for a temporary name (when creating an archive with a long name and we need its DOS name,
     // DOSTmpName expands instead of the long name; after creating the archive the file is renamed)
-    char DOSTmpName[MAX_PATH];
+    CPathBuffer DOSTmpName; // Heap-allocated for long path support
     if (!PackExpandCmdLine(archiveFileName, rootPath, tmpListNameBuf, NULL,
                            command, cmdLine, PACK_CMDLINE_MAXLEN, DOSTmpName))
     {
@@ -419,10 +419,10 @@ BOOL PackUniversalCompress(HWND parent, const char* command, TPackErrorTable* co
     }
 
     // construct the current directory
-    char currentDir[MAX_PATH];
+    CPathBuffer currentDir; // Heap-allocated for long path support
     if (!expandInitDir)
     {
-        if (strlen(initDir) < MAX_PATH)
+        if (strlen(initDir) < currentDir.Size())
             strcpy(currentDir, initDir);
         else
         {
@@ -433,7 +433,7 @@ BOOL PackUniversalCompress(HWND parent, const char* command, TPackErrorTable* co
     else
     {
         if (!PackExpandInitDir(archiveFileName, sourceDir, rootPath, initDir, currentDir,
-                               MAX_PATH))
+                               currentDir.Size()))
         {
             DeleteFileA(gFileSystem, tmpListNameBuf);
             return (*PackErrorHandlerPtr)(parent, IDS_PACKERR_IDIRERR);
@@ -442,8 +442,8 @@ BOOL PackUniversalCompress(HWND parent, const char* command, TPackErrorTable* co
 
     // back up the short archive file name, later we check whether the long name
     // survived -> if the short one remained, rename it back to the original long name
-    char DOSArchiveFileName[MAX_PATH];
-    if (!GetShortPathName(archiveFileName, DOSArchiveFileName, MAX_PATH))
+    CPathBuffer DOSArchiveFileName; // Heap-allocated for long path support
+    if (!GetShortPathName(archiveFileName, DOSArchiveFileName, DOSArchiveFileName.Size()))
         DOSArchiveFileName[0] = 0;
 
     // and run the external program
@@ -484,7 +484,7 @@ BOOL PackUniversalCompress(HWND parent, const char* command, TPackErrorTable* co
         //    if (dstExt == dstNameBuf || *dstExt == '\\' || *(dstExt - 1) == '\\') dstExt = dstNameBuf + strlen(dstNameBuf); // for "name", ".cvspass", "path\\name" or "path\\.name" there is no extension
         if (dstExt < dstNameBuf || *dstExt == '\\')
             dstExt = dstNameBuf + strlen(dstNameBuf); // for "name" or "path\\name" there is no extension; in Windows ".cvspass" is an extension
-        char path[MAX_PATH];
+        CPathBuffer path; // Heap-allocated for long path support
         strcpy(path, DOSTmpName);
         char* ext = path + strlen(path);
         //    while (--ext > path && *ext != '\\' && *ext != '.');
@@ -605,7 +605,7 @@ BOOL PackDelFromArc(HWND parent, CFilesWindow* panel, const char* archiveFileNam
     //
     // We must adjust the directory in the archive to the required format
     //
-    char rootPath[MAX_PATH];
+    CPathBuffer rootPath; // Heap-allocated for long path support
     if (archiveRoot != NULL && *archiveRoot != '\0')
     {
         if (*archiveRoot == '\\')
@@ -628,7 +628,7 @@ BOOL PackDelFromArc(HWND parent, CFilesWindow* panel, const char* archiveFileNam
     // in the %TEMP% directory a helper file will contain the list of files to delete
     //
     // buffer for the full name of the helper file
-    char tmpListNameBuf[MAX_PATH];
+    CPathBuffer tmpListNameBuf; // Heap-allocated for long path support
     if (!SalGetTempFileName(NULL, "PACK", tmpListNameBuf, TRUE))
     {
         char buffer[1000];
@@ -648,7 +648,7 @@ BOOL PackDelFromArc(HWND parent, CFilesWindow* panel, const char* archiveFileNam
     // and we can fill it
     BOOL isDir;
     const char* name;
-    char namecnv[MAX_PATH];
+    CPathBuffer namecnv; // Heap-allocated for long path support
     int errorOccured;
     if (!needANSIListFile)
         CharToOem(rootPath, rootPath);
@@ -662,7 +662,7 @@ BOOL PackDelFromArc(HWND parent, CFilesWindow* panel, const char* archiveFileNam
         // and put it into the list
         if (!isDir)
         {
-            if (fprintf(listFile, "%s%s\n", rootPath, namecnv) <= 0)
+            if (fprintf(listFile, "%s%s\n", rootPath.Get(), namecnv.Get()) <= 0)
             {
                 fclose(listFile);
                 DeleteFileA(gFileSystem, tmpListNameBuf);
@@ -673,7 +673,7 @@ BOOL PackDelFromArc(HWND parent, CFilesWindow* panel, const char* archiveFileNam
         {
             if (modifyTable->DelEmptyDir == PMT_EMPDIRS_DELETE)
             {
-                if (fprintf(listFile, "%s%s\n", rootPath, namecnv) <= 0)
+                if (fprintf(listFile, "%s%s\n", rootPath.Get(), namecnv.Get()) <= 0)
                 {
                     fclose(listFile);
                     DeleteFileA(gFileSystem, tmpListNameBuf);
@@ -684,7 +684,7 @@ BOOL PackDelFromArc(HWND parent, CFilesWindow* panel, const char* archiveFileNam
             {
                 if (modifyTable->DelEmptyDir == PMT_EMPDIRS_DELETEWITHASTERISK)
                 {
-                    if (fprintf(listFile, "%s%s\\*\n", rootPath, namecnv) <= 0)
+                    if (fprintf(listFile, "%s%s\\*\n", rootPath.Get(), namecnv.Get()) <= 0)
                     {
                         fclose(listFile);
                         DeleteFileA(gFileSystem, tmpListNameBuf);
@@ -726,9 +726,9 @@ BOOL PackDelFromArc(HWND parent, CFilesWindow* panel, const char* archiveFileNam
     }
 
     // construct the current directory
-    char currentDir[MAX_PATH];
+    CPathBuffer currentDir; // Heap-allocated for long path support
     if (!PackExpandInitDir(archiveFileName, NULL, NULL, modifyTable->DeleteInitDir,
-                           currentDir, MAX_PATH))
+                           currentDir, currentDir.Size()))
     {
         DeleteFileA(gFileSystem, tmpListNameBuf);
         return (*PackErrorHandlerPtr)(parent, IDS_PACKERR_IDIRERR);
@@ -741,8 +741,8 @@ BOOL PackDelFromArc(HWND parent, CFilesWindow* panel, const char* archiveFileNam
 
     // back up the short archive file name, later we check whether the long name
     // survived -> if the short one remained, rename it back to the original long name
-    char DOSArchiveFileName[MAX_PATH];
-    if (!GetShortPathName(archiveFileName, DOSArchiveFileName, MAX_PATH))
+    CPathBuffer DOSArchiveFileName; // Heap-allocated for long path support
+    if (!GetShortPathName(archiveFileName, DOSArchiveFileName, DOSArchiveFileName.Size()))
         DOSArchiveFileName[0] = 0;
 
     // and run the external program
