@@ -1642,10 +1642,10 @@ void CCfgPageViewer::Validate(CTransferInfo& ti)
         ti.ErrorOn(IDC_TABSIZE);
     }
 
-    char buf[MAX_PATH];
+    CPathBuffer buf; // Heap-allocated for long path support
     if (ti.IsGood())
     {
-        lstrcpyn(buf, Configuration.TextModeMasks.GetMasksString(), MAX_PATH); // backup of TextModeMasks
+        lstrcpyn(buf, Configuration.TextModeMasks.GetMasksString(), buf.Size()); // backup of TextModeMasks
         // provide MasksString, there is range checking, nothing serious
         ti.EditLine(IDC_VIEW_INTEXT, Configuration.TextModeMasks.GetWritableMasksString(), MAX_PATH);
         int errorPos;
@@ -2167,15 +2167,15 @@ void CCfgPageUserMenu::StoreControls()
     {
         CUserMenuItem* item = UserMenuItems->At(index);
 
-        char command[MAX_PATH];
+        CPathBuffer command; // Heap-allocated for long path support
         char arguments[USRMNUARGS_MAXLEN];
-        char initdir[MAX_PATH];
+        CPathBuffer initdir; // Heap-allocated for long path support
         SendMessage(GetDlgItem(HWindow, IDE_COMMAND), WM_GETTEXT,
-                    MAX_PATH, (LPARAM)command);
+                    command.Size(), (LPARAM)command.Get());
         SendMessage(GetDlgItem(HWindow, IDE_ARGUMENTS), WM_GETTEXT,
                     USRMNUARGS_MAXLEN, (LPARAM)arguments);
         SendMessage(GetDlgItem(HWindow, IDE_INITDIR), WM_GETTEXT,
-                    MAX_PATH, (LPARAM)initdir);
+                    initdir.Size(), (LPARAM)initdir.Get());
 
         item->Set(item->ItemName, command, arguments, initdir, item->Icon);
 
@@ -2749,7 +2749,7 @@ void CCfgPageHotPath::Transfer(CTransferInfo& ti)
         int index = 0;
         DisableNotification = TRUE;
         char buff[20];
-        char name[MAX_PATH];
+        CPathBuffer name; // Heap-allocated for long path support
         int i;
         for (i = 0; i < HOT_PATHS_COUNT; i++)
         {
@@ -2759,7 +2759,7 @@ void CCfgPageHotPath::Transfer(CTransferInfo& ti)
             lvi.iSubItem = 0;
             lvi.state = 0;
             name[0] = 0;
-            Config->GetName(i, name, MAX_PATH);
+            Config->GetName(i, name, name.Size());
             lvi.pszText = name;
             ListView_InsertItem(HListView, &lvi);
 
@@ -2885,10 +2885,10 @@ void CCfgPageHotPath::OnMove(BOOL up)
         index2 = index1 + 1;
     if (index2 != index1)
     {
-        char name1[MAX_PATH];
-        char name2[MAX_PATH];
-        Config->GetName(index1, name1, MAX_PATH);
-        Config->GetName(index2, name2, MAX_PATH);
+        CPathBuffer name1; // Heap-allocated for long path support
+        CPathBuffer name2; // Heap-allocated for long path support
+        Config->GetName(index1, name1, name1.Size());
+        Config->GetName(index2, name2, name2.Size());
         ListView_SetItemText(HListView, index1, 0, name2);
         ListView_SetItemText(HListView, index2, 0, name1);
         DWORD state1 = ListView_GetItemState(HListView, index1, LVIS_STATEIMAGEMASK);
@@ -3043,8 +3043,8 @@ CCfgPageHotPath::DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
                 EnableHeader();
                 if (nmhd->item.pszText != NULL)
                 {
-                    char name[MAX_PATH];
-                    lstrcpyn(name, nmhd->item.pszText, MAX_PATH);
+                    CPathBuffer name; // Heap-allocated for long path support
+                    lstrcpyn(name, nmhd->item.pszText, name.Size());
                     Config->CleanName(name);
                     int index = nmhd->item.iItem;
                     char path[HOTPATHITEM_MAXPATH];
@@ -3128,8 +3128,8 @@ void CCfgPageSystem::Validate(CTransferInfo& ti)
     ti.RadioButton(IDR_RECYCLE3, 2, useRecycle);
     if (useRecycle == 2)
     {
-        char buf[MAX_PATH];
-        lstrcpyn(buf, Configuration.RecycleMasks.GetMasksString(), MAX_PATH); // backup of RecycleBinMasks
+        CPathBuffer buf; // Heap-allocated for long path support
+        lstrcpyn(buf, Configuration.RecycleMasks.GetMasksString(), buf.Size()); // backup of RecycleBinMasks
         // provide MasksString, there is range checking, nothing serious
         ti.EditLine(IDE_RECYCLEMASKS, Configuration.RecycleMasks.GetWritableMasksString(), MAX_PATH);
         int errorPos;
