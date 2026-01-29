@@ -391,8 +391,8 @@ unsigned WINAPI ThreadIEMessageLoop(void* param)
     }
 
     CALL_STACK_MESSAGE1("ThreadIEMessageLoop::SetEvent");
-    char name[MAX_PATH];
-    lstrcpyn(name, data->Name, MAX_PATH);
+    CPathBuffer name; // Heap-allocated for long path support
+    lstrcpyn(name, data->Name, name.Size());
     IStream* contentStream = data->ContentStream;
     BOOL openFile = data->Success;
     SetEvent(data->Continue); // let the main thread continue; data are invalid from this point (=NULL)
