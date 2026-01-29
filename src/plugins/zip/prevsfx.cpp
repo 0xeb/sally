@@ -41,7 +41,7 @@ LRESULT CALLBACK LinkControlProc(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lPa
     {
         RECT r;
         PAINTSTRUCT ps;
-        char txt[MAX_PATH];
+        CPathBuffer txt; // Heap-allocated for long path support
         DWORD c;
         UINT format = DT_SINGLELINE | DT_BOTTOM | DT_NOPREFIX;
 
@@ -64,7 +64,7 @@ LRESULT CALLBACK LinkControlProc(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lPa
         HFONT hOldFont = (HFONT)SelectObject(ps.hdc, hFont);
         SetTextColor(ps.hdc, c);
         int prevBkMode = SetBkMode(ps.hdc, TRANSPARENT);
-        int len = GetWindowText(hWnd, txt, MAX_PATH);
+        int len = GetWindowText(hWnd, txt, txt.Size());
         DrawText(ps.hdc, txt, len, &r, format);
         SetBkMode(ps.hdc, prevBkMode);
         SelectObject(ps.hdc, hOldFont);
@@ -79,8 +79,8 @@ LRESULT CALLBACK LinkControlProc(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lPa
 
     case WM_LBUTTONDOWN:
     {
-        char link[MAX_PATH];
-        GetWindowText(hWnd, link, MAX_PATH);
+        CPathBuffer link; // Heap-allocated for long path support
+        GetWindowText(hWnd, link, link.Size());
         ShellExecute(hWnd, "open", link, NULL, NULL, SW_SHOWNORMAL);
         break;
     }
@@ -119,8 +119,8 @@ INT_PTR WINAPI SfxPreviewDlgProc(HWND dlg, UINT uMsg, WPARAM wParam, LPARAM lPar
         if (data->LargeIcon)
             SendMessage(GetDlgItem(dlg, IDC_ANIMATION), STM_SETICON, (WPARAM)data->LargeIcon, 0);
         SetWindowText(dlg, data->Settings->Title);
-        char path[MAX_PATH];
-        GetCurrentDirectory(MAX_PATH, path);
+        CPathBuffer path; // Heap-allocated for long path support
+        GetCurrentDirectory(path.Size(), path);
         SetDlgItemText(dlg, IDC_PATH, path);
         SetDlgItemText(dlg, IDOK, data->Settings->ExtractBtnText);
         SetDlgItemText(dlg, IDC_ABOUT, data->AboutButton1);

@@ -527,18 +527,18 @@ BOOL CAdvancedSEDialog::OnChangeIcon(WORD wNotifyCode, WORD wID, HWND hwndCtl)
         FPickIconDlg PickIconDlg = (FPickIconDlg)GetProcAddress(Shell32DLL, (LPCSTR)62); // Min: XP (shell32.dll version 6.0)
         if (PickIconDlg)
         {
-            char file[MAX_PATH];
+            CPathBuffer file; // Heap-allocated for long path support
             DWORD index = TmpSfxSettings.IconIndex;
             WCHAR wfile[MAX_PATH];
 
             lstrcpy(file, TmpSfxSettings.IconFile);
-            MultiByteToWideChar(CP_ACP, 0, file, -1, wfile, MAX_PATH);
-            wfile[MAX_PATH - 1] = 0;
+            MultiByteToWideChar(CP_ACP, 0, file, -1, wfile, _countof(wfile));
+            wfile[file.Size() - 1] = 0;
 
             if (PickIconDlg(Dlg, (LPSTR)wfile, MAX_PATH, &index))
             {
-                WideCharToMultiByte(CP_ACP, 0, wfile, -1, file, MAX_PATH, NULL, NULL);
-                file[MAX_PATH - 1] = 0;
+                WideCharToMultiByte(CP_ACP, 0, wfile, -1, file, file.Size(), NULL, NULL);
+                file[file.Size() - 1] = 0;
 
                 /*
         if (file[0] == '%')
@@ -556,8 +556,8 @@ BOOL CAdvancedSEDialog::OnChangeIcon(WORD wNotifyCode, WORD wID, HWND hwndCtl)
           }
         }
         */
-                char buf[MAX_PATH];
-                DWORD ret = ExpandEnvironmentStrings(file, buf, MAX_PATH);
+                CPathBuffer buf; // Heap-allocated for long path support
+                DWORD ret = ExpandEnvironmentStrings(file, buf, buf.Size());
                 if (ret != 0 && ret <= MAX_PATH)
                     lstrcpy(file, buf);
 
@@ -1006,12 +1006,12 @@ BOOL CAdvancedSEDialog::OnImport()
             LoadStr(IDS_ALLFILES), 0, "*.*", 0);
     ofn.lpstrFilter = buf;
     ofn.nFilterIndex = 1;
-    char fileName[MAX_PATH];
+    CPathBuffer fileName; // Heap-allocated for long path support
     fileName[0] = 0;
     ofn.lpstrFile = fileName;
     if (PackObject->Config.LastExportPath[0])
         ofn.lpstrInitialDir = PackObject->Config.LastExportPath;
-    ofn.nMaxFile = MAX_PATH;
+    ofn.nMaxFile = fileName.Size();
     ofn.Flags = OFN_EXPLORER | OFN_FILEMUSTEXIST | OFN_HIDEREADONLY | OFN_NOCHANGEDIR;
     ofn.lpstrDefExt = "set";
 
@@ -1052,10 +1052,10 @@ BOOL CAdvancedSEDialog::OnImport()
                     settings.SfxFile[0] = 0;
                 }
 
-                char zip2sfxDir[MAX_PATH];
-                if (GetModuleFileName(DLLInstance, zip2sfxDir, MAX_PATH - 1)) // -1 is the length difference between "zip2sfx\\" and "zip.spl"
+                CPathBuffer zip2sfxDir; // Heap-allocated for long path support
+                if (GetModuleFileName(DLLInstance, zip2sfxDir, zip2sfxDir.Size() - 1)) // -1 is the length difference between "zip2sfx\\" and "zip.spl"
                 {
-                    char* name = strrchr(zip2sfxDir, '\\');
+                    char* name = strrchr(zip2sfxDir.Get(), '\\');
                     if (name != NULL)
                         strcpy(name + 1, "zip2sfx\\");
                 }
@@ -1099,7 +1099,7 @@ BOOL CAdvancedSEDialog::OnImport()
 
                         SalamanderGeneral->SalPathStripPath(settings.SfxFile);
 
-                        char buff[MAX_PATH];
+                        CPathBuffer buff; // Heap-allocated for long path support
                         int rootLen = SalamanderGeneral->GetRootPath(buff, settings.IconFile);
                         int iconFileLen = (int)strlen(settings.IconFile);
                         if (iconFileLen < rootLen)
@@ -1164,11 +1164,11 @@ BOOL CAdvancedSEDialog::OnExport()
     CSfxSettings settings;
     if (!GetSettings(&settings))
         return TRUE;
-    char fullPath[MAX_PATH];
-    GetModuleFileName(DLLInstance, fullPath, MAX_PATH);
+    CPathBuffer fullPath; // Heap-allocated for long path support
+    GetModuleFileName(DLLInstance, fullPath, fullPath.Size());
     SalamanderGeneral->CutDirectory(fullPath);
-    SalamanderGeneral->SalPathAppend(fullPath, "sfx", MAX_PATH);
-    SalamanderGeneral->SalPathAppend(fullPath, settings.SfxFile, MAX_PATH);
+    SalamanderGeneral->SalPathAppend(fullPath, "sfx", fullPath.Size());
+    SalamanderGeneral->SalPathAppend(fullPath, settings.SfxFile, fullPath.Size());
     lstrcpy(settings.SfxFile, fullPath);
     //lstrcpy(settings.IconFile, TmpSfxSettings.IconFile);
     //settings.IconIndex = TmpSfxSettings.IconIndex;
@@ -1181,12 +1181,12 @@ BOOL CAdvancedSEDialog::OnExport()
     sprintf(buf, "%s%c*.set%c", LoadStr(IDS_SETTINGSFILE), 0, 0);
     ofn.lpstrFilter = buf;
     ofn.nFilterIndex = 1;
-    char fileName[MAX_PATH];
+    CPathBuffer fileName; // Heap-allocated for long path support
     fileName[0] = 0;
     ofn.lpstrFile = fileName;
     if (PackObject->Config.LastExportPath[0])
         ofn.lpstrInitialDir = PackObject->Config.LastExportPath;
-    ofn.nMaxFile = MAX_PATH;
+    ofn.nMaxFile = fileName.Size();
     ofn.Flags = OFN_EXPLORER | /*OFN_FILEMUSTEXIST | */ OFN_HIDEREADONLY | OFN_NOCHANGEDIR;
     ofn.lpstrDefExt = "set";
 
@@ -1253,7 +1253,7 @@ BOOL CAdvancedSEDialog::OnPreview()
         }
     }
 
-    char tmpName[MAX_PATH];
+    CPathBuffer tmpName; // Heap-allocated for long path support
     DWORD e;
     if (!SalamanderGeneral->SalGetTempFileName(NULL, "Sal", tmpName, TRUE, &e))
     {
@@ -1371,8 +1371,8 @@ BOOL CAdvancedSEDialog::OnResetValues()
         HICON iconLarge, iconSmall;
         CIcon* icons;
         int count;
-        char file[MAX_PATH];
-        GetModuleFileName(DLLInstance, file, MAX_PATH);
+        CPathBuffer file; // Heap-allocated for long path support
+        GetModuleFileName(DLLInstance, file, file.Size());
         int errorID = 0;
         switch (LoadIcons(file, -IDI_SFXICON, &icons, &count))
         {

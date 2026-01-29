@@ -210,13 +210,13 @@ BOOL CPluginInterface::Release(HWND parent, BOOL force)
 void ValidateDefSfxFile()
 {
     // ensure the file exists; otherwise use the first available one as default
-    char path[MAX_PATH];
+    CPathBuffer path; // Heap-allocated for long path support
     char* file;
-    GetModuleFileName(DLLInstance, path, MAX_PATH);
+    GetModuleFileName(DLLInstance, path, path.Size());
     SalamanderGeneral->CutDirectory(path);
     SalamanderGeneral->SalPathAppend(path, "sfx", MAX_PATH);
-    SalamanderGeneral->SalPathAddBackslash(path, MAX_PATH);
-    file = path + lstrlen(path);
+    SalamanderGeneral->SalPathAddBackslash(path, path.Size());
+    file = path.Get() + lstrlen(path);
     lstrcpy(file, Config.DefSfxFile);
     DWORD attr = SalamanderGeneral->SalGetFileAttributes(path);
     if (attr == 0xFFFFFFFF || attr & FILE_ATTRIBUTE_DIRECTORY)
@@ -623,20 +623,20 @@ BOOL CPluginInterfaceForMenuExt::ExecuteMenuItem(CSalamanderForOperationsAbstrac
     CALL_STACK_MESSAGE3("CPluginInterfaceForMenuExt::ExecuteMenuItem(, , %d, 0x%X)", id,
                         eventMask);
 
-    char zipFile[MAX_PATH];
+    CPathBuffer zipFile; // Heap-allocated for long path support
     char* fileName;
     char* arch;
     BOOL selFiles = FALSE;
     int index = 0;
     BOOL ok = TRUE;
 
-    if (!SalamanderGeneral->GetPanelPath(PANEL_SOURCE, zipFile, MAX_PATH, NULL, &arch))
+    if (!SalamanderGeneral->GetPanelPath(PANEL_SOURCE, zipFile, zipFile.Size(), NULL, &arch))
         return FALSE;
 
     if (!arch)
     {
-        SalamanderGeneral->SalPathAddBackslash(zipFile, MAX_PATH);
-        fileName = zipFile + lstrlen(zipFile);
+        SalamanderGeneral->SalPathAddBackslash(zipFile, zipFile.Size());
+        fileName = zipFile.Get() + lstrlen(zipFile);
         selFiles = eventMask & MENU_EVENT_FILES_SELECTED;
     }
 
@@ -727,7 +727,7 @@ BOOL CPluginInterfaceForMenuExt::ExecuteMenuItem(CSalamanderForOperationsAbstrac
             if (ok)
             {
                 char buf[1024];
-                sprintf(buf, unpack.AllFilesOK ? LoadStr(IDS_TESTOK) : LoadStr(IDS_TESTKO), zipFile);
+                sprintf(buf, unpack.AllFilesOK ? LoadStr(IDS_TESTOK) : LoadStr(IDS_TESTKO), zipFile.Get());
                 SalamanderGeneral->ShowMessageBox(buf, LoadStr(IDS_PLUGINNAME), MSGBOX_INFO);
             }
             break;
@@ -741,7 +741,7 @@ BOOL CPluginInterfaceForMenuExt::ExecuteMenuItem(CSalamanderForOperationsAbstrac
                 changesReported = TRUE;
                 // notify the path containing the modified PAK files (notification happens after leaving
                 // the plugin code — once this method returns)
-                char zipFileDir[MAX_PATH];
+                CPathBuffer zipFileDir; // Heap-allocated for long path support
                 strcpy(zipFileDir, zipFile);
                 SalamanderGeneral->CutDirectory(zipFileDir); // must succeed because the file exists
                 SalamanderGeneral->PostChangeOnPathNotification(zipFileDir, FALSE);

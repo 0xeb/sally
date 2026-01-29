@@ -295,16 +295,16 @@ void HandlePathRelativeToZip2Sfx(char* path, const char* zip2sfxDir)
     if (zip2sfxDir[0] != 0 &&
         !(path[0] != 0 && path[1] == ':' || path[0] == '\\' && path[1] == '\\'))
     { // relative path and we know the path to zip2sfx.exe
-        char joinedPath[MAX_PATH];
+        CPathBuffer joinedPath; // Heap-allocated for long path support
         if (path[0] == '\\')
             GetRootPath(joinedPath, zip2sfxDir);
         else
-            lstrcpyn(joinedPath, zip2sfxDir, MAX_PATH);
+            lstrcpyn(joinedPath, zip2sfxDir, joinedPath.Size());
         int len = (int)strlen(joinedPath);
         const char* pathAux = path[0] == '\\' ? path + 1 : path;
         if (strlen(pathAux) + len < MAX_PATH)
         {
-            strcpy(joinedPath + len, pathAux);
+            strcpy(joinedPath.Get() + len, pathAux);
             strcpy(path, joinedPath);
         }
         else

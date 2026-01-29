@@ -216,16 +216,16 @@ int CZipCommon::ChangeDisk()
 void CZipCommon::FindLastFile(char* lastFile)
 {
     CALL_STACK_MESSAGE1("CZipCommon::FindLastFile()");
-    char path[MAX_PATH];
-    char name[MAX_PATH];
-    char ext[MAX_PATH];
+    CPathBuffer path; // Heap-allocated for long path support
+    CPathBuffer name; // Heap-allocated for long path support
+    CPathBuffer ext; // Heap-allocated for long path support
     char* sour;
     int i, j;
-    char mask[MAX_PATH];
+    CPathBuffer mask; // Heap-allocated for long path support
     WIN32_FIND_DATA data;
     HANDLE search;
     int biggest = 0;
-    char buf[MAX_PATH];
+    CPathBuffer buf; // Heap-allocated for long path support
     int pathLen;
 
     *lastFile = NULL;
@@ -237,17 +237,17 @@ void CZipCommon::FindLastFile(char* lastFile)
     *ext = 0;
   }*/
     i = lstrlen(name) - 1;
-    sour = name + i;
-    while (sour >= name)
+    sour = name.Get() + i;
+    while (sour >= name.Get())
     {
         if (!isdigit(*sour))
             break;
         sour--;
     }
-    if (sour < name || sour == name + i)
+    if (sour < name.Get() || sour == name.Get() + i)
         return;
     *(++sour) = 0;
-    sprintf(mask, "%s%s*%s", path, name, ext);
+    sprintf(mask.Get(), "%s%s*%s", path.Get(), name.Get(), ext.Get());
     search = FindFirstFile(mask, &data);
     if (search == INVALID_HANDLE_VALUE)
         return;
@@ -262,20 +262,20 @@ void CZipCommon::FindLastFile(char* lastFile)
       *ext = 0;
     }*/
         i = lstrlen(name) - 1;
-        sour = name + i;
-        while (sour >= name)
+        sour = name.Get() + i;
+        while (sour >= name.Get())
         {
             if (!isdigit(*sour))
                 break;
             sour--;
         }
-        if (sour >= name && sour != name + i)
+        if (sour >= name.Get() && sour != name.Get() + i)
         {
             j = atoi(++sour);
             if (j > biggest && !(data.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY))
             {
                 biggest = j;
-                lstrcpy(buf + pathLen, data.cFileName);
+                lstrcpy(buf.Get() + pathLen, data.cFileName);
             }
         }
     } while (FindNextFile(search, &data));

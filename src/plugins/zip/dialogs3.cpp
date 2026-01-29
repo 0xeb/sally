@@ -498,9 +498,9 @@ BOOL LoadSfxLangs(HWND dlg, char* selectedSfxFile, bool isConfig)
 BOOL LoadLangChache(HWND parent)
 {
     CALL_STACK_MESSAGE1("LoadLangChache()");
-    char path[MAX_PATH];
+    CPathBuffer path; // Heap-allocated for long path support
     char* file;
-    GetModuleFileName(DLLInstance, path, MAX_PATH);
+    GetModuleFileName(DLLInstance, path, path.Size());
     SalamanderGeneral->CutDirectory(path);
     SalamanderGeneral->SalPathAppend(path, "sfx\\*.sfx", MAX_PATH);
     WIN32_FIND_DATA fd;

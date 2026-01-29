@@ -1484,12 +1484,12 @@ int CZipUnpack::ExtractSingleFile(char* targetDir, int targetDirLen,
                         if (!Test)
                         {
                             char attr[101];
-                            char buf[MAX_PATH];
+                            CPathBuffer buf; // Heap-allocated for long path support
                             int len = lstrlen(ZipName);
 
                             lstrcpy(buf, ZipName);
-                            *(buf + len++) = '\\';
-                            lstrcpyn(buf + len, fileInfo->Name, MAX_PATH - len);
+                            *(buf.Get() + len++) = '\\';
+                            lstrcpyn(buf.Get() + len, fileInfo->Name, buf.Size() - len);
                             GetInfo(attr, &fileInfo->LastWrite, fileInfo->Size);
                             result = SafeCreateCFile(&OutputFile, targetDir, buf, attr, GENERIC_WRITE,
                                                      FILE_SHARE_READ, fileInfo->FileAttr & ~FILE_ATTRIBUTE_READONLY | FILE_FLAG_SEQUENTIAL_SCAN,

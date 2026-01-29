@@ -238,9 +238,9 @@ int CZipPack::PackMultiVol(SalEnumSelection2 next, void* param)
     {
         Salamander->ProgressDialogAddText(LoadStr(IDS_WRITINGEXE), FALSE);
 
-        char name[MAX_PATH];
+        CPathBuffer name; // Heap-allocated for long path support
         lstrcpy(name, ZipName);
-        if (!SalamanderGeneral->SalPathRenameExtension(name, ".exe", MAX_PATH))
+        if (!SalamanderGeneral->SalPathRenameExtension(name, ".exe", name.Size()))
         {
             Salamander->CloseProgressDialog();
             return IDS_TOOLONGZIPNAME;
@@ -268,7 +268,7 @@ int CZipPack::PackMultiVol(SalEnumSelection2 next, void* param)
         ErrorID = WriteSfxExecutable(name, Options.SfxSettings.SfxFile, FALSE, 0);
         if (!ErrorID)
         {
-            char archName[MAX_PATH];
+            CPathBuffer archName; // Heap-allocated for long path support
             MakeFileName(1, Options.SeqNames, SalamanderGeneral->SalPathFindFileName(ZipName), archName,
                          false);
             CharToOem(archName, archName);
@@ -383,7 +383,7 @@ int CZipPack::PackMultiVol(SalEnumSelection2 next, void* param)
                                 {
                                     if (TempFile)
                                     {
-                                        char name[MAX_PATH];
+                                        CPathBuffer name; // Heap-allocated for long path support
                                         strcpy(name, TempFile->FileName);
                                         CloseCFile(TempFile);
                                         TempFile = NULL;
@@ -2421,11 +2421,11 @@ int CZipPack::WriteSfxExecutable(const char* sfxFile, const char* sfxPackage, BO
     CSfxFileHeader sfxHead;
 
     //copy exetutable
-    char package[MAX_PATH];
-    GetModuleFileName(DLLInstance, package, MAX_PATH);
+    CPathBuffer package; // Heap-allocated for long path support
+    GetModuleFileName(DLLInstance, package, package.Size());
     SalamanderGeneral->CutDirectory(package);
-    SalamanderGeneral->SalPathAppend(package, "sfx", MAX_PATH);
-    SalamanderGeneral->SalPathAppend(package, sfxPackage, MAX_PATH);
+    SalamanderGeneral->SalPathAppend(package, "sfx", package.Size());
+    SalamanderGeneral->SalPathAppend(package, sfxPackage, package.Size());
     ret = CreateCFile(&sfx, package, GENERIC_READ, FILE_SHARE_READ, OPEN_EXISTING,
                       FILE_ATTRIBUTE_NORMAL | FILE_FLAG_SEQUENTIAL_SCAN, PE_NOSKIP, NULL,
                       false, false);
@@ -3016,9 +3016,9 @@ int CZipPack::WriteSFXECRec(QWORD offset)
     }
     DiskNum = 0;
 
-    char name[MAX_PATH];
+    CPathBuffer name; // Heap-allocated for long path support
     lstrcpy(name, ZipName);
-    if (!SalamanderGeneral->SalPathRenameExtension(name, ".exe", MAX_PATH))
+    if (!SalamanderGeneral->SalPathRenameExtension(name, ".exe", name.Size()))
     {
         Salamander->CloseProgressDialog();
         return IDS_TOOLONGZIPNAME;
