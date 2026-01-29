@@ -850,14 +850,15 @@ BOOL CCalculateDialog::GetSaveFileName(LPTSTR buffer, LPCTSTR title)
     CALL_STACK_MESSAGE2("CCalculateDialog::GetSaveFileName(, %s)", title);
 
     // obtain the default name; are all names identical?
-    char file1[MAX_PATH], file2[MAX_PATH], filter[MAX_PATH], *s;
-    GetItemText(0, 0, file1, MAX_PATH);
+    CPathBuffer file1, file2; // Heap-allocated for long path support
+    char filter[MAX_PATH], *s;
+    GetItemText(0, 0, file1, file1.Size());
     SalamanderGeneral->SalPathRemoveExtension(file1);
     BOOL allSame = TRUE;
     int i;
     for (i = 1; i < ListView_GetItemCount(hList); i++)
     {
-        GetItemText(i, 0, file2, MAX_PATH);
+        GetItemText(i, 0, file2, file2.Size());
         SalamanderGeneral->SalPathRemoveExtension(file2);
         if (_stricmp(file1, file2))
         {
@@ -958,7 +959,7 @@ void CCalculateDialog::SaveHashes()
 {
     CALL_STACK_MESSAGE1("CCalculateDialog::SaveHashes()");
 
-    char filename[MAX_PATH];
+    CPathBuffer filename; // Heap-allocated for long path support
     if (GetSaveFileName(filename, LoadStr(IDS_SAVE_TITLE)))
     {
         FILE* f;
@@ -983,8 +984,9 @@ void CCalculateDialog::SaveHashes()
         int i;
         for (i = 0; i < ListView_GetItemCount(hList); i++)
         {
-            char name[MAX_PATH], hash[HASH_MAX_SIZE];
-            GetItemText(i, 0, name, SizeOf(name));
+            CPathBuffer name; // Heap-allocated for long path support
+            char hash[HASH_MAX_SIZE];
+            GetItemText(i, 0, name, name.Size());
             GetItemText(i, colInd, hash, SizeOf(hash));
             if (!hash[0] || !strcmp(hash, LoadStr(IDS_CANCELED)) || !strcmp(hash, LoadStr(IDS_SKIPPED)))
             { // Skip canceled / skipped files with empty hash/CRC
@@ -1622,9 +1624,9 @@ BOOL CVerifyDialog::LoadSourceFile()
             if (info->fileName[0] != 0)
             {
                 // fetch file information and insert into the list
-                char path[MAX_PATH];
-                strcpy(path, sourcePath);
-                if (SalamanderGeneral->SalPathAppend(path, info->fileName, MAX_PATH))
+                CPathBuffer path; // Heap-allocated for long path support
+                lstrcpyn(path, sourcePath, path.Size());
+                if (SalamanderGeneral->SalPathAppend(path, info->fileName, path.Size()))
                 {
                     WIN32_FIND_DATA fd;
                     HANDLE hFind = HANDLES_Q(FindFirstFile(path, &fd));
@@ -2085,7 +2087,7 @@ BOOL OpenCalculateDialog(HWND parent)
     }
 
     int nFiles, nDirs;
-    char sourcePath[MAX_PATH];
+    CPathBuffer sourcePath; // Heap-allocated for long path support
 
     // Check if nothing is selected and no focus is set
     if (SalamanderGeneral->GetPanelSelection(PANEL_SOURCE, &nFiles, &nDirs))
@@ -2094,7 +2096,7 @@ BOOL OpenCalculateDialog(HWND parent)
         const CFileData* fd;
         BOOL isDir;
 
-        SalamanderGeneral->GetPanelPath(PANEL_SOURCE, sourcePath, SizeOf(sourcePath), NULL, NULL);
+        SalamanderGeneral->GetPanelPath(PANEL_SOURCE, sourcePath, sourcePath.Size(), NULL, NULL);
 
         while (((nFiles || nDirs) ? (fd = SalamanderGeneral->GetPanelSelectedItem(PANEL_SOURCE, &index, &isDir)) != NULL : (fd = SalamanderGeneral->GetPanelFocusedItem(PANEL_SOURCE, &isDir)) != NULL))
         {
@@ -2117,7 +2119,7 @@ BOOL OpenCalculateDialog(HWND parent)
     // NOTE: GetConfigParameter can only be called from the main thread
     SalamanderGeneral->GetConfigParameter(SALCFG_ALWAYSONTOP, &bAlwaysOnTop, sizeof(bAlwaysOnTop), NULL);
 
-    CCalculateDialogThread* t = new CCalculateDialogThread(parent, bAlwaysOnTop, pFileList, _strdup(sourcePath));
+    CCalculateDialogThread* t = new CCalculateDialogThread(parent, bAlwaysOnTop, pFileList, _strdup(sourcePath.Get()));
     if (t != NULL)
     {
         // start the thread
