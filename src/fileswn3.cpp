@@ -302,7 +302,7 @@ BOOL CFilesWindow::ReadDirectory(HWND parent, BOOL isRefresh)
 
         BOOL isUpDir = FALSE;
         WIN32_FIND_DATAW fileDataW;
-        char ansiFileName[MAX_PATH];      // ANSI conversion buffer for cFileName (also used as scratch)
+        CPathBuffer ansiFileName; // Heap-allocated for long path support; ANSI conversion buffer for cFileName (also used as scratch)
         BOOL nameConversionLossy = FALSE; // TRUE if wide->ANSI conversion lost characters
         HANDLE search;
         search = SalFindFirstFileHW(fileName, &fileDataW);
@@ -1257,7 +1257,7 @@ BOOL CFilesWindow::ReadDirectory(HWND parent, BOOL isRefresh)
             {
 */
                         char* s = f->Ext - 1;
-                        char buf[MAX_PATH];
+                        CPathBuffer buf; // Heap-allocated for long path support
                         char* st = buf;
                         while (*++s != 0)
                             *st++ = LowerCase[*s];
@@ -1535,7 +1535,7 @@ BOOL CFilesWindow::ReadDirectory(HWND parent, BOOL isRefresh)
                 {
   */
                                 char* s = f->Ext - 1;
-                                char buf[MAX_PATH];
+                                CPathBuffer buf; // Heap-allocated for long path support
                                 char* st = buf;
                                 while (*++s != 0)
                                     *st++ = LowerCase[*s];
@@ -1790,7 +1790,7 @@ BOOL IsWin64RedirectedDir(const char* path, char** lastSubDir, BOOL failIfDirWit
 {
     if (Windows64Bit && WindowsDirectory[0] != 0)
     {
-        char winDir[MAX_PATH];
+        CPathBuffer winDir; // Heap-allocated for long path support
         strcpy(winDir, WindowsDirectory);
         int len = (int)strlen(winDir);
         if (len > 0 && winDir[len - 1] != '\\')
@@ -1914,7 +1914,7 @@ BOOL AddWin64RedirectedDir(const char* path, CFilesArray* dirs, WIN32_FIND_DATA*
     *dirWithSameNameExists = FALSE;
     if (Windows64Bit && WindowsDirectory[0] != 0)
     {
-        char winDir[MAX_PATH];
+        CPathBuffer winDir; // Heap-allocated for long path support
         strcpy(winDir, WindowsDirectory);
         int len = (int)strlen(winDir);
         if (len > 0 && winDir[len - 1] != '\\')
@@ -1948,10 +1948,10 @@ BOOL CFilesWindow::ChangeDir(const char* newDir, int suggestedTopIndex, const ch
                         suggestedFocusName, mode, convertFSPathToInternal, showNewDirPathInErrBoxes);
 
     // backup the string (it could change during execution - e.g. Name from CFileData from panel)
-    char backup[MAX_PATH];
+    CPathBuffer backup; // Heap-allocated for long path support
     if (suggestedFocusName != NULL)
     {
-        lstrcpyn(backup, suggestedFocusName, MAX_PATH);
+        lstrcpyn(backup, suggestedFocusName, backup.Size());
         suggestedFocusName = backup;
     }
 
