@@ -527,7 +527,7 @@ BOOL GetOpenFileName(HWND parent, const char* title, const char* filter, char* b
     CALL_STACK_MESSAGE4("GetOpenFileName(, %s, %s, , %d)", title, filter, save);
     OPENFILENAME ofn;
     char buf[200];
-    char fileName[MAX_PATH];
+    CPathBuffer fileName; // Heap-allocated for long path support
     lstrcpyn(buf, filter, 200);
     Replace(buf, '\t', '\0');
 
@@ -542,9 +542,9 @@ BOOL GetOpenFileName(HWND parent, const char* title, const char* filter, char* b
         ofn.lpstrInitialDir = buffer;
     }
     else
-        strcpy(fileName, buffer);
+        lstrcpyn(fileName, buffer, fileName.Size());
     ofn.lpstrFile = fileName;
-    ofn.nMaxFile = MAX_PATH;
+    ofn.nMaxFile = fileName.Size();
     ofn.lpstrTitle = title;
     //ofn.lpfnHook = OFNHookProc;
     ofn.Flags = OFN_EXPLORER | OFN_HIDEREADONLY | OFN_NOCHANGEDIR /*| OFN_ENABLEHOOK*/;
@@ -573,10 +573,10 @@ BOOL RemoveFSNameFromPath(LPWSTR path)
     {
         if (*iterator == L':')
         {
-            char fsName[MAX_PATH];
+            CPathBuffer fsName; // Heap-allocated for long path support
             if (iterator - path)
             {
-                int len = (int)WStrToStr(fsName, MAX_PATH, path, (int)(iterator - path));
+                int len = (int)WStrToStr(fsName, fsName.Size(), path, (int)(iterator - path));
                 if (len == (int)strlen(AssignedFSName) && SG->StrNICmp(fsName, AssignedFSName, len) == 0)
                 {
                     memmove(path, iterator + 1, (wcslen(iterator + 1) + 1) * 2);
