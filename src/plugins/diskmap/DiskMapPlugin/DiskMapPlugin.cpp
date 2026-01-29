@@ -85,8 +85,8 @@ public:
     }
     BOOL DoFocusFile()
     {
-        char focusPath[MAX_PATH];
-        lstrcpyn(focusPath, FocusPathBuf, MAX_PATH);
+        CPathBuffer focusPath; // Heap-allocated for long path support
+        lstrcpyn(focusPath, FocusPathBuf, focusPath.Size());
         FocusPathBuf[0] = 0;
         if (focusPath[0] != 0) // only if we were not unlucky (we did not hit the beginning of Salamander's BUSY mode)
         {
@@ -102,8 +102,8 @@ public:
     }
     BOOL DoOpenFolder()
     {
-        char focusPath[MAX_PATH];
-        lstrcpyn(focusPath, FocusPathBuf, MAX_PATH);
+        CPathBuffer focusPath; // Heap-allocated for long path support
+        lstrcpyn(focusPath, FocusPathBuf, focusPath.Size());
         FocusPathBuf[0] = 0;
         if (focusPath[0] != 0) // only if we were not unlucky (we did not hit the beginning of Salamander's BUSY mode)
         {
@@ -704,8 +704,9 @@ BOOL WINAPI CPluginInterfaceForMenuExt::ExecuteMenuItem(CSalamanderForOperations
         // the current path is needed to convert relative paths to absolute ones
         int type;
         BOOL curPathIsDisk = FALSE;
-        char curPath[MAX_PATH] = "";
-        if (SalamanderGeneral->GetPanelPath(PANEL_SOURCE, curPath, MAX_PATH, &type, NULL))
+        CPathBuffer curPath; // Heap-allocated for long path support
+        curPath[0] = 0;
+        if (SalamanderGeneral->GetPanelPath(PANEL_SOURCE, curPath, curPath.Size(), &type, NULL))
         {
             if (type != PATH_TYPE_WINDOWS)
                 curPath[0] = 0; // we take only disk paths

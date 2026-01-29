@@ -2126,11 +2126,11 @@ void CNethoodCacheEnumerationThread::ProcessShareInfo(
 #else
     StringCchPrintf(szRemoteName, COUNTOF(szRemoteName), "%s\\%ls",
                     pszServerName, sShareInfo.shi1_netname);
-    char szComment[MAX_PATH];
+    CPathBuffer szComment; // Heap-allocated for long path support
     if (sShareInfo.shi1_remark && *sShareInfo.shi1_remark != L'\0')
     {
         if (WideCharToMultiByte(CP_ACP, 0, sShareInfo.shi1_remark,
-                                -1, szComment, COUNTOF(szComment), NULL, NULL) > 0)
+                                -1, szComment, szComment.Size(), NULL, NULL) > 0)
         {
             sNetResource.lpComment = szComment;
         }
@@ -2441,7 +2441,7 @@ BOOL CNethoodCacheEnumerationThread::ResolveNetShortcut(
     if (path[0] == '\\')
         return FALSE; // UNC path -> not a NetHood location
 
-    char name[MAX_PATH];
+    CPathBuffer name; // Heap-allocated for long path support
     name[0] = path[0];
     name[1] = TEXT(':');
     name[2] = TEXT('\\');
@@ -2450,8 +2450,8 @@ BOOL CNethoodCacheEnumerationThread::ResolveNetShortcut(
         return FALSE; // not a local fixed path -> not a NetHood location
 
     BOOL tryTarget = FALSE; // if TRUE, it is worth trying to find the "target.lnk" file
-    lstrcpyn(name, path, MAX_PATH);
-    if (SalamanderGeneral->SalPathAppend(name, "desktop.ini", MAX_PATH))
+    lstrcpyn(name, path, name.Size());
+    if (SalamanderGeneral->SalPathAppend(name, "desktop.ini", name.Size()))
     {
         HANDLE hFile = HANDLES_Q(CreateFile(name, GENERIC_READ,
                                             FILE_SHARE_WRITE | FILE_SHARE_READ, NULL,
@@ -2499,8 +2499,8 @@ BOOL CNethoodCacheEnumerationThread::ResolveNetShortcut(
 
     if (tryTarget)
     {
-        lstrcpyn(name, path, MAX_PATH);
-        if (SalamanderGeneral->SalPathAppend(name, "target.lnk", MAX_PATH))
+        lstrcpyn(name, path, name.Size());
+        if (SalamanderGeneral->SalPathAppend(name, "target.lnk", name.Size()))
         {
             WIN32_FIND_DATA data;
             HANDLE find = HANDLES_Q(FindFirstFile(name, &data));
@@ -2521,7 +2521,7 @@ BOOL CNethoodCacheEnumerationThread::ResolveNetShortcut(
                         oleName[MAX_PATH - 1] = 0;
                         if (fileInt->Load(oleName, STGM_READ) == S_OK)
                         {
-                            if (link->GetPath(name, MAX_PATH, &data, SLGP_UNCPRIORITY) == NOERROR)
+                            if (link->GetPath(name, name.Size(), &data, SLGP_UNCPRIORITY) == NOERROR)
                             {                                        // Skip Resolve; it's not critical here and would slow things down.
                                 StringCchCopy(path, MAX_PATH, name); // Finally we know where the shortcut points.
                                 ok = TRUE;

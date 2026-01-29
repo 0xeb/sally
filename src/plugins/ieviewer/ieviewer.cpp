@@ -160,10 +160,10 @@ void UpdateInternetFeatureControl()
     // https://msdn.microsoft.com/en-us/library/aa753277%28v=vs.85%29.aspx?f=255&MSPPError=-2147217396
     // but it still works under W10/IE11, so I am ignoring it
 
-    char exePath[MAX_PATH];
-    if (!GetModuleFileName(NULL, exePath, MAX_PATH))
+    CPathBuffer exePath; // Heap-allocated for long path support
+    if (!GetModuleFileName(NULL, exePath, exePath.Size()))
         exePath[0] = 0;
-    char* s = strrchr(exePath, '\\');
+    char* s = strrchr(exePath.Get(), '\\');
     if (s == NULL)
     {
         TRACE_E("GetModuleFileName() failed");
@@ -918,11 +918,11 @@ STDMETHODIMP CImpIOleInPlaceFrame::RemoveMenus(HMENU hmenuShared)
 STDMETHODIMP CImpIOleInPlaceFrame::SetStatusText(LPCOLESTR lpszStatusText)
 {
     CALL_STACK_MESSAGE1("CImpIOleInPlaceFrame::SetStatusText()");
-    char buff[MAX_PATH];
+    CPathBuffer buff; // Heap-allocated for long path support
     WideCharToMultiByte(CP_ACP, 0, lpszStatusText, -1, buff,
-                        MAX_PATH, NULL, NULL);
-    buff[MAX_PATH - 1] = 0;
-    TRACE_I("CImpIOleInPlaceFrame::SetStatusText: " << buff);
+                        buff.Size(), NULL, NULL);
+    buff[buff.Size() - 1] = 0;
+    TRACE_I("CImpIOleInPlaceFrame::SetStatusText: " << buff.Get());
     return E_NOTIMPL;
 }
 
