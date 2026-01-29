@@ -83,7 +83,7 @@ void CFilesWindow::Execute(int index)
             CFileData* file = &Files->At(index - Dirs->Count);
             char* fileName = file->Name;
             CPathBuffer fullPath;
-            char netFSName[MAX_PATH];
+            CPathBuffer netFSName; // Heap-allocated for long path support
             netFSName[0] = 0;
             if (file->DosName != NULL)
             {
@@ -505,8 +505,8 @@ void CFilesWindow::Execute(int index)
                     isDir = 2; // up-dir
                 CFileData* file = isDir ? &Dirs->At(index) : &Files->At(index - Dirs->Count);
                 CPluginInterfaceForFSEncapsulation* ifaceForFS = GetPluginFS()->GetPluginInterfaceForFS();
-                char fsNameBuf[MAX_PATH]; // GetPluginFS() may cease to exist, so we copy fsName to local buffer
-                lstrcpyn(fsNameBuf, GetPluginFS()->GetPluginFSName(), MAX_PATH);
+                CPathBuffer fsNameBuf; // GetPluginFS() may cease to exist, so we copy fsName to local buffer
+                lstrcpyn(fsNameBuf, GetPluginFS()->GetPluginFSName(), fsNameBuf.Size());
                 ifaceForFS->ExecuteOnFS(MainWindow->LeftPanel == this ? PANEL_LEFT : PANEL_RIGHT,
                                         GetPluginFS()->GetInterface(), fsNameBuf,
                                         GetPluginFS()->GetPluginFSNameIndex(), *file, isDir);
@@ -649,7 +649,7 @@ BOOL CFilesWindow::ChangeToRescuePathOrFixedDrive(HWND parent, BOOL* noChange, B
     CALL_STACK_MESSAGE4("CFilesWindow::ChangeToRescuePathOrFixedDrive(, , %d, %d, %d,)",
                         refreshListBox, canForce, tryCloseReason);
     BOOL noChangeUsed = FALSE;
-    char ifPathIsInaccessibleGoTo[MAX_PATH];
+    CPathBuffer ifPathIsInaccessibleGoTo; // Heap-allocated for long path support
     GetIfPathIsInaccessibleGoTo(ifPathIsInaccessibleGoTo);
     if (ifPathIsInaccessibleGoTo[0] == '\\' && ifPathIsInaccessibleGoTo[1] == '\\' ||
         ifPathIsInaccessibleGoTo[0] != 0 && ifPathIsInaccessibleGoTo[1] == ':')
@@ -692,9 +692,9 @@ BOOL CFilesWindow::ChangeToFixedDrive(HWND parent, BOOL* noChange, BOOL refreshL
                         refreshListBox, canForce, tryCloseReason);
     if (noChange != NULL)
         *noChange = TRUE;
-    char sysDir[MAX_PATH];
+    CPathBuffer sysDir; // Heap-allocated for long path support
     char root[4] = " :\\";
-    if (EnvGetWindowsDirectoryA(gEnvironment, sysDir, MAX_PATH).success && sysDir[0] != 0 && sysDir[1] == ':')
+    if (EnvGetWindowsDirectoryA(gEnvironment, sysDir, sysDir.Size()).success && sysDir[0] != 0 && sysDir[1] == ':')
     {
         root[0] = sysDir[0];
         if (GetDriveType(root) == DRIVE_FIXED)
@@ -1433,7 +1433,7 @@ void CFilesWindow::CloseCurrentPath(HWND parent, BOOL cancel, BOOL detachFS, BOO
                     BOOL sendDetachEvent = FALSE;
                     CPluginFSInterfaceEncapsulation* detachedFS = NULL;
 
-                    char buf[MAX_PATH];
+                    CPathBuffer buf; // Heap-allocated for long path support
                     if (GetPluginFS()->GetCurrentPath(buf))
                     {
                         if (UserWorkedOnThisPath)
@@ -1545,7 +1545,7 @@ void CFilesWindow::RefreshPathHistoryData()
             {
                 if (Is(ptPluginFS))
                 {
-                    char curPath[MAX_PATH];
+                    CPathBuffer curPath; // Heap-allocated for long path support
                     if (GetPluginFS()->NotEmpty() && GetPluginFS()->GetCurrentPath(curPath))
                     {
                         PathHistory->ChangeActualPathData(2, GetPluginFS()->GetPluginFSName(), curPath,
@@ -1576,7 +1576,7 @@ void CFilesWindow::RemoveCurrentPathFromHistory()
         {
             if (Is(ptPluginFS))
             {
-                char curPath[MAX_PATH];
+                CPathBuffer curPath; // Heap-allocated for long path support
                 if (GetPluginFS()->NotEmpty() && GetPluginFS()->GetCurrentPath(curPath))
                 {
                     PathHistory->RemoveActualPath(2, GetPluginFS()->GetPluginFSName(), curPath,
@@ -1801,10 +1801,10 @@ BOOL CFilesWindow::ChangePathToDisk(HWND parent, const char* path, int suggested
                             OpenCfgToChangeIfPathIsInaccessibleGoTo = TRUE;
 
                         // cannot shorten, we find the system or first fixed-drive (our "escape drive")
-                        char sysDir[MAX_PATH];
+                        CPathBuffer sysDir; // Heap-allocated for long path support
                         char root[4] = " :\\";
                         BOOL done = FALSE;
-                        if (EnvGetWindowsDirectoryA(gEnvironment, sysDir, MAX_PATH).success && sysDir[0] != 0 && sysDir[1] == ':')
+                        if (EnvGetWindowsDirectoryA(gEnvironment, sysDir, sysDir.Size()).success && sysDir[0] != 0 && sysDir[1] == ':')
                         {
                             root[0] = sysDir[0];
                             if (GetDriveType(root) == DRIVE_FIXED)
@@ -2017,8 +2017,8 @@ BOOL CFilesWindow::ChangePathToArchive(const char* archive, const char* archiveP
     FILETIME archiveDate;  // date and time of the archive file
     CQuadWord archiveSize; // size of the archive file
 
-    char text[MAX_PATH + 500];
-    char path[MAX_PATH];
+    CPathBuffer text; // Heap-allocated for long path support (used for messages with paths)
+    CPathBuffer path; // Heap-allocated for long path support
     BOOL sameArch;
     BOOL checkPath = TRUE;
     BOOL forceUpdateInt = FALSE; // is path change required? (possibly even to disk)
@@ -2139,7 +2139,7 @@ BOOL CFilesWindow::ChangePathToArchive(const char* archive, const char* archiveP
                     BOOL isTheSamePath = FALSE; // TRUE = the path doesn't change
                     if (Is(ptZIPArchive) && StrICmp(GetZIPArchive(), archive) == 0)
                     {
-                        char buf[MAX_PATH];
+                        CPathBuffer buf; // Heap-allocated for long path support
                         strcpy(buf, *archivePath == '\\' ? archivePath + 1 : archivePath);
                         char* end = buf + strlen(buf);
                         if (end > buf && *(end - 1) == '\\')
@@ -2298,7 +2298,7 @@ BOOL CFilesWindow::ChangePathToArchive(const char* archive, const char* archiveP
     }
 
     // save the current path in the archive
-    char currentPath[MAX_PATH];
+    CPathBuffer currentPath; // Heap-allocated for long path support
     strcpy(currentPath, GetZIPPath());
 
     SetZIPPath(path);
@@ -2394,7 +2394,7 @@ BOOL CFilesWindow::ChangeAndListPathOnFS(const char* fsName, int fsNameIndex, co
                          forceUpdate, (keepOldListing != NULL && *keepOldListing));
     if (cutFileName != NULL)
         *cutFileName = 0;
-    char bufFSUserPart[MAX_PATH];
+    CPathBuffer bufFSUserPart; // Heap-allocated for long path support
     const char* origUserPart; // user-part to which we switch the path to
     int origFSNameIndex;
     if (fsUserPart == NULL) // detached FS, restoration of the listing...
@@ -2450,15 +2450,15 @@ BOOL CFilesWindow::ChangeAndListPathOnFS(const char* fsName, int fsNameIndex, co
     }
 
     BOOL ok = FALSE;
-    char user[MAX_PATH];
-    lstrcpyn(user, origUserPart, MAX_PATH);
+    CPathBuffer user; // Heap-allocated for long path support
+    lstrcpyn(user, origUserPart, user.Size());
     pluginData = NULL;
     shorterPath = FALSE;
     if (cancel != NULL)
         *cancel = FALSE; // new data
     // we will try to read the directory contents (the path may shorten progressively)
     BOOL useCutFileName = TRUE;
-    char fsNameBuf[MAX_PATH];
+    CPathBuffer fsNameBuf; // Heap-allocated for long path support
     fsNameBuf[0] = 0;
     while (1)
     {
@@ -2466,8 +2466,8 @@ BOOL CFilesWindow::ChangeAndListPathOnFS(const char* fsName, int fsNameIndex, co
             useCutFileName = FALSE;
         BOOL pathWasCut = FALSE;
 
-        char newFSName[MAX_PATH];
-        lstrcpyn(newFSName, fsName, MAX_PATH);
+        CPathBuffer newFSName; // Heap-allocated for long path support
+        lstrcpyn(newFSName, fsName, newFSName.Size());
         BOOL changePathRet = pluginFS.ChangePath(pluginFS.GetPluginFSNameIndex(), newFSName,
                                                  fsNameIndex, user, cutFileName,
                                                  cutFileName != NULL ? &pathWasCut : NULL,
@@ -2669,8 +2669,8 @@ BOOL CFilesWindow::ChangePathToPluginFS(const char* fsName, const char* fsUserPa
     //TRACE_I("change-to-fs: begin");
 
     // as a precaution if fsName points to an unchangeable string (GetPluginFS()->PluginFSName()), we create a backup copy
-    char backup[MAX_PATH];
-    lstrcpyn(backup, fsName, MAX_PATH);
+    CPathBuffer backup; // Heap-allocated for long path support
+    lstrcpyn(backup, fsName, backup.Size());
     fsName = backup;
 
     if (noChange != NULL)
@@ -2681,7 +2681,7 @@ BOOL CFilesWindow::ChangePathToPluginFS(const char* fsName, const char* fsUserPa
         canFocusFileName = FALSE;
     }
 
-    if (strlen(fsUserPart) >= MAX_PATH)
+    if (strlen(fsUserPart) >= SAL_MAX_LONG_PATH)
     {
         if (failReason != NULL)
             *failReason = CHPPFR_INVALIDPATH;
@@ -2689,14 +2689,14 @@ BOOL CFilesWindow::ChangePathToPluginFS(const char* fsName, const char* fsUserPa
         return FALSE;
     }
     // make backup copies
-    char backup2[MAX_PATH];
-    lstrcpyn(backup2, fsUserPart, MAX_PATH);
+    CPathBuffer backup2; // Heap-allocated for long path support
+    lstrcpyn(backup2, fsUserPart, backup2.Size());
     fsUserPart = backup2;
     char* fsUserPart2 = backup2;
-    char backup3[MAX_PATH];
+    CPathBuffer backup3; // Heap-allocated for long path support
     if (suggestedFocusName != NULL)
     {
-        lstrcpyn(backup3, suggestedFocusName, MAX_PATH);
+        lstrcpyn(backup3, suggestedFocusName, backup3.Size());
         suggestedFocusName = backup3;
     }
 
@@ -2715,7 +2715,7 @@ BOOL CFilesWindow::ChangePathToPluginFS(const char* fsName, const char* fsUserPa
 
     BOOL ok = FALSE;
     BOOL shorterPath;
-    char cutFileNameBuf[MAX_PATH];
+    CPathBuffer cutFileNameBuf; // Heap-allocated for long path support
     int fsNameIndex;
     if (!Is(ptPluginFS) || !IsPathFromActiveFS(fsName, fsUserPart2, fsNameIndex, convertPathToInternal))
     { // is not FS or the path is from a different FS (even within a single plug-in - one FS name)
@@ -2748,7 +2748,7 @@ BOOL CFilesWindow::ChangePathToPluginFS(const char* fsName, const char* fsUserPa
                         SetThreadPriority(GetCurrentThread(), THREAD_PRIORITY_NORMAL);
                         CPluginDataInterfaceAbstract* pluginData;
                         int pluginIconsType;
-                        char* cutFileName = canFocusFileName && suggestedFocusName == NULL ? cutFileNameBuf : NULL; // focus the file only if no other focus is proposed
+                        char* cutFileName = canFocusFileName && suggestedFocusName == NULL ? cutFileNameBuf.Get() : NULL; // focus the file only if no other focus is proposed
                         if (ChangeAndListPathOnFS(fsName, fsNameIndex, fsUserPart2, pluginFS, newFSDir, pluginData,
                                                   shorterPath, pluginIconsType, mode, FALSE, NULL, NULL, -1,
                                                   FALSE, cutFileName, NULL))
@@ -2874,15 +2874,15 @@ BOOL CFilesWindow::ChangePathToPluginFS(const char* fsName, const char* fsUserPa
 
         // back up the current FS path (we'll try to select it again if an error occurs)
         BOOL currentPathOK = TRUE;
-        char currentPath[MAX_PATH];
+        CPathBuffer currentPath; // Heap-allocated for long path support
         if (!GetPluginFS()->GetCurrentPath(currentPath))
             currentPathOK = FALSE;
-        char currentPathFSName[MAX_PATH];
+        CPathBuffer currentPathFSName; // Heap-allocated for long path support
         strcpy(currentPathFSName, GetPluginFS()->GetPluginFSName());
         int currentPathFSNameIndex = GetPluginFS()->GetPluginFSNameIndex();
 
         int originalTopIndex = ListBox->GetTopIndex();
-        char originalFocusName[MAX_PATH];
+        CPathBuffer originalFocusName; // Heap-allocated for long path support
         originalFocusName[0] = 0;
         if (FocusedIndex >= 0)
         {
@@ -2895,7 +2895,7 @@ BOOL CFilesWindow::ChangePathToPluginFS(const char* fsName, const char* fsUserPa
                     file = &Files->At(FocusedIndex - Dirs->Count);
             }
             if (file != NULL)
-                lstrcpyn(originalFocusName, file->Name, MAX_PATH);
+                lstrcpyn(originalFocusName, file->Name, originalFocusName.Size());
         }
 
         // attempt to change the path on the current FS
@@ -2905,10 +2905,10 @@ BOOL CFilesWindow::ChangePathToPluginFS(const char* fsName, const char* fsUserPa
         int pluginIconsType;
         BOOL cancel;
         BOOL keepOldListing = TRUE;
-        char* cutFileName = canFocusFileName && suggestedFocusName == NULL ? cutFileNameBuf : NULL; // focus the file only if no other focus is proposed
+        char* cutFileName = canFocusFileName && suggestedFocusName == NULL ? cutFileNameBuf.Get() : NULL; // focus the file only if no other focus is proposed
         if (ChangeAndListPathOnFS(fsName, fsNameIndex, fsUserPart2, *GetPluginFS(), GetPluginFSDir(),
                                   pluginData, shorterPath, pluginIconsType, mode, TRUE, &cancel,
-                                  currentPathOK ? currentPath : NULL, currentPathFSNameIndex, forceUpdate,
+                                  currentPathOK ? currentPath.Get() : NULL, currentPathFSNameIndex, forceUpdate,
                                   cutFileName, &keepOldListing))
         { // success, the path (or subpath) was listed
             if (failReason != NULL)
@@ -2957,7 +2957,7 @@ BOOL CFilesWindow::ChangePathToPluginFS(const char* fsName, const char* fsUserPa
                                                          currentPathFSNameIndex, currentPath))
                         {
                             suggestedTopIndex = originalTopIndex;
-                            suggestedFocusName = originalFocusName[0] == 0 ? NULL : originalFocusName;
+                            suggestedFocusName = originalFocusName[0] == 0 ? NULL : originalFocusName.Get();
                         }
                     }
                 }
@@ -3057,7 +3057,7 @@ BOOL CFilesWindow::ChangePathToPluginFS(const char* fsName, const char* fsUserPa
                 if (!shorterPath)
                 {
                     suggestedTopIndex = originalTopIndex;
-                    suggestedFocusName = originalFocusName[0] == 0 ? NULL : originalFocusName;
+                    suggestedFocusName = originalFocusName[0] == 0 ? NULL : originalFocusName.Get();
                 }
 
                 // add the path we just left (paths inside the FS remain open,
@@ -3176,10 +3176,10 @@ BOOL CFilesWindow::ChangePathToDetachedFS(int fsIndex, int suggestedTopIndex,
                         suggestedTopIndex, suggestedFocusName, refreshListBox, newFSName, newUserPart,
                         mode, canFocusFileName);
 
-    char backup[MAX_PATH];
+    CPathBuffer backup; // Heap-allocated for long path support
     if (suggestedFocusName != NULL)
     {
-        lstrcpyn(backup, suggestedFocusName, MAX_PATH);
+        lstrcpyn(backup, suggestedFocusName, backup.Size());
         suggestedFocusName = backup;
     }
     if (newUserPart == NULL || newFSName == NULL)
@@ -3187,16 +3187,16 @@ BOOL CFilesWindow::ChangePathToDetachedFS(int fsIndex, int suggestedTopIndex,
         newUserPart = NULL;
         newFSName = NULL;
     }
-    char backup2[MAX_PATH];
+    CPathBuffer backup2; // Heap-allocated for long path support
     if (newUserPart != NULL)
     {
-        lstrcpyn(backup2, newUserPart, MAX_PATH);
+        lstrcpyn(backup2, newUserPart, backup2.Size());
         newUserPart = backup2;
     }
-    char backup3[MAX_PATH];
+    CPathBuffer backup3; // Heap-allocated for long path support
     if (newFSName != NULL)
     {
-        lstrcpyn(backup3, newFSName, MAX_PATH);
+        lstrcpyn(backup3, newFSName, backup3.Size());
         newFSName = backup3;
     }
 
@@ -3223,7 +3223,7 @@ BOOL CFilesWindow::ChangePathToDetachedFS(int fsIndex, int suggestedTopIndex,
     CPluginFSInterfaceEncapsulation* pluginFS = MainWindow->DetachedFSList->At(fsIndex);
 
     // retrieve fs-name of the detached FS
-    char fsName[MAX_PATH];
+    CPathBuffer fsName; // Heap-allocated for long path support
     int fsNameIndex;
     if (newFSName != NULL) // if we must switch to a new fs-name, find out whether it exists and obtain its fs-name-index
     {
@@ -3268,7 +3268,7 @@ BOOL CFilesWindow::ChangePathToDetachedFS(int fsIndex, int suggestedTopIndex,
 
     BOOL ok = FALSE;
     BOOL shorterPath;
-    char cutFileNameBuf[MAX_PATH];
+    CPathBuffer cutFileNameBuf; // Heap-allocated for long path support
 
     // not a FS path or the path is from another FS (even within the same plugin - one FS name)
     BOOL detachFS;
@@ -3280,7 +3280,7 @@ BOOL CFilesWindow::ChangePathToDetachedFS(int fsIndex, int suggestedTopIndex,
         SetThreadPriority(GetCurrentThread(), THREAD_PRIORITY_NORMAL);
         CPluginDataInterfaceAbstract* pluginData;
         int pluginIconsType;
-        char* cutFileName = canFocusFileName && suggestedFocusName == NULL ? cutFileNameBuf : NULL; // focus the file only if no other focus is proposed
+        char* cutFileName = canFocusFileName && suggestedFocusName == NULL ? cutFileNameBuf.Get() : NULL; // focus the file only if no other focus is proposed
         if (ChangeAndListPathOnFS(fsName, fsNameIndex, newUserPart, *pluginFS, newFSDir, pluginData,
                                   shorterPath, pluginIconsType, mode,
                                   FALSE, NULL, NULL, -1, FALSE, cutFileName, NULL))
