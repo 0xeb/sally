@@ -23,6 +23,9 @@
 struct CFileData;
 class CPluginDataInterfaceAbstract;
 
+// Include CPathBuffer for long path support in plugins
+#include "../../common/widepath.h"
+
 //
 // ****************************************************************************
 // CSalamanderGeneralAbstract

@@ -1692,11 +1692,11 @@ unsigned WINAPI ViewerThreadBody(void *param)
   }
 
   CALL_STACK_MESSAGE1("ViewerThreadBody::SetEvent");
-  char name[MAX_PATH];
+  CPathBuffer name; // Heap-allocated for long path support
   BOOL openFile = data->Success;
   int  ShowCmd = data->ShowCmd;
 
-  lstrcpyn(name, data->Name, MAX_PATH); // Fixed unsafe strcpy
+  lstrcpyn(name, data->Name, name.Size());
   SetEvent(data->Continue);    // let the main thread continue; from this point the data are invalid (=NULL)
   data = NULL;
 
