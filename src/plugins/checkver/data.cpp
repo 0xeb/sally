@@ -1051,11 +1051,10 @@ void CModules::EnumSalModules()
     // limitation - must be called from Salamander's main thread
     SalModules.DestroyMembers();
     int index = 0;
-    char module[MAX_PATH];
-    char version[MAX_PATH];
+    CPathBuffer module, version; // Heap-allocated for long path support
     while (SalGeneral->EnumInstalledModules(&index, module, version))
     {
-        char* p = strrchr(module, '\\');
+        char* p = strrchr(module.Get(), '\\');
         if (p != NULL)
         {
             CSalModuleInfo* mdl = new CSalModuleInfo();
