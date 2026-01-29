@@ -150,7 +150,7 @@ int CZipCommon::ChangeDisk()
     // small test to detect WinZip names
     if (CHDiskFlags & (CHD_FIRST | CHD_SEQNAMES))
     {
-        char buf[MAX_PATH];
+        CPathBuffer buf; // Heap-allocated for long path support
         RenumberName(DiskNum + 1, ZipName, buf,
                      DiskNum == EOCentrDir.DiskNum, CHDiskFlags & CHD_WINZIP);
         if (SalamanderGeneral->SalGetFileAttributes(buf) == 0xFFFFFFFF)
