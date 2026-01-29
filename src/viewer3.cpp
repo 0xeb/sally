@@ -568,12 +568,12 @@ CViewerWindow::WindowProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
     case WM_DROPFILES:
     {
         UINT drag;
-        char path[MAX_PATH];
+        CPathBuffer path; // Heap-allocated for long path support
 
         drag = DragQueryFile((HDROP)wParam, 0xFFFFFFFF, NULL, 0); // how many files were dropped on us
         if (drag > 0)
         {
-            DragQueryFile((HDROP)wParam, 0, path, MAX_PATH);
+            DragQueryFile((HDROP)wParam, 0, path, path.Size());
             if (SalGetFullName(path))
             {
                 if (Lock != NULL)
@@ -842,7 +842,7 @@ CViewerWindow::WindowProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
         {
             if (MouseDrag)
                 return 0;
-            char file[MAX_PATH];
+            CPathBuffer file; // Heap-allocated for long path support
             file[0] = 0;
             OPENFILENAME ofn;
             memset(&ofn, 0, sizeof(OPENFILENAME));
@@ -857,7 +857,7 @@ CViewerWindow::WindowProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
                 s++;
             }
             ofn.lpstrFile = file;
-            ofn.nMaxFile = MAX_PATH;
+            ofn.nMaxFile = file.Size();
             ofn.nFilterIndex = 1;
             ofn.lpstrInitialDir = CurrentDir[0] != 0 ? CurrentDir : NULL;
             ofn.Flags = OFN_PATHMUSTEXIST | OFN_FILEMUSTEXIST | OFN_HIDEREADONLY;
@@ -887,7 +887,7 @@ CViewerWindow::WindowProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
             BOOL ok = FALSE;
             BOOL srcBusy = FALSE;
             BOOL noMoreFiles = FALSE;
-            char fileName[MAX_PATH];
+            CPathBuffer fileName; // Heap-allocated for long path support
             fileName[0] = 0;
             int enumFileNamesLastFileIndex = EnumFileNamesLastFileIndex;
             if (LOWORD(wParam) == CM_PREVFILE || LOWORD(wParam) == CM_PREVSELFILE || LOWORD(wParam) == CM_LASTFILE)
@@ -1527,7 +1527,7 @@ CViewerWindow::WindowProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
 
             ENTER_AGAIN:
 
-                char fileName[MAX_PATH];
+                CPathBuffer fileName; // Heap-allocated for long path support
                 strcpy(fileName, FileName);
                 OPENFILENAME ofn;
                 memset(&ofn, 0, sizeof(OPENFILENAME));
@@ -1542,7 +1542,7 @@ CViewerWindow::WindowProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
                     s++;
                 }
                 ofn.lpstrFile = fileName;
-                ofn.nMaxFile = MAX_PATH;
+                ofn.nMaxFile = fileName.Size();
                 ofn.nFilterIndex = 1;
                 ofn.lpstrTitle = LoadStr(IDS_VIEWERCOPYTOFILE);
                 ofn.Flags = OFN_PATHMUSTEXIST | OFN_HIDEREADONLY | OFN_LONGNAMES | OFN_NOCHANGEDIR;
@@ -3051,7 +3051,7 @@ CViewerWindow::WindowProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
                     BOOL ok = FALSE;
                     BOOL srcBusy = FALSE;
                     BOOL noMoreFiles = FALSE;
-                    char fileName[MAX_PATH];
+                    CPathBuffer fileName; // Heap-allocated for long path support
                     fileName[0] = 0;
                     int enumFileNamesLastFileIndex = EnumFileNamesLastFileIndex;
                     ok = GetPreviousFileNameForViewer(EnumFileNamesSourceUID,
