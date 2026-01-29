@@ -77,10 +77,10 @@ BOOL CCHMFile::Open(const char* fileName, BOOL quiet /* = FALSE*/)
 {
     CALL_STACK_MESSAGE3("CCHMFile::Open(%s, %d)", fileName, quiet);
 
-    char dllPath[MAX_PATH];
-    if (!GetModuleFileName(DLLInstance, dllPath, MAX_PATH))
+    CPathBuffer dllPath; // Heap-allocated for long path support
+    if (!GetModuleFileName(DLLInstance, dllPath, dllPath.Size()))
         return FALSE;
-    lstrcpy(strrchr(dllPath, '\\') + 1, "chmlib.dll");
+    lstrcpy(strrchr(dllPath.Get(), '\\') + 1, "chmlib.dll");
 
     HMODULE hDLL = LoadLibrary(dllPath);
     if (hDLL != NULL)
@@ -259,9 +259,9 @@ int CCHMFile::ExtractObject(CSalamanderForOperationsAbstract* salamander, const 
     SalamanderGeneral->SalPathAppend(nameInArc, fileData->Name, MAX_PATH + MAX_PATH);
 
     ///
-    char name[MAX_PATH];
+    CPathBuffer name; // Heap-allocated for long path support
     strcpy(name, path);
-    if (!SalamanderGeneral->SalPathAppend(name, fileData->Name, MAX_PATH))
+    if (!SalamanderGeneral->SalPathAppend(name, fileData->Name, name.Size()))
         return UNPACK_ERROR;
 
     char fileInfo[100];

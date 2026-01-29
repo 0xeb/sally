@@ -1046,7 +1046,8 @@ static BOOL TestYEncBlock(CParserOutput* pOutput, BOOL& bEnd)
 
     // yes, extract the attributes line, size, part, and name
     const char* line = cLine + 8;
-    char text[50], value[50], filename[MAX_PATH];
+    char text[50], value[50];
+    CPathBuffer filename; // Heap-allocated for long path support
     int size, part = 0, attrLine = 0, attrSize = 0, attrName = 0, partsize;
     while (*line)
     {
@@ -1067,7 +1068,7 @@ static BOOL TestYEncBlock(CParserOutput* pOutput, BOOL& bEnd)
         else if (!strcmp(text, "name"))
         {
             attrName = 1;
-            strncpy_s(filename, line, _TRUNCATE);
+            lstrcpyn(filename, line, filename.Size());
             TrimChars(filename, " \"");
             line = "";
         }
@@ -1172,7 +1173,7 @@ static BOOL TestYEncBlock(CParserOutput* pOutput, BOOL& bEnd)
             p->iSize = pDecoder->iDecodedSize;
             strcpy(p->cCharset, "us-ascii");
             if (part)
-                sprintf(p->cFileName, "%s.%03d", filename, part);
+                sprintf(p->cFileName, "%s.%03d", filename.Get(), part);
             else
                 strcpy(p->cFileName, filename);
             DestroyIllegalChars(p->cFileName);

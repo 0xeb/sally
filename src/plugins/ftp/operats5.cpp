@@ -2328,8 +2328,8 @@ CFTPDiskThread::Body()
     localWork.NewTgtName = NULL;
     localWork.OpenedFile = NULL;
     localWork.DiskListing = NULL;
-    char fullName[MAX_PATH];
-    char nameBackup[MAX_PATH];
+    CPathBuffer fullName; // Heap-allocated for long path support
+    CPathBuffer nameBackup;
     char suffix[20];
 #ifdef TRACE_ENABLE
     char errBuf[300];
