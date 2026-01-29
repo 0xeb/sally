@@ -823,9 +823,9 @@ BOOL CDuplicateCandidates::GetMD5Digest(CGrepData* data, CFoundFilesData* file,
                                         int* progress, CQuadWord* readSize, const CQuadWord* totalSize)
 {
     // build full path to the file
-    char fullPath[MAX_PATH];
-    lstrcpyn(fullPath, file->Path, MAX_PATH);
-    SalPathAppend(fullPath, file->Name, MAX_PATH);
+    CPathBuffer fullPath;  // Heap-allocated for long path support
+    lstrcpyn(fullPath, file->Path, fullPath.Size());
+    SalPathAppend(fullPath, file->Name, fullPath.Size());
 
     data->SearchingText->Set(fullPath); // set the current file
 
@@ -1828,7 +1828,7 @@ void RefineData(CMaskGroup* masksGroup, CGrepData* data)
                 ok = FALSE; // a directory cannot be grepped
             else
             {
-                char fullPath[MAX_PATH];
+                CPathBuffer fullPath;  // Heap-allocated for long path support
                 strcpy(fullPath, refineData->Path);
                 if (fullPath[strlen(fullPath) - 1] != '\\')
                     strcat(fullPath, "\\");

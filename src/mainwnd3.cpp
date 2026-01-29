@@ -2252,7 +2252,7 @@ MENU_TEMPLATE_ITEM AddToSystemMenu[] =
                 char* listFull = userMenuAdvancedData.ListOfSelFullNames;
                 char* listFullEnd = listFull + USRMNUARGS_MAXLEN - 1;
                 smallBuf = FALSE;
-                char fullName[MAX_PATH];
+                CPathBuffer fullName;  // Heap-allocated for long path support
                 if (activePanel->SelectedCount > 0)
                 {
                     int count = activePanel->Files->Count + activePanel->Dirs->Count;
@@ -2269,8 +2269,8 @@ MENU_TEMPLATE_ITEM AddToSystemMenu[] =
                                 else
                                     break;
                             }
-                            lstrcpyn(fullName, activePanel->GetPath(), MAX_PATH);
-                            if (!SalPathAppend(fullName, file->Name, MAX_PATH) ||
+                            lstrcpyn(fullName, activePanel->GetPath(), fullName.Size());
+                            if (!SalPathAppend(fullName, file->Name, fullName.Size()) ||
                                 !AddToListOfNames(&listFull, listFullEnd, fullName, (int)strlen(fullName)))
                                 break;
                         }
