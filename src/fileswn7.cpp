@@ -486,7 +486,7 @@ void CFilesWindow::UnpackZIPArchive(CFilesWindow* target, BOOL deleteOp, const c
     data.EnumLastDir = NULL;
     data.EnumLastIndex = -1;
 
-    char changesRoot[MAX_PATH]; // directory from which changes on disk are taken into account
+    CPathBuffer changesRoot; // directory from which changes on disk are taken into account
     changesRoot[0] = 0;
 
     if (!deleteOp) // copy
@@ -1132,7 +1132,7 @@ CSalamanderDirectory* ReadDirectoryTree(HWND parent, CPanelTmpEnumData* data, in
             newF.IsOffline = f->IsOffline;
         }
 
-        char path[MAX_PATH];
+        char path[MAX_PATH]; // Cannot use CPathBuffer due to goto and _ReadDirectoryTree signature
         if (isDir) // directory
         {
             CSalamanderDirectory* salDir = NULL;
@@ -1175,7 +1175,7 @@ CSalamanderDirectory* ReadDirectoryTree(HWND parent, CPanelTmpEnumData* data, in
                 { // for a symlink determine the target file size
                     CQuadWord size;
                     strcpy(path, data->WorkPath);
-                    if (SalPathAppend(path, newF.Name, _countof(path)))
+                    if (SalPathAppend(path, newF.Name, MAX_PATH))
                     { // only if the path is not too long (any resulting error will be reported during enumeration)
                         if (GetLinkTgtFileSize(parent, path, NULL, &size, &cancel, &errGetFileSizeOfLnkTgtIgnAll))
                             newF.Size = size;
@@ -1293,7 +1293,7 @@ void CFilesWindow::Pack(CFilesWindow* target, int pluginIndex, const char* plugi
 
     //---  obtain the files and directories to work with
     char subject[MAX_PATH + 100]; // text for the Unpack dialog (that is being unpacked)
-    char path[MAX_PATH];
+    CPathBuffer path; // Heap-allocated for long path support
     char text[1000];
     BOOL nameByItem;
     CPanelTmpEnumData data;
@@ -1379,7 +1379,7 @@ void CFilesWindow::Pack(CFilesWindow* target, int pluginIndex, const char* plugi
     }
     sprintf(subject, LoadStr(IDS_PACKTOARCHIVE), expanded);
     CTruncatedString str;
-    str.Set(subject, data.IndexesCount > 1 ? NULL : path);
+    str.Set(subject, data.IndexesCount > 1 ? NULL : path.Get());
 
     data.CurrentIndex = 0;
     data.ZIPPath = GetZIPPath();
@@ -1391,8 +1391,8 @@ void CFilesWindow::Pack(CFilesWindow* target, int pluginIndex, const char* plugi
     data.EnumLastIndex = -1;
 
     //---  we are packing into a new file, ask for its name
-    char fileBuf[MAX_PATH];    // file we will pack into
-    char fileBufAlt[MAX_PATH]; // alternative name shown in the Pack dialog combo box
+    CPathBuffer fileBuf; // file we will pack into
+    CPathBuffer fileBufAlt; // alternative name shown in the Pack dialog combo box
 
     if (nameByItem) // if only one item (file/directory) is selected, the archive inherits its name
     {
@@ -1405,8 +1405,8 @@ void CFilesWindow::Pack(CFilesWindow* target, int pluginIndex, const char* plugi
         }
         else
         {
-            memcpy(fileBuf, path, ext + 1 - path);
-            fileBuf[ext + 1 - path] = 0;
+            memcpy(fileBuf.Get(), path.Get(), ext + 1 - path.Get());
+            fileBuf[ext + 1 - path.Get()] = 0;
         }
     }
     else
@@ -1423,7 +1423,7 @@ void CFilesWindow::Pack(CFilesWindow* target, int pluginIndex, const char* plugi
             dir--;
         if (dir < end)
         {
-            memcpy(fileBuf, dir, end - dir);
+            memcpy(fileBuf.Get(), dir, end - dir);
             fileBuf[end - dir] = '.';
             fileBuf[end - dir + 1] = 0;
         }
@@ -1482,9 +1482,9 @@ void CFilesWindow::Pack(CFilesWindow* target, int pluginIndex, const char* plugi
     }
 
     // if no item is selected, choose the focused item and store its name
-    char temporarySelected[MAX_PATH];
+    CPathBuffer temporarySelected; // Heap-allocated for long path support
     temporarySelected[0] = 0;
-    SelectFocusedItemAndGetName(temporarySelected, MAX_PATH);
+    SelectFocusedItemAndGetName(temporarySelected, temporarySelected.Size());
 
     if (delFilesAfterPacking == 1)
         PackerConfig.Move = TRUE;
@@ -1509,9 +1509,9 @@ _PACK_AGAIN:
         if (!Configuration.QuickRenameSelectAll)
         {
             const char* dot = strrchr(fileBuf, '.');
-            if (dot != NULL && dot > fileBuf) // although ".cvspass" is technically an extension in Windows, Explorer selects the entire name, so we do the same
+            if (dot != NULL && dot > fileBuf.Get()) // although ".cvspass" is technically an extension in Windows, Explorer selects the entire name, so we do the same
                                               //    if (dot != NULL)
-                selectionEnd = (int)(dot - fileBuf);
+                selectionEnd = (int)(dot - fileBuf.Get());
             dlg.SetSelectionEnd(selectionEnd);
         }
         first = FALSE; // after an error we get the full filename, so select it entirely
@@ -1528,7 +1528,7 @@ _PACK_AGAIN:
         //--- adjust the archive name to its full form
         int errTextID;
         BOOL empty = FALSE;
-        char nextFocus[MAX_PATH];
+        CPathBuffer nextFocus; // Heap-allocated for long path support
         nextFocus[0] = 0;
         if (SalGetFullName(fileBuf, &errTextID, Is(ptDisk) ? GetPath() : NULL, nextFocus))
         {
@@ -1544,7 +1544,7 @@ _PACK_AGAIN:
                 CreateSafeWaitWindow(LoadStr(IDS_ANALYSINGDIRTREEESC), NULL, 3000, TRUE, NULL);
 
                 // try to find the first directory link; if found, simulate an error to stop the search
-                char linkName[MAX_PATH];
+                CPathBuffer linkName; // Heap-allocated for long path support
                 linkName[0] = 0;
                 ReadDirectoryTree(NULL /* silent mode */, &data, NULL, FALSE, &containsDirLinks, linkName);
 
@@ -1677,9 +1677,9 @@ void CFilesWindow::Unpack(CFilesWindow* target, int pluginIndex, const char* plu
         BeginStopRefresh();
 
         CFileData* file = &Files->At(i - Dirs->Count);
-        char path[MAX_PATH];
-        char pathAlt[MAX_PATH]; // alternate path displayed in the UnPack dialog combo box
-        char mask[MAX_PATH];
+        CPathBuffer path; // Heap-allocated for long path support
+        CPathBuffer pathAlt; // alternate path displayed in the UnPack dialog combo box
+        CPathBuffer mask; // Heap-allocated for long path support
         char subject[MAX_PATH + 100];
         path[0] = 0;
         pathAlt[0] = 0;
@@ -1693,16 +1693,16 @@ void CFilesWindow::Unpack(CFilesWindow* target, int pluginIndex, const char* plu
             else
                 strcpy(pathAlt, target->GetPath());
         }
-        char fileName[MAX_PATH];
+        CPathBuffer fileName; // Heap-allocated for long path support
         AlterFileName(fileName, file->Name, -1, Configuration.FileNameFormat, 0, FALSE);
         if (Configuration.UseSubdirNameByArchiveForUnpack)
         {
             int i2;
             for (i2 = 0; i2 < 2; i2++) // for path and pathAlt
             {
-                char* buff = (i2 == 0) ? path : pathAlt;
+                char* buff = (i2 == 0) ? path.Get() : pathAlt.Get();
                 int l = (int)strlen(buff);
-                if (l + (l > 0 && buff[l - 1] != '\\' ? 1 : 0) + (file->Ext - file->Name) - (*file->Ext == 0 ? 0 : 1) < MAX_PATH)
+                if (l + (l > 0 && buff[l - 1] != '\\' ? 1 : 0) + (file->Ext - file->Name) - (*file->Ext == 0 ? 0 : 1) < (int)path.Size())
                 {
                     if (l > 0 && buff[l - 1] != '\\')
                         buff[l++] = '\\';
@@ -1714,7 +1714,7 @@ void CFilesWindow::Unpack(CFilesWindow* target, int pluginIndex, const char* plu
             }
         }
         if (unpackMask != NULL)
-            lstrcpyn(mask, unpackMask, MAX_PATH);
+            lstrcpyn(mask, unpackMask, mask.Size());
         else
             strcpy(mask, "*.*");
         CTruncatedString str;
@@ -1786,7 +1786,7 @@ void CFilesWindow::Unpack(CFilesWindow* target, int pluginIndex, const char* plu
             UpdateWindow(MainWindow->HWindow);
             //--- adjust the archive name to its full form
             int errTextID;
-            char nextFocus[MAX_PATH];
+            CPathBuffer nextFocus; // Heap-allocated for long path support
             nextFocus[0] = 0;
             const char* text = NULL;
             if (!SalGetFullName(path, &errTextID, Is(ptDisk) ? GetPath() : NULL, nextFocus))
@@ -1803,7 +1803,7 @@ void CFilesWindow::Unpack(CFilesWindow* target, int pluginIndex, const char* plu
                     l--;
                 memcpy(subject, GetPath(), l);
                 sprintf(subject + l, "\\%s", file->Name);
-                char newDir[MAX_PATH];
+                CPathBuffer newDir; // Heap-allocated for long path support
                 if (CheckAndCreateDirectory(path, NULL, TRUE, NULL, 0, newDir, FALSE, TRUE))
                 {
                     // launch the unpacker
@@ -2035,10 +2035,10 @@ void CFilesWindow::AcceptChangeOnPathNotification(const char* path, BOOL includi
     {
         // test the equality of paths or at least their prefix (we only care about disk paths,
         // FS paths in 'path' are automatically excluded because they can never match GetPath())
-        char path1[MAX_PATH];
-        char path2[MAX_PATH];
-        lstrcpyn(path1, path, MAX_PATH);
-        lstrcpyn(path2, GetPath(), MAX_PATH); // for archives this is the path to the archive
+        CPathBuffer path1; // Heap-allocated for long path support
+        CPathBuffer path2; // Heap-allocated for long path support
+        lstrcpyn(path1, path, path1.Size());
+        lstrcpyn(path2, GetPath(), path2.Size()); // for archives this is the path to the archive
         SalPathRemoveBackslash(path1);
         SalPathRemoveBackslash(path2);
         int len1 = (int)strlen(path1);
