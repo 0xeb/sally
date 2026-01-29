@@ -522,7 +522,7 @@ const char* GetCurrentDir(POINTL& pt, void* param, DWORD* effect, BOOL rButton, 
             // if it's a shortcut, perform its analysis
             BOOL linkIsDir = FALSE;  // TRUE -> shortcut to directory -> ChangePathToDisk
             BOOL linkIsFile = FALSE; // TRUE -> shortcut to file -> archive test
-            char linkTgt[MAX_PATH];
+            CPathBuffer linkTgt; // Heap-allocated for long path support
             linkTgt[0] = 0;
             if (StrICmp(file->Ext, "lnk") == 0) // is it a directory shortcut?
             {
@@ -912,7 +912,7 @@ void DoDragFromArchiveOrFS(CFilesWindow* panel, BOOL& dropDone, char* targetPath
         CALL_STACK_MESSAGE1("ShellAction::archive/FS::drag_files");
 
         // create "fake" directory
-        char fakeRootDir[MAX_PATH];
+        CPathBuffer fakeRootDir; // Heap-allocated for long path support
         char* fakeName;
         if (SalGetTempFileName(NULL, "SAL", fakeRootDir, FALSE))
         {
@@ -920,7 +920,7 @@ void DoDragFromArchiveOrFS(CFilesWindow* panel, BOOL& dropDone, char* targetPath
             // jr: Nasel jsem na netu zminku "Did implementing "IPersistStream" and providing the undocumented
             // "OleClipboardPersistOnFlush" format solve the problem?" -- pro pripad, ze bychom se potrebovali
             // zbavit DROPFAKE metody
-            if (SalPathAppend(fakeRootDir, "DROPFAKE", MAX_PATH))
+            if (SalPathAppend(fakeRootDir, "DROPFAKE", fakeRootDir.Size()))
             {
                 if (CreateDirectory(fakeRootDir, NULL))
                 {
@@ -1325,13 +1325,13 @@ void ShellAction(CFilesWindow* panel, CShellAction action, BOOL useSelection,
                     CALL_STACK_MESSAGE1("ShellAction::archive::clipcopy_files");
 
                     // create "fake" directory
-                    char fakeRootDir[MAX_PATH];
+                    CPathBuffer fakeRootDir; // Heap-allocated for long path support
                     char* fakeName;
                     if (SalGetTempFileName(NULL, "SAL", fakeRootDir, FALSE))
                     {
                         BOOL delFakeDir = TRUE;
                         fakeName = fakeRootDir + strlen(fakeRootDir);
-                        if (SalPathAppend(fakeRootDir, "CLIPFAKE", MAX_PATH))
+                        if (SalPathAppend(fakeRootDir, "CLIPFAKE", fakeRootDir.Size()))
                         {
                             if (CreateDirectory(fakeRootDir, NULL))
                             {
@@ -1619,7 +1619,7 @@ void ShellAction(CFilesWindow* panel, CShellAction action, BOOL useSelection,
     }
 
 #ifndef _WIN64
-    char redirectedDir[MAX_PATH];
+    CPathBuffer redirectedDir; // Heap-allocated for long path support
     char msg[300 + MAX_PATH];
 #endif // _WIN64
     switch (action)
@@ -2000,7 +2000,7 @@ void ShellAction(CFilesWindow* panel, CShellAction action, BOOL useSelection,
                 BOOL cmdDelete = FALSE;    // is it "our delete"?
                 BOOL cmdMapNetDrv = FALSE; // is it "our Map Network Drive"? (only UNC root, we don't want to complicate things)
                 DWORD cmd = 0;             // command number for context menu (10000 = "our paste")
-                char pastePath[MAX_PATH];  // buffer for path where "our paste" will be performed (if it happens)
+                CPathBuffer pastePath; // Heap-allocated for long path support; buffer for path where "our paste" will be performed (if it happens)
                 if (panel->ContextMenu != NULL && h != NULL)
                 {
                     if (!alreadyHaveContextMenu)
@@ -2653,11 +2653,11 @@ BOOL MakeFileAvailOfflineIfOneDriveOnWin81(HWND parent, const char *name)
   CALL_STACK_MESSAGE2("MakeFileAvailOfflineIfOneDriveOnWin81(, %s)", name);
 
   BOOL ret = TRUE;    // WARNING: support for OneDriveBusinessStorages is missing, add if needed !!!
-  if (Windows8_1AndLater && OneDrivePath[0] != 0 && strlen(name) < MAX_PATH)
+  if (Windows8_1AndLater && OneDrivePath[0] != 0)
   {
-    char path[MAX_PATH];
+    CPathBuffer path; // Heap-allocated for long path support
     char *cutName;
-    strcpy_s(path, name);
+    strcpy_s(path, path.Size(), name);
     if (CutDirectory(path, &cutName) && SalPathIsPrefix(OneDrivePath, path)) // we handle this only under OneDrive folder
     {
       BOOL makeOffline = FALSE;
