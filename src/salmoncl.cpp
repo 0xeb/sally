@@ -131,8 +131,8 @@ void GetStartupSLGName(char* slgName, DWORD slgNameMax)
     // this serves only as a default; if the record is not found, we pass an empty string
     slgName[0] = 0;
 
-    char keyName[MAX_PATH];
-    sprintf(keyName, "%s\\%s", SalamanderConfigurationRoots[0], SALAMANDER_CONFIG_REG);
+    CPathBuffer keyName; // Heap-allocated for long path support
+    sprintf(keyName.Get(), "%s\\%s", SalamanderConfigurationRoots[0], SALAMANDER_CONFIG_REG);
     HKEY hKey;
     LONG res = NOHANDLES(RegOpenKeyEx(HKEY_CURRENT_USER, keyName, 0, KEY_READ, &hKey));
     if (res == ERROR_SUCCESS)
@@ -150,9 +150,9 @@ BOOL SalmonStartProcess(const char* fileMappingName) //Configuration.LoadedSLGNa
     STARTUPINFO si;
     PROCESS_INFORMATION pi;
     char cmd[2 * MAX_PATH];
-    char rtlDir[MAX_PATH];
-    char oldCurDir[MAX_PATH];
-    char slgName[MAX_PATH];
+    CPathBuffer rtlDir;    // Heap-allocated for long path support
+    CPathBuffer oldCurDir; // Heap-allocated for long path support
+    CPathBuffer slgName;   // Heap-allocated for long path support
 #define MAX_ENV_PATH 32766
     char envPATH[MAX_ENV_PATH];
     BOOL ret;
@@ -164,14 +164,14 @@ BOOL SalmonStartProcess(const char* fileMappingName) //Configuration.LoadedSLGNa
     *(strrchr(cmd, '\\') + 1) = 0;
     lstrcat(cmd, "utils\\salmon.exe");
     AddDoubleQuotesIfNeeded(cmd, MAX_PATH); // CreateProcess wants the name with spaces in quotes (otherwise it tries various variants, see help)
-    GetStartupSLGName(slgName, sizeof(slgName));
-    wsprintf(cmd + strlen(cmd), " \"%s\" \"%s\"", fileMappingName, slgName); // slgName can be an empty string if configuration does not exist
+    GetStartupSLGName(slgName, slgName.Size());
+    wsprintf(cmd + strlen(cmd), " \"%s\" \"%s\"", fileMappingName, slgName.Get()); // slgName can be an empty string if configuration does not exist
     memset(&si, 0, sizeof(STARTUPINFO));
     si.cb = sizeof(STARTUPINFO);
     si.wShowWindow = SW_SHOWNORMAL;
-    GetModuleFileName(NULL, rtlDir, MAX_PATH);
+    GetModuleFileName(NULL, rtlDir, rtlDir.Size());
     *(strrchr(rtlDir, '\\') + 1) = 0;
-    GetCurrentDirectory(MAX_PATH, oldCurDir);
+    GetCurrentDirectory(oldCurDir.Size(), oldCurDir);
 
     // another attempt to solve the problem before we split SALMON.EXE into EXE+DLL
     // we try to extend the PATH env variable for the child process (SALMON.EXE) with the path to RTL
