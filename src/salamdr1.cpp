@@ -964,8 +964,8 @@ HICON GetDriveIcon(const char* root, UINT type, BOOL accessible, BOOL large)
         id = 32;
         if (type == DRIVE_FIXED && root[1] == ':')
         {
-            char win[MAX_PATH];
-            if (EnvGetWindowsDirectoryA(gEnvironment, win, MAX_PATH).success && win[1] == ':' && win[0] == root[0])
+            CPathBuffer win; // Heap-allocated for long path support
+            if (EnvGetWindowsDirectoryA(gEnvironment, win, win.Size()).success && win[1] == ':' && win[0] == root[0])
                 id = 36;
         }
         break;
@@ -1154,7 +1154,7 @@ BOOL HasTheSameRootPathAndVolume(const char* p1, const char* p2)
 
             // if we're under W2K and it's not a root path, we'll try traversing through reparse points
             cutPathIsPossible = TRUE;
-            char p2NetPath[MAX_PATH];
+            CPathBuffer p2NetPath; // Heap-allocated for long path support
             p2NetPath[0] = 0;
             ResolveLocalPathWithReparsePoints(ourPath, p2, &cutPathIsPossible, NULL, NULL, NULL, NULL, p2NetPath);
 
@@ -1185,15 +1185,15 @@ BOOL HasTheSameRootPathAndVolume(const char* p1, const char* p2)
 
 BOOL PathsAreOnTheSameVolume(const char* path1, const char* path2, BOOL* resIsOnlyEstimation)
 {
-    char root1[MAX_PATH];
-    char root2[MAX_PATH];
-    char ourPath[MAX_PATH];
-    char path1NetPath[MAX_PATH];
-    char path2NetPath[MAX_PATH];
-    lstrcpyn(ourPath, path1, MAX_PATH);
+    CPathBuffer root1; // Heap-allocated for long path support
+    CPathBuffer root2; // Heap-allocated for long path support
+    CPathBuffer ourPath; // Heap-allocated for long path support
+    CPathBuffer path1NetPath; // Heap-allocated for long path support
+    CPathBuffer path2NetPath; // Heap-allocated for long path support
+    lstrcpyn(ourPath, path1, ourPath.Size());
     ResolveSubsts(ourPath);
     GetRootPath(root1, ourPath);
-    lstrcpyn(ourPath, path2, MAX_PATH);
+    lstrcpyn(ourPath, path2, ourPath.Size());
     ResolveSubsts(ourPath);
     GetRootPath(root2, ourPath);
     BOOL ret = TRUE;
@@ -1216,7 +1216,7 @@ BOOL PathsAreOnTheSameVolume(const char* path1, const char* path2, BOOL* resIsOn
                 ResolveLocalPathWithReparsePoints(ourPath, path1, &cutPathIsPossible, NULL, NULL, NULL, NULL, path1NetPath);
             }
             else
-                lstrcpyn(ourPath, root1, MAX_PATH);
+                lstrcpyn(ourPath, root1, ourPath.Size());
             int numOfGetVolNamesFailed = 0;
             if (path1NetPath[0] == 0) // cannot get volume name from network path, won't even try
             {
@@ -1227,7 +1227,7 @@ BOOL PathsAreOnTheSameVolume(const char* path1, const char* path2, BOOL* resIsOn
                         numOfGetVolNamesFailed++;
                         break;
                     }
-                    SalPathAddBackslash(ourPath, MAX_PATH);
+                    SalPathAddBackslash(ourPath, ourPath.Size());
                 }
             }
 
@@ -1239,7 +1239,7 @@ BOOL PathsAreOnTheSameVolume(const char* path1, const char* path2, BOOL* resIsOn
                 ResolveLocalPathWithReparsePoints(ourPath, path2, &cutPathIsPossible, NULL, NULL, NULL, NULL, path2NetPath);
             }
             else
-                lstrcpyn(ourPath, root2, MAX_PATH);
+                lstrcpyn(ourPath, root2, ourPath.Size());
             if (path2NetPath[0] == 0) // cannot get volume name from network path, won't even try
             {
                 if (path1NetPath[0] == 0)
@@ -1251,7 +1251,7 @@ BOOL PathsAreOnTheSameVolume(const char* path1, const char* path2, BOOL* resIsOn
                             numOfGetVolNamesFailed++;
                             break;
                         }
-                        SalPathAddBackslash(ourPath, MAX_PATH);
+                        SalPathAddBackslash(ourPath, ourPath.Size());
                     }
                     if (numOfGetVolNamesFailed != 2)
                     {
@@ -2426,7 +2426,7 @@ BOOL InitializeGraphics(BOOL colorsOnly)
                     TRACE_E("Cannot retrieve icon from IMAGERES.DLL or SHELL32.DLL resID=" << resID[i]);
             }
         }
-        char systemDir[MAX_PATH];
+        char systemDir[MAX_PATH]; // Cannot use CPathBuffer due to __try block
         EnvGetSystemDirectoryA(gEnvironment, systemDir, MAX_PATH);
         // 16x16, 32x32, 48x48
         int sizeIndex;
@@ -3393,7 +3393,7 @@ BOOL RunningInCompatibilityMode()
 
 void GetCommandLineParamExpandEnvVars(const char* argv, char* target, DWORD targetSize, BOOL hotpathForJumplist)
 {
-    char curDir[MAX_PATH];
+    CPathBuffer curDir; // Heap-allocated for long path support
     if (hotpathForJumplist)
     {
         BOOL ret = ExpandHotPath(NULL, argv, target, targetSize, FALSE); // if path syntax is not OK, TRACE_E will fire, which doesn't bother us
@@ -3414,7 +3414,7 @@ void GetCommandLineParamExpandEnvVars(const char* argv, char* target, DWORD targ
             lstrcpyn(target, argv, targetSize);
         }
     }
-    if (!IsPluginFSPath(target) && EnvGetCurrentDirectoryA(gEnvironment, curDir, MAX_PATH).success)
+    if (!IsPluginFSPath(target) && EnvGetCurrentDirectoryA(gEnvironment, curDir, curDir.Size()).success)
     {
         SalGetFullName(target, NULL, curDir, NULL, NULL, targetSize);
     }
@@ -3430,13 +3430,13 @@ BOOL ParseCommandLineParameters(LPSTR cmdLine, CCommandLineParams* cmdLineParams
     char* argv[20];
     int p = 20; // number of elements in argv array
 
-    char curDir[MAX_PATH];
+    CPathBuffer curDir; // Heap-allocated for long path support
     GetModuleFileName(HInstance, ConfigurationName, MAX_PATH);
     *(strrchr(ConfigurationName, '\\') + 1) = 0;
     const char* configReg = "config.reg";
     strcat(ConfigurationName, configReg);
     if (!FileExists(ConfigurationName) && GetOurPathInRoamingAPPDATA(curDir) &&
-        SalPathAppend(curDir, configReg, MAX_PATH) && FileExists(curDir))
+        SalPathAppend(curDir, configReg, curDir.Size()) && FileExists(curDir))
     { // if config.reg file doesn't exist next to .exe, we also look for it in APPDATA
         lstrcpyn(ConfigurationName, curDir, MAX_PATH);
         ConfigurationNameIgnoreIfNotExists = FALSE;
@@ -3841,7 +3841,7 @@ FIND_NEW_SLG_FILE:
         Configuration.UseAsAltSLGInOtherPlugins = FALSE;
         Configuration.AltPluginSLGName[0] = 0;
 
-        char prevVerSLGName[MAX_PATH];
+        CPathBuffer prevVerSLGName; // Heap-allocated for long path support
         if (!autoImportConfig &&                            // during UPGRADE this doesn't make sense (language is read a few lines above, this routine would just re-read it)
             FindLanguageFromPrevVerOfSal(prevVerSLGName) && // we'll import language from previous version, it's quite probable user wants to use it again (it's about importing old Salamander configuration)
             slgDialog.SLGNameExists(prevVerSLGName))
@@ -3883,9 +3883,9 @@ FIND_NEW_SLG_FILE:
         langChanged = TRUE;
     }
 
-    char path[MAX_PATH];
+    CPathBuffer path; // Heap-allocated for long path support
     char errorText[MAX_PATH + 200];
-    GetModuleFileName(NULL, path, MAX_PATH);
+    GetModuleFileName(NULL, path, path.Size());
     sprintf(strrchr(path, '\\') + 1, "lang\\%s", Configuration.SLGName);
     HLanguage = HANDLES(LoadLibrary(path));
     LanguageID = 0;
@@ -3897,7 +3897,7 @@ FIND_NEW_SLG_FILE:
         {
             sprintf(errorText, "File %s was not found or is not valid language file.\nOpen Salamander "
                                "will try to search for some other language file (.SLG).",
-                    path);
+                    path.Get());
             MessageBox(NULL, errorText, SALAMANDER_TEXT_VERSION, MB_OK | MB_ICONERROR);
             Configuration.SLGName[0] = 0;
             goto FIND_NEW_SLG_FILE;
@@ -3906,7 +3906,7 @@ FIND_NEW_SLG_FILE:
         {
             sprintf(errorText, "File %s was not found or is not valid language file.\n"
                                "Please run Open Salamander again and try to choose some other language file.",
-                    path);
+                    path.Get());
             MessageBox(NULL, errorText, "Open Salamander", MB_OK | MB_ICONERROR);
             goto EXIT_1a;
         }
@@ -4181,8 +4181,8 @@ FIND_NEW_SLG_FILE:
 
     // shell extensions registration
     // if we find library in "utils" subdirectory, we'll verify its registration and potentially register it
-    char shellExtPath[MAX_PATH];
-    GetModuleFileName(HInstance, shellExtPath, MAX_PATH);
+    CPathBuffer shellExtPath; // Heap-allocated for long path support
+    GetModuleFileName(HInstance, shellExtPath, shellExtPath.Size());
     char* shellExtPathSlash = strrchr(shellExtPath, '\\');
     if (shellExtPathSlash != NULL)
     {
