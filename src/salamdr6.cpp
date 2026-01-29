@@ -8,6 +8,8 @@
 #include "common/IClipboard.h"
 #include "ui/IPrompter.h"
 #include "common/unicode/helpers.h"
+#include "common/IEnvironment.h"
+#include "common/fsutil.h"
 #include "cfgdlg.h"
 #include "mainwnd.h"
 #include "plugins.h"
@@ -1558,19 +1560,26 @@ int IsFileLink(const char* fileExtension)
                : 0;
 }
 
-BOOL IsSambaDrivePath(const char* path)
+// Wide version - no MAX_PATH buffers
+BOOL IsSambaDrivePathW(const wchar_t* path)
 {
-    char root[MAX_PATH];
-    GetRootPath(root, path);
+    std::wstring root = GetRootPathW(path);
+    if (root.empty())
+        return FALSE;
 
     DWORD dummy1, flags;
-    char fsName[MAX_PATH];
-    BOOL sambaDrive = FALSE;
-    if (GetVolumeInformation(root, NULL, 0, NULL, &dummy1, &flags, fsName, MAX_PATH))
+    wchar_t fsName[64]; // filesystem names are short (NTFS, FAT32, exFAT, etc.)
+    if (GetVolumeInformationW(root.c_str(), NULL, 0, NULL, &dummy1, &flags, fsName, _countof(fsName)))
     {
-        return StrICmp(fsName, "NTFS") == 0 && (flags & FS_UNICODE_STORED_ON_DISK) == 0;
+        return _wcsicmp(fsName, L"NTFS") == 0 && (flags & FS_UNICODE_STORED_ON_DISK) == 0;
     }
     return FALSE;
+}
+
+// ANSI wrapper
+BOOL IsSambaDrivePath(const char* path)
+{
+    return IsSambaDrivePathW(AnsiToWide(path).c_str());
 }
 
 BOOL AddToListOfNames(char** list, char* listEnd, const char* name, int nameLen)
@@ -1687,7 +1696,7 @@ void GetIfPathIsInaccessibleGoTo(char* path, BOOL forceIsMyDocs)
         if (!GetMyDocumentsOrDesktopPath(path, MAX_PATH))
         {
             char winPath[MAX_PATH];
-            if (GetWindowsDirectory(winPath, MAX_PATH) != 0)
+            if (EnvGetWindowsDirectoryA(gEnvironment, winPath, MAX_PATH).success)
                 GetRootPath(path, winPath);
             else
                 strcpy(path, "C:\\");

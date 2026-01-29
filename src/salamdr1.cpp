@@ -4,6 +4,7 @@
 
 #include "precomp.h"
 #include <time.h>
+#include <vector>
 //#ifdef MSVC_RUNTIME_CHECKS
 #include <rtcapi.h>
 //#endif // MSVC_RUNTIME_CHECKS
@@ -20,6 +21,7 @@
 #include "viewer.h"
 #include "ui/IPrompter.h"
 #include "common/unicode/helpers.h"
+#include "common/IEnvironment.h"
 #include "ui/IPrompter.h"
 #include "editwnd.h"
 #include "find.h"
@@ -963,7 +965,7 @@ HICON GetDriveIcon(const char* root, UINT type, BOOL accessible, BOOL large)
         if (type == DRIVE_FIXED && root[1] == ':')
         {
             char win[MAX_PATH];
-            if (GetWindowsDirectory(win, MAX_PATH) && win[1] == ':' && win[0] == root[0])
+            if (EnvGetWindowsDirectoryA(gEnvironment, win, MAX_PATH).success && win[1] == ':' && win[0] == root[0])
                 id = 36;
         }
         break;
@@ -2425,7 +2427,7 @@ BOOL InitializeGraphics(BOOL colorsOnly)
             }
         }
         char systemDir[MAX_PATH];
-        GetSystemDirectory(systemDir, MAX_PATH);
+        EnvGetSystemDirectoryA(gEnvironment, systemDir, MAX_PATH);
         // 16x16, 32x32, 48x48
         int sizeIndex;
         for (sizeIndex = ICONSIZE_16; sizeIndex < ICONSIZE_COUNT; sizeIndex++)
@@ -3303,25 +3305,39 @@ BOOL FindPluginsWithoutImportedCfg(BOOL* doNotDeleteImportedCfg)
     return FALSE;
 }
 
-void StartNotepad(const char* file)
+// Wide version - no MAX_PATH buffer limitations
+void StartNotepadW(const wchar_t* file)
 {
-    STARTUPINFO si = {0};
+    STARTUPINFOW si = {0};
     PROCESS_INFORMATION pi;
-    char buf[MAX_PATH];
-    char buf2[MAX_PATH + 50];
 
-    if (lstrlen(file) >= MAX_PATH)
+    std::wstring sysDir;
+    if (!gEnvironment->GetSystemDirectory(sysDir).success)
         return;
 
-    GetSystemDirectory(buf, MAX_PATH); // give it system directory, so it doesn't block deletion of current working directory
-    wsprintf(buf2, "notepad.exe \"%s\"", file);
-    si.cb = sizeof(STARTUPINFO);
-    if (HANDLES(CreateProcess(NULL, buf2, NULL, NULL, TRUE, CREATE_DEFAULT_ERROR_MODE | NORMAL_PRIORITY_CLASS,
-                              NULL, buf, &si, &pi)))
+    // Build command line: notepad.exe "filename"
+    std::wstring cmdLine = L"notepad.exe \"";
+    cmdLine += file;
+    cmdLine += L"\"";
+
+    si.cb = sizeof(STARTUPINFOW);
+    // CreateProcessW needs a mutable buffer for cmdLine
+    std::vector<wchar_t> cmdBuf(cmdLine.begin(), cmdLine.end());
+    cmdBuf.push_back(L'\0');
+
+    if (::CreateProcessW(NULL, cmdBuf.data(), NULL, NULL, TRUE,
+                         CREATE_DEFAULT_ERROR_MODE | NORMAL_PRIORITY_CLASS,
+                         NULL, sysDir.c_str(), &si, &pi))
     {
-        HANDLES(CloseHandle(pi.hProcess));
-        HANDLES(CloseHandle(pi.hThread));
+        ::CloseHandle(pi.hProcess);
+        ::CloseHandle(pi.hThread);
     }
+}
+
+// ANSI wrapper
+void StartNotepad(const char* file)
+{
+    StartNotepadW(AnsiToWide(file).c_str());
 }
 
 BOOL RunningInCompatibilityMode()
@@ -3398,7 +3414,7 @@ void GetCommandLineParamExpandEnvVars(const char* argv, char* target, DWORD targ
             lstrcpyn(target, argv, targetSize);
         }
     }
-    if (!IsPluginFSPath(target) && GetCurrentDirectory(MAX_PATH, curDir))
+    if (!IsPluginFSPath(target) && EnvGetCurrentDirectoryA(gEnvironment, curDir, MAX_PATH).success)
     {
         SalGetFullName(target, NULL, curDir, NULL, NULL, targetSize);
     }
@@ -3738,7 +3754,7 @@ int WinMainBody(HINSTANCE hInstance, HINSTANCE /*hPrevInstance*/, LPSTR cmdLine,
         pGNSI(&si);
     Windows64Bit = si.wProcessorArchitecture == PROCESSOR_ARCHITECTURE_AMD64;
 
-    if (!GetWindowsDirectory(WindowsDirectory, MAX_PATH))
+    if (!EnvGetWindowsDirectoryA(gEnvironment, WindowsDirectory, MAX_PATH).success)
         WindowsDirectory[0] = 0;
 
     // we're interested in the ITaskbarList3 interface, which MS introduced from Windows 7 - for example progress in taskbar buttons
