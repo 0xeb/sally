@@ -332,10 +332,10 @@ int CRenamer::Rename(CSourceFile* file, int counter, char* newName, char** newPa
     int l;
     if (Substitute)
     {
-        char tmp[MAX_PATH];
+        CPathBuffer tmp; // Heap-allocated for long path support
 
         // expand the New Name into a temporary buffer
-        l = NewName.Execute(tmp, MAX_PATH, &param);
+        l = NewName.Execute(tmp, tmp.Size(), &param);
         if (l < 0)
             return -1;
         // l is strlen(tmp)
