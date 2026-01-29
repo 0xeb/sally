@@ -630,12 +630,12 @@ int C7zClient::DeleteMakeUpdateList(TIndirectArray<CArchiveItem>* archiveItems, 
 int C7zClient::Delete(CSalamanderForOperationsAbstract* salamander, const char* archiveName,
                       TIndirectArray<CArchiveItemInfo>* deleteList, bool passwordIsDefined, UString& password)
 {
-    char tmpName[MAX_PATH];
+    CPathBuffer tmpName; // Heap-allocated for long path support
     DWORD err;
 
-    char srcPath[MAX_PATH];
-    strcpy(srcPath, archiveName);
-    char* rbackslash = _tcsrchr(srcPath, '\\');
+    CPathBuffer srcPath; // Heap-allocated for long path support
+    lstrcpyn(srcPath, archiveName, srcPath.Size());
+    char* rbackslash = _tcsrchr(srcPath.Get(), '\\');
     if (rbackslash != NULL)
         *rbackslash = '\0';
 
@@ -737,7 +737,7 @@ int C7zClient::Delete(CSalamanderForOperationsAbstract* salamander, const char* 
                 // rename the tmp file to the archive
                 if (!SalamanderGeneral->SalMoveFile(tmpName, archiveName, &err2))
                 {
-                    SysError(IDS_CANT_MOVE_TMPARCHIVE, err2, FALSE, tmpName);
+                    SysError(IDS_CANT_MOVE_TMPARCHIVE, err2, FALSE, tmpName.Get());
                     throw OPER_CANCEL;
                 }
             }
@@ -1079,9 +1079,9 @@ int C7zClient::Update(CSalamanderForOperationsAbstract* salamander, const char* 
                       const char* srcPath, BOOL isNewArchive, TIndirectArray<CFileItem>* fileList,
                       CCompressParams* compressParams, bool passwordIsDefined, UString password)
 {
-    char tmpName[MAX_PATH];
+    CPathBuffer tmpName; // Heap-allocated for long path support
     // trim the filename from archiveName, leaving the target path where we will extract
-    lstrcpy(tmpName, archiveName);
+    lstrcpyn(tmpName, archiveName, tmpName.Size());
     SalamanderGeneral->CutDirectory(tmpName, NULL);
     DWORD err;
     if (!SalamanderGeneral->SalGetTempFileName(tmpName, "sal", tmpName, TRUE, &err))
@@ -1213,7 +1213,7 @@ int C7zClient::Update(CSalamanderForOperationsAbstract* salamander, const char* 
             // rename the tmp file to the archive
             if (!SalamanderGeneral->SalMoveFile(tmpName, archiveName, &err2))
             {
-                SysError(IDS_CANT_MOVE_TMPARCHIVE, err2, FALSE, tmpName);
+                SysError(IDS_CANT_MOVE_TMPARCHIVE, err2, FALSE, tmpName.Get());
                 throw OPER_CANCEL;
             }
         }

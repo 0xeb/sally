@@ -1307,7 +1307,7 @@ CPluginInterfaceForViewer::ViewFile(const char *name, int left, int top, int wid
     return FALSE;
   }
 
-  char tempFileName[MAX_PATH];
+  CPathBuffer tempFileName; // Heap-allocated for long path support
   if (SalamanderGeneral->SalGetTempFileName(NULL, "ISO", tempFileName, TRUE, NULL))
   {
     char caption[2000];
