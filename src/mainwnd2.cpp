@@ -23,6 +23,7 @@
 #include "find.h"
 #include "dialogs.h"
 #include "logo.h"
+#include "common/widepath.h"
 #include "tasklist.h"
 #include "pwdmngr.h"
 
@@ -2425,8 +2426,8 @@ void CMainWindow::LoadPanelConfig(char* panelPath, int panelPathSize, CFilesWind
             GetValue(actKey, PANEL_FILTER_ENABLE, REG_DWORD, &panel->FilterEnabled,
                      sizeof(DWORD));
 
-            char filter[MAX_PATH];
-            if (!GetValue(actKey, PANEL_FILTER, REG_SZ, filter, MAX_PATH))
+            CPathBuffer filter; // Heap-allocated for long path support
+            if (!GetValue(actKey, PANEL_FILTER, REG_SZ, filter, filter.Size()))
             {
                 filter[0] = 0;
                 if (Configuration.ConfigVersion < 22)
@@ -2651,8 +2652,8 @@ BOOL CMainWindow::LoadConfig(BOOL importingOldConfig, const CCommandLineParams* 
                 HighlightMasks->DestroyMembers();
                 while (OpenKey(hHltKey, buf, hSubKey))
                 {
-                    char masks[MAX_PATH];
-                    if (GetValue(hSubKey, SALAMANDER_HLT_ITEM_MASKS, REG_SZ, masks, MAX_PATH))
+                    CPathBuffer masks; // Heap-allocated for long path support
+                    if (GetValue(hSubKey, SALAMANDER_HLT_ITEM_MASKS, REG_SZ, masks, masks.Size()))
                     {
                         CHighlightMasksItem* item = new CHighlightMasksItem();
                         if (item == NULL || !item->Set(masks))
@@ -2993,14 +2994,14 @@ BOOL CMainWindow::LoadConfig(BOOL importingOldConfig, const CCommandLineParams* 
             HKEY subKey;
             char buf[30];
             strcpy(buf, "1");
-            char name[MAX_PATH];
-            char command[MAX_PATH];
+            CPathBuffer name; // Heap-allocated for long path support
+            CPathBuffer command; // Heap-allocated for long path support
             char arguments[USRMNUARGS_MAXLEN];
-            char initDir[MAX_PATH];
+            CPathBuffer initDir; // Heap-allocated for long path support
             int throughShell, closeShell, useWindow;
             int showInToolbar, separator;
             CUserMenuItemType type;
-            char icon[MAX_PATH];
+            CPathBuffer icon; // Heap-allocated for long path support
             int i = 1;
             UserMenuItems->DestroyMembers();
 
@@ -3008,8 +3009,8 @@ BOOL CMainWindow::LoadConfig(BOOL importingOldConfig, const CCommandLineParams* 
 
             while (OpenKey(actKey, buf, subKey))
             {
-                if (GetValue(subKey, USERMENU_ITEMNAME_REG, REG_SZ, name, MAX_PATH) &&
-                    GetValue(subKey, USERMENU_COMMAND_REG, REG_SZ, command, MAX_PATH) &&
+                if (GetValue(subKey, USERMENU_ITEMNAME_REG, REG_SZ, name, name.Size()) &&
+                    GetValue(subKey, USERMENU_COMMAND_REG, REG_SZ, command, command.Size()) &&
                     GetValue(subKey, USERMENU_SHELL_REG, REG_DWORD,
                              &throughShell, sizeof(DWORD)) &&
                     GetValue(subKey, USERMENU_CLOSE_REG, REG_DWORD,
@@ -3298,7 +3299,7 @@ BOOL CMainWindow::LoadConfig(BOOL importingOldConfig, const CCommandLineParams* 
             if (!GetValue(actKey, CONFIG_IFPATHISINACCESSIBLEGOTOISMYDOCS_REG, REG_DWORD,
                           &Configuration.IfPathIsInaccessibleGoToIsMyDocs, sizeof(DWORD)))
             {
-                char path[MAX_PATH];
+                CPathBuffer path; // Heap-allocated for long path support
                 GetIfPathIsInaccessibleGoTo(path, TRUE);
                 if (IsTheSamePath(path, Configuration.IfPathIsInaccessibleGoTo)) // user wants to go to My Documents
                 {
