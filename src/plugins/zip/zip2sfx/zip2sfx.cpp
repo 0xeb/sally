@@ -237,7 +237,7 @@ BOOL LoadSettings()
         {
             if (Read(file, SettingsTextData, fsiz))
             {
-                char zip2sfxDir[MAX_PATH];
+                CPathBuffer zip2sfxDir; // Heap-allocated for long path support
                 GetZip2SfxDir(zip2sfxDir);
 
                 SettingsTextData[fsiz] = 0;
@@ -411,7 +411,7 @@ BOOL main2()
         return FALSE;
     if (Param && *Param == 's')
     {
-        char zip2sfxDir[MAX_PATH];
+        CPathBuffer zip2sfxDir; // Heap-allocated for long path support
         GetZip2SfxDir(zip2sfxDir);
 
         ImportSFXSettings(SettingsTextData, &Settings, zip2sfxDir);
