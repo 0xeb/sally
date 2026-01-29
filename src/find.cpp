@@ -405,8 +405,8 @@ BOOL CFindIgnore::Load(HKEY hKey, DWORD cfgVersion)
             TRACE_E(LOW_MEMORY);
             break;
         }
-        char path[MAX_PATH];
-        if (!GetValue(subKey, FINDIGNOREITEM_PATH_REG, REG_SZ, path, MAX_PATH))
+        CPathBuffer path; // Heap-allocated for long path support
+        if (!GetValue(subKey, FINDIGNOREITEM_PATH_REG, REG_SZ, path, path.Size()))
             path[0] = 0;
         item->Path = DupStr(path);
         if (!GetValue(subKey, FINDIGNOREITEM_ENABLED_REG, REG_DWORD, &item->Enabled, sizeof(DWORD)))
