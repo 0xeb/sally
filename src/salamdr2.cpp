@@ -654,7 +654,7 @@ BOOL DoExpandVarString(HWND msgParent, const char* varText, BOOL validateOnly, i
                        BOOL detectMaxVarWidths, int* maxVarWidths, int maxVarWidthsCount,
                        BOOL ignoreEnvVarNotFoundOrTooLong)
 {
-    char buf[MAX_PATH];
+    CPathBuffer buf; // Heap-allocated for long path support
     const char* s = varText;
     char* out = buffer;
     char* outEnd = buffer + bufferLen;
@@ -811,7 +811,7 @@ BOOL DoExpandVarString(HWND msgParent, const char* varText, BOOL validateOnly, i
                             memcpy(buf, var, varLen);
                             buf[varLen] = 0;
                             char text[200];
-                            sprintf(text, LoadStr(IDS_EXP_VARNOTFOUND), buf);
+                            sprintf(text, LoadStr(IDS_EXP_VARNOTFOUND), buf.Get());
                             if (msgParent == NULL)
                                 TRACE_I(text);
                             else
@@ -850,19 +850,19 @@ BOOL DoExpandVarString(HWND msgParent, const char* varText, BOOL validateOnly, i
                         if (!validateOnly)
                         {
                             int varLen = (int)(s - var);
-                            char envVar[MAX_PATH];
-                            if (varLen >= MAX_PATH)
-                                varLen = MAX_PATH - 1;
+                            CPathBuffer envVar; // Heap-allocated for long path support
+                            if (varLen >= envVar.Size())
+                                varLen = envVar.Size() - 1;
                             memcpy(envVar, var, varLen);
                             envVar[varLen] = 0;
-                            DWORD res = GetEnvironmentVariable(envVar, buf, MAX_PATH);
-                            if (res == 0 || res >= MAX_PATH)
+                            DWORD res = GetEnvironmentVariable(envVar, buf, buf.Size());
+                            if (res == 0 || res >= buf.Size())
                             {
                                 char text[MAX_PATH + 100];
                                 if (res == 0)
-                                    sprintf(text, LoadStr(IDS_EXP_ENVVARNOTFOUND), envVar);
+                                    sprintf(text, LoadStr(IDS_EXP_ENVVARNOTFOUND), envVar.Get());
                                 else
-                                    sprintf(text, LoadStr(IDS_EXP_ENVVARTOOLARGE), envVar);
+                                    sprintf(text, LoadStr(IDS_EXP_ENVVARTOOLARGE), envVar.Get());
                                 if (msgParent == NULL)
                                     TRACE_I(text);
                                 else
@@ -1127,10 +1127,10 @@ BOOL ResolveSubsts(char* resPath)
             ret = FALSE;
             break;
         }
-        char tgt[MAX_PATH];
-        if (GetSubstInformation(LowerCase[resPath[0]] - 'a', tgt, MAX_PATH) && tgt[0] != '\\' /* mapped network disks handled elsewhere */)
+        CPathBuffer tgt; // Heap-allocated for long path support
+        if (GetSubstInformation(LowerCase[resPath[0]] - 'a', tgt, tgt.Size()) && tgt[0] != '\\' /* mapped network disks handled elsewhere */)
         {
-            if (!SalPathAppend(tgt, resPath + 2, MAX_PATH))
+            if (!SalPathAppend(tgt, resPath + 2, tgt.Size()))
             {
                 TRACE_E("ResolveSubsts(): too long path!");
                 ret = FALSE;
@@ -1161,7 +1161,7 @@ void ResolveLocalPathWithReparsePoints(char* resPath, const char* path, BOOL* cu
     {
         if (strlen(resPath) > 3)
         {
-            char repPointPath[MAX_PATH];
+            CPathBuffer repPointPath; // Heap-allocated for long path support
             int allowedDepth = 50;
             BOOL firstRepPoint = TRUE;
             while (GetCurrentLocalReparsePoint(resPath, repPointPath))
@@ -1195,7 +1195,7 @@ void ResolveLocalPathWithReparsePoints(char* resPath, const char* path, BOOL* cu
                 if (!SalPathAddBackslash(resPath, MAX_PATH))
                     TRACE_E("ResolveLocalPathWithReparsePoints(): too long path");
                 int repPointType;
-                BOOL getRepPointDestRes = GetReparsePointDestination(repPointPath, repPointPath, MAX_PATH, &repPointType, TRUE);
+                BOOL getRepPointDestRes = GetReparsePointDestination(repPointPath, repPointPath, repPointPath.Size(), &repPointType, TRUE);
                 if (getRepPointDestRes && (repPointType == 2 /* JUNCTION POINT */ || repPointType == 3 /* SYMBOLIC LINK */))
                 {
                     if (firstRepPoint)
@@ -1253,9 +1253,9 @@ BOOL MyGetDiskFreeSpace(const char* path, LPDWORD lpSectorsPerCluster,
                         LPDWORD lpTotalNumberOfClusters)
 {
     CALL_STACK_MESSAGE2("MyGetDiskFreeSpace(%s, , , , )", path);
-    char ourPath[MAX_PATH];
-    char resPath[MAX_PATH];
-    lstrcpyn(resPath, path, MAX_PATH);
+    CPathBuffer ourPath; // Heap-allocated for long path support
+    CPathBuffer resPath; // Heap-allocated for long path support
+    lstrcpyn(resPath, path, resPath.Size());
     ResolveSubsts(resPath);
     GetRootPath(ourPath, resPath);
     if (!IsUNCPath(ourPath) && GetDriveType(ourPath) == DRIVE_FIXED) // reparse points only make sense to look for on fixed disks
@@ -1269,7 +1269,7 @@ BOOL MyGetDiskFreeSpace(const char* path, LPDWORD lpSectorsPerCluster,
         {
             if (!cutPathIsPossible || !CutDirectory(ourPath))
                 return FALSE; // we must not cut it or even the root did not succeed; abort with error
-            SalPathAddBackslash(ourPath, MAX_PATH);
+            SalPathAddBackslash(ourPath, ourPath.Size());
         }
         return TRUE;
     }
@@ -1285,14 +1285,14 @@ BOOL MyGetVolumeInformation(const char* path, char* rootOrCurReparsePoint, char*
                             LPDWORD lpMaximumComponentLength, LPDWORD lpFileSystemFlags,
                             LPTSTR lpFileSystemNameBuffer, DWORD nFileSystemNameSize)
 {
-    char ourPath[MAX_PATH];
+    CPathBuffer ourPath; // Heap-allocated for long path support
     BOOL ret = TRUE;
     if (junctionOrSymlinkTgt != NULL)
         *junctionOrSymlinkTgt = 0;
     if (linkType != NULL)
         *linkType = 0;
-    char resPath[MAX_PATH];
-    lstrcpyn(resPath, path, MAX_PATH);
+    CPathBuffer resPath; // Heap-allocated for long path support
+    lstrcpyn(resPath, path, resPath.Size());
     ResolveSubsts(resPath);
     GetRootPath(ourPath, resPath);
     if (!IsUNCPath(ourPath) && GetDriveType(ourPath) == DRIVE_FIXED) // reparse points only make sense to look for on fixed disks
@@ -1313,7 +1313,7 @@ BOOL MyGetVolumeInformation(const char* path, char* rootOrCurReparsePoint, char*
                 ret = FALSE; // we must not cut it or even the root did not succeed; abort with error
                 break;
             }
-            SalPathAddBackslash(ourPath, MAX_PATH);
+            SalPathAddBackslash(ourPath, ourPath.Size());
         }
         if (!rootOrCurReparsePointSet && rootOrCurReparsePoint != NULL)
         { // ourPath is ResolveSubsts(path) or a shortened version of ResolveSubsts(path)
@@ -1526,7 +1526,7 @@ BOOL GetCurrentLocalReparsePoint(const char* path, char* currentReparsePoint, BO
     else
     {
         // walk through reparse points from the beginning of the path to the end or to the first symlink leading to a network path
-        char repPointPath[MAX_PATH];
+        CPathBuffer repPointPath; // Heap-allocated for long path support
         char* end = (char*)SkipRoot(currentReparsePoint) + 1; // currentReparsePoint always ends with a backslash
         char* lastRepPointEnd = NULL;
         while (1)
@@ -1537,7 +1537,7 @@ BOOL GetCurrentLocalReparsePoint(const char* path, char* currentReparsePoint, BO
             end++;
             char backup = *end;
             *end = 0;
-            if (GetReparsePointDestination(currentReparsePoint, repPointPath, MAX_PATH, NULL, TRUE))
+            if (GetReparsePointDestination(currentReparsePoint, repPointPath, repPointPath.Size(), NULL, TRUE))
             {
                 lastRepPointEnd = end;
                 if (IsUNCPath(repPointPath) ||
@@ -1561,9 +1561,9 @@ BOOL GetCurrentLocalReparsePoint(const char* path, char* currentReparsePoint, BO
 
 UINT MyGetDriveType(const char* path)
 {
-    char ourPath[MAX_PATH];
-    char resPath[MAX_PATH];
-    lstrcpyn(resPath, path, MAX_PATH);
+    CPathBuffer ourPath; // Heap-allocated for long path support
+    CPathBuffer resPath; // Heap-allocated for long path support
+    lstrcpyn(resPath, path, resPath.Size());
     ResolveSubsts(resPath);
     GetRootPath(ourPath, resPath);
     UINT ret = DRIVE_UNKNOWN;
@@ -1580,7 +1580,7 @@ UINT MyGetDriveType(const char* path)
             { // NOTE: differs from MyGetVolumeInformation because GetDriveType returns success for any path (not just root + mounted volume)
                 if (!cutPathIsPossible || !CutDirectory(ourPath))
                     break; // we must not cut it or even the root did not succeed; end with error
-                SalPathAddBackslash(ourPath, MAX_PATH);
+                SalPathAddBackslash(ourPath, ourPath.Size());
             }
         }
         else
@@ -1607,8 +1607,8 @@ BOOL MyQueryDosDevice(BYTE driveNum, char* target, int maxTarget)
 
 BOOL GetSubstInformation(BYTE driveNum, char* path, int pathMax)
 {
-    char target[MAX_PATH];
-    if (MyQueryDosDevice(driveNum, target, MAX_PATH))
+    CPathBuffer target; // Heap-allocated for long path support
+    if (MyQueryDosDevice(driveNum, target, target.Size()))
     {
         //  A (floppy)                          \Device\Floppy0
         //  C (fixed disk)                      \Device\HarddiskVolume1
@@ -2674,31 +2674,31 @@ BOOL LoadViewers(HKEY hKey, const char* name, CViewerMasks* viewerMasks)
         HKEY subKey;
         char buf[30];
         strcpy(buf, "1");
-        char masks[MAX_PATH];
-        char command[MAX_PATH];
-        char arguments[MAX_PATH];
-        char initDir[MAX_PATH];
+        CPathBuffer masks; // Heap-allocated for long path support
+        CPathBuffer command; // Heap-allocated for long path support
+        CPathBuffer arguments; // Heap-allocated for long path support
+        CPathBuffer initDir; // Heap-allocated for long path support
         int type;
         int i = 1;
         viewerMasks->DestroyMembers();
 
         while (OpenKey(viewersKey, buf, subKey))
         {
-            if (GetValue(subKey, VIEWERS_MASKS_REG, REG_SZ, masks, MAX_PATH) &&
+            if (GetValue(subKey, VIEWERS_MASKS_REG, REG_SZ, masks, masks.Size()) &&
                 strchr(masks, '|') == NULL &&
                 GetValue(subKey, VIEWERS_TYPE_REG, REG_DWORD, &type, sizeof(DWORD)))
             {
-                if (!GetValue(subKey, VIEWERS_COMMAND_REG, REG_SZ, command, MAX_PATH))
+                if (!GetValue(subKey, VIEWERS_COMMAND_REG, REG_SZ, command, command.Size()))
                     *command = 0;
-                if (!GetValue(subKey, VIEWERS_ARGUMENTS_REG, REG_SZ, arguments, MAX_PATH))
+                if (!GetValue(subKey, VIEWERS_ARGUMENTS_REG, REG_SZ, arguments, arguments.Size()))
                     *arguments = 0;
-                if (!GetValue(subKey, VIEWERS_INITDIR_REG, REG_SZ, initDir, MAX_PATH))
+                if (!GetValue(subKey, VIEWERS_INITDIR_REG, REG_SZ, initDir, initDir.Size()))
                     *initDir = 0;
 
                 if (Configuration.ConfigVersion < 44) // convert extensions to lowercase
                 {
-                    char masksAux[MAX_PATH];
-                    lstrcpyn(masksAux, masks, MAX_PATH);
+                    CPathBuffer masksAux; // Heap-allocated for long path support
+                    lstrcpyn(masksAux, masks, masksAux.Size());
                     StrICpy(masks, masksAux);
                 }
                 CViewerMasksItem* item = new CViewerMasksItem(masks, command, arguments,
@@ -2776,28 +2776,28 @@ BOOL LoadEditors(HKEY hKey, const char* name, CEditorMasks* editorMasks)
         HKEY subKey;
         char buf[30];
         strcpy(buf, "1");
-        char masks[MAX_PATH];
-        char command[MAX_PATH];
-        char arguments[MAX_PATH];
-        char initDir[MAX_PATH];
+        CPathBuffer masks; // Heap-allocated for long path support
+        CPathBuffer command; // Heap-allocated for long path support
+        CPathBuffer arguments; // Heap-allocated for long path support
+        CPathBuffer initDir; // Heap-allocated for long path support
         int i = 1;
         editorMasks->DestroyMembers();
 
         while (OpenKey(editorKey, buf, subKey))
         {
-            if (GetValue(subKey, EDITORS_MASKS_REG, REG_SZ, masks, MAX_PATH))
+            if (GetValue(subKey, EDITORS_MASKS_REG, REG_SZ, masks, masks.Size()))
             {
-                if (!GetValue(subKey, EDITORS_COMMAND_REG, REG_SZ, command, MAX_PATH))
+                if (!GetValue(subKey, EDITORS_COMMAND_REG, REG_SZ, command, command.Size()))
                     *command = 0;
-                if (!GetValue(subKey, EDITORS_ARGUMENTS_REG, REG_SZ, arguments, MAX_PATH))
+                if (!GetValue(subKey, EDITORS_ARGUMENTS_REG, REG_SZ, arguments, arguments.Size()))
                     *arguments = 0;
-                if (!GetValue(subKey, EDITORS_INITDIR_REG, REG_SZ, initDir, MAX_PATH))
+                if (!GetValue(subKey, EDITORS_INITDIR_REG, REG_SZ, initDir, initDir.Size()))
                     *initDir = 0;
 
                 if (Configuration.ConfigVersion < 44) // convert extensions to lowercase
                 {
-                    char masksAux[MAX_PATH];
-                    lstrcpyn(masksAux, masks, MAX_PATH);
+                    CPathBuffer masksAux; // Heap-allocated for long path support
+                    lstrcpyn(masksAux, masks, masksAux.Size());
                     StrICpy(masks, masksAux);
                 }
                 CEditorMasksItem* item = new CEditorMasksItem(masks, command, arguments, initDir);
@@ -2876,8 +2876,8 @@ BOOL ExportConfiguration(HWND hParent, const char* fileName, BOOL clearKeyBefore
     }
 
     BOOL ret = FALSE;
-    char keyName[MAX_PATH];
-    _snprintf_s(keyName, _TRUNCATE, "HKEY_CURRENT_USER\\%s", SALAMANDER_ROOT_REG);
+    CPathBuffer keyName; // Heap-allocated for long path support
+    _snprintf_s(keyName, keyName.Size(), _TRUNCATE, "HKEY_CURRENT_USER\\%s", SALAMANDER_ROOT_REG);
     CSalamanderRegistryExAbstract* sysReg = REG_SysRegistryFactory();
     CSalamanderRegistryExAbstract* memReg = REG_MemRegistryFactory();
     if (sysReg != NULL && memReg != NULL)
@@ -2888,7 +2888,7 @@ BOOL ExportConfiguration(HWND hParent, const char* fileName, BOOL clearKeyBefore
         if (RPE_OK == regerr)
         {
             memReg->RemoveHiddenKeysAndValues(); // cut out keys and values that should not be exported
-            if (!memReg->Dump(fileName, clearKeyBeforeImport ? keyName : NULL))
+            if (!memReg->Dump(fileName, clearKeyBeforeImport ? keyName.Get() : NULL))
                 ShowFileError(hParent, IDS_EXPORTCFG_FILEERR, fileName, 0 /* not used */);
             else
                 ret = TRUE;
@@ -3165,19 +3165,19 @@ BOOL IsSLGFileValid(HINSTANCE hModule, HINSTANCE hSLG, WORD& slgLangID, char* is
     CVersionInfo slgVer;
     CVersionInfo moduleVer;
 
-    char path[MAX_PATH];
+    CPathBuffer path; // Heap-allocated for long path support
     BYTE *slgBuf, *moduleBuf;
     DWORD slgSize, moduleSize;
 
     if (!slgVer.ReadResource(hSLG, VS_VERSION_INFO))
     {
-        GetModuleFileName(hSLG, path, MAX_PATH);
+        GetModuleFileName(hSLG, path, path.Size());
         TRACE_E("Unable to load VERSIONINFO resource from SLG module: " << path);
         return FALSE;
     }
     if (!moduleVer.ReadResource(hModule, VS_VERSION_INFO))
     {
-        GetModuleFileName(hModule, path, MAX_PATH);
+        GetModuleFileName(hModule, path, path.Size());
         TRACE_E("Unable to load VERSIONINFO resource from plugin: " << path);
         return FALSE;
     }
@@ -3198,9 +3198,9 @@ BOOL IsSLGFileValid(HINSTANCE hModule, HINSTANCE hSLG, WORD& slgLangID, char* is
         char ver2[20];
         sprintf(ver2, "%08X%08X", ((VS_FIXEDFILEINFO*)slgBuf)->dwFileVersionMS,
                 ((VS_FIXEDFILEINFO*)slgBuf)->dwFileVersionLS);
-        GetModuleFileName(hModule, path, MAX_PATH);
+        GetModuleFileName(hModule, path, path.Size());
         TRACE_E("Plugin and SLG module are not of the same version (0x" << ver1 << " != 0x" << ver2 << "). Plugin: " << path);
-        GetModuleFileName(hSLG, path, MAX_PATH);
+        GetModuleFileName(hSLG, path, path.Size());
         TRACE_E("... SLG module: " << path);
         return FALSE;
     }
@@ -3210,7 +3210,7 @@ BOOL IsSLGFileValid(HINSTANCE hModule, HINSTANCE hSLG, WORD& slgLangID, char* is
         isIncomplete[0] = 0;
         if (!slgVer.QueryString("\\StringFileInfo\\040904b0\\SLGIncomplete", isIncomplete, ISSLGINCOMPLETE_SIZE))
         {
-            GetModuleFileName(hSLG, path, MAX_PATH);
+            GetModuleFileName(hSLG, path, path.Size());
             TRACE_E("Missing SLGIncomplete value in VERSIONINFO resource in SLG module: " << path);
             return FALSE;
         }
@@ -3219,7 +3219,7 @@ BOOL IsSLGFileValid(HINSTANCE hModule, HINSTANCE hSLG, WORD& slgLangID, char* is
     // extract the language in which the SLG is written
     if (!slgVer.QueryValue("\\VarFileInfo\\Translation", &slgBuf, &slgSize))
     {
-        GetModuleFileName(hSLG, path, MAX_PATH);
+        GetModuleFileName(hSLG, path, path.Size());
         TRACE_E("Missing Translation value in VERSIONINFO resource in SLG module: " << path);
         return FALSE;
     }
@@ -3232,10 +3232,10 @@ BOOL IsSLGFileValid(HINSTANCE hModule, HINSTANCE hSLG, WORD& slgLangID, char* is
 BOOL CLanguage::Init(const char* fileName, HINSTANCE modul)
 {
     BOOL ret = FALSE;
-    char path[MAX_PATH];
+    CPathBuffer path; // Heap-allocated for long path support
     if (modul == NULL)
         modul = HInstance;
-    GetModuleFileName(modul, path, MAX_PATH);
+    GetModuleFileName(modul, path, path.Size());
     sprintf(strrchr(path, '\\') + 1, "lang\\%s", fileName);
 
     HINSTANCE hLib = HANDLES(LoadLibrary(path));
