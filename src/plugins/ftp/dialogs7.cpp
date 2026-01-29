@@ -119,10 +119,10 @@ CSolveItemErrorDlg::CSolveItemErrorDlg(HWND parent, CFTPOperation* oper, DWORD w
 
 void CSolveItemErrorDlg::Validate(CTransferInfo& ti)
 {
-    char buf[MAX_PATH];
+    CPathBuffer buf; // Heap-allocated for long path support
     if (!DontTransferName)
     {
-        ti.EditLine(IDE_SCRD_TGTNAME, buf, MAX_PATH);
+        ti.EditLine(IDE_SCRD_TGTNAME, buf, buf.Size());
         if (buf[0] == 0)
         {
             SalamanderGeneral->SalMessageBox(HWindow, LoadStr(IDS_MAYNOTBEEMPTY),
@@ -1347,9 +1347,9 @@ CGetDiskFreeSpaceThread::Body()
 
         // determine what we should do
         HANDLES(EnterCriticalSection(&GetFreeSpaceCritSect));
-        char path[MAX_PATH];
+        CPathBuffer path; // Heap-allocated for long path support
         BOOL terminate = TerminateThread;
-        lstrcpyn(path, Path, MAX_PATH);
+        lstrcpyn(path, Path, path.Size());
         HANDLES(LeaveCriticalSection(&GetFreeSpaceCritSect));
         if (terminate)
             break; // we are done...
