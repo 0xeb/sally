@@ -7,6 +7,7 @@
 #include "cfgdlg.h"
 #include "geticon.h"
 #include "shiconov.h"
+#include "common/widepath.h"
 #include "plugins\shared\sqlite\sqlite3.h"
 
 CShellIconOverlays ShellIconOverlays;                                  // array of all available icon-overlays
@@ -49,8 +50,8 @@ struct CSQLite3DynLoad : public CSQLite3DynLoadBase
 
 CSQLite3DynLoad::CSQLite3DynLoad()
 {
-    char sqlitePath[MAX_PATH];
-    if (GetSQLitePath(sqlitePath, MAX_PATH))
+    CPathBuffer sqlitePath; // Heap-allocated for long path support
+    if (GetSQLitePath(sqlitePath, sqlitePath.Size()))
     {
         SQLite3DLL = HANDLES(LoadLibrary(sqlitePath));
         if (SQLite3DLL != NULL)
@@ -81,19 +82,19 @@ BOOL GetGoogleDrivePath(char* gdPath, int gdPathMax, CSQLite3DynLoadBase** sqlit
     *pathIsFromConfig = FALSE;
 
     WCHAR widePath[MAX_PATH]; // longer paths are not supported anyway
-    char mbPath[MAX_PATH];    // ANSI or UTF8 path
-    char sDbPath[MAX_PATH];
+    CPathBuffer mbPath; // Heap-allocated for long path support
+    CPathBuffer sDbPath; // Heap-allocated for long path support
     if (SHGetFolderPath(NULL, CSIDL_LOCAL_APPDATA, NULL, 0 /* SHGFP_TYPE_CURRENT */, sDbPath) == S_OK)
     {
         BOOL pathOK = FALSE;
         char* sDbPathEnd = sDbPath + strlen(sDbPath);
-        if (SalPathAppend(sDbPath, "Google\\Drive\\user_default\\sync_config.db", MAX_PATH) &&
+        if (SalPathAppend(sDbPath, "Google\\Drive\\user_default\\sync_config.db", sDbPath.Size()) &&
             FileExists(sDbPath))
             pathOK = TRUE;
         if (!pathOK)
         {
             *sDbPathEnd = 0;
-            if (SalPathAppend(sDbPath, "Google\\Drive\\sync_config.db", MAX_PATH) &&
+            if (SalPathAppend(sDbPath, "Google\\Drive\\sync_config.db", sDbPath.Size()) &&
                 FileExists(sDbPath))
                 pathOK = TRUE;
         }
@@ -109,7 +110,7 @@ BOOL GetGoogleDrivePath(char* gdPath, int gdPathMax, CSQLite3DynLoadBase** sqlit
 
                 // sqlite3_open_v2 requires UTF8 path, so we will convert it from ANSI to UTF8
                 if (ConvertA2U(sDbPath, -1, widePath, _countof(widePath)) &&
-                    ConvertU2A(widePath, -1, mbPath, _countof(mbPath), FALSE, CP_UTF8))
+                    ConvertU2A(widePath, -1, mbPath, mbPath.Size(), FALSE, CP_UTF8))
                 {
                     int iSts = sqlite3_Dyn->open_v2(mbPath, &pDb, SQLITE_OPEN_READONLY, NULL);
                     if (!iSts)
@@ -124,7 +125,7 @@ BOOL GetGoogleDrivePath(char* gdPath, int gdPathMax, CSQLite3DynLoadBase** sqlit
                                 int utf8PathLen = sqlite3_Dyn->column_bytes(pStmt, 0);
                                 if (utf8Path != NULL && utf8PathLen > 0 &&
                                     ConvertA2U((const char*)utf8Path, utf8PathLen, widePath, _countof(widePath), CP_UTF8) &&
-                                    ConvertU2A(widePath, -1, mbPath, _countof(mbPath)) &&
+                                    ConvertU2A(widePath, -1, mbPath, mbPath.Size()) &&
                                     (int)strlen(mbPath) < gdPathMax)
                                 {
                                     if (strnicmp(mbPath, "\\\\?\\UNC\\", 8) == 0)
@@ -225,9 +226,9 @@ void InitShellIconOverlaysAuxAux(CLSID* clsid, const char* name)
                 if ((flags & ISIOI_ICONINDEX) == 0)
                     iconIndex = 0;
 
-                char iconFileMB[MAX_PATH];
-                WideCharToMultiByte(CP_ACP, 0, (wchar_t*)iconFile, -1, iconFileMB, MAX_PATH, NULL, NULL);
-                iconFileMB[MAX_PATH - 1] = 0;
+                CPathBuffer iconFileMB; // Heap-allocated for long path support
+                WideCharToMultiByte(CP_ACP, 0, (wchar_t*)iconFile, -1, iconFileMB, iconFileMB.Size(), NULL, NULL);
+                iconFileMB[iconFileMB.Size() - 1] = 0;
 
                 // load icons of all sizes for this icon-overlay
                 HICON hIcons[2] = {0};
@@ -350,12 +351,12 @@ void InitShellIconOverlays()
                                          0, KEY_ENUMERATE_SUB_KEYS, &key))) == ERROR_SUCCESS)
     {
         TIndirectArray<char> keyNames(15, 5);
-        char name[MAX_PATH];
+        CPathBuffer name; // Heap-allocated for long path support
         DWORD i = 0;
         while (1)
         { // enumerate all icon-overlay-handlers sequentially
             FILETIME dummy;
-            DWORD nameLen = MAX_PATH;
+            DWORD nameLen = name.Size();
             if ((errRet = RegEnumKeyEx(key, i, name, &nameLen, NULL, NULL, NULL, &dummy)) == ERROR_SUCCESS)
             {
                 int s = 0; // insert new name, there are about 15 of them, so we don't need any quick-sort
@@ -864,9 +865,9 @@ void ColorsChangedAuxAux(CShellIconOverlayItem* item)
             if ((flags & ISIOI_ICONINDEX) == 0)
                 iconIndex = 0;
 
-            char iconFileMB[MAX_PATH];
-            WideCharToMultiByte(CP_ACP, 0, (wchar_t*)iconFile, -1, iconFileMB, MAX_PATH, NULL, NULL);
-            iconFileMB[MAX_PATH - 1] = 0;
+            CPathBuffer iconFileMB; // Heap-allocated for long path support
+            WideCharToMultiByte(CP_ACP, 0, (wchar_t*)iconFile, -1, iconFileMB, iconFileMB.Size(), NULL, NULL);
+            iconFileMB[iconFileMB.Size() - 1] = 0;
 
             // load icons of all sizes for this icon-overlay
             HICON hIcons[2] = {0};
@@ -942,9 +943,9 @@ void CShellIconOverlays::InitGoogleDrivePath(CSQLite3DynLoadBase** sqlite3_Dyn_I
 
     if (!GetGDAlreadyCalled)
     {
-        char gdPath[MAX_PATH];
+        CPathBuffer gdPath; // Heap-allocated for long path support
         BOOL pathIsFromConfig;
-        if (GetGoogleDrivePath(gdPath, _countof(gdPath), sqlite3_Dyn_InOut, &pathIsFromConfig))
+        if (GetGoogleDrivePath(gdPath, gdPath.Size(), sqlite3_Dyn_InOut, &pathIsFromConfig))
             SetGoogleDrivePath(gdPath, pathIsFromConfig);
         GetGDAlreadyCalled = TRUE;
     }
