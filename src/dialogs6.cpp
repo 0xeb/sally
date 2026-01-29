@@ -2386,7 +2386,7 @@ CDriveSelectErrDlg::DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
         // I had to keep periodic tests even when drvType == DRIVE_NO_ROOT_DIR
         if (drvType == DRIVE_REMOVABLE || drvType == DRIVE_CDROM || drvType == DRIVE_NO_ROOT_DIR)
         {
-            char root[MAX_PATH];
+            CPathBuffer root;  // Heap-allocated for long path support
             GetRootPath(root, DrvPath);
             switch (GetDriveType(root))
             {

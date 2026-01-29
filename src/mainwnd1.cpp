@@ -1733,7 +1733,7 @@ void CMainWindow::GetFormatedPathForTitle(char* path)
                 char* trimEnd = NULL;
                 if (panel->Is(ptDisk) || panel->Is(ptZIPArchive))
                 {
-                    char rootPath[MAX_PATH];
+                    CPathBuffer rootPath;  // Heap-allocated for long path support
                     GetRootPath(rootPath, path);
                     int chars = (int)strlen(rootPath);
                     // we isolated the root
@@ -1794,7 +1794,7 @@ void CMainWindow::GetFormatedPathForTitle(char* path)
             {
                 if (panel->Is(ptDisk) || panel->Is(ptZIPArchive))
                 {
-                    char rootPath[MAX_PATH];
+                    CPathBuffer rootPath;  // Heap-allocated for long path support
                     GetRootPath(rootPath, path);
                     int chars = (int)strlen(rootPath);
                     char* p = path + strlen(path);

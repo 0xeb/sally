@@ -1239,7 +1239,7 @@ AGAIN:
     CPathBuffer name;
     if (attrs == 0xFFFFFFFF) // probably doesn't exist, allow creating it
     {
-        char root[MAX_PATH];
+        CPathBuffer root;  // Heap-allocated for long path support
         GetRootPath(root, dir);
         if (dirLen <= (int)strlen(root)) // dir is root directory
         {
@@ -1439,7 +1439,7 @@ CPathHistoryItem::CPathHistoryItem(int type, const char* pathOrArchiveOrFSName,
 
     if (Type == 0) // disk
     {
-        char root[MAX_PATH];
+        CPathBuffer root;  // Heap-allocated for long path support
         GetRootPath(root, pathOrArchiveOrFSName);
         const char* e = pathOrArchiveOrFSName + strlen(pathOrArchiveOrFSName);
         if ((int)strlen(root) < e - pathOrArchiveOrFSName || // it's not a root path

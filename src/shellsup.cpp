@@ -2231,7 +2231,7 @@ MENU_TEMPLATE_ITEM PanelBkgndMenu[] =
                                     stricmp(cmdName, "explore") != 0 &&    // not necessary for explore
                                     stricmp(cmdName, "link") != 0)         // not necessary for create-short-cut
                                 {
-                                    char root[MAX_PATH];
+                                    CPathBuffer root;  // Heap-allocated for long path support
                                     GetRootPath(root, panel->GetPath());
                                     if (strlen(root) >= strlen(panel->GetPath())) // menu for entire disk - due to commands like
                                     {                                             // for "format..." we must "hands off" the media

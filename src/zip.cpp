@@ -4855,10 +4855,10 @@ void CSalamanderGeneral::OpenNetworkContextMenu(HWND parent, int panel, BOOL for
                          !WindowsVistaAndLater && cmd == 40) &&
                         forItems && netPath[2] != 0)
                     {
-                        char root[MAX_PATH];
+                        CPathBuffer root;  // Heap-allocated for long path support
                         strcpy(root, netPath);
                         int focus = p->GetCaretIndex();
-                        if (SalPathAppend(root, (focus < p->Dirs->Count ? p->Dirs->At(focus) : p->Files->At(focus - p->Dirs->Count)).Name, MAX_PATH))
+                        if (SalPathAppend(root, (focus < p->Dirs->Count ? p->Dirs->At(focus) : p->Files->At(focus - p->Dirs->Count)).Name, root.Size()))
                         {
                             char newDrive = 0;
                             p->ConnectNet(TRUE, root, FALSE /* called from a plug-in; must not change the panel path, otherwise

@@ -1128,16 +1128,16 @@ unsigned ReadCDVolNameThreadFBody(void* param) // directory accessibility test
 {
     CALL_STACK_MESSAGE1("ReadCDVolNameThreadFBody()");
     UINT_PTR uid = (UINT_PTR)param;
-    char root[MAX_PATH];
+    CPathBuffer root;  // Heap-allocated for long path support
     root[0] = 0;
-    char buf[MAX_PATH];
+    char buf[MAX_PATH];  // Volume name buffer - standard size
     buf[0] = 0;
 
     HANDLES(EnterCriticalSection(&ReadCDVolNameCS));
     BOOL run = FALSE;
     if (uid == ReadCDVolNameReqUID) // someone is still waiting for an answer
     {
-        lstrcpyn(root, ReadCDVolNameBuffer, MAX_PATH);
+        lstrcpyn(root, ReadCDVolNameBuffer, root.Size());
         run = TRUE;
     }
     HANDLES(LeaveCriticalSection(&ReadCDVolNameCS));

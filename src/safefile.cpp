@@ -464,7 +464,7 @@ CSalamanderSafeFile::SafeFileCreate(const char* fileName,
             }
         }
         // create the directory path
-        char root[MAX_PATH];
+        CPathBuffer root;  // Heap-allocated for long path support
         GetRootPath(root, namecopy);
         // if the directory is the root directory, there is a problem
         if (strlen(namecopy) <= strlen(root))

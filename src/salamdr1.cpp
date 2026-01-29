@@ -1123,19 +1123,19 @@ BOOL HasTheSameRootPathAndVolume(const char* p1, const char* p2)
     if (HasTheSameRootPath(p1, p2))
     {
         ret = TRUE;
-        char root[MAX_PATH];
-        char ourPath[MAX_PATH];
+        CPathBuffer root;  // Heap-allocated for long path support
+        CPathBuffer ourPath;  // Heap-allocated for long path support
         char p1Volume[100] = "1";
         char p2Volume[100] = "2";
-        char resPath[MAX_PATH];
-        lstrcpyn(resPath, p1, MAX_PATH);
+        CPathBuffer resPath;  // Heap-allocated for long path support
+        lstrcpyn(resPath, p1, resPath.Size());
         ResolveSubsts(resPath);
         GetRootPath(root, resPath);
         if (!IsUNCPath(root) && GetDriveType(root) == DRIVE_FIXED) // it makes sense to look for reparse points only on fixed drives
         {
             // if it's not a root path, we'll try traversing through reparse points
             BOOL cutPathIsPossible = TRUE;
-            char p1NetPath[MAX_PATH];
+            CPathBuffer p1NetPath;  // Heap-allocated for long path support
             p1NetPath[0] = 0;
             ResolveLocalPathWithReparsePoints(ourPath, p1, &cutPathIsPossible, NULL, NULL, NULL, NULL, p1NetPath);
 
