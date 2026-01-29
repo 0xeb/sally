@@ -2178,11 +2178,11 @@ void DoDeleteFile(CFTPDiskWork& localWork, BOOL& needCopyBack)
 
 void DoOpenFileForReading(CFTPDiskWork& localWork, BOOL& needCopyBack)
 {
-    char fileName[MAX_PATH];
-    lstrcpyn(fileName, localWork.Path, MAX_PATH);
+    CPathBuffer fileName; // Heap-allocated for long path support
+    lstrcpyn(fileName, localWork.Path, fileName.Size());
     DWORD winError = NO_ERROR;
     BOOL ok = FALSE;
-    if (SalamanderGeneral->SalPathAppend(fileName, localWork.Name, MAX_PATH))
+    if (SalamanderGeneral->SalPathAppend(fileName, localWork.Name, fileName.Size()))
     {
         HANDLE in = HANDLES_Q(CreateFile(fileName, GENERIC_READ,
                                          FILE_SHARE_READ | FILE_SHARE_WRITE, NULL,

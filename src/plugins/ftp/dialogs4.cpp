@@ -874,7 +874,7 @@ void CSrvTypeTestParserDlg::LoadTextFromFile()
     static char initDir[MAX_PATH] = "";
     if (initDir[0] == 0)
         GetMyDocumentsPath(initDir);
-    char fileName[MAX_PATH];
+    CPathBuffer fileName; // Heap-allocated for long path support
     fileName[0] = 0;
     OPENFILENAME ofn;
     memset(&ofn, 0, sizeof(OPENFILENAME));
@@ -889,7 +889,7 @@ void CSrvTypeTestParserDlg::LoadTextFromFile()
         s++;
     }
     ofn.lpstrFile = fileName;
-    ofn.nMaxFile = MAX_PATH;
+    ofn.nMaxFile = fileName.Size();
     ofn.nFilterIndex = 1;
     ofn.lpstrInitialDir = initDir;
     ofn.Flags = OFN_PATHMUSTEXIST | OFN_FILEMUSTEXIST | OFN_HIDEREADONLY;
@@ -899,11 +899,11 @@ void CSrvTypeTestParserDlg::LoadTextFromFile()
     {
         HCURSOR oldCur = SetCursor(LoadCursor(NULL, IDC_WAIT));
 
-        s = strrchr(fileName, '\\');
+        s = strrchr(fileName.Get(), '\\');
         if (s != NULL)
         {
-            memcpy(initDir, fileName, s - fileName);
-            initDir[s - fileName] = 0;
+            memcpy(initDir, fileName.Get(), s - fileName.Get());
+            initDir[s - fileName.Get()] = 0;
         }
 
         HANDLE file = HANDLES_Q(CreateFile(fileName, GENERIC_READ,

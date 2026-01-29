@@ -152,9 +152,9 @@ void CConfigPageServers::OnExportServer(CServerType* serverType)
 {
     if (ImpExpInitDir[0] == 0)
         GetMyDocumentsPath(ImpExpInitDir);
-    char fileName[MAX_PATH];
+    CPathBuffer fileName; // Heap-allocated for long path support
     lstrcpyn(fileName, serverType->TypeName[0] == '*' ? serverType->TypeName + 1 : serverType->TypeName,
-             MAX_PATH - 4);
+             fileName.Size() - 4);
     strcat(fileName, ".str");
     SalamanderGeneral->SalMakeValidFileNameComponent(fileName);
 
@@ -171,7 +171,7 @@ void CConfigPageServers::OnExportServer(CServerType* serverType)
         s++;
     }
     ofn.lpstrFile = fileName;
-    ofn.nMaxFile = MAX_PATH;
+    ofn.nMaxFile = fileName.Size();
     ofn.lpstrInitialDir = ImpExpInitDir;
     ofn.lpstrDefExt = "str";
     ofn.nFilterIndex = 1;
@@ -184,11 +184,11 @@ void CConfigPageServers::OnExportServer(CServerType* serverType)
     {
         HCURSOR oldCur = SetCursor(LoadCursor(NULL, IDC_WAIT));
 
-        s = strrchr(fileName, '\\');
+        s = strrchr(fileName.Get(), '\\');
         if (s != NULL)
         {
-            memcpy(ImpExpInitDir, fileName, s - fileName);
-            ImpExpInitDir[s - fileName] = 0;
+            memcpy(ImpExpInitDir, fileName.Get(), s - fileName.Get());
+            ImpExpInitDir[s - fileName.Get()] = 0;
         }
 
         if (SalamanderGeneral->SalGetFileAttributes(fileName) != 0xFFFFFFFF) // so a read-only file can be overwritten
@@ -233,7 +233,7 @@ void CConfigPageServers::OnImportServer()
     {
         if (ImpExpInitDir[0] == 0)
             GetMyDocumentsPath(ImpExpInitDir);
-        char fileName[MAX_PATH];
+        CPathBuffer fileName; // Heap-allocated for long path support
         fileName[0] = 0;
         OPENFILENAME ofn;
         memset(&ofn, 0, sizeof(OPENFILENAME));
@@ -248,7 +248,7 @@ void CConfigPageServers::OnImportServer()
             s++;
         }
         ofn.lpstrFile = fileName;
-        ofn.nMaxFile = MAX_PATH;
+        ofn.nMaxFile = fileName.Size();
         ofn.nFilterIndex = 1;
         ofn.lpstrInitialDir = ImpExpInitDir;
         ofn.Flags = OFN_PATHMUSTEXIST | OFN_FILEMUSTEXIST | OFN_HIDEREADONLY;
@@ -259,11 +259,11 @@ void CConfigPageServers::OnImportServer()
         {
             HCURSOR oldCur = SetCursor(LoadCursor(NULL, IDC_WAIT));
 
-            s = strrchr(fileName, '\\');
+            s = strrchr(fileName.Get(), '\\');
             if (s != NULL)
             {
-                memcpy(ImpExpInitDir, fileName, s - fileName);
-                ImpExpInitDir[s - fileName] = 0;
+                memcpy(ImpExpInitDir, fileName.Get(), s - fileName.Get());
+                ImpExpInitDir[s - fileName.Get()] = 0;
             }
 
             HANDLE file = HANDLES_Q(CreateFile(fileName, GENERIC_READ,

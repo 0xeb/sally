@@ -1914,8 +1914,8 @@ void CLogs::SaveLog(HWND parent, const char* itemName, int uid)
     static char initDir[MAX_PATH] = "";
     if (initDir[0] == 0)
         GetMyDocumentsPath(initDir);
-    char fileName[MAX_PATH];
-    strcpy(fileName, "ftp.log");
+    CPathBuffer fileName; // Heap-allocated for long path support
+    lstrcpyn(fileName, "ftp.log", fileName.Size());
 
     OPENFILENAME ofn;
     memset(&ofn, 0, sizeof(OPENFILENAME));
@@ -1930,7 +1930,7 @@ void CLogs::SaveLog(HWND parent, const char* itemName, int uid)
         s++;
     }
     ofn.lpstrFile = fileName;
-    ofn.nMaxFile = MAX_PATH;
+    ofn.nMaxFile = fileName.Size();
     ofn.lpstrInitialDir = initDir;
     ofn.lpstrDefExt = "log";
     ofn.nFilterIndex = 1;
@@ -1943,11 +1943,11 @@ void CLogs::SaveLog(HWND parent, const char* itemName, int uid)
     {
         HCURSOR oldCur = SetCursor(LoadCursor(NULL, IDC_WAIT));
 
-        s = strrchr(fileName, '\\');
+        s = strrchr(fileName.Get(), '\\');
         if (s != NULL)
         {
-            memcpy(initDir, fileName, s - fileName);
-            initDir[s - fileName] = 0;
+            memcpy(initDir, fileName.Get(), s - fileName.Get());
+            initDir[s - fileName.Get()] = 0;
         }
 
         if (SalamanderGeneral->SalGetFileAttributes(fileName) != 0xFFFFFFFF) // so that a read-only file can be overwritten

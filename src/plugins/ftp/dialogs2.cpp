@@ -259,8 +259,8 @@ void CWelcomeMsgDlg::OnSaveTextAs()
     static char initDir[MAX_PATH] = "";
     if (initDir[0] == 0)
         GetMyDocumentsPath(initDir);
-    char fileName[MAX_PATH];
-    strcpy(fileName, "listing.txt");
+    CPathBuffer fileName; // Heap-allocated for long path support
+    lstrcpyn(fileName, "listing.txt", fileName.Size());
 
     OPENFILENAME ofn;
     memset(&ofn, 0, sizeof(OPENFILENAME));
@@ -275,7 +275,7 @@ void CWelcomeMsgDlg::OnSaveTextAs()
         s++;
     }
     ofn.lpstrFile = fileName;
-    ofn.nMaxFile = MAX_PATH;
+    ofn.nMaxFile = fileName.Size();
     ofn.lpstrInitialDir = initDir;
     ofn.lpstrDefExt = "txt";
     ofn.nFilterIndex = 1;
@@ -288,11 +288,11 @@ void CWelcomeMsgDlg::OnSaveTextAs()
     {
         HCURSOR oldCur = SetCursor(LoadCursor(NULL, IDC_WAIT));
 
-        s = strrchr(fileName, '\\');
+        s = strrchr(fileName.Get(), '\\');
         if (s != NULL)
         {
-            memcpy(initDir, fileName, s - fileName);
-            initDir[s - fileName] = 0;
+            memcpy(initDir, fileName.Get(), s - fileName.Get());
+            initDir[s - fileName.Get()] = 0;
         }
 
         if (SalamanderGeneral->SalGetFileAttributes(fileName) != 0xFFFFFFFF) // allow overwriting even a read-only file
