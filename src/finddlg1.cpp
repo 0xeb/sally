@@ -987,11 +987,11 @@ CFoundFilesListView::WindowProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
                 {
                     BOOL ok = FALSE;
                     CFoundFilesData* f = (index >= 0 && index < count) ? Data[index] : NULL;
-                    char fileName[MAX_PATH];
+                    CPathBuffer fileName; // Heap-allocated for long path support
                     if (f != NULL && f->Path != NULL && f->Name != NULL)
                     {
-                        lstrcpyn(fileName, f->Path, MAX_PATH);
-                        SalPathAppend(fileName, f->Name, MAX_PATH);
+                        lstrcpyn(fileName, f->Path, fileName.Size());
+                        SalPathAppend(fileName, f->Name, fileName.Size());
                         if (StrICmp(fileName, FileNamesEnumData.LastFileName) == 0)
                         {
                             ok = TRUE;
@@ -1838,7 +1838,7 @@ void CFindDialog::BuildSerchForData()
 
     SearchForData.DestroyMembers();
 
-    char path[MAX_PATH];
+    CPathBuffer path; // Heap-allocated for long path support
     lstrcpy(path, Data.LookInText);
     begin = path;
     do
@@ -2373,7 +2373,7 @@ BOOL CFindDialog::GetFocusedFile(char* buffer, int bufferLen, int* viewedIndex)
     CFoundFilesData* data = FoundFilesListView->At(index);
     if (data->IsDir)
         return FALSE;
-    char longName[MAX_PATH];
+    CPathBuffer longName; // Heap-allocated for long path support
     int len = (int)strlen(data->Path);
     memmove(longName, data->Path, len);
     if (data->Path[len - 1] != '\\')
@@ -2412,9 +2412,9 @@ void CFindDialog::UpdateInternalViewerData()
 void CFindDialog::OnViewFile(BOOL alternate)
 {
     CALL_STACK_MESSAGE2("CFindDialog::OnViewFile(%d)", alternate);
-    char longName[MAX_PATH];
+    CPathBuffer longName; // Heap-allocated for long path support
     int viewedIndex = 0;
-    if (!GetFocusedFile(longName, MAX_PATH, &viewedIndex))
+    if (!GetFocusedFile(longName, longName.Size(), &viewedIndex))
         return;
 
     if (SalamanderBusy)
@@ -2438,8 +2438,8 @@ void CFindDialog::OnViewFile(BOOL alternate)
 void CFindDialog::OnEditFile()
 {
     CALL_STACK_MESSAGE1("CFindDialog::OnEditFile()");
-    char longName[MAX_PATH];
-    if (!GetFocusedFile(longName, MAX_PATH, NULL))
+    CPathBuffer longName; // Heap-allocated for long path support
+    if (!GetFocusedFile(longName, longName.Size(), NULL))
         return;
 
     if (SalamanderBusy)
@@ -2452,15 +2452,15 @@ void CFindDialog::OnEditFile()
             return;
         }
     }
-    SendMessage(MainWindow->GetActivePanel()->HWindow, WM_USER_EDITFILE, (WPARAM)longName, 0);
+    SendMessage(MainWindow->GetActivePanel()->HWindow, WM_USER_EDITFILE, (WPARAM)longName.Get(), 0);
 }
 
 void CFindDialog::OnViewFileWith()
 {
     CALL_STACK_MESSAGE1("CFindDialog::OnViewFileWith()");
-    char longName[MAX_PATH];
+    CPathBuffer longName; // Heap-allocated for long path support
     int viewedIndex = 0;
-    if (!GetFocusedFile(longName, MAX_PATH, &viewedIndex))
+    if (!GetFocusedFile(longName, longName.Size(), &viewedIndex))
         return;
 
     if (SalamanderBusy)
@@ -2505,8 +2505,8 @@ void CFindDialog::OnViewFileWith()
 void CFindDialog::OnEditFileWith()
 {
     CALL_STACK_MESSAGE1("CFindDialog::OnEditFileWith()");
-    char longName[MAX_PATH];
-    if (!GetFocusedFile(longName, MAX_PATH, NULL))
+    CPathBuffer longName; // Heap-allocated for long path support
+    if (!GetFocusedFile(longName, longName.Size(), NULL))
         return;
 
     if (SalamanderBusy)
@@ -2539,7 +2539,7 @@ void CFindDialog::OnEditFileWith()
             }
         }
         SendMessage(MainWindow->GetActivePanel()->HWindow, WM_USER_EDITFILEWITH,
-                    (WPARAM)longName, (WPARAM)handlerID);
+                    (WPARAM)longName.Get(), (LPARAM)handlerID);
     }
 }
 
