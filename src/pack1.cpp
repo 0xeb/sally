@@ -12,6 +12,7 @@
 #include "zip.h"
 #include "pack.h"
 #include "common/IFileSystem.h"
+#include "common/widepath.h"
 
 //
 // ****************************************************************************
@@ -216,7 +217,7 @@ BOOL PackScanLine(char* buffer, CSalamanderDirectory& dir, const int index,
     int idx;
 
     // buffer for the file name
-    char filename[MAX_PATH];
+    CPathBuffer filename; // Heap-allocated for long path support
     char* tmpfname = filename;
 
     // locate the name in the line
@@ -619,9 +620,9 @@ BOOL PackList(CFilesWindow* panel, const char* archiveFileName, CSalamanderDirec
     const SPackBrowseTable* browseTable = ArchiverConfig.GetUnpackerConfigTable(index);
 
     // build the current directory
-    char currentDir[MAX_PATH];
+    CPathBuffer currentDir; // Heap-allocated for long path support
     if (!PackExpandInitDir(archiveFileName, NULL, NULL, browseTable->ListInitDir,
-                           currentDir, MAX_PATH))
+                           currentDir, currentDir.Size()))
         return (*PackErrorHandlerPtr)(NULL, IDS_PACKERR_IDIRERR);
 
     // build the command line
@@ -632,9 +633,9 @@ BOOL PackList(CFilesWindow* panel, const char* archiveFileName, CSalamanderDirec
                            cmdLine + cmdIndex, PACK_CMDLINE_MAXLEN - cmdIndex, NULL))
         return (*PackErrorHandlerPtr)(NULL, IDS_PACKERR_CMDLNERR);
 
-    char cmdForErrors[MAX_PATH]; // path and name of executed exe if an error occurs
+    CPathBuffer cmdForErrors; // path and name of executed exe if an error occurs
     if (PackExpandCmdLine(archiveFileName, NULL, NULL, NULL, browseTable->ListCommand,
-                          cmdForErrors, MAX_PATH, NULL))
+                          cmdForErrors, cmdForErrors.Size(), NULL))
     {
         char* begin;
         char* p = cmdForErrors;
@@ -815,7 +816,7 @@ BOOL PackList(CFilesWindow* panel, const char* archiveFileName, CSalamanderDirec
                 return (*PackErrorHandlerPtr)(NULL, IDS_PACKERR_RETURN, SPAWN_EXE_NAME, LoadStr(IDS_PACKRET_SPAWN));
             // CreateProcess error
             if (exitCode >= SPAWN_ERR_BASE * 2 && exitCode < SPAWN_ERR_BASE * 3)
-                return (*PackErrorHandlerPtr)(NULL, IDS_PACKERR_PROCESS, cmdForErrors, GetErrorText(exitCode - SPAWN_ERR_BASE * 2));
+                return (*PackErrorHandlerPtr)(NULL, IDS_PACKERR_PROCESS, cmdForErrors.Get(), GetErrorText(exitCode - SPAWN_ERR_BASE * 2));
             // WaitForSingleObject error
             if (exitCode >= SPAWN_ERR_BASE * 3 && exitCode < SPAWN_ERR_BASE * 4)
             {
@@ -841,7 +842,7 @@ BOOL PackList(CFilesWindow* panel, const char* archiveFileName, CSalamanderDirec
         {
             char buffer[1000];
             sprintf(buffer, LoadStr(IDS_PACKRET_GENERAL), exitCode);
-            return (*PackErrorHandlerPtr)(NULL, IDS_PACKERR_RETURN, cmdForErrors, buffer);
+            return (*PackErrorHandlerPtr)(NULL, IDS_PACKERR_RETURN, cmdForErrors.Get(), buffer);
         }
         // find the appropriate text in the table
         int i;
@@ -851,9 +852,9 @@ BOOL PackList(CFilesWindow* panel, const char* archiveFileName, CSalamanderDirec
             ;
         // did we find it?
         if ((*browseTable->ErrorTable)[i][0] == -1)
-            return (*PackErrorHandlerPtr)(NULL, IDS_PACKERR_RETURN, cmdForErrors, LoadStr(IDS_PACKRET_UNKNOWN));
+            return (*PackErrorHandlerPtr)(NULL, IDS_PACKERR_RETURN, cmdForErrors.Get(), LoadStr(IDS_PACKRET_UNKNOWN));
         else
-            return (*PackErrorHandlerPtr)(NULL, IDS_PACKERR_RETURN, cmdForErrors,
+            return (*PackErrorHandlerPtr)(NULL, IDS_PACKERR_RETURN, cmdForErrors.Get(),
                                           LoadStr((*browseTable->ErrorTable)[i][1]));
     }
 
@@ -1008,7 +1009,7 @@ BOOL PackUC2List(const char* archiveFileName, CPackLineArray& lineArray,
 {
     CALL_STACK_MESSAGE2("PackUC2List(%s, ,)", archiveFileName);
     // First delete the helper file that UC2 creates when using the ~D flag
-    char arcPath[MAX_PATH];
+    CPathBuffer arcPath; // Heap-allocated for long path support
     const char* arcName = strrchr(archiveFileName, '\\') + 1;
     strncpy(arcPath, archiveFileName, arcName - archiveFileName);
     arcPath[arcName - archiveFileName] = '\0';
@@ -1427,7 +1428,7 @@ BOOL PackUniversalUncompress(HWND parent, const char* command, TPackErrorTable* 
     //
     // We must adjust the directory in the archive to the required format
     //
-    char rootPath[MAX_PATH];
+    CPathBuffer rootPath; // Heap-allocated for long path support
     if (archiveRoot != NULL && *archiveRoot != '\0')
     {
         if (*archiveRoot == '\\')
@@ -1449,7 +1450,7 @@ BOOL PackUniversalUncompress(HWND parent, const char* command, TPackErrorTable* 
     // Now it's time for the temporary extraction directory
 
     // Create the name of the temporary directory
-    char tmpDirNameBuf[MAX_PATH];
+    CPathBuffer tmpDirNameBuf; // Heap-allocated for long path support
     if (!SalGetTempFileName(targetDir, "PACK", tmpDirNameBuf, FALSE))
     {
         char buffer[1000];
@@ -1463,7 +1464,7 @@ BOOL PackUniversalUncompress(HWND parent, const char* command, TPackErrorTable* 
     //
 
     // Create the name of the temporary file
-    char tmpListNameBuf[MAX_PATH];
+    CPathBuffer tmpListNameBuf; // Heap-allocated for long path support
     if (!SalGetTempFileName(NULL, "PACK", tmpListNameBuf, TRUE))
     {
         char buffer[1000];
@@ -1485,7 +1486,7 @@ BOOL PackUniversalUncompress(HWND parent, const char* command, TPackErrorTable* 
     BOOL isDir;
     CQuadWord size;
     const char* name;
-    char namecnv[MAX_PATH];
+    CPathBuffer namecnv; // Heap-allocated for long path support
     CQuadWord totalSize(0, 0);
     int errorOccured;
 
@@ -1503,7 +1504,7 @@ BOOL PackUniversalUncompress(HWND parent, const char* command, TPackErrorTable* 
         // put the name into the list
         if (!isDir)
         {
-            if (fprintf(listFile, "%s%s\n", rootPath, namecnv) <= 0)
+            if (fprintf(listFile, "%s%s\n", rootPath.Get(), namecnv.Get()) <= 0)
             {
                 fclose(listFile);
                 DeleteFileA(gFileSystem, tmpListNameBuf);
@@ -1549,10 +1550,10 @@ BOOL PackUniversalUncompress(HWND parent, const char* command, TPackErrorTable* 
     }
 
     // build the current directory
-    char currentDir[MAX_PATH];
+    CPathBuffer currentDir; // Heap-allocated for long path support
     if (!expandInitDir)
     {
-        if (strlen(initDir) < MAX_PATH)
+        if (strlen(initDir) < currentDir.Size())
             strcpy(currentDir, initDir);
         else
         {
@@ -1563,7 +1564,7 @@ BOOL PackUniversalUncompress(HWND parent, const char* command, TPackErrorTable* 
     }
     else
     {
-        if (!PackExpandInitDir(archiveFileName, NULL, tmpDirNameBuf, initDir, currentDir, MAX_PATH))
+        if (!PackExpandInitDir(archiveFileName, NULL, tmpDirNameBuf, initDir, currentDir, currentDir.Size()))
         {
             DeleteFileA(gFileSystem, tmpListNameBuf);
             RemoveDirectory(tmpDirNameBuf);
@@ -1582,7 +1583,7 @@ BOOL PackUniversalUncompress(HWND parent, const char* command, TPackErrorTable* 
     DeleteFileA(gFileSystem, tmpListNameBuf);
 
     // and now finally move the files where they belong
-    char srcDir[MAX_PATH];
+    CPathBuffer srcDir; // Heap-allocated for long path support
     strcpy(srcDir, tmpDirNameBuf);
     if (*rootPath != '\0')
     {
@@ -1807,7 +1808,7 @@ BOOL PackUnpackOneFile(CFilesWindow* panel, const char* archiveFileName,
     //
 
     // buffer for the full name of the temporary directory
-    char tmpDirNameBuf[MAX_PATH];
+    CPathBuffer tmpDirNameBuf; // Heap-allocated for long path support
     if (!SalGetTempFileName(targetDir, "PACK", tmpDirNameBuf, FALSE))
     {
         char buffer[1000];
@@ -1840,9 +1841,9 @@ BOOL PackUnpackOneFile(CFilesWindow* panel, const char* archiveFileName,
     }
 
     // build the current directory
-    char currentDir[MAX_PATH];
+    CPathBuffer currentDir; // Heap-allocated for long path support
     if (!PackExpandInitDir(archiveFileName, NULL, tmpDirNameBuf, browseTable->ExtractInitDir,
-                           currentDir, MAX_PATH))
+                           currentDir, currentDir.Size()))
     {
         RemoveTemporaryDir(tmpDirNameBuf);
         return (*PackErrorHandlerPtr)(NULL, IDS_PACKERR_IDIRERR);
