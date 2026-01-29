@@ -1108,7 +1108,7 @@ void CPluginFSInterface::OpenActiveFolder(const char* fsName, HWND parent)
     DWORD disp;
     RegCreateKeyEx(HKEY_CURRENT_USER, "Software\\Microsoft\\Windows\\CurrentVersion\\Applets\\Regedit", 0, NULL,
                    REG_OPTION_NON_VOLATILE, KEY_CREATE_SUB_KEY | KEY_WRITE, NULL, &hKey, &disp);
-    char path[100 + MAX_PATH];
+    CPathBuffer path; // Heap-allocated for long path support
     GetCurrentPath(path);
     const char* path2 = path;
     if (*path2 == '\\')
@@ -1117,11 +1117,11 @@ void CPluginFSInterface::OpenActiveFolder(const char* fsName, HWND parent)
     RegCloseKey(hKey);
 
     // launch regedit with optional elevation (Vista/7)
-    char regEditPath[MAX_PATH];
-    if (!GetWindowsDirectory(regEditPath, MAX_PATH))
+    CPathBuffer regEditPath; // Heap-allocated for long path support
+    if (!GetWindowsDirectory(regEditPath, regEditPath.Size()))
         *regEditPath = 0;
     else
-        SG->SalPathAddBackslash(regEditPath, MAX_PATH);
+        SG->SalPathAddBackslash(regEditPath, regEditPath.Size());
     lstrcat(regEditPath, "regedit.exe");
 
     SHELLEXECUTEINFO sei = {0};

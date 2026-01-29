@@ -940,9 +940,9 @@ void CConfigDialog::Validate(CTransferInfoEx& ti)
 {
     CALL_STACK_MESSAGE1("CConfigDialog::Validate()");
     int e1, e2;
-    char buffer[MAX_PATH];
+    CPathBuffer buffer; // Heap-allocated for long path support
 
-    ti.EditLine(IDE_COMMAND, buffer, MAX_PATH);
+    ti.EditLine(IDE_COMMAND, buffer, buffer.Size());
     if (!SG->ValidateVarString(HWindow, buffer, e1, e2, ExpCommandVariables))
     {
         ti.ErrorOn(IDE_COMMAND);
@@ -951,7 +951,7 @@ void CConfigDialog::Validate(CTransferInfoEx& ti)
         return;
     }
 
-    ti.EditLine(IDE_ARGUMENTS, buffer, MAX_PATH);
+    ti.EditLine(IDE_ARGUMENTS, buffer, buffer.Size());
     if (!SG->ValidateVarString(HWindow, buffer, e1, e2, ExpArgumentsVariables))
     {
         ti.ErrorOn(IDE_ARGUMENTS);
@@ -960,7 +960,7 @@ void CConfigDialog::Validate(CTransferInfoEx& ti)
         return;
     }
 
-    ti.EditLine(IDE_INITDIR, buffer, MAX_PATH);
+    ti.EditLine(IDE_INITDIR, buffer, buffer.Size());
     if (!SG->ValidateVarString(HWindow, buffer, e1, e2, ExpInitDirVariables))
     {
         ti.ErrorOn(IDE_INITDIR);
@@ -1035,9 +1035,9 @@ CConfigDialog::DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
             {
                 if (cmd == 1)
                 {
-                    char path[MAX_PATH];
+                    CPathBuffer path; // Heap-allocated for long path support
                     path[0] = 0;
-                    GetDlgItemText(HWindow, IDE_COMMAND, path, MAX_PATH);
+                    GetDlgItemText(HWindow, IDE_COMMAND, path, path.Size());
                     if (GetOpenFileName(HWindow, NULL, LoadStr(IDS_EXEFILES), path))
                         SetDlgItemText(HWindow, IDE_COMMAND, path);
                 }
@@ -1213,8 +1213,8 @@ void CExportDialog::Validate(CTransferInfoEx& ti)
         ti.ErrorOn(IDE_NAME);
     }
 
-    char buffer2[MAX_PATH];
-    ti.EditLine(IDE_FILE, buffer2, MAX_PATH);
+    CPathBuffer buffer2; // Heap-allocated for long path support
+    ti.EditLine(IDE_FILE, buffer2, buffer2.Size());
     if (strlen(buffer2) == 0)
     {
         SG->SalMessageBox(HWindow, LoadStr(IDS_EMPTY), LoadStr(IDS_ERROR), MB_ICONERROR);
@@ -1242,13 +1242,13 @@ CExportDialog::DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
         {
         case IDB_BROWSE:
         {
-            char path[MAX_PATH];
+            CPathBuffer path; // Heap-allocated for long path support
             path[0] = 0;
-            GetDlgItemText(HWindow, IDE_FILE, path, MAX_PATH);
+            GetDlgItemText(HWindow, IDE_FILE, path, path.Size());
             SG->SalPathRemoveBackslash(path);
             if (GetOpenFileName(HWindow, NULL, LoadStr(IDS_REGFILES), path, TRUE))
             {
-                SG->SalPathAddExtension(path, ".reg", MAX_PATH);
+                SG->SalPathAddExtension(path, ".reg", path.Size());
                 SetDlgItemText(HWindow, IDE_FILE, path);
             }
             return TRUE;

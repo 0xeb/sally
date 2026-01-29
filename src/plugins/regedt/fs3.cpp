@@ -391,9 +391,9 @@ void CPluginFSInterface::ViewFile(const char* fsName, HWND parent,
     SG->ToLowerCase(uniqueFileName);
 
     // create a file name that Windows can handle
-    char fileName[MAX_PATH];
-    fileName[0] = '_';
-    lstrcpyn(fileName + 1, file.Name, MAX_PATH - 1);
+    CPathBuffer fileName; // Heap-allocated for long path support
+    *fileName = '_';
+    lstrcpyn(fileName.Get() + 1, file.Name, fileName.Size() - 1);
 
     // obtain the copy name in the disk cache
     BOOL fileExists;
@@ -1018,10 +1018,10 @@ MENU_TEMPLATE_ITEM PanelMenu[] =
 
     case CMD_COPYFULLNAME:
     {
-        char path[MAX_PATH];
-        if (GetCurrentPath(path) && SG->SalPathAppend(path, fd->Name, MAX_PATH))
+        CPathBuffer path; // Heap-allocated for long path support
+        if (GetCurrentPath(path) && SG->SalPathAppend(path, fd->Name, path.Size()))
         {
-            SG->CopyTextToClipboard(*path == '\\' ? path + 1 : path, -1,
+            SG->CopyTextToClipboard(*path.Get() == '\\' ? path.Get() + 1 : path, -1,
                                     FALSE, NULL);
         }
         break;
@@ -1029,10 +1029,10 @@ MENU_TEMPLATE_ITEM PanelMenu[] =
 
     case CMD_COPYPATH:
     {
-        char path[MAX_PATH];
+        CPathBuffer path; // Heap-allocated for long path support
         if (GetCurrentPath(path))
         {
-            SG->CopyTextToClipboard(*path == '\\' ? path + 1 : path, -1,
+            SG->CopyTextToClipboard(*path.Get() == '\\' ? path.Get() + 1 : path, -1,
                                     FALSE, NULL);
         }
         break;

@@ -9,9 +9,9 @@ char LastExportPath[MAX_PATH];
 BOOL ExportKey(LPWSTR fullName)
 {
     CALL_STACK_MESSAGE1("ExportKey()");
-    char file[MAX_PATH];
+    CPathBuffer file; // Heap-allocated for long path support
     strcpy(file, LastExportPath);
-    SG->SalPathAddBackslash(file, MAX_PATH);
+    SG->SalPathAddBackslash(file, file.Size());
     while (1)
     {
         BOOL direct = FALSE;
@@ -91,26 +91,26 @@ BOOL ExportKey(LPWSTR fullName)
         {
             // starting with XP we invoke the reg.exe command line, see https://forum.altap.cz/viewtopic.php?f=24&t=5682
             // the advantage of reg.exe is that from Vista onward it does not require UAC elevation for exports
-            char sysdir[MAX_PATH];
-            if (!GetSystemDirectory(sysdir, MAX_PATH))
+            CPathBuffer sysdir; // Heap-allocated for long path support
+            if (!GetSystemDirectory(sysdir, sysdir.Size()))
                 *sysdir = 0;
             else
-                SG->SalPathAddBackslash(sysdir, MAX_PATH);
-            SalPrintf(command, 4096, "\"%sreg.exe\" EXPORT \"%ls\" \"%s\"", sysdir,
-                      *fullName == L'\\' ? fullName + 1 : fullName, file);
+                SG->SalPathAddBackslash(sysdir, sysdir.Size());
+            SalPrintf(command, 4096, "\"%sreg.exe\" EXPORT \"%ls\" \"%s\"", sysdir.Get(),
+                      *fullName == L'\\' ? fullName + 1 : fullName, file.Get());
         }
         else
         {
-            char windir[MAX_PATH];
-            if (!GetWindowsDirectory(windir, MAX_PATH))
+            CPathBuffer windir; // Heap-allocated for long path support
+            if (!GetWindowsDirectory(windir, windir.Size()))
                 *windir = 0;
             else
-                SG->SalPathAddBackslash(windir, MAX_PATH);
+                SG->SalPathAddBackslash(windir, windir.Size());
             if (root != -1)
-                SalPrintf(command, 4096, "\"%sregedit.exe\" /e \"%s\" \"%ls\"", windir, file,
+                SalPrintf(command, 4096, "\"%sregedit.exe\" /e \"%s\" \"%ls\"", windir.Get(), file.Get(),
                           *fullName == L'\\' ? fullName + 1 : fullName);
             else
-                SalPrintf(command, 4096, "\"%sregedit.exe\" /e \"%s\"", windir, file);
+                SalPrintf(command, 4096, "\"%sregedit.exe\" /e \"%s\"", windir.Get(), file.Get());
         }
 
         STARTUPINFO si;
@@ -139,8 +139,8 @@ BOOL ExportKey(LPWSTR fullName)
         CloseHandle(pi.hThread);
 
         // announce the change on the path (our file was added)
-        char changedPath[MAX_PATH];
-        lstrcpyn(changedPath, file, MAX_PATH);
+        CPathBuffer changedPath; // Heap-allocated for long path support
+        lstrcpyn(changedPath, file, changedPath.Size());
         SG->CutDirectory(changedPath);
         SG->PostChangeOnPathNotification(changedPath, FALSE);
 

@@ -593,9 +593,9 @@ BOOL ExtractArchive(CSalamanderDirectoryAbstract const* dir, CSalamanderMaskGrou
         salamander->ProgressSetTotalSize(COPY_MIN_FILE_SIZE, CQuadWord(-1, -1));
 
         // an empty directory must be created explicitly
-        char dirName[MAX_PATH];
-        lstrcpyn(dirName, targetDir, MAX_PATH);
-        SalamanderGeneral->SalPathAppend(dirName, path, MAX_PATH);
+        CPathBuffer dirName; // Heap-allocated for long path support
+        lstrcpyn(dirName, targetDir, dirName.Size());
+        SalamanderGeneral->SalPathAppend(dirName, path, dirName.Size());
 
         // "extracting: %s..."
         char progressText[MAX_PATH + 100];
@@ -641,11 +641,11 @@ BOOL CPluginInterfaceForArchiver::UnpackWholeArchive(CSalamanderForOperationsAbs
             int err;
             if (maskGroup->PrepareMasks(err))
             {
-                char path[MAX_PATH];
+                CPathBuffer path; // Heap-allocated for long path support
                 path[0] = 0;
                 CQuadWord totalSize(0, 0);
                 CQuadWord realTotalSize(0, 0);
-                CalcSize(dir, maskGroup, path, MAX_PATH, &totalSize, &realTotalSize);
+                CalcSize(dir, maskGroup, path, path.Size(), &totalSize, &realTotalSize);
 
                 if (SalamanderGeneral->TestFreeSpace(SalamanderGeneral->GetMsgBoxParent(),
                                                      targetDir, realTotalSize, LoadStr(IDS_PLUGINNAME)))
