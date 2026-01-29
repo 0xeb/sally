@@ -97,7 +97,7 @@ BOOL GetUserName(const char* drive, const char* remoteName, char* userName, DWOR
         return FALSE; // well, nothing ...
 
     BOOL ret = FALSE;
-    char keyName[MAX_PATH];
+    CPathBuffer keyName; // Heap-allocated for long path support
     DWORD keyNameSize, type;
     HKEY driveKey;
 
@@ -105,10 +105,10 @@ BOOL GetUserName(const char* drive, const char* remoteName, char* userName, DWOR
     keyName[1] = 0;
     if (HANDLES_Q(RegOpenKeyEx(network, keyName, 0, KEY_READ, &driveKey)) == ERROR_SUCCESS)
     {
-        keyNameSize = MAX_PATH;
+        keyNameSize = keyName.Size();
         type = REG_SZ;
         res = SalRegQueryValueEx(driveKey, "RemotePath", 0, &type,
-                                 (unsigned char*)keyName, &keyNameSize);
+                                 (unsigned char*)keyName.Get(), &keyNameSize);
         if (res == ERROR_SUCCESS && type == REG_SZ && IsTheSamePath(keyName, remoteName))
         {
             ret = TRUE; // we will announce success, even if the user name is not defined (the current user should be used)
@@ -444,13 +444,13 @@ BOOL RestoreNetworkConnection(HWND parent, const char* name, const char* remoteN
     CALL_STACK_MESSAGE3("RestoreNetworkConnection(, %s, %s, ,)", name, remoteName);
 
     BOOL ret = TRUE;
-    char serverName[MAX_PATH];
+    CPathBuffer serverName; // Heap-allocated for long path support
     serverName[0] = 0;
     NETRESOURCE nsBuf;
     NETRESOURCE* ns = NULL;
     char userNameBuf[USERNAME_MAXLEN];
     char* userName = NULL;
-    char providerBuf[MAX_PATH];
+    CPathBuffer providerBuf; // Heap-allocated for long path support
 
     if (lpNetResource != NULL)
     {
@@ -463,9 +463,9 @@ BOOL RestoreNetworkConnection(HWND parent, const char* name, const char* remoteN
             if (end == NULL || *(end + 1) == 0)
             {
                 if (end == NULL)
-                    lstrcpyn(serverName, lpNetResource->lpRemoteName + 2, MAX_PATH);
+                    lstrcpyn(serverName, lpNetResource->lpRemoteName + 2, serverName.Size());
                 else
-                    lstrcpyn(serverName, lpNetResource->lpRemoteName + 2, (int)min(MAX_PATH, (end - (lpNetResource->lpRemoteName + 2)) + 1));
+                    lstrcpyn(serverName, lpNetResource->lpRemoteName + 2, (int)min((int)serverName.Size(), (end - (lpNetResource->lpRemoteName + 2)) + 1));
             }
         }
         if (serverName[0] == 0) // this is not a \\server or \\server\ variant, we will solve it by calling the original code
@@ -1488,7 +1488,7 @@ void InitOneDrivePath()
     }
 
     HKEY hKey;
-    char path[MAX_PATH];
+    CPathBuffer path; // Heap-allocated for long path support
     for (int i = 0; !done && i < 2; i++) // theoretically only needed for Windows 8 and lower (from 8.1 we have FOLDERID_SkyDrive)
     {
         if (HANDLES_Q(RegOpenKeyEx(HKEY_CURRENT_USER,
@@ -1497,9 +1497,9 @@ void InitOneDrivePath()
                                                                             : (i == 0 ? "Software\\Microsoft\\OneDrive" : "Software\\Microsoft\\SkyDrive"), // krom Win 8.1
                                    0, KEY_READ, &hKey)) == ERROR_SUCCESS)
         {
-            DWORD size = sizeof(path); // size in bytes
+            DWORD size = path.Size(); // size in bytes
             DWORD type;
-            if (SalRegQueryValueEx(hKey, "UserFolder", 0, &type, (BYTE*)path, &size) == ERROR_SUCCESS &&
+            if (SalRegQueryValueEx(hKey, "UserFolder", 0, &type, (BYTE*)path.Get(), &size) == ERROR_SUCCESS &&
                 type == REG_SZ && size > 1)
             {
                 //TRACE_I("OneDrive path (UserFolder): " << path);
@@ -1532,8 +1532,8 @@ void InitOneDrivePath()
                     if (SalRegQueryValueEx(hAccount, "DisplayName", 0, &type, (BYTE*)disp, &size) == ERROR_SUCCESS &&
                         type == REG_SZ && size > 1)
                     {
-                        size = sizeof(path); // size in bytes
-                        if (SalRegQueryValueEx(hAccount, "UserFolder", 0, &type, (BYTE*)path, &size) == ERROR_SUCCESS &&
+                        size = path.Size(); // size in bytes
+                        if (SalRegQueryValueEx(hAccount, "UserFolder", 0, &type, (BYTE*)path.Get(), &size) == ERROR_SUCCESS &&
                             type == REG_SZ && size > 1)
                         { // we will collect everything that has DisplayName and UserFolder, no matter what it is, we will offer it to the user under "OneDrive"
                             //TRACE_I("OneDrive Business: DisplayName: " << disp << ", UserFolder: " << path);
@@ -2099,7 +2099,7 @@ BOOL CDrivesList::BuildData(BOOL noTimeout, TDirectArray<CDriveData>* copyDrives
             if (panel->Is(ptDisk))
             {
                 UINT type = MyGetDriveType(panel->GetPath());
-                char root2[MAX_PATH];
+                CPathBuffer root2; // Heap-allocated for long path support
                 GetRootPath(root2, panel->GetPath());
                 drv.HIcon = GetDriveIcon(root2, type, TRUE);
                 drv.HGrayIcon = NULL;
@@ -2153,8 +2153,8 @@ BOOL CDrivesList::BuildData(BOOL noTimeout, TDirectArray<CDriveData>* copyDrives
     {
         if (MainWindow->HotPaths.GetVisible(i))
         {
-            char srcName[MAX_PATH];
-            MainWindow->HotPaths.GetName(i, srcName, MAX_PATH);
+            CPathBuffer srcName; // Heap-allocated for long path support
+            MainWindow->HotPaths.GetName(i, srcName, srcName.Size());
             if (srcName[0] != 0 && MainWindow->HotPaths.GetPathLen(i) > 0)
             {
                 if (addSeparator)
@@ -2165,9 +2165,9 @@ BOOL CDrivesList::BuildData(BOOL noTimeout, TDirectArray<CDriveData>* copyDrives
                 }
                 char text[MAX_PATH + 10];
                 if (i < 10)
-                    sprintf(text, "%d\t%s", i == 9 ? 0 : i + 1, srcName);
+                    sprintf(text, "%d\t%s", i == 9 ? 0 : i + 1, srcName.Get());
                 else
-                    sprintf(text, "\t%s", srcName);
+                    sprintf(text, "\t%s", srcName.Get());
                 // double '&' so that it is not displayed as an underline
                 DuplicateAmpersands(text + 2, MAX_PATH);
 
@@ -2387,7 +2387,7 @@ BOOL CDrivesList::ExecuteItem(int index, HWND hwnd, const RECT* exclude, BOOL* f
         if (!item->Accessible)
         {
             char name[3] = " :";
-            char remoteName[MAX_PATH];
+            CPathBuffer remoteName; // Heap-allocated for long path support
             strcpy(remoteName, item->DriveText + 2);
             name[0] = item->DriveText[0];
 
@@ -2849,11 +2849,11 @@ BOOL CDrivesList::OnContextMenu(BOOL posByMouse, int itemIndex, int panel, const
                 p.y = selectedIndexRect.bottom;
             }
 
-            char pluginFSNameBuf[MAX_PATH]; // 'pluginFS' may cease to exist, so we put 'fsName' into a local buffer
+            CPathBuffer pluginFSNameBuf; // 'pluginFS' may cease to exist, so we put 'fsName' into a local buffer
             if (pluginFSName != NULL)
-                lstrcpyn(pluginFSNameBuf, pluginFSName, MAX_PATH);
+                lstrcpyn(pluginFSNameBuf, pluginFSName, pluginFSNameBuf.Size());
             if (pluginData->ChangeDriveMenuItemContextMenu(MainWindow->HWindow, panel, p.x, p.y, pluginFS,
-                                                           pluginFSName != NULL ? pluginFSNameBuf : NULL,
+                                                           pluginFSName != NULL ? pluginFSNameBuf.Get() : NULL,
                                                            pluginFSName != NULL ? pluginFSNameIndex : -1,
                                                            isDetachedFS, refreshMenu,
                                                            closeMenu, postCmd, postCmdParam))
