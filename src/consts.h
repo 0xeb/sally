@@ -2282,6 +2282,9 @@ BOOL ContainsString(TIndirectArray<char>* usedNames, const char* name, int* inde
 // in case of truncation
 BOOL GetMyDocumentsOrDesktopPath(char* path, int pathLen);
 
+// Wide version - no MAX_PATH limitation
+BOOL GetMyDocumentsOrDesktopPathW(std::wstring& path);
+
 // To optimize performance, it is good practice for applications to detect whether they
 // are running in a Terminal Services client session. For example, when an application
 // is running on a remote session, it should eliminate unnecessary graphic effects, as
@@ -2380,6 +2383,9 @@ void ShellActionAux6(CFilesWindow* panel);
 // returns Configuration.IfPathIsInaccessibleGoTo path in 'path' (buffer at least MAX_PATH characters);
 // takes into account Configuration.IfPathIsInaccessibleGoToIsMyDocs setting
 void GetIfPathIsInaccessibleGoTo(char* path, BOOL forceIsMyDocs = FALSE);
+
+// Wide version - no MAX_PATH limitation
+void GetIfPathIsInaccessibleGoToW(std::wstring& path, BOOL forceIsMyDocs = FALSE);
 
 // loads icon overlay handler configuration from registry
 void LoadIconOvrlsInfo(const char* root);

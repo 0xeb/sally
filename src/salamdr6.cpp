@@ -1689,32 +1689,42 @@ BOOL SafeGetSaveFileName(LPOPENFILENAME lpofn)
     return ret;
 }
 
-void GetIfPathIsInaccessibleGoTo(char* path, BOOL forceIsMyDocs)
+// Wide version - no MAX_PATH buffer limitations
+void GetIfPathIsInaccessibleGoToW(std::wstring& path, BOOL forceIsMyDocs)
 {
+    path.clear();
     if (forceIsMyDocs || Configuration.IfPathIsInaccessibleGoToIsMyDocs)
     {
-        if (!GetMyDocumentsOrDesktopPath(path, MAX_PATH))
+        if (!GetMyDocumentsOrDesktopPathW(path))
         {
-            char winPath[MAX_PATH];
-            if (EnvGetWindowsDirectoryA(gEnvironment, winPath, MAX_PATH).success)
-                GetRootPath(path, winPath);
+            std::wstring winPath;
+            if (gEnvironment->GetWindowsDirectory(winPath).success)
+                path = GetRootPathW(winPath.c_str());
             else
-                strcpy(path, "C:\\");
+                path = L"C:\\";
         }
     }
     else
     {
-        lstrcpyn(path, Configuration.IfPathIsInaccessibleGoTo, MAX_PATH);
-        if (path[0] != 0 && path[1] == ':')
+        // Configuration.IfPathIsInaccessibleGoTo is ANSI, convert to wide
+        path = AnsiToWide(Configuration.IfPathIsInaccessibleGoTo);
+        if (path.length() >= 2 && path[1] == L':')
         {
-            path[0] = UpperCase[path[0]];
-            if (path[2] == 0)
+            path[0] = towupper(path[0]);
+            if (path.length() == 2)
             { // "C:" -> "C:\"
-                path[2] = '\\';
-                path[3] = 0;
+                path += L'\\';
             }
         }
     }
+}
+
+// ANSI version - thin wrapper around wide version
+void GetIfPathIsInaccessibleGoTo(char* path, BOOL forceIsMyDocs)
+{
+    std::wstring widePath;
+    GetIfPathIsInaccessibleGoToW(widePath, forceIsMyDocs);
+    WideToAnsi(widePath, path, MAX_PATH);
 }
 
 HICON SalLoadImage(int vistaResID, int otherResID, int cx, int cy, UINT flags)

@@ -36,6 +36,15 @@ inline std::string WideToAnsi(const std::wstring& s)
     return WideToAnsi(s.c_str());
 }
 
+// Write wide string to ANSI char buffer with size limit
+inline void WideToAnsi(const std::wstring& s, char* buffer, int bufferSize)
+{
+    if (buffer == NULL || bufferSize <= 0)
+        return;
+    WideCharToMultiByte(CP_ACP, 0, s.c_str(), -1, buffer, bufferSize, NULL, NULL);
+    buffer[bufferSize - 1] = '\0'; // Ensure null termination
+}
+
 // Format a wide string using printf-style formatting, returns std::wstring
 template <typename... Args>
 inline std::wstring FormatStrW(const wchar_t* format, Args... args)

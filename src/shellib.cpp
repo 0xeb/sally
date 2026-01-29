@@ -2784,6 +2784,46 @@ BOOL GetMyDocumentsOrDesktopPath(char* path, int pathLen)
     return ret;
 }
 
+// Wide version - no MAX_PATH limitation
+BOOL GetMyDocumentsOrDesktopPathW(std::wstring& path)
+{
+    path.clear();
+    wchar_t buff[32768]; // Support long paths
+
+    BOOL ret = FALSE;
+    ITEMIDLIST* pidl = NULL;
+    if (SHGetSpecialFolderLocation(NULL, CSIDL_PERSONAL, &pidl) == NOERROR)
+    {
+        if (SHGetPathFromIDListW(pidl, buff))
+        {
+            path = buff;
+            ret = TRUE;
+        }
+        IMalloc* alloc;
+        if (SUCCEEDED(CoGetMalloc(1, &alloc)))
+        {
+            alloc->Free(pidl);
+            alloc->Release();
+        }
+    }
+    if (!ret && SHGetSpecialFolderLocation(NULL, CSIDL_DESKTOP, &pidl) == NOERROR)
+    {
+        if (SHGetPathFromIDListW(pidl, buff))
+        {
+            path = buff;
+            ret = TRUE;
+        }
+        IMalloc* alloc;
+        if (SUCCEEDED(CoGetMalloc(1, &alloc)))
+        {
+            alloc->Free(pidl);
+            alloc->Release();
+        }
+    }
+
+    return ret;
+}
+
 //
 //*****************************************************************************
 // GetSHObjectName
