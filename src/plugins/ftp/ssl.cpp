@@ -764,22 +764,22 @@ bool InitSSL(int logUID, int* errorID)
     memset(&SSLLib, 0, sizeof(SSLLib));
 
     bool ret = false;
-    char dir[MAX_PATH];
+    CPathBuffer dir; // Heap-allocated for long path support
     int loadStatus = 1;
-    if (GetModuleFileName(NULL, dir, _countof(dir)) &&
+    if (GetModuleFileName(NULL, dir, dir.Size()) &&
         SalamanderGeneral->CutDirectory(dir) &&
-        SalamanderGeneral->SalPathAppend(dir, "utils", _countof(dir)))
+        SalamanderGeneral->SalPathAppend(dir, "utils", dir.Size()))
     {
         ret = true;
-        char* s = dir + strlen(dir);
-        if (!SalamanderGeneral->SalPathAppend(dir, "libeay32.dll", _countof(dir)) ||
+        char* s = dir.Get() + strlen(dir);
+        if (!SalamanderGeneral->SalPathAppend(dir, "libeay32.dll", dir.Size()) ||
             !LoadSymbols(dir, NULL, SSLLib.hSSLUtilLib, SSLUtilSymbols, logUID))
         {
             ret = false;
         }
         *s = 0;
         if (!ret ||
-            !SalamanderGeneral->SalPathAppend(dir, "ssleay32.dll", _countof(dir)) ||
+            !SalamanderGeneral->SalPathAppend(dir, "ssleay32.dll", dir.Size()) ||
             !LoadSymbols(dir, NULL /*_T("libssl32.dll")*/, SSLLib.hSSLLib, SSLSymbols, logUID))
         {
             ret = false;
