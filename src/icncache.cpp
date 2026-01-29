@@ -734,8 +734,8 @@ BOOL GetIconFromAssocAux(BOOL initFlagAndIndexes, HKEY root, const char* keyName
         data.SetIndexAll(-1);
     }
     iconLocation[0] = 0;
-    char keyNameBuf[MAX_PATH];
-    lstrcpyn(keyNameBuf, keyName, min(size, MAX_PATH));
+    CPathBuffer keyNameBuf; // Heap-allocated for long path support
+    lstrcpyn(keyNameBuf, keyName, min(size, keyNameBuf.Size()));
     HKEY openKey;
 
     if (type != NULL)
@@ -781,16 +781,16 @@ BOOL GetIconFromAssocAux(BOOL initFlagAndIndexes, HKEY root, const char* keyName
         }
     }
 
-    if (!found && size - 1 + 13 <= MAX_PATH)
+    if (!found && size - 1 + 13 <= keyNameBuf.Size())
     {
-        memmove(keyNameBuf + size - 1, "\\DefaultIcon", 13);
+        memmove(keyNameBuf.Get() + size - 1, "\\DefaultIcon", 13);
         if (HANDLES_Q(RegOpenKey(root, keyNameBuf, &openKey)) == ERROR_SUCCESS)
         {
-            char buf[MAX_PATH];
-            size = MAX_PATH; // getting path to icon
+            CPathBuffer buf; // Heap-allocated for long path support
+            size = buf.Size(); // getting path to icon
             DWORD type2 = REG_SZ;
             DWORD err = SalRegQueryValueEx(openKey, "", 0, &type2,
-                                           (LPBYTE)buf, (LPDWORD)&size);
+                                           (LPBYTE)buf.Get(), (LPDWORD)&size);
             if (err == ERROR_SUCCESS && size > 1)
             {
                 found = TRUE;
@@ -1149,11 +1149,11 @@ void CAssociations::ReadAssociations(BOOL showWaitWnd)
     Release();
     //---  iterate through registry records about classes (extensions)
     char ext[MAX_PATH + 4];
-    char extType[MAX_PATH];
+    CPathBuffer extType; // Heap-allocated for long path support
     char *s, *e;
 
     char iconLocation[MAX_PATH + 10];
-    char type[MAX_PATH];
+    CPathBuffer type; // Heap-allocated for long path support
     HKEY extKey, openKey;
     LONG size;
     CAssociationData data;
@@ -1206,10 +1206,10 @@ void CAssociations::ReadAssociations(BOOL showWaitWnd)
                         addExt = TRUE;
                     else
                     { // also try the key from the PerceivedType value (if defined)
-                        size = MAX_PATH;
-                        if (SalRegQueryValueEx(extKey, "PerceivedType", NULL, NULL, (BYTE*)extType, (DWORD*)&size) == ERROR_SUCCESS && size > 1)
+                        size = extType.Size();
+                        if (SalRegQueryValueEx(extKey, "PerceivedType", NULL, NULL, (BYTE*)extType.Get(), (DWORD*)&size) == ERROR_SUCCESS && size > 1)
                         {
-                            extType[MAX_PATH - 1] = 0; // just to be sure (value may not be string type, then null-terminator may be missing)
+                            extType[extType.Size() - 1] = 0; // just to be sure (value may not be string type, then null-terminator may be missing)
                             if (GetIconFromAssocAux(FALSE, systemFileAssoc, extType, (LONG)strlen(extType) + 1, data, iconLocation, NULL))
                                 addExt = TRUE;
                         }
@@ -1316,10 +1316,10 @@ void CAssociations::ReadAssociations(BOOL showWaitWnd)
                     BOOL found = GetIndex(e, index);
                     if (WindowsVistaAndLater && HANDLES_Q(RegOpenKey(extKey, "UserChoice", &openKey)) == ERROR_SUCCESS)
                     {                    // try if associated via UserChoice key, if so, it's the highest priority record, so we possibly overwrite the existing association
-                        size = MAX_PATH; // getting association type
-                        if (SalRegQueryValueEx(openKey, "Progid", NULL, NULL, (BYTE*)extType, (DWORD*)&size) == ERROR_SUCCESS && size > 1)
+                        size = extType.Size(); // getting association type
+                        if (SalRegQueryValueEx(openKey, "Progid", NULL, NULL, (BYTE*)extType.Get(), (DWORD*)&size) == ERROR_SUCCESS && size > 1)
                         {
-                            extType[MAX_PATH - 1] = 0; // just to be sure (value may not be string type, then null-terminator may be missing)
+                            extType[extType.Size() - 1] = 0; // just to be sure (value may not be string type, then null-terminator may be missing)
 
                             if (GetIconFromAssocAux(TRUE, HKEY_CLASSES_ROOT, extType, (LONG)strlen(extType) + 1, data, iconLocation, type))
                             {
