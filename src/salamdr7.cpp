@@ -477,7 +477,7 @@ BOOL IsPathOnSSD(const char* path)
 {
     BOOL isSSD = FALSE;
 
-    char guidPath[MAX_PATH];
+    CPathBuffer guidPath; // Heap-allocated for long path support
     guidPath[0] = 0;
     if (GetResolvedPathMountPointAndGUID(path, NULL, guidPath))
     {
@@ -501,16 +501,16 @@ BOOL IsPathOnSSD(const char* path)
 
 BOOL GetResolvedPathMountPointAndGUID(const char* path, char* mountPoint, char* guidPath)
 {
-    char resolvedPath[MAX_PATH];
+    CPathBuffer resolvedPath; // Heap-allocated for long path support
     strcpy(resolvedPath, path);
     ResolveSubsts(resolvedPath);
-    char rootPath[MAX_PATH];
+    CPathBuffer rootPath; // Heap-allocated for long path support
     GetRootPath(rootPath, resolvedPath);
     BOOL remotePath = TRUE;
     if (!IsUNCPath(rootPath) && GetDriveType(rootPath) == DRIVE_FIXED) // reparse points make sense to look for only on fixed disks
     {
         BOOL cutPathIsPossible = TRUE;
-        char netPath[MAX_PATH];
+        CPathBuffer netPath; // Heap-allocated for long path support
         netPath[0] = 0;
         ResolveLocalPathWithReparsePoints(resolvedPath, path, &cutPathIsPossible, NULL, NULL, NULL, NULL, netPath);
         remotePath = netPath[0] != 0;
@@ -527,15 +527,15 @@ BOOL GetResolvedPathMountPointAndGUID(const char* path, char* mountPoint, char* 
     // GUID can be obtained even for non-DRIVE_FIXED disks, for example card readers
     // according to https://msdn.microsoft.com/en-us/library/windows/desktop/aa364996%28v=vs.85%29.aspx there is no support for DRIVE_REMOTE yet,
     // but that could potentially come too
-    char guidP[MAX_PATH];
-    SalPathAddBackslash(resolvedPath, MAX_PATH); // GetVolumeNameForVolumeMountPoint requires backslash at the end
-    if (GetVolumeNameForVolumeMountPoint(resolvedPath, guidP, sizeof(guidP)))
+    CPathBuffer guidP; // Heap-allocated for long path support
+    SalPathAddBackslash(resolvedPath, resolvedPath.Size()); // GetVolumeNameForVolumeMountPoint requires backslash at the end
+    if (GetVolumeNameForVolumeMountPoint(resolvedPath, guidP, guidP.Size()))
     {
         if (mountPoint != NULL)
             strcpy(mountPoint, resolvedPath);
         if (guidPath != NULL)
         {
-            SalPathAddBackslash(guidP, sizeof(guidP));
+            SalPathAddBackslash(guidP, guidP.Size());
             strcpy(guidPath, guidP);
         }
         return TRUE;
