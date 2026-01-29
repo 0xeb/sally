@@ -411,22 +411,19 @@ BOOL ExpandArguments(const char* varText, char* arguments,
 BOOL ExecuteEditor(const char* tempFile)
 {
     CALL_STACK_MESSAGE2("ExecuteEditor(%s)", tempFile);
-    char command[MAX_PATH];
-    char directory[MAX_PATH];
-    char arguments[MAX_PATH];
-
-    char longName[MAX_PATH];
-    char dosName[MAX_PATH];
+    CPathBuffer command, directory, arguments; // Heap-allocated for long path support
+    CPathBuffer longName, dosName;             // Heap-allocated for long path support
 
     // expand initdir
-    SG->CutDirectory(strcpy(longName, tempFile));
-    if (!GetShortPathName(longName, dosName, MAX_PATH))
+    lstrcpyn(longName, tempFile, longName.Size());
+    SG->CutDirectory(longName);
+    if (!GetShortPathName(longName, dosName, dosName.Size()))
         dosName[0] = 0;
 
     int e1, e2;
 
     if (!SG->ValidateVarString(GetParent(), Command, e1, e2, ExpCommandVariables) ||
-        !ExpandCommand(Command, command, MAX_PATH, FALSE))
+        !ExpandCommand(Command, command, command.Size(), FALSE))
         return FALSE;
 
     if (!SG->ValidateVarString(GetParent(), InitDir, e1, e2, ExpInitDirVariables) ||
@@ -434,7 +431,7 @@ BOOL ExecuteEditor(const char* tempFile)
         return FALSE;
 
     // expand arguments
-    if (!GetShortPathName(tempFile, dosName, MAX_PATH))
+    if (!GetShortPathName(tempFile, dosName, dosName.Size()))
         dosName[0] = 0;
 
     if (!SG->ValidateVarString(GetParent(), Arguments, e1, e2, ExpArgumentsVariables) ||
@@ -447,7 +444,7 @@ BOOL ExecuteEditor(const char* tempFile)
     TBuffer<char> cmdLine;
     if (!cmdLine.Reserve(strlen(command) + 3 + strlen(arguments) + 1))
         return Error(IDS_LOWMEM);
-    SalPrintf(cmdLine.Get(), (unsigned int)cmdLine.GetSize(), "\"%s\" %s", command, arguments);
+    SalPrintf(cmdLine.Get(), (unsigned int)cmdLine.GetSize(), "\"%s\" %s", command.Get(), arguments.Get());
 
     STARTUPINFO si;
     PROCESS_INFORMATION pi;
@@ -458,7 +455,7 @@ BOOL ExecuteEditor(const char* tempFile)
     si.wShowWindow = SW_SHOWNORMAL;
 
     if (!CreateProcess(NULL, cmdLine.Get(), NULL, NULL, FALSE, CREATE_DEFAULT_ERROR_MODE | NORMAL_PRIORITY_CLASS,
-                       NULL, directory[0] ? directory : NULL, &si, &pi))
+                       NULL, directory[0] ? directory.Get() : NULL, &si, &pi))
         return Error(IDS_ERRLAUNCHEDIT);
 
     CloseHandle(pi.hProcess);

@@ -1046,9 +1046,9 @@ CConfigDialog::DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
             {
                 if (cmd == 1)
                 {
-                    char path[MAX_PATH];
+                    CPathBuffer path; // Heap-allocated for long path support
                     path[0] = 0;
-                    GetDlgItemText(HWindow, IDE_COMMAND, path, MAX_PATH);
+                    GetDlgItemText(HWindow, IDE_COMMAND, path, path.Size());
                     if (GetOpenFileName(HWindow, NULL, LoadStr(IDS_EXEFILES), path))
                         SetDlgItemText(HWindow, IDE_COMMAND, path);
                 }
