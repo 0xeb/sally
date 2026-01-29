@@ -3214,7 +3214,7 @@ HANDLE SalCreateFileEx(const char* fileName, DWORD desiredAccess,
                         CutDirectory(tmpName);
                         SalPathAddBackslash(tmpName, MAX_PATH + 20);
                         char* tmpNamePart = tmpName + strlen(tmpName);
-                        char origFullName[MAX_PATH];
+                        CPathBuffer origFullName; // Heap-allocated for long path support
                         if (SalPathAppend(tmpName, data.cFileName, MAX_PATH))
                         {
                             strcpy(origFullName, tmpName);
@@ -6006,7 +6006,7 @@ BOOL DoMoveFile(COperation* op, HWND hProgressDlg, void* buffer,
                             CutDirectory(tmpName);
                             SalPathAddBackslash(tmpName, MAX_PATH + 20);
                             char* tmpNamePart = tmpName + strlen(tmpName);
-                            char origFullName[MAX_PATH];
+                            CPathBuffer origFullName; // Heap-allocated for long path support
                             if (SalPathAppend(tmpName, findData.cFileName, MAX_PATH))
                             {
                                 strcpy(origFullName, tmpName);
@@ -6566,7 +6566,7 @@ BOOL SalCreateDirectoryEx(const char* name, DWORD* err)
                     CutDirectory(tmpName);
                     SalPathAddBackslash(tmpName, MAX_PATH + 20);
                     char* tmpNamePart = tmpName + strlen(tmpName);
-                    char origFullName[MAX_PATH];
+                    CPathBuffer origFullName; // Heap-allocated for long path support
                     if (SalPathAppend(tmpName, data.cFileName, MAX_PATH))
                     {
                         strcpy(origFullName, tmpName);
@@ -7408,7 +7408,7 @@ CONVERT_AGAIN:
         if (hSource != INVALID_HANDLE_VALUE)
         {
             // derive the path for the temporary file
-            char tmpPath[MAX_PATH];
+            CPathBuffer tmpPath; // Heap-allocated for long path support
             strcpy(tmpPath, name);
             char* terminator = strrchr(tmpPath, '\\');
             if (terminator == NULL)
@@ -7421,7 +7421,7 @@ CONVERT_AGAIN:
             *(terminator + 1) = 0;
 
             // find a name for the temporary file and let the system create it
-            char tmpFileName[MAX_PATH];
+            CPathBuffer tmpFileName; // Heap-allocated for long path support
             BOOL tmpFileExists = FALSE;
             while (1)
             {
@@ -7769,7 +7769,7 @@ CONVERT_AGAIN:
 
                     DWORD err = GetLastError();
 
-                    char fakeName[MAX_PATH]; // name of the temp file that cannot be created/opened
+                    CPathBuffer fakeName; // Heap-allocated for long path support; name of the temp file that cannot be created/opened
                     if (tmpFileExists)
                     {
                         strcpy(fakeName, tmpFileName);
@@ -8105,7 +8105,7 @@ unsigned ThreadWorkerBody(void* parameter)
     SetProgress(hProgressDlg, 0, 0, dlgData);
     script->InitSpeedMeters(FALSE);
 
-    char lastLantasticCheckRoot[MAX_PATH]; // last path root checked for Lantastic ("" = nothing checked yet)
+    CPathBuffer lastLantasticCheckRoot; // Heap-allocated for long path support; last path root checked for Lantastic ("" = nothing checked yet)
     lastLantasticCheckRoot[0] = 0;
     BOOL lastIsLantasticPath = FALSE;                                                                                  // result of checking root lastLantasticCheckRoot
     int mustDeleteFileBeforeOverwrite = 0; /* need test */                                                             // (added for SNAP server - NSA drive - SetEndOfFile fails - 0/1/2 = need-test/yes/no
