@@ -789,7 +789,7 @@ int CZipCommon::FindEOCentrDirSig(BOOL* success)
     QWORD i;
     unsigned size;
     bool retry;
-    char lastFile[MAX_PATH];
+    CPathBuffer lastFile; // Heap-allocated for long path support
 
     do
     {
@@ -1947,9 +1947,9 @@ int CZipCommon::MatchFiles(TIndirectArray2<CFileInfo>& files, TIndirectArray2<CE
 void CZipCommon::DetectRemovable()
 {
     CALL_STACK_MESSAGE1("CZipCommon::DetectRemovable()");
-    char pathRoot[MAX_PATH];
+    CPathBuffer pathRoot; // Heap-allocated for long path support
     const char* sour = ZipName;
-    char* dest = pathRoot;
+    char* dest = pathRoot.Get();
 
     while (*sour && *sour != '\\')
         *dest++ = *sour++;
@@ -2396,11 +2396,11 @@ DWORD ExpandSfxSettings(CSfxSettings* settings, void* buffer, DWORD size)
     {
         // add default values
         CSfxLang* lang = NULL;
-        char file[MAX_PATH];
-        GetModuleFileName(DLLInstance, file, MAX_PATH);
+        CPathBuffer file; // Heap-allocated for long path support
+        GetModuleFileName(DLLInstance, file, file.Size());
         SalamanderGeneral->CutDirectory(file);
-        SalamanderGeneral->SalPathAppend(file, "sfx", MAX_PATH);
-        SalamanderGeneral->SalPathAppend(file, settings->SfxFile, MAX_PATH);
+        SalamanderGeneral->SalPathAppend(file, "sfx", file.Size());
+        SalamanderGeneral->SalPathAppend(file, settings->SfxFile, file.Size());
         if (LoadSfxFileData(file, &lang) == 0)
         {
             strcpy(settings->Vendor, lang->Vendor);

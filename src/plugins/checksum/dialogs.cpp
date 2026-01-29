@@ -851,7 +851,8 @@ BOOL CCalculateDialog::GetSaveFileName(LPTSTR buffer, LPCTSTR title)
 
     // obtain the default name; are all names identical?
     CPathBuffer file1, file2; // Heap-allocated for long path support
-    char filter[MAX_PATH], *s;
+    CPathBuffer filter; // Heap-allocated for long path support
+    char* s;
     GetItemText(0, 0, file1, file1.Size());
     SalamanderGeneral->SalPathRemoveExtension(file1);
     BOOL allSame = TRUE;
