@@ -1643,9 +1643,9 @@ BOOL CFileHistoryItem::Execute()
         break;
     case fhitOpen:
     {
-        char buff[MAX_PATH];
-        lstrcpy(buff, FileName);
-        char* ptr = strrchr(buff, '\\');
+        CPathBuffer buff; // Heap-allocated for long path support
+        lstrcpyn(buff, FileName, buff.Size());
+        char* ptr = strrchr(buff.Get(), '\\');
         if (ptr != NULL)
         {
             *ptr = 0; // split the path into the path part and the file name
