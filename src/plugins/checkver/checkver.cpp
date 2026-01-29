@@ -164,7 +164,7 @@ CPluginInterfaceAbstract* WINAPI SalamanderPluginEntry(CSalamanderPluginEntryAbs
 
     // obtain the Salamander version
     int index = 0;
-    char salModule[MAX_PATH];
+    CPathBuffer salModule; // Heap-allocated for long path support
     SalGeneral->EnumInstalledModules(&index, salModule, SalamanderTextVersion);
 
     // find out whether the user disabled saving the configuration on exit, in that case
