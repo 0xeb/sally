@@ -352,7 +352,7 @@ BOOL CFTPListingPluginDataInterface::GetInfoLineContent(int panel, const CFileDa
                 int fileNameFormat;
                 SalamanderGeneral->GetConfigParameter(SALCFG_FILENAMEFORMAT, &fileNameFormat,
                                                       sizeof(fileNameFormat), NULL);
-                char formatedFileName[MAX_PATH]; // CFileData::Name is limited to MAX_PATH-5 characters
+                CPathBuffer formatedFileName; // Heap-allocated for long path support
                 SalamanderGeneral->AlterFileName(formatedFileName, file->Name, fileNameFormat, 0, isDir);
 
                 beg = s;
@@ -814,7 +814,7 @@ CFTPQueueItem* CreateItemForCopyOrMoveOperation(const CFileData* f, BOOL isDir, 
 
     char *name, *ext;               // helper variables for auto-detect transfer mode
     BOOL asciiTransferMode = FALSE; // helper variable for auto-detect transfer mode
-    char buffer[MAX_PATH];          // helper variable for auto-detect transfer mode
+    CPathBuffer buffer;             // Heap-allocated for long path support
     BOOL isLink = rightsCol != -1 && IsUNIXLink(dataIface->GetStringFromColumn(*f, rightsCol));
     if (isLink || !isDir) // when 'asciiTransferMode' is used, calculate it
     {
@@ -1103,7 +1103,7 @@ BOOL CPluginFSInterface::CopyOrMoveFromFS(BOOL copy, int mode, const char* fsNam
                                     }
                                     else
                                     {
-                                        char mbrName[MAX_PATH];
+                                        CPathBuffer mbrName; // Heap-allocated for long path support
                                         FTPAS400CutFileNamePart(mbrName, f->Name);
                                         if (donotUseOpMask)
                                             lstrcpyn(targetName, mbrName, 2 * MAX_PATH); // masks trim '.' from name ends, which is not always OK (e.g. directories "a.b" and "a.b." would merge) - probably rare, so for now we solve it only provisionally like this

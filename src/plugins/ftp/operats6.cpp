@@ -1465,14 +1465,14 @@ BOOL CFTPWorker::ParseListingToFTPQueue(TIndirectArray<CFTPQueueItem>* ftpQueueI
 
                 // variables for Copy and Move operations
                 CQuadWord size(-1, -1); // variable for the current file size
-                char targetPath[MAX_PATH];
+                CPathBuffer targetPath; // Heap-allocated for long path support
                 if (CurItem->Type == fqitCopyExploreDir ||
                     CurItem->Type == fqitMoveExploreDir ||
                     CurItem->Type == fqitMoveExploreDirLink)
                 {
                     CFTPQueueItemCopyMoveExplore* cmItem = (CFTPQueueItemCopyMoveExplore*)CurItem;
-                    lstrcpyn(targetPath, cmItem->TgtPath, MAX_PATH);
-                    SalamanderGeneral->SalPathAppend(targetPath, cmItem->TgtName, MAX_PATH); // must succeed, the directory already exists on disk and its full name is at most PATH_MAX_PATH-1 characters
+                    lstrcpyn(targetPath, cmItem->TgtPath, targetPath.Size());
+                    SalamanderGeneral->SalPathAppend(targetPath, cmItem->TgtName, targetPath.Size()); // must succeed, the directory already exists on disk and its full name is at most PATH_MAX_PATH-1 characters
                 }
                 else
                     targetPath[0] = 0;
@@ -1508,7 +1508,7 @@ BOOL CFTPWorker::ParseListingToFTPQueue(TIndirectArray<CFTPQueueItem>* ftpQueueI
                         case fqitMoveExploreDir:     // explore a directory for moving (deletes the directory after completion) (object of class CFTPQueueItemCopyMoveExplore)
                         case fqitMoveExploreDirLink: // explore a link to a directory for moving (deletes the directory link after completion) (object of class CFTPQueueItemCopyMoveExplore)
                         {
-                            char mbrName[MAX_PATH];
+                            CPathBuffer mbrName; // Heap-allocated for long path support
                             char* tgtName = file.Name;
                             if (is_AS_400_QSYS_LIB_Path)
                             {

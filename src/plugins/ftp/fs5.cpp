@@ -380,8 +380,8 @@ void CPluginFSInterface::ViewFile(const char* fsName, HWND parent,
     // obtain the name of the file copy in the disk cache
     BOOL fileExists;
     const char* tmpFileName;
-    char nameInCache[MAX_PATH];
-    lstrcpyn(nameInCache, file.Name, MAX_PATH);
+    CPathBuffer nameInCache; // Heap-allocated for long path support
+    lstrcpyn(nameInCache, file.Name, nameInCache.Size());
     if (GetFTPServerPathType(Path) == ftpsptOpenVMS)
         FTPVMSCutFileVersion(nameInCache, -1);
     SalamanderGeneral->SalMakeValidFileNameComponent(nameInCache);
@@ -419,8 +419,8 @@ void CPluginFSInterface::ViewFile(const char* fsName, HWND parent,
             dataIface = NULL; // we only care about data iface objects of type CFTPListingPluginDataInterface
 
         BOOL asciiMode = FALSE;
-        char *name, *ext;      // helper variables for auto-detect-transfer-mode
-        char buffer[MAX_PATH]; // helper variable for auto-detect-transfer-mode
+        char *name, *ext;   // helper variables for auto-detect-transfer-mode
+        CPathBuffer buffer; // Heap-allocated for long path support
         if (TransferMode == trmAutodetect)
         {
             if (dataIface != NULL) // on VMS we must have the name trimmed to the base (the version number would break mask comparison)
@@ -657,10 +657,10 @@ CFTPQueueItem* CreateItemForCopyOrMoveUploadOperation(const char* name, BOOL isD
         BOOL asciiTransferMode;
         if (transferMode == trmAutodetect)
         {
-            char buffer[MAX_PATH];
+            CPathBuffer buffer; // Heap-allocated for long path support
             if (isVMS) // on VMS we must have the name trimmed to the base (the version number would break mask comparison)
             {
-                lstrcpyn(buffer, name, MAX_PATH);
+                lstrcpyn(buffer, name, buffer.Size());
                 FTPVMSCutFileVersion(buffer, -1);
                 name = buffer;
             }
@@ -822,8 +822,8 @@ BOOL CPluginFSInterface::CopyOrMoveFromDiskToFS(BOOL copy, int mode, const char*
         }
 
         char tgtPath[FTP_MAX_PATH];
-        char mask[MAX_PATH];
-        strcpy(mask, "*");
+        CPathBuffer mask; // Heap-allocated for long path support
+        lstrcpyn(mask, "*", mask.Size());
         if (path != NULL)
         {
             BOOL isSpecRootPath = FALSE;
@@ -895,27 +895,27 @@ BOOL CPluginFSInterface::CopyOrMoveFromDiskToFS(BOOL copy, int mode, const char*
                 {
                     char cutTgtPath[FTP_MAX_PATH];
                     lstrcpyn(cutTgtPath, tgtPath, FTP_MAX_PATH);
-                    char cutMask[MAX_PATH];
+                    CPathBuffer cutMask; // Heap-allocated for long path support
                     BOOL cutMaybeFileName = FALSE;
-                    if (FTPCutDirectory(pathType, cutTgtPath, FTP_MAX_PATH, cutMask, MAX_PATH, &cutMaybeFileName))
+                    if (FTPCutDirectory(pathType, cutTgtPath, FTP_MAX_PATH, cutMask, cutMask.Size(), &cutMaybeFileName))
                     { // if a part of the path can be trimmed, we will determine whether it is a mask (otherwise it is probably a root path, use the "*" mask)
                         char cutTgtPathIBMz_VM[FTP_MAX_PATH];
                         cutTgtPathIBMz_VM[0] = 0;
-                        char cutMaskIBMz_VM[MAX_PATH];
+                        CPathBuffer cutMaskIBMz_VM; // Heap-allocated for long path support
                         cutMaskIBMz_VM[0] = 0;
                         BOOL done = FALSE;
                         if (pathType == ftpsptIBMz_VM)
                         {
                             lstrcpyn(cutTgtPathIBMz_VM, tgtPath, FTP_MAX_PATH);
-                            if (FTPIBMz_VmCutTwoDirectories(cutTgtPathIBMz_VM, FTP_MAX_PATH, cutMaskIBMz_VM, MAX_PATH))
+                            if (FTPIBMz_VmCutTwoDirectories(cutTgtPathIBMz_VM, FTP_MAX_PATH, cutMaskIBMz_VM, cutMaskIBMz_VM.Size()))
                             {
-                                char* sep = strchr(cutMaskIBMz_VM, '.');
-                                char* ast = strchr(cutMaskIBMz_VM, '*');
-                                char* exc = strchr(cutMaskIBMz_VM, '?');
+                                char* sep = strchr(cutMaskIBMz_VM.Get(), '.');
+                                char* ast = strchr(cutMaskIBMz_VM.Get(), '*');
+                                char* exc = strchr(cutMaskIBMz_VM.Get(), '?');
                                 if (ast != NULL && ast < sep || exc != NULL && exc < sep)
                                 { // the trimmed part contains '*' or '?' (wildcards) before '.' (definitely a file mask such as "*.*")
                                     lstrcpyn(tgtPath, cutTgtPathIBMz_VM, FTP_MAX_PATH);
-                                    lstrcpyn(mask, cutMaskIBMz_VM, MAX_PATH);
+                                    lstrcpyn(mask, cutMaskIBMz_VM, mask.Size());
                                     done = TRUE;
                                 }
                             }
@@ -928,11 +928,11 @@ BOOL CPluginFSInterface::CopyOrMoveFromDiskToFS(BOOL copy, int mode, const char*
                         if (!done)
                         {
                             if (cutTgtPathIBMz_VM[0] == 0 && // we need to test whether 'cutMaskIBMz_VM' contains a mask
-                                    (strchr(cutMask, '*') != NULL || strchr(cutMask, '?') != NULL) ||
+                                    (strchr(cutMask.Get(), '*') != NULL || strchr(cutMask.Get(), '?') != NULL) ||
                                 pathType == ftpsptOpenVMS && cutMaybeFileName)
                             { // the trimmed part contains '*' or '?' (wildcards) or it is a VMS file name (must be a mask, the target path is the path to that file)
                                 lstrcpyn(tgtPath, cutTgtPath, FTP_MAX_PATH);
-                                lstrcpyn(mask, cutMask, MAX_PATH);
+                                lstrcpyn(mask, cutMask, mask.Size());
                             }
                             else
                             {
@@ -941,7 +941,7 @@ BOOL CPluginFSInterface::CopyOrMoveFromDiskToFS(BOOL copy, int mode, const char*
                                 BOOL notInPanel = !SalamanderGeneral->GetPanelWithPluginFS(this, panel);
                                 BOOL success = FALSE;
                                 char replyBuf[700];
-                                if (strchr(cutMask, '*') != NULL || strchr(cutMask, '?') != NULL ||
+                                if (strchr(cutMask.Get(), '*') != NULL || strchr(cutMask.Get(), '?') != NULL ||
                                     ControlConnection->SendChangeWorkingPath(notInPanel, panel == PANEL_LEFT,
                                                                              SalamanderGeneral->GetMsgBoxParent(),
                                                                              tgtPath, User, USER_MAX_SIZE,
@@ -959,7 +959,7 @@ BOOL CPluginFSInterface::CopyOrMoveFromDiskToFS(BOOL copy, int mode, const char*
                                             if (success) // 'cutTgtPath' is a valid path - the mask is 'cutMask'
                                             {
                                                 lstrcpyn(tgtPath, cutTgtPath, FTP_MAX_PATH);
-                                                lstrcpyn(mask, cutMask, MAX_PATH);
+                                                lstrcpyn(mask, cutMask, mask.Size());
                                             }
                                             else // otherwise continue
                                             {
@@ -974,7 +974,7 @@ BOOL CPluginFSInterface::CopyOrMoveFromDiskToFS(BOOL copy, int mode, const char*
                                                         if (success) // 'cutTgtPathIBMz_VM' is a valid path - the mask is 'cutMaskIBMz_VM'
                                                         {
                                                             lstrcpyn(tgtPath, cutTgtPathIBMz_VM, FTP_MAX_PATH);
-                                                            lstrcpyn(mask, cutMaskIBMz_VM, MAX_PATH);
+                                                            lstrcpyn(mask, cutMaskIBMz_VM, mask.Size());
                                                             done = TRUE;
                                                         }
                                                     }
@@ -1110,11 +1110,11 @@ BOOL CPluginFSInterface::CopyOrMoveFromDiskToFS(BOOL copy, int mode, const char*
                             const char* dosName; // dummy
                             CQuadWord size;
                             DWORD attr; // dummy
-                            BOOL useMask = strchr(mask, '*') != NULL || strchr(mask, '?') != NULL;
-                            char linkName[MAX_PATH];
-                            lstrcpyn(linkName, sourcePath, _countof(linkName));
-                            SalamanderGeneral->SalPathAddBackslash(linkName, _countof(linkName));
-                            char* linkNameEnd = linkName + strlen(linkName);
+                            BOOL useMask = strchr(mask.Get(), '*') != NULL || strchr(mask.Get(), '?') != NULL;
+                            CPathBuffer linkName; // Heap-allocated for long path support
+                            lstrcpyn(linkName, sourcePath, linkName.Size());
+                            SalamanderGeneral->SalPathAddBackslash(linkName, linkName.Size());
+                            char* linkNameEnd = linkName.Get() + strlen(linkName);
                             BOOL ignoreAll = FALSE;
                             while ((name = next(parent, 0, &dosName, &isDir, &size, &attr, NULL, nextParam, NULL)) != NULL)
                             {
@@ -1131,7 +1131,7 @@ BOOL CPluginFSInterface::CopyOrMoveFromDiskToFS(BOOL copy, int mode, const char*
                                 // links: size == 0, the file size must be obtained via GetLinkTgtFileSize() later
                                 BOOL cancel = FALSE;
                                 if (!isDir && (attr & FILE_ATTRIBUTE_REPARSE_POINT) != 0 &&
-                                    linkNameEnd - linkName + strlen(name) < _countof(linkName))
+                                    linkNameEnd - linkName.Get() + strlen(name) < (size_t)linkName.Size())
                                 { // this is a link to a file and the link name is not too long (otherwise reported elsewhere)
                                     CQuadWord linkSize;
                                     strcpy(linkNameEnd, name);

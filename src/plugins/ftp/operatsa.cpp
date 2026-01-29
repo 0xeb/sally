@@ -805,11 +805,11 @@ void CFTPWorker::HandleEventInWorkingState4(CFTPWorkerEvent event, BOOL& sendQui
                         int transferMode = Oper->GetTransferMode();
                         BOOL copy = CurItem->Type == fqitUploadCopyExploreDir;
                         CQuadWord totalSize(0, 0); // total size (in bytes)
-                        char sourcePath[MAX_PATH];
-                        lstrcpyn(sourcePath, CurItem->Path, MAX_PATH);
+                        CPathBuffer sourcePath; // Heap-allocated for long path support
+                        lstrcpyn(sourcePath, CurItem->Path, sourcePath.Size());
 
                         BOOL err = ftpQueueItems == NULL || !HaveWorkingPath || DiskWork.DiskListing == NULL ||
-                                   !SalamanderGeneral->SalPathAppend(sourcePath, CurItem->Name, MAX_PATH) /* always true - an error would already have been reported by DoListDirectory() */;
+                                   !SalamanderGeneral->SalPathAppend(sourcePath, CurItem->Name, sourcePath.Size()) /* always true - an error would already have been reported by DoListDirectory() */;
                         if (!err) // add queue items for files/directories from the listing
                         {
                             BOOL ok = TRUE;
