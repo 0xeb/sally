@@ -2737,7 +2737,7 @@ void CFilesWindow::UpdateDriveIcon(BOOL check)
             if (DirectoryLine->HWindow != NULL)
             {
                 UINT type = MyGetDriveType(GetPath());
-                char root[MAX_PATH];
+                CPathBuffer root;  // Heap-allocated for long path support (UNC roots can exceed MAX_PATH)
                 GetRootPath(root, GetPath());
                 HICON hIcon = GetDriveIcon(root, type, TRUE);
                 DirectoryLine->SetDriveIcon(hIcon);

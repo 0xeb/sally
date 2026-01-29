@@ -755,10 +755,10 @@ void CFilesWindow::ConnectNet(BOOL readOnlyUNC, const char* netRootPath, BOOL ch
         cs.hwndOwner = HWindow;
         NETRESOURCE nr;
         memset(&nr, 0, sizeof(nr));
-        char root[MAX_PATH];
+        CPathBuffer root;  // Heap-allocated for long path support (UNC roots can exceed MAX_PATH)
         GetRootPath(root, netPath);
         root[strlen(root) - 1] = 0;
-        nr.lpRemoteName = root;
+        nr.lpRemoteName = root.Get();
         nr.dwType = RESOURCETYPE_DISK;
         cs.lpConnRes = &nr;
         cs.dwFlags = readOnlyUNC ? CONNDLG_RO_PATH : CONNDLG_USE_MRU;

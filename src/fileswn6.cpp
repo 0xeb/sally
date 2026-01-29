@@ -536,8 +536,8 @@ BOOL CFilesWindow::BuildScriptMain2(COperations* script, BOOL copy, char* target
     ErrTooBigFileFAT32SkipAll = FALSE;
     ErrGetFileSizeOfLnkTgtIgnAll = FALSE;
 
-    char root[MAX_PATH];
-    char fsName[MAX_PATH];
+    CPathBuffer root;  // Heap-allocated for long path support (UNC roots can exceed MAX_PATH)
+    char fsName[MAX_PATH];  // Filesystem names are short (NTFS, FAT32, etc.)
     DWORD dummy, flags;
 
     //---  initialize the build interruption test
@@ -1170,8 +1170,8 @@ BOOL CFilesWindow::BuildScriptMain(COperations* script, CActionType type,
     ErrTooBigFileFAT32SkipAll = FALSE;
     ErrGetFileSizeOfLnkTgtIgnAll = FALSE;
 
-    char root[MAX_PATH];
-    char fsName[MAX_PATH];
+    CPathBuffer root;  // Heap-allocated for long path support (UNC roots can exceed MAX_PATH)
+    char fsName[MAX_PATH];  // Filesystem names are short (NTFS, FAT32, etc.)
 
     //---  initialize the build interruption test
     LastTickCount = GetTickCount();

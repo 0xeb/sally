@@ -1416,7 +1416,7 @@ void CFilesWindow::Pack(CFilesWindow* target, int pluginIndex, const char* plugi
         if (end > GetPath() && *(end - 1) == '\\')
             end--;
         const char* dir = end;
-        char root[MAX_PATH];
+        CPathBuffer root;  // Heap-allocated for long path support (UNC roots can exceed MAX_PATH)
         GetRootPath(root, GetPath());
         const char* min = GetPath() + strlen(root);
         while (dir > min && *(dir - 1) != '\\')

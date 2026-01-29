@@ -2155,7 +2155,7 @@ void CFilesWindow::GotoRoot()
     CALL_STACK_MESSAGE1("CFilesWindow::GotoRoot()");
     TopIndexMem.Clear(); // long jump
 
-    char root[MAX_PATH];
+    CPathBuffer root;  // Heap-allocated for long path support (UNC roots can exceed MAX_PATH)
     if (Is(ptDisk) || Is(ptZIPArchive))
     {
         if (Is(ptZIPArchive) && GetZIPPath()[0] != 0) // we are not in the root of the archive -> go there
