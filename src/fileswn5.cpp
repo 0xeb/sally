@@ -207,12 +207,12 @@ void CFilesWindow::ChangeAttr(BOOL setCompress, BOOL compressed, BOOL setEncrypt
     BeginStopRefresh(); // snooper takes a break
 
     // if no item is selected, select the one under focus and store its name
-    char temporarySelected[MAX_PATH];
+    CPathBuffer temporarySelected; // Heap-allocated for long path support
     temporarySelected[0] = 0;
     if ((!setCompress || Configuration.CnfrmNTFSPress) &&
         (!setEncryption || Configuration.CnfrmNTFSCrypt))
     {
-        SelectFocusedItemAndGetName(temporarySelected, MAX_PATH);
+        SelectFocusedItemAndGetName(temporarySelected, temporarySelected.Size());
     }
 
     if (Is(ptDisk))
@@ -351,7 +351,7 @@ void CFilesWindow::ChangeAttr(BOOL setCompress, BOOL compressed, BOOL setEncrypt
                     char subject[MAX_PATH + 100];
                     char expanded[200];
                     int count = GetSelCount();
-                    char path[MAX_PATH];
+                    CPathBuffer path; // Heap-allocated for long path support
                     if (count > 1)
                     {
                         int totalCount = Dirs->Count + Files->Count;
@@ -403,7 +403,7 @@ void CFilesWindow::ChangeAttr(BOOL setCompress, BOOL compressed, BOOL setEncrypt
                     }
                     sprintf(subject, LoadStr(resTextID), expanded);
                     CTruncatedString str;
-                    str.Set(subject, count > 1 ? NULL : path);
+                    str.Set(subject, count > 1 ? NULL : path.Get());
                     CMessageBox msgBox(HWindow, MSGBOXEX_YESNO | MSGBOXEX_ESCAPEENABLED | MSGBOXEX_ICONQUESTION | MSGBOXEX_SILENT,
                                        LoadStr(resTitleID), &str, NULL, NULL, NULL, 0, NULL, NULL, NULL, NULL);
                     if (msgBox.Execute() != IDYES)
@@ -770,7 +770,7 @@ void CFilesWindow::ViewFile(char* name, BOOL altView, DWORD handlerID, int enumF
                     strcat(dcFileName, f->Name);
 
                     // setting disk-cache for the plugin (standard values change only for the plugin)
-                    char arcCacheTmpPath[MAX_PATH];
+                    CPathBuffer arcCacheTmpPath; // Heap-allocated for long path support
                     arcCacheTmpPath[0] = 0;
                     BOOL arcCacheOwnDelete = FALSE;
                     CPluginInterfaceAbstract* plugin = NULL; // != NULL if the plugin handles its own deletion
@@ -814,17 +814,17 @@ void CFilesWindow::ViewFile(char* name, BOOL altView, DWORD handlerID, int enumF
 
                     BOOL exists;
                     int errorCode;
-                    char validTmpName[MAX_PATH];
+                    CPathBuffer validTmpName; // Heap-allocated for long path support
                     validTmpName[0] = 0;
                     if (!SalIsValidFileNameComponent(f->Name))
                     {
-                        lstrcpyn(validTmpName, f->Name, MAX_PATH);
+                        lstrcpyn(validTmpName, f->Name, validTmpName.Size());
                         SalMakeValidFileNameComponent(validTmpName);
                     }
                     name = (char*)DiskCache.GetName(dcFileName,
-                                                    validTmpName[0] != 0 ? validTmpName : f->Name,
+                                                    validTmpName[0] != 0 ? validTmpName.Get() : f->Name,
                                                     &exists, FALSE,
-                                                    arcCacheTmpPath[0] != 0 ? arcCacheTmpPath : NULL,
+                                                    arcCacheTmpPath[0] != 0 ? arcCacheTmpPath.Get() : NULL,
                                                     plugin != NULL, plugin, &errorCode);
                     if (name == NULL)
                     {
@@ -836,15 +836,15 @@ void CFilesWindow::ViewFile(char* name, BOOL altView, DWORD handlerID, int enumF
                     if (!exists) // we must unpack it
                     {
                         char* backSlash = strrchr(name, '\\');
-                        char tmpPath[MAX_PATH];
-                        memcpy(tmpPath, name, backSlash - name);
+                        CPathBuffer tmpPath; // Heap-allocated for long path support
+                        memcpy(tmpPath.Get(), name, backSlash - name);
                         tmpPath[backSlash - name] = 0;
                         BeginStopRefresh(); // snooper takes a break
                         SetThreadPriority(GetCurrentThread(), THREAD_PRIORITY_NORMAL);
                         HCURSOR oldCur = SetCursor(LoadCursor(NULL, IDC_WAIT));
                         BOOL renamingNotSupported = FALSE;
                         if (PackUnpackOneFile(this, GetZIPArchive(), PluginData.GetInterface(), nameInArchive, f, tmpPath,
-                                              validTmpName[0] == 0 ? NULL : validTmpName,
+                                              validTmpName[0] == 0 ? NULL : validTmpName.Get(),
                                               validTmpName[0] == 0 ? NULL : &renamingNotSupported))
                         {
                             SetCursor(oldCur);
@@ -932,8 +932,8 @@ BOOL ViewFileInt(HWND parent, const char* name, BOOL altView, DWORD handlerID, B
     lockOwner = FALSE;
 
     // obtain the full DOS name
-    char dosName[MAX_PATH];
-    if (GetShortPathName(name, dosName, MAX_PATH) == 0)
+    CPathBuffer dosName; // Heap-allocated for long path support
+    if (GetShortPathName(name, dosName, dosName.Size()) == 0)
     {
         TRACE_E("GetShortPathName() failed");
         dosName[0] = 0;
@@ -1035,12 +1035,12 @@ BOOL ViewFileInt(HWND parent, const char* name, BOOL altView, DWORD handlerID, B
         {
         case VIEWER_EXTERNAL:
         {
-            char expCommand[MAX_PATH];
-            char expArguments[MAX_PATH];
-            char expInitDir[MAX_PATH];
-            if (ExpandCommand(parent, viewer->Command, expCommand, MAX_PATH, FALSE) &&
-                ExpandArguments(parent, name, dosName, viewer->Arguments, expArguments, MAX_PATH, NULL) &&
-                ExpandInitDir(parent, name, dosName, viewer->InitDir, expInitDir, MAX_PATH, FALSE))
+            CPathBuffer expCommand; // Heap-allocated for long path support
+            CPathBuffer expArguments; // Heap-allocated for long path support
+            CPathBuffer expInitDir; // Heap-allocated for long path support
+            if (ExpandCommand(parent, viewer->Command, expCommand, expCommand.Size(), FALSE) &&
+                ExpandArguments(parent, name, dosName, viewer->Arguments, expArguments, expArguments.Size(), NULL) &&
+                ExpandInitDir(parent, name, dosName, viewer->InitDir, expInitDir, expInitDir.Size(), FALSE))
             {
                 if (SystemPolicies.GetMyRunRestricted() &&
                     !SystemPolicies.GetMyCanRun(expCommand))
@@ -1084,7 +1084,7 @@ BOOL ViewFileInt(HWND parent, const char* name, BOOL altView, DWORD handlerID, B
                     {
                         DWORD err = GetLastError();
                         char buff[4 * MAX_PATH];
-                        sprintf(buff, LoadStr(IDS_ERROREXECVIEW), expCommand, GetErrorText(err));
+                        sprintf(buff, LoadStr(IDS_ERROREXECVIEW), expCommand.Get(), GetErrorText(err));
                         if (gPrompter != NULL)
                             ShowErrorViaPrompter(LoadStrW(IDS_ERRORTITLE), AnsiToWide(buff).c_str());
                     }
@@ -1276,8 +1276,8 @@ void CFilesWindow::EditFile(char* name, DWORD handlerID)
     }
 
     // obtain the full DOS name
-    char dosName[MAX_PATH];
-    if (GetShortPathName(name, dosName, MAX_PATH) == 0)
+    CPathBuffer dosName; // Heap-allocated for long path support
+    if (GetShortPathName(name, dosName, dosName.Size()) == 0)
     {
         TRACE_I("GetShortPathName() failed.");
         dosName[0] = 0;
@@ -1355,12 +1355,12 @@ void CFilesWindow::EditFile(char* name, DWORD handlerID)
         if (addToHistory)
             MainWindow->FileHistory->AddFile(fhitEdit, editor->HandlerID, name); // add file to history
 
-        char expCommand[MAX_PATH];
-        char expArguments[MAX_PATH];
-        char expInitDir[MAX_PATH];
-        if (ExpandCommand(HWindow, editor->Command, expCommand, MAX_PATH, FALSE) &&
-            ExpandArguments(HWindow, name, dosName, editor->Arguments, expArguments, MAX_PATH, NULL) &&
-            ExpandInitDir(HWindow, name, dosName, editor->InitDir, expInitDir, MAX_PATH, FALSE))
+        CPathBuffer expCommand; // Heap-allocated for long path support
+        CPathBuffer expArguments; // Heap-allocated for long path support
+        CPathBuffer expInitDir; // Heap-allocated for long path support
+        if (ExpandCommand(HWindow, editor->Command, expCommand, expCommand.Size(), FALSE) &&
+            ExpandArguments(HWindow, name, dosName, editor->Arguments, expArguments, expArguments.Size(), NULL) &&
+            ExpandInitDir(HWindow, name, dosName, editor->InitDir, expInitDir, expInitDir.Size(), FALSE))
         {
             if (SystemPolicies.GetMyRunRestricted() &&
                 !SystemPolicies.GetMyCanRun(expCommand))
@@ -1404,7 +1404,7 @@ void CFilesWindow::EditFile(char* name, DWORD handlerID)
                 {
                     DWORD err = GetLastError();
                     char buff[4 * MAX_PATH];
-                    sprintf(buff, LoadStr(IDS_ERROREXECEDIT), expCommand, GetErrorText(err));
+                    sprintf(buff, LoadStr(IDS_ERROREXECEDIT), expCommand.Get(), GetErrorText(err));
                     if (gPrompter != NULL)
                         ShowErrorViaPrompter(LoadStrW(IDS_ERRORTITLE), AnsiToWide(buff).c_str());
                 }
@@ -1417,7 +1417,7 @@ void CFilesWindow::EditFile(char* name, DWORD handlerID)
             else
             {
                 char buff[4 * MAX_PATH];
-                sprintf(buff, LoadStr(IDS_ERROREXECEDIT), expCommand, LoadStr(IDS_TOOLONGNAME));
+                sprintf(buff, LoadStr(IDS_ERROREXECEDIT), expCommand.Get(), LoadStr(IDS_TOOLONGNAME));
                 if (gPrompter != NULL)
                     ShowErrorViaPrompter(LoadStrW(IDS_ERRORTITLE), AnsiToWide(buff).c_str());
             }
@@ -1440,11 +1440,11 @@ void CFilesWindow::EditNewFile()
     // restore DefaultDir
     MainWindow->UpdateDefaultDir(TRUE);
 
-    char path[MAX_PATH];
+    CPathBuffer path; // Heap-allocated for long path support
     if (Configuration.UseEditNewFileDefault)
-        lstrcpyn(path, Configuration.EditNewFileDefault, MAX_PATH);
+        lstrcpyn(path, Configuration.EditNewFileDefault, path.Size());
     else
-        lstrcpyn(path, LoadStr(IDS_EDITNEWFILE_DEFAULTNAME), MAX_PATH);
+        lstrcpyn(path, LoadStr(IDS_EDITNEWFILE_DEFAULTNAME), path.Size());
     CTruncatedString subject;
     subject.Set(LoadStr(IDS_NEWFILENAME), NULL);
 
@@ -1452,7 +1452,7 @@ void CFilesWindow::EditNewFile()
 
     while (1)
     {
-        CEditNewFileDialog dlg(HWindow, path, MAX_PATH, &subject, Configuration.EditNewHistory, EDITNEW_HISTORY_SIZE);
+        CEditNewFileDialog dlg(HWindow, path, path.Size(), &subject, Configuration.EditNewHistory, EDITNEW_HISTORY_SIZE);
 
         // Some users always create .txt and are satisfied with overwriting just the extension; others create various files and want to overwrite the whole name,
         // so we compromised and introduced a dedicated option for Edit New File in the configuration.
@@ -1493,7 +1493,7 @@ void CFilesWindow::EditNewFile()
             //                         MainWindow->GetActivePanel()->GetPath() : NULL, NextFocusName))
             if (SalGetFullName(path, &errTextID, Is(ptDisk) ? GetPath() : NULL, NextFocusName)) // for consistency with ChangePathToDisk()
             {
-                char checkPath[MAX_PATH];
+                CPathBuffer checkPath; // Heap-allocated for long path support
                 strcpy(checkPath, path);
                 CutDirectory(checkPath);
                 if (CheckPath(TRUE, checkPath) != ERROR_SUCCESS)
@@ -1961,13 +1961,13 @@ void CFilesWindow::CreateDir(CFilesWindow* target)
             }
             else
             {
-                char checkPath[MAX_PATH];
+                CPathBuffer checkPath; // Heap-allocated for long path support
                 GetRootPath(checkPath, path);
                 if (CheckPath(TRUE, checkPath) != ERROR_SUCCESS)
                     goto CREATE_AGAIN;
                 strcpy(checkPath, path);
                 CutDirectory(checkPath);
-                char newDir[MAX_PATH];
+                CPathBuffer newDir; // Heap-allocated for long path support
                 if (!CheckAndCreateDirectory(checkPath, HWindow, FALSE, NULL, 0, newDir, TRUE, TRUE))
                     goto CREATE_AGAIN;
                 if (newDir[0] != 0)
@@ -2091,20 +2091,20 @@ void CFilesWindow::RenameFileInternal(CFileData* f, const char* formatedFileName
             *tryAgain = FALSE;
             return;
         }
-        char tgtPath[MAX_PATH];
-        memmove(tgtPath, GetPath(), l);
+        CPathBuffer tgtPath; // Heap-allocated for long path support
+        memmove(tgtPath.Get(), GetPath(), l);
         if (GetPath()[l - 1] != '\\')
             tgtPath[l++] = '\\';
-        if (strlen(finalName) + l < MAX_PATH && (f->NameLen + l < MAX_PATH ||
-                                                 f->DosName != NULL && strlen(f->DosName) + l < MAX_PATH))
+        if (strlen(finalName) + l < tgtPath.Size() && (f->NameLen + l < tgtPath.Size() ||
+                                                 f->DosName != NULL && strlen(f->DosName) + l < tgtPath.Size()))
         {
             strcpy(tgtPath + l, finalName);
-            char path[MAX_PATH];
+            CPathBuffer path; // Heap-allocated for long path support
             strcpy(path, GetPath());
             char* end = path + l;
             if (*(end - 1) != '\\')
                 *--end = '\\';
-            if (f->NameLen + l < MAX_PATH)
+            if (f->NameLen + l < (int)path.Size())
                 strcpy(path + l, f->Name);
             else
                 strcpy(path + l, f->DosName);
@@ -2174,7 +2174,7 @@ void CFilesWindow::RenameFileInternal(CFileData* f, const char* formatedFileName
                             CutDirectory(tmpName);
                             SalPathAddBackslash(tmpName, MAX_PATH + 20);
                             char* tmpNamePart = tmpName + strlen(tmpName);
-                            char origFullName[MAX_PATH];
+                            CPathBuffer origFullName; // Heap-allocated for long path support
                             if (SalPathAppend(tmpName, data.cFileName, MAX_PATH))
                             {
                                 strcpy(origFullName, tmpName);
@@ -2426,14 +2426,14 @@ void CFilesWindow::RenameFile(int specialIndex)
     f = isDir ? &Dirs->At(i) : &Files->At(i - Dirs->Count);
 
     BOOL useUnicode = f->UseWideName();
-    char formatedFileName[MAX_PATH];
+    CPathBuffer formatedFileName; // Heap-allocated for long path support
     AlterFileName(formatedFileName, f->Name, -1, Configuration.FileNameFormat, 0, isDir);
 
     char buff[200];
     sprintf(buff, LoadStr(IDS_RENAME_TO), LoadStr(isDir ? IDS_QUESTION_DIRECTORY : IDS_QUESTION_FILE));
     CTruncatedString subject;
-    subject.Set(buff, useUnicode ? "..." : formatedFileName);
-    CCopyMoveDialog dlg(HWindow, formatedFileName, MAX_PATH, LoadStr(IDS_RENAME_TITLE),
+    subject.Set(buff, useUnicode ? "..." : formatedFileName.Get());
+    CCopyMoveDialog dlg(HWindow, formatedFileName, formatedFileName.Size(), LoadStr(IDS_RENAME_TITLE),
                         &subject, IDD_RENAMEDIALOG, Configuration.QuickRenameHistory,
                         QUICKRENAME_HISTORY_SIZE, FALSE);
 
@@ -2464,8 +2464,8 @@ void CFilesWindow::RenameFile(int specialIndex)
         while (1)
         {
             // if no item is selected, select the one under focus and store its name
-            char temporarySelected[MAX_PATH];
-            SelectFocusedItemAndGetName(temporarySelected, MAX_PATH);
+            CPathBuffer temporarySelected; // Heap-allocated for long path support
+            SelectFocusedItemAndGetName(temporarySelected, temporarySelected.Size());
 
             // Since Windows Vista, Microsoft introduced a demanded feature: quick rename selects only the name without the dot and extension
             // the same code appears here four times
@@ -2547,13 +2547,13 @@ void CFilesWindow::RenameFile(int specialIndex)
             // lower the thread priority to "normal" (so operations don't overload the machine)
             SetThreadPriority(GetCurrentThread(), THREAD_PRIORITY_NORMAL);
 
-            char newName[MAX_PATH];
+            CPathBuffer newName; // Heap-allocated for long path support
             newName[0] = 0;
             BOOL cancel = FALSE;
 
             // if no item is selected, select the one under focus and store its name
-            char temporarySelected[MAX_PATH];
-            SelectFocusedItemAndGetName(temporarySelected, MAX_PATH);
+            CPathBuffer temporarySelected; // Heap-allocated for long path support
+            SelectFocusedItemAndGetName(temporarySelected, temporarySelected.Size());
 
             BOOL ret = GetPluginFS()->QuickRename(GetPluginFS()->GetPluginFSName(), 1, HWindow, *f, isDir, newName, cancel);
 
@@ -2568,7 +2568,7 @@ void CFilesWindow::RenameFile(int specialIndex)
                     {
                         // open the standard dialog
                         // if no item is selected, select the one under focus and store its name
-                        SelectFocusedItemAndGetName(temporarySelected, MAX_PATH);
+                        SelectFocusedItemAndGetName(temporarySelected, temporarySelected.Size());
 
                         // Since Windows Vista, Microsoft introduced a demanded feature: quick rename selects only the name without the dot and extension
                         // the same code appears here four times
@@ -2737,7 +2737,7 @@ void CFilesWindow::QuickRenameBegin(int index, const RECT* labelRect)
     BOOL isDir = index < Dirs->Count;
     f = isDir ? &Dirs->At(index) : &Files->At(index - Dirs->Count);
 
-    char formatedFileName[MAX_PATH];
+    CPathBuffer formatedFileName; // Heap-allocated for long path support
     AlterFileName(formatedFileName, f->Name, -1, Configuration.FileNameFormat, 0, isDir);
 
     // Since Windows Vista, Microsoft introduced a demanded feature: quick rename selects only the name without the dot and extension
@@ -2748,9 +2748,9 @@ void CFilesWindow::QuickRenameBegin(int index, const RECT* labelRect)
         if (!isDir)
         {
             const char* dot = strrchr(formatedFileName, '.');
-            if (dot != NULL && dot > formatedFileName) // although ".cvspass" is an extension in Windows, Explorer selects the entire name, so we do the same
+            if (dot != NULL && dot > formatedFileName.Get()) // although ".cvspass" is an extension in Windows, Explorer selects the entire name, so we do the same
                                                        //    if (dot != NULL)
-                selectionEnd = (int)(dot - formatedFileName);
+                selectionEnd = (int)(dot - formatedFileName.Get());
         }
     }
 
@@ -2764,13 +2764,13 @@ void CFilesWindow::QuickRenameBegin(int index, const RECT* labelRect)
         // lower the thread priority to "normal" (so operations don't overload the machine)
         SetThreadPriority(GetCurrentThread(), THREAD_PRIORITY_NORMAL);
 
-        char newName[MAX_PATH];
+        CPathBuffer newName; // Heap-allocated for long path support
         newName[0] = 0;
         BOOL cancel = FALSE;
 
         // if no item is selected, select the one under focus and store its name
-        char temporarySelected[MAX_PATH];
-        SelectFocusedItemAndGetName(temporarySelected, MAX_PATH);
+        CPathBuffer temporarySelected; // Heap-allocated for long path support
+        SelectFocusedItemAndGetName(temporarySelected, temporarySelected.Size());
 
         BOOL ret = GetPluginFS()->QuickRename(GetPluginFS()->GetPluginFSName(), 1, HWindow, *f, isDir, newName, cancel);
 
@@ -2865,8 +2865,8 @@ BOOL CFilesWindow::HandeQuickRenameWindowKey(WPARAM wParam)
     QuickRenameWindow.SetCloseEnabled(FALSE);
 
     HWND hWnd = QuickRenameWindow.HWindow;
-    char newName[MAX_PATH];
-    GetWindowText(hWnd, newName, MAX_PATH);
+    CPathBuffer newName; // Heap-allocated for long path support
+    GetWindowText(hWnd, newName, newName.Size());
 
     // lower the thread priority to "normal" (so operations don't overload the machine)
     SetThreadPriority(GetCurrentThread(), THREAD_PRIORITY_NORMAL);
