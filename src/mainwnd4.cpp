@@ -20,6 +20,7 @@
 #include "toolbar.h"
 #include "salinflt.h"
 #include "menu.h"
+#include "common/widepath.h"
 extern "C"
 {
 #include "shexreg.h"
@@ -87,7 +88,7 @@ void CMainWindow::DirHistoryRemoveActualPath(CFilesWindow* panel)
         {
             if (panel->Is(ptPluginFS))
             {
-                char curPath[MAX_PATH];
+                CPathBuffer curPath; // Heap-allocated for long path support
                 if (panel->GetPluginFS()->NotEmpty() && panel->GetPluginFS()->GetCurrentPath(curPath))
                 {
                     DirHistory->RemoveActualPath(2, panel->GetPluginFS()->GetPluginFSName(), curPath,
@@ -241,7 +242,7 @@ void CMainWindow::MakeFileList()
     CFileListDialog dlg(HWindow);
     if (dlg.Execute() == IDOK)
     {
-        char fileName[MAX_PATH];
+        CPathBuffer fileName; // Heap-allocated for long path support
 
         switch (Configuration.FileListDestination)
         {
@@ -492,10 +493,10 @@ BOOL ExpandCommand2(HWND parent,
                         cmdSize, initDirSize, path, longName);
 
     *fileNameUsed = FALSE;
-    char command[MAX_PATH];
-    if (ExpandCommand(parent, item->UMCommand, command, MAX_PATH, ignoreEnvVarNotFoundOrTooLong))
+    CPathBuffer command; // Heap-allocated for long path support
+    if (ExpandCommand(parent, item->UMCommand, command, command.Size(), ignoreEnvVarNotFoundOrTooLong))
     {
-        char fileName[MAX_PATH];
+        CPathBuffer fileName; // Heap-allocated for long path support
         if (path[0] != 0)
         {
             int l = (int)strlen(path);
@@ -503,17 +504,17 @@ BOOL ExpandCommand2(HWND parent,
                 l--;
             memcpy(fileName, path, l);
 
-            char dosName[MAX_PATH];
+            CPathBuffer dosName; // Heap-allocated for long path support
             if (longName[0] != 0)
             {
-                if (l + 1 + lstrlen(longName) > MAX_PATH - 1)
+                if (l + 1 + lstrlen(longName) > fileName.Size() - 1)
                 {
                     gPrompter->ShowError(LoadStrW(IDS_ERRORTITLE), LoadStrW(IDS_TOOLONGNAME));
                     goto EXIT;
                 }
                 fileName[l++] = '\\';
                 strcpy(fileName + l, longName);
-                if (GetShortPathName(fileName, dosName, MAX_PATH) == 0)
+                if (GetShortPathName(fileName, dosName, dosName.Size()) == 0)
                 {
                     TRACE_E("GetShortPathName() failed");
                     dosName[0] = 0;
@@ -526,7 +527,7 @@ BOOL ExpandCommand2(HWND parent,
                     fileName[l++] = '\\';
                 }
                 fileName[l] = 0;
-                if (GetShortPathName(fileName, dosName, MAX_PATH) == 0)
+                if (GetShortPathName(fileName, dosName, dosName.Size()) == 0)
                 {
                     TRACE_E("GetShortPathName() failed");
                     dosName[0] = 0;
@@ -758,8 +759,8 @@ MENU_TEMPLATE_ITEM MsgBoxButtons[] =
                 {
                     if (swapNames)
                     {
-                        char swap[MAX_PATH];
-                        lstrcpyn(swap, userMenuAdvancedData->CompareName1, MAX_PATH);
+                        CPathBuffer swap; // Heap-allocated for long path support
+                        lstrcpyn(swap, userMenuAdvancedData->CompareName1, swap.Size());
                         lstrcpyn(userMenuAdvancedData->CompareName1, userMenuAdvancedData->CompareName2, MAX_PATH);
                         lstrcpyn(userMenuAdvancedData->CompareName2, swap, MAX_PATH);
                     }
@@ -816,11 +817,11 @@ MENU_TEMPLATE_ITEM MsgBoxButtons[] =
             index = 0;
             char cmdLine[USRMNUCMDLINE_MAXLEN];
             char arguments[USRMNUARGS_MAXLEN];
-            char initDir[MAX_PATH];
-            char prevInitDir[MAX_PATH];
+            char initDir[MAX_PATH]; // Cannot use CPathBuffer due to goto ERROR_LABEL
+            char prevInitDir[MAX_PATH]; // Cannot use CPathBuffer due to goto ERROR_LABEL
             initDir[0] = 0;
             arguments[0] = 0;
-            char path[MAX_PATH], name[MAX_PATH];
+            char path[MAX_PATH], name[MAX_PATH]; // Cannot use CPathBuffer due to goto ERROR_LABEL
             BOOL error;
             error = FALSE;
             BOOL skipErrorMessage;
@@ -850,7 +851,7 @@ MENU_TEMPLATE_ITEM MsgBoxButtons[] =
                 {
                     if (buildBat) // building a .bat file
                     {
-                        char initDirOEM[MAX_PATH];
+                        CPathBuffer initDirOEM; // Heap-allocated for long path support
                         char cmdLineOEM[USRMNUCMDLINE_MAXLEN];
                         CharToOem(initDir, initDirOEM);
                         CharToOem(cmdLine, cmdLineOEM);
