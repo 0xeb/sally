@@ -3006,11 +3006,11 @@ BOOL CSalamanderGeneral::GetConfigParameter(int paramID, void* buffer, int buffe
     case SALCFG_IFPATHISINACCESSIBLEGOTO:
     {
         auxType = SALCFGTYPE_STRING;
-        char ifPathIsInaccessibleGoTo[MAX_PATH];
+        CPathBuffer ifPathIsInaccessibleGoTo; // Heap-allocated for long path support
         GetIfPathIsInaccessibleGoTo(ifPathIsInaccessibleGoTo);
         auxDataSize = (int)strlen(ifPathIsInaccessibleGoTo) + 1;
-        if (auxDataSize > MAX_PATH)
-            auxDataSize = MAX_PATH; // we limited the required buffer to MAX_PATH characters
+        if (auxDataSize > ifPathIsInaccessibleGoTo.Size())
+            auxDataSize = ifPathIsInaccessibleGoTo.Size(); // we limited the required buffer
         memcpy(auxBuf, ifPathIsInaccessibleGoTo, auxDataSize);
         auxBuf[auxDataSize - 1] = 0;
         break;
@@ -3882,7 +3882,7 @@ void CSalamanderGeneral::GetCommonFSOperSourceDescr(char* sourceDescr, int sourc
     {
         BOOL nameIsDir;
         char* name;
-        char nameBuf[MAX_PATH];
+        CPathBuffer nameBuf; // Heap-allocated for long path support
         if (panel != -1)
         {
             const CFileData* f;
@@ -3904,7 +3904,7 @@ void CSalamanderGeneral::GetCommonFSOperSourceDescr(char* sourceDescr, int sourc
         }
         else
         {
-            lstrcpyn(nameBuf, fileOrDirName, MAX_PATH);
+            lstrcpyn(nameBuf, fileOrDirName, nameBuf.Size());
             name = nameBuf;
             nameIsDir = isDir;
         }
@@ -4575,9 +4575,9 @@ void CSalamanderGeneral::DisconnectFSFromPanel(HWND parent, int panel)
         TRACE_E("You can call CSalamanderGeneral::DisconnectFSFromPanel() only from main thread!");
         return;
     }
-    char buf[MAX_PATH];
+    CPathBuffer buf; // Heap-allocated for long path support
     BOOL rescueOrFixed = TRUE;
-    if (GetLastWindowsPanelPath(panel, buf, MAX_PATH))
+    if (GetLastWindowsPanelPath(panel, buf, buf.Size()))
     { // change the path to the last visited Windows path
         BOOL tryNet = FALSE;
         DWORD err;
@@ -5728,8 +5728,8 @@ BOOL CSalamanderDirectory::FindDir(const char* path, const char*& s, int& i, con
 
         if (pluginData != NULL) // let the plug-in add its specific data
         {
-            char arcPath[MAX_PATH]; // name of the added directory inside the archive
-            memcpy(arcPath, archivePath, s - archivePath);
+            CPathBuffer arcPath; // Heap-allocated for long path support
+            memcpy(arcPath.Get(), archivePath, s - archivePath);
             arcPath[s - archivePath] = 0;
             CPluginDataInterfaceEncapsulation plugin(pluginData, STR_NONE, STR_NONE, NULL, 0);
             if (!plugin.GetFileDataForNewDir(arcPath, data)) // cannot add the plug-in data
