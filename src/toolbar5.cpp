@@ -16,6 +16,7 @@ extern "C"
 #include "shexreg.h"
 }
 #include "salshlib.h"
+#include "common/widepath.h"
 
 //****************************************************************************
 //
@@ -209,9 +210,9 @@ public:
             int insertIndex = -1;
             BOOL after;
             int pasteIndex = -1;
-            char fileName[MAX_PATH];
+            CPathBuffer fileName; // Heap-allocated for long path support
 
-            char buff[MAX_PATH];
+            CPathBuffer buff; // Heap-allocated for long path support
             BOOL insert = GetPathFromDataObject(pDataObject, buff);
 
             HitTest(pt, insertIndex, after, pasteIndex, fileName, insert);
@@ -262,9 +263,9 @@ public:
             int insertIndex = -1;
             BOOL after;
             int pasteIndex = -1;
-            char fileName[MAX_PATH];
+            CPathBuffer fileName; // Heap-allocated for long path support
 
-            char buff[MAX_PATH];
+            CPathBuffer buff; // Heap-allocated for long path support
             BOOL insert = GetPathFromDataObject(DataObject, buff);
 
             HitTest(pt, insertIndex, after, pasteIndex, fileName, insert);
@@ -347,9 +348,9 @@ public:
             int insertIndex = -1;
             BOOL after;
             int pasteIndex = -1;
-            char fileName[MAX_PATH];
+            CPathBuffer fileName; // Heap-allocated for long path support
 
-            char buff[MAX_PATH];
+            CPathBuffer buff; // Heap-allocated for long path support
             BOOL insert = GetPathFromDataObject(pDataObject, buff);
 
             HitTest(pt, insertIndex, after, pasteIndex, fileName, insert);
@@ -362,7 +363,7 @@ public:
                 if (insert)
                 {
                     *pdwEffect = DROPEFFECT_LINK;
-                    char name[MAX_PATH];
+                    CPathBuffer name; // Heap-allocated for long path support
                     char* p = buff + strlen(buff);
                     while (p > buff && *p != '\\')
                         p--;
@@ -370,7 +371,7 @@ public:
                         p++;
                     strcpy(name, p);
 
-                    char tmp[MAX_PATH];
+                    CPathBuffer tmp; // Heap-allocated for long path support
                     BOOL shell = FALSE;
 
                     // CMainWindow::UserMenu was changed so that if it does not launch via Shell,
@@ -639,8 +640,8 @@ void CUserMenuBar::OnGetToolTip(LPARAM lParam)
         CUserMenuItem* item = MainWindow->UserMenuItems->At(tt->ID - CM_USERMENU_MIN);
         if (Configuration.UserMenuToolbarLabels)
         {
-            char umCommand[MAX_PATH];
-            if (ExpandCommand(MainWindow->HWindow, item->UMCommand, umCommand, MAX_PATH, TRUE))
+            CPathBuffer umCommand; // Heap-allocated for long path support
+            if (ExpandCommand(MainWindow->HWindow, item->UMCommand, umCommand, umCommand.Size(), TRUE))
                 lstrcpy(tt->Buffer, umCommand);
         }
         else
