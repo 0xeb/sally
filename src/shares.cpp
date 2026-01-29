@@ -16,9 +16,9 @@ CSharesItem::CSharesItem(const char* localPath, const char* remoteName, const ch
 
     if (localPath != NULL && localPath[0] != 0 && localPath[1] == ':')
     {
-        char buff[MAX_PATH];
-        lstrcpyn(buff, localPath, MAX_PATH);
-        SalPathAddBackslash(buff, MAX_PATH); // in case it's just "c:", so that root is created
+        CPathBuffer buff; // Heap-allocated for long path support
+        lstrcpyn(buff, localPath, buff.Size());
+        SalPathAddBackslash(buff, buff.Size()); // in case it's just "c:", so that root is created
         if (SalGetFullName(buff))            // root "c:\\", others without '\\' at the end
         {
             LocalPath = DupStr(buff);
@@ -94,17 +94,17 @@ void CShares::Refresh()
             p = BufPtr;
             for (i = 1; i <= er; i++)
             {
-                char netname[MAX_PATH];
-                char path[MAX_PATH];
-                char remark[MAX_PATH];
+                CPathBuffer netname; // Heap-allocated for long path support
+                CPathBuffer path;    // Heap-allocated for long path support
+                CPathBuffer remark;  // Heap-allocated for long path support
                 // we don't want special shares because Explorer doesn't show them
                 BOOL include = p->shi502_type == 0;
                 if (!SubsetOnly && p->shi502_type == 0x80000000) // special
                     include = TRUE;
                 if (include &&
-                    WideCharToMultiByte(CP_ACP, 0, p->shi502_netname, -1, netname, MAX_PATH, NULL, NULL) &&
-                    WideCharToMultiByte(CP_ACP, 0, p->shi502_path, -1, path, MAX_PATH, NULL, NULL) &&
-                    WideCharToMultiByte(CP_ACP, 0, p->shi502_remark, -1, remark, MAX_PATH, NULL, NULL))
+                    WideCharToMultiByte(CP_ACP, 0, p->shi502_netname, -1, netname, netname.Size(), NULL, NULL) &&
+                    WideCharToMultiByte(CP_ACP, 0, p->shi502_path, -1, path, path.Size(), NULL, NULL) &&
+                    WideCharToMultiByte(CP_ACP, 0, p->shi502_remark, -1, remark, remark.Size(), NULL, NULL))
                 {
                     //              TRACE_I("Share: " << netname << " = " << path);
                     // adding the shared path to the Data array
@@ -197,10 +197,10 @@ void CShares::PrepareSearch(const char* path)
     Wanted.DestroyMembers();
 
     // add only those shares that lie on the requested path
-    char buff[MAX_PATH];
-    lstrcpyn(buff, path, MAX_PATH);
-    if (buff[0] != 0)                        // if searching for shares from this_computer we must not append backslash
-        SalPathAddBackslash(buff, MAX_PATH); // we want backslash at the end
+    CPathBuffer buff; // Heap-allocated for long path support
+    lstrcpyn(buff, path, buff.Size());
+    if (buff[0] != 0)                         // if searching for shares from this_computer we must not append backslash
+        SalPathAddBackslash(buff, buff.Size()); // we want backslash at the end
     int pathLen = (int)strlen(buff);
 
     int i;
@@ -232,9 +232,9 @@ BOOL CShares::Search(const char* name)
 BOOL CShares::GetUNCPath(const char* path, char* uncPath, int uncPathMax)
 {
     HANDLES(EnterCriticalSection(&CS));
-    char buff[MAX_PATH];
-    lstrcpyn(buff, path, MAX_PATH);
-    SalPathAddBackslash(buff, MAX_PATH); // we want backslash at the end
+    CPathBuffer buff; // Heap-allocated for long path support
+    lstrcpyn(buff, path, buff.Size());
+    SalPathAddBackslash(buff, buff.Size()); // we want backslash at the end
 
     int longestIndex = -1; // index into Data array where the longest matching share is located
 
