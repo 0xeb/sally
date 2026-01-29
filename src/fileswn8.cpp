@@ -265,7 +265,7 @@ void CFilesWindow::FilesAction(CActionType type, CFilesWindow* target, int count
                 if (oneIndex == 0 && subDir)
                     oneIndex = -1;
             }
-            char redirectedDir[MAX_PATH];
+            CPathBuffer redirectedDir; // Heap-allocated for long path support
             if ((count > 0 || oneIndex != -1) &&
                 ContainsWin64RedirectedDir(this, count > 0 ? indexes : &oneIndex,
                                            count > 0 ? count : 1, redirectedDir, FALSE))
@@ -487,8 +487,8 @@ void CFilesWindow::FilesAction(CActionType type, CFilesWindow* target, int count
             BOOL havePermissions = FALSE;
             BOOL supportsADS = IsPathOnVolumeSupADS(GetPath(), NULL);
             DWORD dummy1, flags;
-            char dummy2[MAX_PATH];
-            if (MyGetVolumeInformation(GetPath(), NULL, NULL, NULL, NULL, 0, NULL, &dummy1, &flags, dummy2, MAX_PATH))
+            CPathBuffer dummy2; // Heap-allocated for long path support
+            if (MyGetVolumeInformation(GetPath(), NULL, NULL, NULL, NULL, 0, NULL, &dummy1, &flags, dummy2, dummy2.Size()))
                 havePermissions = (flags & FS_PERSISTENT_ACLS) != 0;
             while (1)
             {
@@ -1321,9 +1321,9 @@ void CFilesWindow::EmailFiles()
                         indexes[0] = GetCaretIndex();
 
                     CFileData* f;
-                    char path[MAX_PATH];
+                    CPathBuffer path; // Heap-allocated for long path support
                     int l = (int)strlen(GetPath());
-                    memmove(path, GetPath(), l);
+                    memmove(path.Get(), GetPath(), l);
                     if (path[l - 1] != '\\')
                         path[l++] = '\\';
                     char* name = path + l;
