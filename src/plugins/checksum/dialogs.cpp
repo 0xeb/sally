@@ -691,11 +691,11 @@ unsigned CCalculateThread::Body()
 
         // open the file
         HANDLE hFile;
-        char path[MAX_PATH];
-        strcpy(path, dialog->SourcePath);
+        CPathBuffer path; // Heap-allocated for long path support
+        lstrcpyn(path, dialog->SourcePath, path.Size());
         // should not happen - the name length was already verified in CCalculateDialog::GetFileList()
         // FILELISTITEM::Name does not change after being added to the array = no need for synchronized access
-        if (!SalamanderGeneral->SalPathAppend(path, dialog->FileList[i]->Name, MAX_PATH))
+        if (!SalamanderGeneral->SalPathAppend(path, dialog->FileList[i]->Name, path.Size()))
         {
             TRACE_E("CCalculateThread::Body(): unexpected situation: SalPathAppend() has failed");
             break;
