@@ -54,8 +54,8 @@ BOOL CombineFiles(TIndirectArray<char>& files, LPTSTR targetName,
     // check available free space
     if (!bOnlyCrc)
     {
-        char dir[MAX_PATH];
-        strncpy_s(dir, targetName, _TRUNCATE);
+        CPathBuffer dir; // Heap-allocated for long path support
+        lstrcpyn(dir, targetName, dir.Size());
         SalamanderGeneral->CutDirectory(dir);
         if (!SalamanderGeneral->TestFreeSpace(parent, dir, totalSize, LoadStr(IDS_COMBINE)))
             return FALSE;
@@ -188,9 +188,9 @@ BOOL CombineFiles(TIndirectArray<char>& files, LPTSTR targetName,
   CALL_STACK_MESSAGE1("CalculateFileCRC()");
   HANDLE hFile;
   const CFileData* pfd = SalamanderGeneral->GetPanelFocusedItem(PANEL_SOURCE, NULL);
-  char path[MAX_PATH];
-  SalamanderGeneral->GetPanelPath(PANEL_SOURCE, path, MAX_PATH, NULL, NULL);
-  if (!SalamanderGeneral->SalPathAppend(path, pfd->Name, MAX_PATH))
+  CPathBuffer path; // Heap-allocated for long path support
+  SalamanderGeneral->GetPanelPath(PANEL_SOURCE, path, path.Size(), NULL, NULL);
+  if (!SalamanderGeneral->SalPathAppend(path, pfd->Name, path.Size()))
   {
     SalamanderGeneral->ShowMessageBox(LoadStr(IDS_TOOLONGNAME2), LoadStr(IDS_CALCCRC), MSGBOX_ERROR);
     return FALSE;
@@ -423,12 +423,12 @@ BOOL CombineCommand(DWORD eventMask, HWND parent, CSalamanderForOperationsAbstra
 
     TIndirectArray<char> files(100, 100, dtDelete);
 
-    char sourceDir[MAX_PATH];
-    SalamanderGeneral->GetPanelPath(PANEL_SOURCE, sourceDir, MAX_PATH, NULL, NULL);
+    CPathBuffer sourceDir; // Heap-allocated for long path support
+    SalamanderGeneral->GetPanelPath(PANEL_SOURCE, sourceDir, sourceDir.Size(), NULL, NULL);
 
     BOOL bTestCompanionFile = FALSE;
-    char companionFile[MAX_PATH];
-    char name1[MAX_PATH], name2[MAX_PATH];
+    CPathBuffer companionFile; // Heap-allocated for long path support
+    CPathBuffer name1, name2; // Heap-allocated for long path support
     const CFileData* pfd;
     BOOL isDir;
 
@@ -539,7 +539,7 @@ BOOL CombineCommand(DWORD eventMask, HWND parent, CSalamanderForOperationsAbstra
                     int prevIndex = nextIndex - 2;
                     while (1)
                     {
-                        sprintf(name2, bZeroPadded ? "%s%#03ld" : "%s%ld", name1, prevIndex--);
+                        sprintf(name2.Get(), bZeroPadded ? "%s%#03ld" : "%s%ld", name1.Get(), prevIndex--);
                         if (!IsInPanel(name2))
                             break;
                         if (!AddFile(files, sourceDir, name2, TRUE))
@@ -554,7 +554,7 @@ BOOL CombineCommand(DWORD eventMask, HWND parent, CSalamanderForOperationsAbstra
                     if (bAddThisFile)
                         if (!AddFile(files, sourceDir, name2, FALSE))
                             return FALSE;
-                    sprintf(name2, bZeroPadded ? "%s%#03ld" : "%s%ld", name1, nextIndex++);
+                    sprintf(name2.Get(), bZeroPadded ? "%s%#03ld" : "%s%ld", name1.Get(), nextIndex++);
                     bAddThisFile = TRUE;
                 } while (IsInPanel(name2));
             }

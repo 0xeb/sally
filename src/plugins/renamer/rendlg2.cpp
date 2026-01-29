@@ -192,7 +192,7 @@ BOOL CRenamerDialog::BuildScript(CRenameScriptEntry*& script, int& count,
     BOOL ret = FALSE;
     CRenameScriptEntry* tmpScript = NULL;
     script = NULL;
-    char newName[MAX_PATH];
+    CPathBuffer newName; // Heap-allocated for long path support
     char* newPart;
     BOOL skip;
     BOOL skipAllLongNames = FALSE,

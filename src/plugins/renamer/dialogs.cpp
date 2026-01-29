@@ -948,9 +948,9 @@ void CConfigDialog::Validate(CTransferInfo& ti)
 {
     CALL_STACK_MESSAGE1("CConfigDialog::Validate()");
     int e1, e2;
-    char buffer[MAX_PATH];
+    CPathBuffer buffer; // Heap-allocated for long path support
 
-    ti.EditLine(IDE_COMMAND, buffer, MAX_PATH);
+    ti.EditLine(IDE_COMMAND, buffer, buffer.Size());
     if (!SG->ValidateVarString(HWindow, buffer, e1, e2, ExpCommandVariables))
     {
         ti.ErrorOn(IDE_COMMAND);
@@ -959,7 +959,7 @@ void CConfigDialog::Validate(CTransferInfo& ti)
         return;
     }
 
-    ti.EditLine(IDE_ARGUMENTS, buffer, MAX_PATH);
+    ti.EditLine(IDE_ARGUMENTS, buffer, buffer.Size());
     if (!SG->ValidateVarString(HWindow, buffer, e1, e2, ExpArgumentsVariables))
     {
         ti.ErrorOn(IDE_ARGUMENTS);

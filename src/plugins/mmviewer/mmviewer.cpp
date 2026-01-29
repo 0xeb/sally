@@ -1182,7 +1182,7 @@ BOOL CPluginInterfaceForMenuExt::ExecuteMenuItem(CSalamanderForOperationsAbstrac
     int ret = FALSE;
 
     COutput output;
-    char fname[MAX_PATH];
+    CPathBuffer fname; // Heap-allocated for long path support
     fname[0] = '\0';
     char* s = LoadStr(IDS_HTMLEXPFILTER);
     if (GetOpenFileName(parent, NULL, s, fname, LoadStr(IDS_HTMLEXT), TRUE))
@@ -1536,7 +1536,7 @@ BOOL GetOpenFileName(HWND parent, const char* title, char* filter, char* buffer,
     CALL_STACK_MESSAGE4("GetOpenFileName(, %s, %s, , %d)", title, filter, save);
     OPENFILENAME ofn;
 
-    char fileName[MAX_PATH];
+    CPathBuffer fileName; // Heap-allocated for long path support
 
     memset(&ofn, 0, sizeof(OPENFILENAME));
     ofn.lStructSize = sizeof(OPENFILENAME);

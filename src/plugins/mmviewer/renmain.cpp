@@ -37,7 +37,7 @@ CRendererWindow::~CRendererWindow()
 
 void CRendererWindow::OnFileOpen()
 {
-    char file[MAX_PATH];
+    CPathBuffer file; // Heap-allocated for long path support
     file[0] = 0;
     OPENFILENAME ofn;
     memset(&ofn, 0, sizeof(OPENFILENAME));
@@ -52,7 +52,7 @@ void CRendererWindow::OnFileOpen()
         s++;
     }
     ofn.lpstrFile = file;
-    ofn.nMaxFile = MAX_PATH;
+    ofn.nMaxFile = file.Size();
     ofn.nFilterIndex = 1;
     ofn.lpstrInitialDir = NULL;
     ofn.Flags = OFN_HIDEREADONLY | OFN_PATHMUSTEXIST | OFN_FILEMUSTEXIST;
@@ -228,7 +228,7 @@ LRESULT CRendererWindow::OnCommand(WPARAM wParam, LPARAM lParam)
         BOOL ok = FALSE;
         BOOL srcBusy = FALSE;
         BOOL noMoreFiles = FALSE;
-        char fileName[MAX_PATH];
+        CPathBuffer fileName; // Heap-allocated for long path support
         fileName[0] = 0;
         int enumFilesCurrentIndex = EnumFilesCurrentIndex;
         if (LOWORD(wParam) == CM_FILE_PREV || LOWORD(wParam) == CM_FILE_LAST)
