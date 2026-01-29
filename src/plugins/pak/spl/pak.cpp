@@ -642,12 +642,12 @@ BOOL CPluginInterfaceForArchiver::ConstructMaskArray(TIndirectArray2<char>& mask
     char* dest;
     char* newMask;
     int newMaskLen;
-    char buffer[MAX_PATH];
+    CPathBuffer buffer; // Heap-allocated for long path support
 
     sour = masks;
     while (*sour)
     {
-        dest = buffer;
+        dest = buffer.Get();
         while (*sour)
         {
             if (*sour == ';')
@@ -657,17 +657,17 @@ BOOL CPluginInterfaceForArchiver::ConstructMaskArray(TIndirectArray2<char>& mask
                 else
                     break;
             }
-            if (dest == buffer + MAX_PATH - 1)
+            if (dest == buffer.Get() + buffer.Size() - 1)
             {
                 SalamanderGeneral->ShowMessageBox(LoadStr(IDS_TOOLONGMASK), LoadStr(IDS_PLUGINNAME), MSGBOX_ERROR);
                 return FALSE;
             }
             *dest++ = *sour++;
         }
-        while (--dest >= buffer && *dest <= ' ')
+        while (--dest >= buffer.Get() && *dest <= ' ')
             ;
         *(dest + 1) = 0;
-        dest = buffer;
+        dest = buffer.Get();
         while (*dest != 0 && *dest <= ' ')
             dest++;
         newMaskLen = (int)strlen(dest);
