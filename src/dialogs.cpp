@@ -303,11 +303,11 @@ unsigned ThreadProgressDlgBody(void* parameter)
     if (data->ConvertData != NULL)
         convertDataCopy = *data->ConvertData;
     CConvertData* convertData = (data->ConvertData != NULL ? &convertDataCopy : NULL);
-    char workPath1[MAX_PATH];
-    lstrcpyn(workPath1, data->Script->WorkPath1, MAX_PATH);
+    CPathBuffer workPath1; // Heap-allocated for long path support
+    lstrcpyn(workPath1, data->Script->WorkPath1, workPath1.Size());
     BOOL workPath1InclSubDirs = data->Script->WorkPath1InclSubDirs;
-    char workPath2[MAX_PATH];
-    lstrcpyn(workPath2, data->Script->WorkPath2, MAX_PATH);
+    CPathBuffer workPath2; // Heap-allocated for long path support
+    lstrcpyn(workPath2, data->Script->WorkPath2, workPath2.Size());
     BOOL workPath2InclSubDirs = data->Script->WorkPath2InclSubDirs;
 
     CProgressDialog dlg(NULL, data->Script, data->Caption, attrsData, convertData, TRUE, data);
@@ -477,8 +477,8 @@ BOOL CProgressDialog::FlushCachedData()
         {
             if (Script->RemapNameFrom != NULL)
             {
-                char name[MAX_PATH];
-                Source->SetTextToDblQuotesIfNeeded(RemapNames(name, MAX_PATH, SourceCache, Script));
+                CPathBuffer name; // Heap-allocated for long path support
+                Source->SetTextToDblQuotesIfNeeded(RemapNames(name, name.Size(), SourceCache, Script));
             }
             else
                 Source->SetTextToDblQuotesIfNeeded(SourceCache);
@@ -802,13 +802,13 @@ CProgressDialog::DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
 
         case 1:
         {
-            char tmpName[MAX_PATH];
-            char tmpName2[MAX_PATH];
+            CPathBuffer tmpName; // Heap-allocated for long path support
+            CPathBuffer tmpName2; // Heap-allocated for long path support
             char *filename1, *filename2;
             if (Script != NULL && Script->RemapNameFrom != NULL)
             {
-                filename1 = RemapNames(tmpName, MAX_PATH, data[1], Script);
-                filename2 = RemapNames(tmpName2, MAX_PATH, data[3], Script);
+                filename1 = RemapNames(tmpName, tmpName.Size(), data[1], Script);
+                filename2 = RemapNames(tmpName2, tmpName2.Size(), data[3], Script);
             }
             else
             {
@@ -1815,7 +1815,7 @@ CCannotMoveDlg::DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
 void BrowseFileName(HWND hParent, int editlineResID, const char* name)
 {
     CALL_STACK_MESSAGE3("BrowseFileName(, %d, %s)", editlineResID, name);
-    char file[MAX_PATH];
+    CPathBuffer file; // Heap-allocated for long path support
     strcpy(file, name);
     OPENFILENAME ofn;
     memset(&ofn, 0, sizeof(OPENFILENAME));
@@ -1830,7 +1830,7 @@ void BrowseFileName(HWND hParent, int editlineResID, const char* name)
         s++;
     }
     ofn.lpstrFile = file;
-    ofn.nMaxFile = MAX_PATH;
+    ofn.nMaxFile = file.Size();
     ofn.nFilterIndex = 1;
     //  ofn.lpstrFileTitle = file;
     //  ofn.nMaxFileTitle = MAX_PATH;
@@ -1840,7 +1840,7 @@ void BrowseFileName(HWND hParent, int editlineResID, const char* name)
     {
         if (SalGetFullName(file))
         {
-            SendMessage(GetDlgItem(hParent, editlineResID), WM_SETTEXT, 0, (LPARAM)file);
+            SendMessage(GetDlgItem(hParent, editlineResID), WM_SETTEXT, 0, (LPARAM)file.Get());
         }
     }
 }
@@ -1879,8 +1879,8 @@ void CFileListDialog::Transfer(CTransferInfo& ti)
         }
         else
         {
-            char buff[MAX_PATH];
-            SendMessage(hWnd, WM_GETTEXT, MAX_PATH, (LPARAM)buff);
+            CPathBuffer buff; // Heap-allocated for long path support
+            SendMessage(hWnd, WM_GETTEXT, buff.Size(), (LPARAM)buff.Get());
             AddValueToStdHistoryValues(history, FILELIST_HISTORY_SIZE, buff, FALSE);
         }
     }
@@ -1896,8 +1896,8 @@ void CFileListDialog::Validate(CTransferInfo& ti)
 
     if (ti.GetControl(hWnd, IDC_FL_LINE))
     {
-        char buff[MAX_PATH];
-        SendMessage(hWnd, WM_GETTEXT, MAX_PATH, (LPARAM)buff);
+        CPathBuffer buff; // Heap-allocated for long path support
+        SendMessage(hWnd, WM_GETTEXT, buff.Size(), (LPARAM)buff.Get());
         int errorPos1, errorPos2;
         if (!ValidateMakeFileList(HWindow, buff, errorPos1, errorPos2))
         {
@@ -1915,8 +1915,8 @@ void CFileListDialog::Validate(CTransferInfo& ti)
             // DefaultDir restoration
             MainWindow->UpdateDefaultDir(TRUE);
 
-            char buffFile[MAX_PATH];
-            SendMessage(hWnd, WM_GETTEXT, MAX_PATH, (LPARAM)buffFile);
+            CPathBuffer buffFile; // Heap-allocated for long path support
+            SendMessage(hWnd, WM_GETTEXT, buffFile.Size(), (LPARAM)buffFile.Get());
             int errTextID;
             if (!SalGetFullName(buffFile, &errTextID, MainWindow->GetActivePanel()->Is(ptDisk) ? MainWindow->GetActivePanel()->GetPath() : NULL))
             {
@@ -1995,14 +1995,14 @@ CFileListDialog::DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
         {
         case IDC_FL_FNBROWSE:
         {
-            char buffFile[MAX_PATH];
+            CPathBuffer buffFile; // Heap-allocated for long path support
             // DefaultDir restoration
             MainWindow->UpdateDefaultDir(TRUE);
 
-            SendMessage(GetDlgItem(HWindow, IDC_FL_FILENAME), WM_GETTEXT, MAX_PATH, (LPARAM)buffFile);
+            SendMessage(GetDlgItem(HWindow, IDC_FL_FILENAME), WM_GETTEXT, buffFile.Size(), (LPARAM)buffFile.Get());
             if (!SalGetFullName(buffFile, NULL, MainWindow->GetActivePanel()->Is(ptDisk) ? MainWindow->GetActivePanel()->GetPath() : NULL))
             { // we cannot do it, so let Windows Browse handle it however it wants...
-                SendMessage(GetDlgItem(HWindow, IDC_FL_FILENAME), WM_GETTEXT, MAX_PATH, (LPARAM)buffFile);
+                SendMessage(GetDlgItem(HWindow, IDC_FL_FILENAME), WM_GETTEXT, buffFile.Size(), (LPARAM)buffFile.Get());
             }
 
             BrowseFileName(HWindow, IDC_FL_FILENAME, buffFile);
