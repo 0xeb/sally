@@ -205,8 +205,8 @@ BOOL
 CTipOfTheDayDialog::LoadTips(BOOL quiet)
 {
   CALL_STACK_MESSAGE2("CTipOfTheDayDialog::LoadTips(%d)", quiet);
-  char fileName[MAX_PATH];
-  GetModuleFileName(HInstance, fileName, MAX_PATH);
+  CPathBuffer fileName; // Heap-allocated for long path support
+  GetModuleFileName(HInstance, fileName, fileName.Size());
   CutDirectory(fileName);
   SalPathAppend(fileName, "help\\tips.txt", MAX_PATH);
   HANDLE hFile = HANDLES_Q(CreateFile(fileName, GENERIC_READ, FILE_SHARE_READ |
@@ -1470,8 +1470,8 @@ BOOL ValidateMask(HWND parent, CTransferInfo& ti, int checkbox, int editline)
     ti.CheckBox(checkbox, ignore);
     if (ignore)
     {
-        char buf[MAX_PATH];
-        ti.EditLine(editline, buf, MAX_PATH);
+        CPathBuffer buf; // Heap-allocated for long path support
+        ti.EditLine(editline, buf, buf.Size());
         CMaskGroup masks(buf);
         int errorPos;
         if (!masks.PrepareMasks(errorPos))

@@ -732,8 +732,8 @@ CPluginsDlg::DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
             ofn.nMaxFile = 2000;
             ofn.lpstrDefExt = "SPL";
 
-            char buf[MAX_PATH];
-            GetModuleFileName(HInstance, buf, MAX_PATH);
+            CPathBuffer buf; // Heap-allocated for long path support
+            GetModuleFileName(HInstance, buf, buf.Size());
             s = strrchr(buf, '\\');
             if (s != NULL)
             {
@@ -749,7 +749,7 @@ CPluginsDlg::DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
             if (SafeGetOpenFileName(&ofn))
             {
                 // loop over all selected names
-                char oneName[MAX_PATH];
+                CPathBuffer oneName; // Heap-allocated for long path support
                 char* fName = NULL;
                 int off = 0;
                 strcpy(oneName, fileName);
@@ -775,10 +775,10 @@ CPluginsDlg::DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
                     }
 
                     // oneName contains the name of the x-th selected plugin (enumeration)
-                    char pluginName[MAX_PATH];
+                    CPathBuffer pluginName; // Heap-allocated for long path support
                     if (StrNICmp(oneName, buf, (int)strlen(buf)) == 0 && oneName[(int)strlen(buf)] == '\\')
                     {
-                        memmove(pluginName, oneName + strlen(buf) + 1, strlen(oneName) - strlen(buf) + 1 - 1);
+                        memmove(pluginName.Get(), oneName + strlen(buf) + 1, strlen(oneName) - strlen(buf) + 1 - 1);
                     }
                     else
                         strcpy(pluginName, oneName);
@@ -820,7 +820,7 @@ CPluginsDlg::DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
         case IDB_PLUGINREMOVE:
         {
             RefreshPanels = TRUE;
-            char name[MAX_PATH];
+            CPathBuffer name; // Heap-allocated for long path support
             int index, lvIndex;
             CPluginData* p = GetSelectedPlugin(&index, &lvIndex);
             if (p != NULL)
@@ -878,12 +878,12 @@ CPluginsDlg::DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
 #endif // _WIN64
             if (p != NULL)
             {
-                char buf[MAX_PATH];
+                CPathBuffer buf; // Heap-allocated for long path support
                 char* s = p->DLLName;
                 if ((*s != '\\' || *(s + 1) != '\\') && // not UNC
                     (*s == 0 || *(s + 1) != ':'))       // not "c:" -> relative path to plugins subdirectory
                 {
-                    GetModuleFileName(HInstance, buf, MAX_PATH);
+                    GetModuleFileName(HInstance, buf, buf.Size());
                     s = strrchr(buf, '\\') + 1;
                     strcpy(s, "plugins\\");
                     strcat(s, p->DLLName);
@@ -1460,7 +1460,7 @@ CArchiveUpdateDlg::DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
                     SendMessage(list, LB_GETSELITEMS, selCount, (LPARAM)indexes);
                     IntSort(indexes, 0, selCount - 1); // indexes may not be sorted, so sort them just in case
 
-                    char path[MAX_PATH];
+                    CPathBuffer path; // Heap-allocated for long path support
                     char* initPath;
                     strcpy(path, FileStamps->GetZIPFile());
                     if (!CutDirectory(path))
@@ -1817,19 +1817,19 @@ void CCfgPageDrives::Transfer(CTransferInfo& ti)
     ti.CheckBox(IDC_DRVSPEC_REMOTEMON, Configuration.DrvSpecRemoteMon);
     ti.CheckBox(IDC_DRVSPEC_REMOTESIMPLE, Configuration.DrvSpecRemoteSimple);
     ti.CheckBox(IDC_DRVSPEC_REMOTEACT, Configuration.DrvSpecRemoteDoNotRefreshOnAct);
-    char path[MAX_PATH];
-    char newPath[MAX_PATH];
+    CPathBuffer path; // Heap-allocated for long path support
+    CPathBuffer newPath; // Heap-allocated for long path support
     if (ti.Type == ttDataToWindow)
     {
         GetIfPathIsInaccessibleGoTo(path);
-        ti.EditLine(IDE_DRVSPEC_ONERRGOTO, path, MAX_PATH);
+        ti.EditLine(IDE_DRVSPEC_ONERRGOTO, path, path.Size());
         IfPathIsInaccessibleGoToChanged = FALSE;
     }
     else
     {
         if (IfPathIsInaccessibleGoToChanged) // change only if the user actually edited the path
         {
-            ti.EditLine(IDE_DRVSPEC_ONERRGOTO, newPath, MAX_PATH);
+            ti.EditLine(IDE_DRVSPEC_ONERRGOTO, newPath, newPath.Size());
             GetIfPathIsInaccessibleGoTo(path, TRUE);
             if (IsTheSamePath(path, newPath)) // user wants to go to My Documents
             {
@@ -1867,8 +1867,8 @@ CCfgPageDrives::DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
     {
         if (LOWORD(wParam) == IDB_BROWSECOMMAND)
         {
-            char path[MAX_PATH];
-            GetDlgItemText(HWindow, IDE_DRVSPEC_ONERRGOTO, path, MAX_PATH);
+            CPathBuffer path; // Heap-allocated for long path support
+            GetDlgItemText(HWindow, IDE_DRVSPEC_ONERRGOTO, path, path.Size());
             if (GetTargetDirectory(HWindow, HWindow, LoadStr(IDS_BROWSEONERRGOTOTITLE),
                                    LoadStr(IDS_BROWSEONERRGOTOTEXT), path, FALSE, path))
             {
@@ -1927,9 +1927,9 @@ void CCfgPageViewers::Transfer(CTransferInfo& ti)
             CPluginData* p = Plugins.Get(index);
             if (p != NULL)
             {
-                char buf[MAX_PATH];
-                p->GetDisplayName(buf, MAX_PATH);
-                SendMessage(hCombo, CB_ADDSTRING, 0, (LPARAM)buf);
+                CPathBuffer buf; // Heap-allocated for long path support
+                p->GetDisplayName(buf, buf.Size());
+                SendMessage(hCombo, CB_ADDSTRING, 0, (LPARAM)buf.Get());
             }
             else
                 TRACE_E("Unexpected situation in CCfgPageViewers::Transfer().");
@@ -2067,15 +2067,15 @@ void CCfgPageViewers::StoreControls()
         Dirty = TRUE;
         CViewerMasksItem* item = ViewerMasks[index];
 
-        char command[MAX_PATH];
-        char arguments[MAX_PATH];
-        char initdir[MAX_PATH];
+        CPathBuffer command; // Heap-allocated for long path support
+        CPathBuffer arguments; // Heap-allocated for long path support
+        CPathBuffer initdir; // Heap-allocated for long path support
         SendMessage(GetDlgItem(HWindow, IDE_COMMAND), WM_GETTEXT,
-                    MAX_PATH, (LPARAM)command);
+                    command.Size(), (LPARAM)command.Get());
         SendMessage(GetDlgItem(HWindow, IDE_ARGUMENTS), WM_GETTEXT,
-                    MAX_PATH, (LPARAM)arguments);
+                    arguments.Size(), (LPARAM)arguments.Get());
         SendMessage(GetDlgItem(HWindow, IDE_INITDIR), WM_GETTEXT,
-                    MAX_PATH, (LPARAM)initdir);
+                    initdir.Size(), (LPARAM)initdir.Get());
         item->Set(item->Masks->GetMasksString(), command, arguments, initdir);
 
         int cmbSel = (int)SendDlgItemMessage(HWindow, IDC_VIEW_TYPE, CB_GETCURSEL, 0, 0);
@@ -2452,15 +2452,15 @@ void CCfgPageEditors::StoreControls()
         Dirty = TRUE;
         CEditorMasksItem* item = EditorMasks[index];
 
-        char command[MAX_PATH];
-        char arguments[MAX_PATH];
-        char initdir[MAX_PATH];
+        CPathBuffer command; // Heap-allocated for long path support
+        CPathBuffer arguments; // Heap-allocated for long path support
+        CPathBuffer initdir; // Heap-allocated for long path support
         SendMessage(GetDlgItem(HWindow, IDE_COMMAND), WM_GETTEXT,
-                    MAX_PATH, (LPARAM)command);
+                    command.Size(), (LPARAM)command.Get());
         SendMessage(GetDlgItem(HWindow, IDE_ARGUMENTS), WM_GETTEXT,
-                    MAX_PATH, (LPARAM)arguments);
+                    arguments.Size(), (LPARAM)arguments.Get());
         SendMessage(GetDlgItem(HWindow, IDE_INITDIR), WM_GETTEXT,
-                    MAX_PATH, (LPARAM)initdir);
+                    initdir.Size(), (LPARAM)initdir.Get());
         item->Set(item->Masks->GetMasksString(), command, arguments, initdir);
     }
 }
@@ -2954,8 +2954,8 @@ void CCfgPageAppearance::Validate(CTransferInfo& ti)
     HWND hWnd;
     if (ti.GetControl(hWnd, IDC_INFOLINECONTENT))
     {
-        char buff[MAX_PATH];
-        SendMessage(hWnd, WM_GETTEXT, MAX_PATH, (LPARAM)buff);
+        CPathBuffer buff; // Heap-allocated for long path support
+        SendMessage(hWnd, WM_GETTEXT, buff.Size(), (LPARAM)buff.Get());
         int errorPos1, errorPos2;
         if (!ValidateInfoLineItems(HWindow, buff, errorPos1, errorPos2))
         {
