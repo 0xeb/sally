@@ -1999,26 +1999,26 @@ BOOL CFilesWindow::BuildScriptDir(COperations* script, CActionType type, char* s
                 res = IDB_SKIP;
             else
             {
-                char detailsTxt[MAX_PATH + 200];
-                char junctionOrSymlinkTgt[MAX_PATH];
+                CPathBuffer detailsTxt;  // Heap-allocated for long path support
+                CPathBuffer junctionOrSymlinkTgt;  // Heap-allocated for long path support
                 int repPointType;
-                if (GetReparsePointDestination(sourcePath, junctionOrSymlinkTgt, MAX_PATH, &repPointType, FALSE))
+                if (GetReparsePointDestination(sourcePath, junctionOrSymlinkTgt, junctionOrSymlinkTgt.Size(), &repPointType, FALSE))
                 {
                     if (repPointType == 1 /* MOUNT POINT */)
-                        strcpy_s(detailsTxt, LoadStr(IDS_VOLMOUNTPOINT));
+                        strcpy_s(detailsTxt.Get(), detailsTxt.Size(), LoadStr(IDS_VOLMOUNTPOINT));
                     else
                     {
-                        sprintf_s(detailsTxt, LoadStr(repPointType == 2 /* JUNCTION POINT */ ? IDS_INFODLGTYPE9 : IDS_INFODLGTYPE10),
-                                  junctionOrSymlinkTgt);
+                        sprintf_s(detailsTxt.Get(), detailsTxt.Size(), LoadStr(repPointType == 2 /* JUNCTION POINT */ ? IDS_INFODLGTYPE9 : IDS_INFODLGTYPE10),
+                                  junctionOrSymlinkTgt.Get());
                         int len = (int)strlen(detailsTxt);
                         if (detailsTxt[0] == '(')
-                            memmove(detailsTxt, detailsTxt + 1, --len + 1);
+                            memmove(detailsTxt.Get(), detailsTxt.Get() + 1, --len + 1);
                         if (len > 0 && detailsTxt[len - 1] == ')')
                             detailsTxt[--len] = 0;
                     }
                 }
                 else
-                    strcpy_s(detailsTxt, LoadStr(IDS_UNABLETORESOLVELINK));
+                    strcpy_s(detailsTxt.Get(), detailsTxt.Size(), LoadStr(IDS_UNABLETORESOLVELINK));
 
                 res = (int)CConfirmLinkTgtCopyDlg(HWindow, sourcePath, detailsTxt).Execute();
             }

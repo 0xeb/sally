@@ -213,12 +213,12 @@ void CFilesWindow::FocusShortcutTarget(CFilesWindow* panel)
     BOOL isDir = index < Dirs->Count;
     CFileData* file = isDir ? &Dirs->At(index) : &Files->At(index - Dirs->Count);
 
-    char shortName[MAX_PATH];
+    char shortName[MAX_PATH];  // File names are limited to MAX_PATH component
     strcpy(shortName, file->Name);
 
-    char fullName[MAX_PATH];
+    CPathBuffer fullName;  // Heap-allocated for long path support
     strcpy(fullName, GetPath());
-    if (!SalPathAppend(fullName, file->Name, MAX_PATH))
+    if (!SalPathAppend(fullName, file->Name, fullName.Size()))
     {
         gPrompter->ShowError(LoadStrW(IDS_ERRORTITLE), LoadStrW(IDS_TOOLONGNAME));
         return;
@@ -232,9 +232,9 @@ void CFilesWindow::FocusShortcutTarget(CFilesWindow* panel)
     BOOL wrongPath = FALSE;
     BOOL mountPoint = FALSE;
     int repPointType;
-    char junctionOrSymlinkTgt[MAX_PATH];
+    CPathBuffer junctionOrSymlinkTgt;  // Heap-allocated for long path support
     strcpy(junctionOrSymlinkTgt, fullName);
-    if (GetReparsePointDestination(junctionOrSymlinkTgt, junctionOrSymlinkTgt, MAX_PATH, &repPointType, FALSE))
+    if (GetReparsePointDestination(junctionOrSymlinkTgt, junctionOrSymlinkTgt, junctionOrSymlinkTgt.Size(), &repPointType, FALSE))
     {
         // MOUNT POINT: I can't get this path in the panel (e.g., \??\Volume{98c0ba30-71ff-11e1-9099-005056c00008}\)
         if (repPointType == 1 /* MOUNT POINT */)
