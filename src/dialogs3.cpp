@@ -78,8 +78,8 @@ void CConvertFilesDlg::Validate(CTransferInfo& ti)
     {
         if (ti.Type == ttDataFromWindow)
         {
-            char buf[MAX_PATH];
-            SendMessage(hWnd, WM_GETTEXT, MAX_PATH, (LPARAM)buf);
+            CPathBuffer buf; // Heap-allocated for long path support
+            SendMessage(hWnd, WM_GETTEXT, buf.Size(), (LPARAM)buf.Get());
             CMaskGroup mask(buf);
             int errorPos;
             if (!mask.PrepareMasks(errorPos))
@@ -277,8 +277,8 @@ void CFilterDialog::Validate(CTransferInfo& ti)
     ti.RadioButton(IDC_USEFILTER, TRUE, useFilter);
     if (useFilter)
     {
-        char buf[MAX_PATH];
-        lstrcpyn(buf, Filter->GetMasksString(), MAX_PATH); // backup
+        CPathBuffer buf; // Heap-allocated for long path support
+        lstrcpyn(buf, Filter->GetMasksString(), buf.Size()); // backup
         // provide a buffer for MasksString, there is a size check, nothing serious
         ti.EditLine(IDE_FILTER, Filter->GetWritableMasksString(), MAX_PATH);
         int errorPos;
@@ -633,8 +633,8 @@ CCopyMoveDialog::DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
         {
             HWND hCombo = (HWND)lParam;
             // Get selected text from combobox and set it on overlay
-            char ansiText[MAX_PATH];
-            int len = (int)SendMessage(hCombo, WM_GETTEXT, MAX_PATH, (LPARAM)ansiText);
+            CPathBuffer ansiText; // Heap-allocated for long path support
+            int len = (int)SendMessage(hCombo, WM_GETTEXT, ansiText.Size(), (LPARAM)ansiText.Get());
             if (len > 0)
             {
                 // Convert ANSI to Unicode and set on overlay
@@ -871,10 +871,10 @@ void CCopyMoveMoreDialog::TransferCriteriaControls(CTransferInfo& ti)
     ti.CheckBox(IDC_CM_EMPTY, Criteria->SkipEmptyDirs);
     ti.CheckBox(IDC_CM_NAMED, Criteria->UseMasks);
     ti.CheckBox(IDC_CM_SPEEDLIMIT, Criteria->UseSpeedLimit);
-    char masks[MAX_PATH];
+    CPathBuffer masks; // Heap-allocated for long path support
     if (ti.Type == ttDataToWindow)
         strcpy(masks, Criteria->Masks.GetMasksString());
-    ti.EditLine(IDC_CM_NAMED_MASK, masks, MAX_PATH - 1);
+    ti.EditLine(IDC_CM_NAMED_MASK, masks, masks.Size() - 1);
     if (ti.Type == ttDataFromWindow)
     {
         Criteria->Masks.SetMasksString(masks);
@@ -976,8 +976,8 @@ void CCopyMoveMoreDialog::Validate(CTransferInfo& ti)
     ti.CheckBox(IDC_CM_NAMED, useMasks);
     if (useMasks)
     {
-        char buf[MAX_PATH];
-        ti.EditLine(IDC_CM_NAMED_MASK, buf, MAX_PATH - 1);
+        CPathBuffer buf; // Heap-allocated for long path support
+        ti.EditLine(IDC_CM_NAMED_MASK, buf, buf.Size() - 1);
         CMaskGroup masks(buf);
         int errorPos;
         if (!masks.PrepareMasks(errorPos))
@@ -1144,9 +1144,9 @@ CCopyMoveMoreDialog::DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
         HWND hSubject = GetDlgItem(HWindow, IDS_SUBJECT);
         if (Subject->TruncateText(hSubject))
         {
-            char buff[MAX_PATH];
-            lstrcpyn(buff, Subject->Get(), MAX_PATH - 1);
-            DuplicateAmpersands(buff, MAX_PATH - 1, TRUE);
+            CPathBuffer buff; // Heap-allocated for long path support
+            lstrcpyn(buff, Subject->Get(), buff.Size() - 1);
+            DuplicateAmpersands(buff, buff.Size() - 1, TRUE);
             SetWindowText(hSubject, buff);
         }
 
@@ -1428,14 +1428,14 @@ void CDriveInfo::Validate(CTransferInfo& ti)
     HWND edit;
     if (ti.GetControl(edit, IDE_VOLNAME) && ti.Type == ttDataFromWindow)
     {
-        char newName[MAX_PATH];
-        SendMessage(edit, WM_GETTEXT, MAX_PATH, (LPARAM)newName);
+        CPathBuffer newName; // Heap-allocated for long path support
+        SendMessage(edit, WM_GETTEXT, newName.Size(), (LPARAM)newName.Get());
 
         if (strcmp(OldVolumeName, newName) != 0)
         {
-            char volumePathWithBackslash[MAX_PATH];
-            lstrcpyn(volumePathWithBackslash, VolumePath, MAX_PATH);
-            SalPathAddBackslash(volumePathWithBackslash, MAX_PATH);
+            CPathBuffer volumePathWithBackslash; // Heap-allocated for long path support
+            lstrcpyn(volumePathWithBackslash, VolumePath, volumePathWithBackslash.Size());
+            SalPathAddBackslash(volumePathWithBackslash, volumePathWithBackslash.Size());
             BOOL handsOffLeft = SalPathIsPrefix(volumePathWithBackslash, MainWindow->LeftPanel->GetPath());
             BOOL handsOffRight = SalPathIsPrefix(volumePathWithBackslash, MainWindow->RightPanel->GetPath());
             if (handsOffLeft)
@@ -1470,26 +1470,26 @@ void CDriveInfo::Transfer(CTransferInfo& ti)
         //---  GetVolumeInformation
         char volumeName[1000]; // later used as a buffer
         char buff[300];
-        char volumePathWithBackslash[MAX_PATH];
+        CPathBuffer volumePathWithBackslash; // Heap-allocated for long path support
         DWORD volumeSerialNumber;
         DWORD maximumComponentLength;
         DWORD fileSystemFlags;
         char fileSystemNameBuffer[100];
-        char junctionOrSymlinkTgt[MAX_PATH];
+        CPathBuffer junctionOrSymlinkTgt; // Heap-allocated for long path support
         int linkType;
         err = (MyGetVolumeInformation(VolumePath, volumePathWithBackslash, junctionOrSymlinkTgt, &linkType,
                                       volumeName, 200, &volumeSerialNumber, &maximumComponentLength,
                                       &fileSystemFlags, fileSystemNameBuffer, 100) == 0);
         lstrcpyn(VolumePath, volumePathWithBackslash, MAX_PATH);
-        SalPathAddBackslash(volumePathWithBackslash, MAX_PATH);
+        SalPathAddBackslash(volumePathWithBackslash, volumePathWithBackslash.Size());
         //---  GetVolumeInformation - display
         if (!err)
         {
             SetWindowText(GetDlgItem(HWindow, IDE_VOLNAME), volumeName);
             strcpy(OldVolumeName, volumeName);
 
-            char mountPoint[MAX_PATH];
-            char guidPath[MAX_PATH];
+            CPathBuffer mountPoint; // Heap-allocated for long path support
+            CPathBuffer guidPath; // Heap-allocated for long path support
             mountPoint[0] = 0;
             guidPath[0] = 0;
             if (GetResolvedPathMountPointAndGUID(VolumePath, mountPoint, guidPath))
@@ -1725,7 +1725,7 @@ void CDriveInfo::Transfer(CTransferInfo& ti)
         }
         //---  GetDriveType
         UINT driveType;
-        char remoteName[MAX_PATH];
+        CPathBuffer remoteName; // Heap-allocated for long path support
         BOOL remoteNameValid = FALSE;
         char userName[100];
         BOOL userNameValid = FALSE;
@@ -1790,7 +1790,7 @@ void CDriveInfo::Transfer(CTransferInfo& ti)
             {
                 strcat(volumeName, " ");
                 sprintf(volumeName + strlen(volumeName), LoadStr(linkType == 2 ? IDS_INFODLGTYPE9 : IDS_INFODLGTYPE10),
-                        junctionOrSymlinkTgt);
+                        junctionOrSymlinkTgt.Get());
             }
             SetWindowText(GetDlgItem(HWindow, IDT_DRIVETYPE), volumeName);
         }
@@ -2162,19 +2162,19 @@ CPackDialog::DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
             if (i != CB_ERR)
             {
                 // swap extensions
-                char name[MAX_PATH];
-                char name2[MAX_PATH];
+                CPathBuffer name; // Heap-allocated for long path support
+                CPathBuffer name2; // Heap-allocated for long path support
 
                 int curSel = (int)SendDlgItemMessage(HWindow, IDE_PATH, CB_GETCURSEL, 0, 0);
                 if (curSel == CB_ERR) // we must retrieve the text here because CB_RESETCONTENT would wipe it
-                    GetWindowText(GetDlgItem(HWindow, IDE_PATH), name2, MAX_PATH);
+                    GetWindowText(GetDlgItem(HWindow, IDE_PATH), name2, name2.Size());
 
                 // WARNING: code must stay consistent with CPackDialog::Transfer
                 // swap extensions in the combobox
                 SendDlgItemMessage(HWindow, IDE_PATH, CB_RESETCONTENT, 0, 0);
                 strcpy(name, Path);
                 if (ChangeExtension(name, PackerConfig->GetPackerExt(i)))
-                    SendDlgItemMessage(HWindow, IDE_PATH, CB_ADDSTRING, 0, (LPARAM)name);
+                    SendDlgItemMessage(HWindow, IDE_PATH, CB_ADDSTRING, 0, (LPARAM)name.Get());
                 else
                     SendDlgItemMessage(HWindow, IDE_PATH, CB_ADDSTRING, 0, (LPARAM)Path);
 
@@ -2183,7 +2183,7 @@ CPackDialog::DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
                 {
                     strcpy(name, PathAlt);
                     if (ChangeExtension(name, PackerConfig->GetPackerExt(i)))
-                        SendDlgItemMessage(HWindow, IDE_PATH, CB_ADDSTRING, 0, (LPARAM)name);
+                        SendDlgItemMessage(HWindow, IDE_PATH, CB_ADDSTRING, 0, (LPARAM)name.Get());
                     else
                         SendDlgItemMessage(HWindow, IDE_PATH, CB_ADDSTRING, 0, (LPARAM)PathAlt);
                 }
@@ -2421,7 +2421,7 @@ void CChangeIconDialog::Transfer(CTransferInfo& ti)
         int curSel = (int)SendDlgItemMessage(HWindow, IDL_CHI_LIST, LB_GETCURSEL, 0, 0);
         if (curSel == LB_ERR || curSel >= (int)IconsCount)
         {
-            char fileName[MAX_PATH];
+            CPathBuffer fileName; // Heap-allocated for long path support
             GetShell32(fileName);
             LoadIcons();
             *IconIndex = 0;
@@ -2435,8 +2435,8 @@ void CChangeIconDialog::Transfer(CTransferInfo& ti)
 
 BOOL CChangeIconDialog::LoadIcons()
 {
-    char fileName[MAX_PATH];
-    GetDlgItemText(HWindow, IDE_CHI_FILENAME, fileName, MAX_PATH);
+    CPathBuffer fileName; // Heap-allocated for long path support
+    GetDlgItemText(HWindow, IDE_CHI_FILENAME, fileName, fileName.Size());
     int counter = 0;
 
 AGAIN:
@@ -3005,7 +3005,7 @@ void CConversionTablesDialog::Transfer(CTransferInfo& ti)
         const char* dirName;
         char buff[MAX_PATH + 120];
 
-        char bestDirName[MAX_PATH];
+        CPathBuffer bestDirName; // Heap-allocated for long path support
         CodeTables.GetBestPreloadedConversion(DirName, bestDirName);
         int bestIndex = -1;
 
