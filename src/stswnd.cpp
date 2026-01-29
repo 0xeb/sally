@@ -198,7 +198,7 @@ void CStatusWindow::BuildHotTrackItems()
                 }
                 else
                 {
-                    char rootPath[MAX_PATH];
+                    CPathBuffer rootPath; // Heap-allocated for long path support
                     GetRootPath(rootPath, Text);
                     chars = (int)strlen(rootPath);
 
@@ -1405,7 +1405,7 @@ public:
             *pdwEffect = DROPEFFECT_COPY;
             return S_OK;
         }
-        char dummy[MAX_PATH];
+        CPathBuffer dummy; // Heap-allocated for long path support
         if (GetDirFromDataObject(DataObject, dummy))
         {
             *pdwEffect = DROPEFFECT_COPY;
@@ -1441,7 +1441,7 @@ public:
                 *pdwEffect = DROPEFFECT_COPY;
                 return S_OK;
             }
-            char dummy[MAX_PATH];
+            CPathBuffer dummy; // Heap-allocated for long path support
             if (GetDirFromDataObject(DataObject, dummy))
             {
                 *pdwEffect = DROPEFFECT_COPY;
@@ -1523,7 +1523,7 @@ public:
         }
         else
         {
-            char path[MAX_PATH];
+            CPathBuffer path; // Heap-allocated for long path support
             if (GetDirFromDataObject(pDataObject, path))
             {
                 // change path
@@ -1795,15 +1795,15 @@ CStatusWindow::WindowProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
                 int index;
                 if (FindHotTrackItem(LButtonDownPoint.x - TextRect.left, index))
                 {
-                    char buffer[MAX_PATH];
+                    CPathBuffer buffer; // Heap-allocated for long path support
                     int hotChars = HotTrackItems[index].Chars;
-                    if (hotChars + 1 > MAX_PATH)
-                        hotChars = MAX_PATH - 1;
+                    if (hotChars + 1 > buffer.Size())
+                        hotChars = buffer.Size() - 1;
                     lstrcpyn(buffer, Text + HotTrackItems[index].Offset, hotChars + 1);
                     // for Directory Line with plugin FS, allow plugin to make final path adjustments (adding ']' for VMS paths in FTP)
                     if ((Border & blTop) && FilesWindow->Is(ptPluginFS) && FilesWindow->GetPluginFS()->NotEmpty())
                     {
-                        FilesWindow->GetPluginFS()->CompleteDirectoryLineHotPath(buffer, MAX_PATH);
+                        FilesWindow->GetPluginFS()->CompleteDirectoryLineHotPath(buffer, buffer.Size());
                         FilesWindow->GetPluginFS()->GetPluginInterfaceForFS()->ConvertPathToExternal(FilesWindow->GetPluginFS()->GetPluginFSName(),
                                                                                                      FilesWindow->GetPluginFS()->GetPluginFSNameIndex(),
                                                                                                      strchr(buffer, ':') + 1);
@@ -2078,12 +2078,12 @@ CStatusWindow::WindowProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
                         if (HotItem != lastItem)
                         {
                             // path truncation
-                            char path[MAX_PATH];
+                            CPathBuffer path; // Heap-allocated for long path support
                             strncpy(path, Text, HotItem->Chars);
                             path[HotItem->Chars] = 0;
 
                             if (FilesWindow->Is(ptPluginFS) && FilesWindow->GetPluginFS()->NotEmpty())
-                                FilesWindow->GetPluginFS()->CompleteDirectoryLineHotPath(path, MAX_PATH);
+                                FilesWindow->GetPluginFS()->CompleteDirectoryLineHotPath(path, path.Size());
 
                             FilesWindow->ChangeDir(path, -1, NULL, 2 /* as back/forward in history*/, NULL, FALSE);
                         }
