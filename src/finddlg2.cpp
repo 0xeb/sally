@@ -1208,7 +1208,7 @@ BOOL CFindDialog::GetCommonPrefixPath(char* buffer, int bufferMax, int& commonPr
         return FALSE;
     }
 
-    char path[MAX_PATH];
+    CPathBuffer path; // Heap-allocated for long path support
     int pathLen = 0;
     path[0] = 0;
 
@@ -1343,9 +1343,9 @@ void CFindDialog::OnDrag(BOOL rightMouseButton)
     if (selCount < 1)
         return;
 
-    char commonPrefixPath[MAX_PATH];
+    CPathBuffer commonPrefixPath; // Heap-allocated for long path support
     int commonPrefixChars;
-    if (!GetCommonPrefixPath(commonPrefixPath, MAX_PATH, commonPrefixChars))
+    if (!GetCommonPrefixPath(commonPrefixPath, commonPrefixPath.Size(), commonPrefixChars))
     {
         gPrompter->ShowError(LoadStrW(IDS_ERRORTITLE), LoadStrW(IDS_COMMONPREFIXNOTFOUND));
         return;
@@ -1418,9 +1418,9 @@ void CFindDialog::OnContextMenu(int x, int y)
     if (selCount < 1)
         return;
 
-    char commonPrefixPath[MAX_PATH];
+    CPathBuffer commonPrefixPath; // Heap-allocated for long path support
     int commonPrefixChars;
-    if (!GetCommonPrefixPath(commonPrefixPath, MAX_PATH, commonPrefixChars))
+    if (!GetCommonPrefixPath(commonPrefixPath, commonPrefixPath.Size(), commonPrefixChars))
     {
         gPrompter->ShowError(LoadStrW(IDS_ERRORTITLE), LoadStrW(IDS_COMMONPREFIXNOTFOUND));
         return;
@@ -1501,9 +1501,9 @@ BOOL CFindDialog::InvokeContextMenu(const char* lpVerb)
     HCURSOR hOldCursor = SetCursor(LoadCursor(NULL, IDC_WAIT));
     if (InitializeOle())
     {
-        char commonPrefixPath[MAX_PATH];
+        CPathBuffer commonPrefixPath; // Heap-allocated for long path support
         int commonPrefixChars;
-        if (GetCommonPrefixPath(commonPrefixPath, MAX_PATH, commonPrefixChars))
+        if (GetCommonPrefixPath(commonPrefixPath, commonPrefixPath.Size(), commonPrefixChars))
         {
             CMyEnumFileNamesData data;
             data.FindDialog = this;
