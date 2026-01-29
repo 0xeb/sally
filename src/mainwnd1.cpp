@@ -87,7 +87,7 @@ void CHotPathItems::FillHotPathsMenu(CMenuPopup* menu, int minCommand, BOOL empt
     mii.Mask = MENU_MASK_TYPE | MENU_MASK_ID | MENU_MASK_STATE | MENU_MASK_STRING | MENU_MASK_ICON;
     mii.Type = MENU_TYPE_STRING;
     mii.State = 0;
-    char name[MAX_PATH];
+    CPathBuffer name; // Heap-allocated for long path support
     int i;
     for (i = 0; i < HOT_PATHS_COUNT; i++)
     {
@@ -100,18 +100,18 @@ void CHotPathItems::FillHotPathsMenu(CMenuPopup* menu, int minCommand, BOOL empt
         if (emptyItems || assigned)
         {
             menuIsEmpty = FALSE;
-            GetName(i, name, MAX_PATH);
-            DuplicateAmpersands(name, MAX_PATH);
+            GetName(i, name, name.Size());
+            DuplicateAmpersands(name, name.Size());
             if (i < 10)
             {
                 int key = (i == 9 ? 0 : i + 1);
                 if (emptyItems)
-                    sprintf(root, "%s\t%s+%s+%d", name, LoadStr(IDS_CTRL), LoadStr(IDS_SHIFT), key);
+                    sprintf(root, "%s\t%s+%s+%d", name.Get(), LoadStr(IDS_CTRL), LoadStr(IDS_SHIFT), key);
                 else
-                    sprintf(root, "%s\t%s+%d", name, LoadStr(IDS_CTRL), key);
+                    sprintf(root, "%s\t%s+%d", name.Get(), LoadStr(IDS_CTRL), key);
             }
             else
-                sprintf(root, "%s", name);
+                sprintf(root, "%s", name.Get());
             mii.ID = minCommand + i;
             mii.String = root;
             mii.HIcon = assigned ? HFavoritIcon : NULL;
@@ -237,13 +237,13 @@ BOOL CHotPathItems::Load(HKEY hKey)
         {
             // when there were only 10 hot paths, the tenth entry was stored under key '0', so we attempt to load it here
             int index = (i == 0) ? 9 : i - 1;
-            char name[MAX_PATH];
+            CPathBuffer name; // Heap-allocated for long path support
             char path[HOTPATHITEM_MAXPATH];
             DWORD visible;
             name[0] = 0;
             path[0] = 0;
             visible = TRUE;
-            GetValue(actKey, SALAMANDER_HOTPATHS_NAME, REG_SZ, name, MAX_PATH);
+            GetValue(actKey, SALAMANDER_HOTPATHS_NAME, REG_SZ, name, name.Size());
             CleanName(name);
             if (GetValue(actKey, SALAMANDER_HOTPATHS_PATH, REG_SZ, path, HOTPATHITEM_MAXPATH))
             {
@@ -266,17 +266,17 @@ BOOL CHotPathItems::Load1_52(HKEY hKey)
     int i;
     for (i = 0; i < HOT_PATHS_COUNT; i++)
     {
-        char name[MAX_PATH];
-        char path[MAX_PATH];
+        CPathBuffer name; // Heap-allocated for long path support
+        CPathBuffer path; // Heap-allocated for long path support
         DWORD visible;
         name[0] = 0;
         path[0] = 0;
         visible = FALSE; // do not display converted paths because they are long
 
         itoa(i, keyName, 10);
-        if (GetValue(hKey, keyName, REG_SZ, path, MAX_PATH))
+        if (GetValue(hKey, keyName, REG_SZ, path, path.Size()))
         {
-            DuplicateDollars(path, MAX_PATH); // if the path is long and contains '$', the end might be truncated; ignore it
+            DuplicateDollars(path, path.Size()); // if the path is long and contains '$', the end might be truncated; ignore it
             strcpy(name, path);
         }
 
@@ -1258,8 +1258,8 @@ void CMainWindow::SetUnescapedHotPath(int index, const char* path)
         // push the value directly
         char buff[HOTPATHITEM_MAXPATH];
         lstrcpyn(buff, path, HOTPATHITEM_MAXPATH);
-        char nameBuff[MAX_PATH];
-        lstrcpyn(nameBuff, path, MAX_PATH);
+        CPathBuffer nameBuff; // Heap-allocated for long path support
+        lstrcpyn(nameBuff, path, nameBuff.Size());
         DuplicateDollars(buff, HOTPATHITEM_MAXPATH);
         HotPaths.Set(index, nameBuff, buff);
         // a change occurred, rebuild the Hot Path Bar
