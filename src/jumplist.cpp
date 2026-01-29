@@ -160,8 +160,8 @@ HRESULT CreateShellLink(const char* path, const char* name, IShellLink** psl)
                                 IID_PPV_ARGS(&ret));
         if (SUCCEEDED(hres))
         {
-            char pathName[MAX_PATH];
-            GetModuleFileName(NULL, pathName, sizeof(pathName) - 1);
+            CPathBuffer pathName; // Heap-allocated for long path support
+            GetModuleFileName(NULL, pathName, pathName.Size() - 1);
 
             // Set path, parameters, icon and description.
             ret->SetPath(pathName);
@@ -218,11 +218,11 @@ HRESULT AddTasksToList(ICustomDestinationList* pcdl)
         {
             if (MainWindow->HotPaths.GetVisible(i))
             {
-                char name[MAX_PATH];
+                CPathBuffer name; // Heap-allocated for long path support
                 char path[HOTPATHITEM_MAXPATH];
                 name[0] = 0;
                 path[0] = 0;
-                MainWindow->HotPaths.GetName(i, name, MAX_PATH);
+                MainWindow->HotPaths.GetName(i, name, name.Size());
                 MainWindow->HotPaths.GetPath(i, path, HOTPATHITEM_MAXPATH);
                 if (name[0] != 0 && path[0] != 0)
                 {
