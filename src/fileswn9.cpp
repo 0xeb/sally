@@ -1715,13 +1715,13 @@ CFilesWindow::CreateDragImage(int cursorX, int cursorY, int& dxHotspot, int& dyH
 
 BOOL CopyUNCPathToClipboard(const char* path, const char* name, BOOL isDir, HWND hMessageParent, int nestingLevel)
 {
-    char buff[2 * MAX_PATH];
-    char uncPath[2 * MAX_PATH];
+    CPathBuffer buff;     // Heap-allocated for long path support
+    CPathBuffer uncPath;  // Heap-allocated for long path support
 
     nestingLevel++; // note: also controls error messaging, we must increment it here
 
-    strcpy(buff, path);
-    SalPathAddBackslash(buff, 2 * MAX_PATH);
+    lstrcpyn(buff, path, buff.Size());
+    SalPathAddBackslash(buff, buff.Size());
 
     if (buff[0] == '\\' && buff[1] == '\\')
     {
@@ -1737,12 +1737,12 @@ BOOL CopyUNCPathToClipboard(const char* path, const char* name, BOOL isDir, HWND
     // try to convert the local path to UNC
 
     // look for shared directories to see if any of them is part of the path
-    if (Shares.GetUNCPath(buff, uncPath, 2 * MAX_PATH))
+    if (Shares.GetUNCPath(buff, uncPath, uncPath.Size()))
     {
         if (!isDir)
         {
             // append the file name
-            SalPathAddBackslash(uncPath, 2 * MAX_PATH); // we want a backslash at the end
+            SalPathAddBackslash(uncPath, uncPath.Size()); // we want a backslash at the end
             strcat(uncPath, name);
         }
         return CopyTextToClipboard(uncPath);
@@ -1753,14 +1753,14 @@ BOOL CopyUNCPathToClipboard(const char* path, const char* name, BOOL isDir, HWND
     localRoot[0] = buff[0];
     localRoot[1] = ':';
     localRoot[2] = 0;
-    DWORD uncPathSize = sizeof(uncPath);
+    DWORD uncPathSize = uncPath.Size();
     if (WNetGetConnection(localRoot, uncPath, &uncPathSize) == NO_ERROR)
     {
-        SalPathAddBackslash(uncPath, 2 * MAX_PATH);
+        SalPathAddBackslash(uncPath, uncPath.Size());
         if (strlen(buff) > 3)
         {
             strcat(uncPath, buff + 3);
-            SalPathAddBackslash(uncPath, 2 * MAX_PATH);
+            SalPathAddBackslash(uncPath, uncPath.Size());
         }
         if (!isDir)
             strcat(uncPath, name);
