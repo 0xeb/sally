@@ -196,32 +196,21 @@ void CFilesWindow::FilesAction(CActionType type, CFilesWindow* target, int count
         else
             subDir = FALSE;
 
-        int* indexes = NULL;
+        std::unique_ptr<int[]> indexes; // RAII: auto-deleted when scope exits
         int files = 0;
         int dirs = 0;
         int count = GetSelCount();
         if (countSizeMode == 0 && count > 0)
         {
-            indexes = new int[count];
-            if (indexes == NULL)
+            indexes = std::make_unique<int[]>(count);
+            GetSelItems(count, indexes.get());
+            int i = count;
+            while (i--)
             {
-                TRACE_E(LOW_MEMORY);
-                FilesActionInProgress = FALSE;
-                EndStopRefresh();
-                EndSuspendMode(); // the snooper starts again now
-                return;
-            }
-            else
-            {
-                GetSelItems(count, indexes);
-                int i = count;
-                while (i--)
-                {
-                    if (indexes[i] < Dirs->Count)
-                        dirs++;
-                    else
-                        files++;
-                }
+                if (indexes[i] < Dirs->Count)
+                    dirs++;
+                else
+                    files++;
             }
         }
         else
@@ -233,22 +222,11 @@ void CFilesWindow::FilesAction(CActionType type, CFilesWindow* target, int count
                     count--;
                 if (count > 0)
                 {
-                    indexes = new int[count];
-                    if (indexes == NULL)
-                    {
-                        TRACE_E(LOW_MEMORY);
-                        FilesActionInProgress = FALSE;
-                        EndStopRefresh();
-                        EndSuspendMode(); // the snooper starts again now
-                        return;
-                    }
-                    else
-                    {
-                        int i = (subDir ? 1 : 0);
-                        int j;
-                        for (j = 0; j < count; j++)
-                            indexes[j] = i++;
-                    }
+                    indexes = std::make_unique<int[]>(count);
+                    int i = (subDir ? 1 : 0);
+                    int j;
+                    for (j = 0; j < count; j++)
+                        indexes[j] = i++;
                 }
             }
             else
@@ -267,7 +245,7 @@ void CFilesWindow::FilesAction(CActionType type, CFilesWindow* target, int count
             }
             CPathBuffer redirectedDir; // Heap-allocated for long path support
             if ((count > 0 || oneIndex != -1) &&
-                ContainsWin64RedirectedDir(this, count > 0 ? indexes : &oneIndex,
+                ContainsWin64RedirectedDir(this, count > 0 ? indexes.get() : &oneIndex,
                                            count > 0 ? count : 1, redirectedDir, FALSE))
             {
                 // TODO: Use wide format strings when available
@@ -276,9 +254,7 @@ void CFilesWindow::FilesAction(CActionType type, CFilesWindow* target, int count
                             LoadStr(type == atMove ? IDS_ERRMOVESELCONTW64ALIAS : IDS_ERRDELETESELCONTW64ALIAS),
                             redirectedDir);
                 gPrompter->ShowError(LoadStrW(IDS_ERRORTITLE), AnsiToWide(msg).c_str());
-
-                if (indexes != NULL)
-                    delete[] (indexes);
+                // RAII: indexes auto-deleted when scope exits
                 FilesActionInProgress = FALSE;
                 EndStopRefresh();
                 EndSuspendMode(); // the snooper starts again now
@@ -399,8 +375,7 @@ void CFilesWindow::FilesAction(CActionType type, CFilesWindow* target, int count
                 if (i < 0 || i >= Dirs->Count + Files->Count || // invalid index (no files)
                     i == 0 && subDir)                           // we do not work with ".."
                 {
-                    if (indexes != NULL)
-                        delete[] (indexes);
+                    // RAII: indexes auto-deleted when scope exits
                     FilesActionInProgress = FALSE;
                     EndStopRefresh();
                     EndSuspendMode(); // thesnooper starts again now
@@ -587,7 +562,7 @@ void CFilesWindow::FilesAction(CActionType type, CFilesWindow* target, int count
                             if (count > 0) // some files are selected
                             {
                                 data.IndexesCount = count;
-                                data.Indexes = indexes; // deallocated via 'indexes'
+                                data.Indexes = indexes.get(); // RAII: auto-deleted via unique_ptr
                             }
                             else // take the focused item
                             {
@@ -712,9 +687,7 @@ void CFilesWindow::FilesAction(CActionType type, CFilesWindow* target, int count
                                     SalPathAddBackslash(path, 2 * MAX_PATH + 200);
                                 continue; // back to the copy/move dialog
                             }
-
-                            if (indexes != NULL)
-                                delete[] (indexes);
+                            // RAII: indexes auto-deleted when scope exits
                             //---  if a Salamander window is active, suspend mode ends
                             EndStopRefresh();
                             EndSuspendMode();
@@ -750,7 +723,7 @@ void CFilesWindow::FilesAction(CActionType type, CFilesWindow* target, int count
                                     selFiles = files;
                                     selDirs = count - files;
                                     data.IndexesCount = count;
-                                    data.Indexes = indexes; // deallocated via 'indexes'
+                                    data.Indexes = indexes.get(); // RAII: auto-deleted via unique_ptr
                                 }
                                 else // take the focused item
                                 {
@@ -906,9 +879,7 @@ void CFilesWindow::FilesAction(CActionType type, CFilesWindow* target, int count
                                     SetSel(FALSE, -1, TRUE);                        // explicit redraw
                                     PostMessage(HWindow, WM_USER_SELCHANGED, 0, 0); // sel-change notify
                                 }
-
-                                if (indexes != NULL)
-                                    delete[] (indexes);
+                                // RAII: indexes auto-deleted when scope exits
                                 //---  if any Salamander window is active, suspend mode ends
                                 EndStopRefresh();
                                 EndSuspendMode();
@@ -971,7 +942,7 @@ void CFilesWindow::FilesAction(CActionType type, CFilesWindow* target, int count
         {
             if (type == atDelete && recycle == 1)
             {
-                if (DeleteThroughRecycleBin(indexes, count, f))
+                if (DeleteThroughRecycleBin(indexes.get(), count, f))
                 {
                     SetSel(FALSE, -1, TRUE);                        // explicit redraw
                     PostMessage(HWindow, WM_USER_SELCHANGED, 0, 0); // sel-change notify
@@ -1071,7 +1042,7 @@ void CFilesWindow::FilesAction(CActionType type, CFilesWindow* target, int count
                     char* auxTargetPath = NULL;
                     if (type == atCopy || type == atMove)
                         auxTargetPath = path;
-                    BOOL res2 = BuildScriptMain(script, type, auxTargetPath, mask, count, indexes,
+                    BOOL res2 = BuildScriptMain(script, type, auxTargetPath, mask, count, indexes.get(),
                                                 f, NULL, &changeCaseData, countSizeMode != 0,
                                                 criteriaPtr);
                     // if there's nothing to do, don't show the progress dialog
@@ -1200,9 +1171,7 @@ void CFilesWindow::FilesAction(CActionType type, CFilesWindow* target, int count
                 }
             }
         }
-        //---
-        if (indexes != NULL)
-            delete[] (indexes);
+        // RAII: indexes auto-deleted when scope exits
         //---  if any Salamander window is active, suspend mode ends
         EndStopRefresh();
         EndSuspendMode();
@@ -1305,18 +1274,12 @@ void CFilesWindow::EmailFiles()
                 int selCount = GetSelCount();
                 int alloc = (selCount == 0 ? 1 : selCount);
 
-                int* indexes;
-                indexes = new int[alloc];
-                if (indexes == NULL)
-                {
-                    TRACE_E(LOW_MEMORY);
-                }
-                else
+                std::unique_ptr<int[]> indexes = std::make_unique<int[]>(alloc); // RAII: auto-deleted when scope exits
                 {
                     HCURSOR oldCur = SetCursor(LoadCursor(NULL, IDC_WAIT));
 
                     if (selCount > 0)
-                        GetSelItems(selCount, indexes);
+                        GetSelItems(selCount, indexes.get());
                     else
                         indexes[0] = GetCaretIndex();
 
@@ -1361,7 +1324,7 @@ void CFilesWindow::EmailFiles()
                             }
                         }
                     }
-                    delete[] (indexes);
+                    // RAII: indexes auto-deleted when scope exits
                     SetCursor(oldCur);
                 }
                 if (send && mapi->GetFilesCount() == 0)
