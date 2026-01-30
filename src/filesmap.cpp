@@ -103,7 +103,7 @@ BOOL CFilesMap::CreateMap()
     {
         // Brief || Detailed
         // items are stored top to bottom and then left to right (Brief view)
-        char formatedFileName[MAX_PATH];
+        CPathBuffer formatedFileName;  // Heap-allocated for long path support
         HDC dc = HANDLES(GetDC(Panel->GetListBoxHWND()));
         HFONT hOldFont = (HFONT)SelectObject(dc, Font);
         int width = Panel->ListBox->GetItemWidth();

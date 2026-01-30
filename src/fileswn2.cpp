@@ -3454,15 +3454,15 @@ void CFilesWindow::GetContextMenuPos(POINT* p)
 
 void GetCommonFileTypeStr(char* buf, int* resLen, const char* ext)
 {
-    char uppercaseExt[MAX_PATH];
+    CPathBuffer uppercaseExt;  // Heap-allocated for long path support
     char* d = uppercaseExt;
-    char* end = uppercaseExt + MAX_PATH - 1;
+    char* end = uppercaseExt + uppercaseExt.Size() - 1;
     while (d < end && *ext != 0 && *ext != ' ')
         *d++ = UpperCase[*ext++];
     *d = 0;
-    if (*ext == 0 && uppercaseExt[0] != 0)
+    if (*ext == 0 && *uppercaseExt != 0)
     { // we have the entire extension in uppercase (no spaces and shorter than MAX_PATH) + it is not empty
-        *resLen = _snprintf_s(buf, TRANSFER_BUFFER_MAX, _TRUNCATE, CommonFileTypeName2, uppercaseExt);
+        *resLen = _snprintf_s(buf, TRANSFER_BUFFER_MAX, _TRUNCATE, CommonFileTypeName2, uppercaseExt.Get());
         if (*resLen < 0)
             *resLen = TRANSFER_BUFFER_MAX - 1; // _snprintf_s reports truncation to the buffer size
     }
@@ -3492,7 +3492,7 @@ void CFilesWindow::RefreshListBox(int suggestedXOffset,
     HFONT of = (HFONT)SelectObject(dc, Font);
     SIZE act;
 
-    char formatedFileName[MAX_PATH];
+    CPathBuffer formatedFileName;  // Heap-allocated for long path support
     switch (GetViewMode())
     {
     case vmBrief:
