@@ -1633,7 +1633,7 @@ BOOL CSalamanderPluginEntry::SetBasicPluginData(const char* pluginName, DWORD fu
     {
         if (Plugin->RegKeyName[0] == 0)
         { // new plugin with load/save - set a new key name in the registry
-            char uniqueKeyName[MAX_PATH];
+            CPathBuffer uniqueKeyName;  // Heap-allocated for long path support
             Plugins.GetUniqueRegKeyName(uniqueKeyName, regKeyName);
             s = DupStr(uniqueKeyName);
             if (s != NULL)

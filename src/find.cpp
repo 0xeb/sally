@@ -1524,13 +1524,13 @@ BOOL AddFoundItem(const char* path, const char* name, DWORD sizeLow, DWORD sizeH
 // 'dirStack' is NULL.
 // If 'duplicateCandidates' != NULL, found items will be added to this array
 // instead of data->FoundFilesListView
-void SearchDirectory(char (&path)[MAX_PATH], char* end, int startPathLen,
+void SearchDirectory(CPathBuffer& path, char* end, int startPathLen,
                      CMaskGroup* masksGroup, BOOL includeSubDirs, CGrepData* data,
                      TDirectArray<char*>* dirStack, int dirStackCount,
                      CDuplicateCandidates* duplicateCandidates,
-                     CFindIgnore* ignoreList, char (&message)[2 * MAX_PATH])
+                     CFindIgnore* ignoreList, CPathBuffer& message)
 {
-    SLOW_CALL_STACK_MESSAGE6("SearchDirectory(%s, , %d, %s, %d, , , %d, , )", path, startPathLen,
+    SLOW_CALL_STACK_MESSAGE6("SearchDirectory(%s, , %d, %s, %d, , , %d, , )", path.Get(), startPathLen,
                              masksGroup->GetMasksString(), includeSubDirs, dirStackCount);
 
     if (ignoreList != NULL && ignoreList->Contains(path, startPathLen))
@@ -1543,8 +1543,8 @@ void SearchDirectory(char (&path)[MAX_PATH], char* end, int startPathLen,
         return;
     }
 
-    if ((end - path) + 1 < _countof(path))
-        strcpy_s(end, _countof(path) - (end - path), "*");
+    if ((end - path) + 1 < path.Size())
+        strcpy_s(end, path.Size() - (end - path), "*");
     else
     {
         FIND_LOG_ITEM log;
@@ -1578,7 +1578,7 @@ void SearchDirectory(char (&path)[MAX_PATH], char* end, int startPathLen,
         {
             BOOL isDir = (file.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY) != 0;
             BOOL ignoreDir = isDir && (lstrcmp(file.cFileName, ".") == 0 || lstrcmp(file.cFileName, "..") == 0);
-            if (ignoreDir || (end - path) + lstrlen(file.cFileName) < _countof(path))
+            if (ignoreDir || (end - path) + lstrlen(file.cFileName) < path.Size())
             {
                 // after finding an item without displaying it and once 0.5 s have passed since the last redraw,
                 // we request the listview to redraw
@@ -1608,7 +1608,7 @@ void SearchDirectory(char (&path)[MAX_PATH], char* end, int startPathLen,
                                     ok = FALSE; // a directory cannot be grepped
                                 else
                                 {
-                                    strcpy_s(end, _countof(path) - (end - path), file.cFileName);
+                                    strcpy_s(end, path.Size() - (end - path), file.cFileName);
                                     // links: file.nFileSizeLow == 0 && file.nFileSizeHigh == 0, the file size
                                     // must be additionally obtained via SalGetFileSize()
                                     BOOL isLink = (file.dwFileAttributes & FILE_ATTRIBUTE_REPARSE_POINT) != 0;
@@ -1643,7 +1643,7 @@ void SearchDirectory(char (&path)[MAX_PATH], char* end, int startPathLen,
                 {
                     int l = (int)strlen(file.cFileName);
 
-                    if ((end - path) + l + 1 /* 1 za backslash */ < _countof(path))
+                    if ((end - path) + l + 1 /* 1 za backslash */ < path.Size())
                     {
                         BOOL searchNow = TRUE;
 
@@ -1682,8 +1682,8 @@ void SearchDirectory(char (&path)[MAX_PATH], char* end, int startPathLen,
                         if (searchNow)
                         {
                             // out of memory - we will not use dirStack
-                            strcpy_s(end, _countof(path) - (end - path), file.cFileName);
-                            strcat_s(end, _countof(path) - (end - path), "\\");
+                            strcpy_s(end, path.Size() - (end - path), file.cFileName);
+                            strcat_s(end, path.Size() - (end - path), "\\");
                             l++;
                             SearchDirectory(path, end + l, startPathLen, masksGroup, includeSubDirs, data, NULL,
                                             0, duplicateCandidates, ignoreList, message);
@@ -1694,7 +1694,7 @@ void SearchDirectory(char (&path)[MAX_PATH], char* end, int startPathLen,
                         FIND_LOG_ITEM log;
                         log.Flags = FLI_ERROR;
                         log.Text = LoadStr(IDS_TOOLONGNAME);
-                        strcpy_s(end, _countof(path) - (end - path), file.cFileName);
+                        strcpy_s(end, path.Size() - (end - path), file.cFileName);
                         log.Path = path;
                         SendMessage(data->HWindow, WM_USER_ADDLOG, (WPARAM)&log, 0);
                     }
@@ -1706,8 +1706,8 @@ void SearchDirectory(char (&path)[MAX_PATH], char* end, int startPathLen,
                 log.Flags = FLI_ERROR;
                 log.Text = LoadStr(IDS_TOOLONGNAME);
                 *end = 0;
-                strcpy_s(message, path);
-                strcat_s(message, file.cFileName);
+                lstrcpyn(message, path, message.Size());
+                lstrcpyn(message + strlen(message), file.cFileName, message.Size() - (int)strlen(message));
                 log.Path = message;
                 SendMessage(data->HWindow, WM_USER_ADDLOG, (WPARAM)&log, 0);
             }
@@ -1749,8 +1749,8 @@ void SearchDirectory(char (&path)[MAX_PATH], char* end, int startPathLen,
                 char* newFileName = (char*)dirStack->At(i);
                 if (!data->StopSearch) // may be set during SearchDirectory
                 {
-                    strcpy_s(end, _countof(path) - (end - path), newFileName);
-                    strcat_s(end, _countof(path) - (end - path), "\\");
+                    strcpy_s(end, path.Size() - (end - path), newFileName);
+                    strcat_s(end, path.Size() - (end - path), "\\");
                     SearchDirectory(path, end + strlen(end), startPathLen, masksGroup, includeSubDirs, data,
                                     dirStack, dirStackCount, duplicateCandidates, ignoreList, message);
                 }
@@ -1863,17 +1863,17 @@ unsigned GrepThreadFBody(void* ptr)
     CGrepData* data = (CGrepData*)ptr;
     data->NeedRefresh = FALSE;
     data->Criteria.PrepareForTest();
-    char path[MAX_PATH];
+    CPathBuffer path;  // Heap-allocated for long path support
     char* end;
     if (data->Refine != 0)
     {
         if (data->Data->Count > 0)
         {
-            strcpy_s(path, data->Data->At(0)->Dir);
+            lstrcpyn(path, data->Data->At(0)->Dir, path.Size());
             int len = (int)strlen(path);
             if (path[len - 1] != '\\')
             {
-                strcat_s(path, "\\");
+                lstrcpyn(path + len, "\\", path.Size() - len);
                 len++;
             }
             end = path + len;
@@ -1912,11 +1912,11 @@ unsigned GrepThreadFBody(void* ptr)
             int i;
             for (i = 0; i < data->Data->Count; i++)
             {
-                strcpy_s(path, data->Data->At(i)->Dir);
+                lstrcpyn(path, data->Data->At(i)->Dir, path.Size());
                 int len = (int)strlen(path);
                 if (path[len - 1] != '\\')
                 {
-                    strcat_s(path, "\\");
+                    lstrcpyn(path + len, "\\", path.Size() - len);
                     len++;
                 }
                 end = path + len;
@@ -1952,7 +1952,7 @@ unsigned GrepThreadFBody(void* ptr)
                     }
                 }
 
-                char message[2 * MAX_PATH];
+                CPathBuffer message;  // Heap-allocated for long path support
                 SearchDirectory(path, end, (int)(end - path), mg, includeSubDirs, data, dirStack, 0,
                                 duplicateCandidates, ignoreList, message);
 

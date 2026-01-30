@@ -441,8 +441,8 @@ BOOL CMaskGroup::PrepareMasks(int& errorPos, const char* masksString)
 
     const char* useMasksString = masksString == NULL ? MasksString : masksString;
     const char* s = useMasksString;
-    char buf[MAX_PATH];
-    char maskBuf[MAX_PATH];
+    CPathBuffer buf;      // Heap-allocated for long path support
+    CPathBuffer maskBuf;  // Heap-allocated for long path support
     int excludePos = -1;   // if not -1, all following masks are exclude type
                            // and will be inserted at the beginning of the array
     int hashableMasks = 0; // number of masks that can be hashed (MASK_OPTIMIZE_EXTENSION + CMaskItemFlags::Exclude==0)
