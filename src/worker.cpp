@@ -1375,7 +1375,7 @@ void GetFileOverwriteInfo(char* buff, int buffLen, HANDLE file, const char* file
 void GetDirInfo(char* buffer, const char* dir)
 {
     const char* dirFindFirst = dir;
-    char dirFindFirstCopy[3 * MAX_PATH];
+    CPathBuffer dirFindFirstCopy; // Heap-allocated for long path support
     MakeCopyWithBackslashIfNeeded(dirFindFirst, dirFindFirstCopy);
 
     BOOL ok = FALSE;
@@ -1731,10 +1731,10 @@ BOOL DoCopySecurity(const char* sourceName, const char* targetName, DWORD* err, 
     // GetNamedSecurityInfo (and others) trim the spaces/dots and then work
     // with a different path
     const char* sourceNameSec = sourceName;
-    char sourceNameSecCopy[3 * MAX_PATH];
+    CPathBuffer sourceNameSecCopy; // Heap-allocated for long path support
     MakeCopyWithBackslashIfNeeded(sourceNameSec, sourceNameSecCopy);
     const char* targetNameSec = targetName;
-    char targetNameSecCopy[3 * MAX_PATH];
+    CPathBuffer targetNameSecCopy; // Heap-allocated for long path support
     MakeCopyWithBackslashIfNeeded(targetNameSec, targetNameSecCopy);
 
     PSID srcOwner = NULL;
@@ -1898,7 +1898,7 @@ DWORD CompressFile(char* fileName, DWORD attrs)
     // if the path ends with a space or dot, we must append '\\', otherwise CreateFile
     // trims the spaces/dots and works with a different path
     const char* fileNameCrFile = fileName;
-    char fileNameCrFileCopy[3 * MAX_PATH];
+    CPathBuffer fileNameCrFileCopy; // Heap-allocated for long path support
     MakeCopyWithBackslashIfNeeded(fileNameCrFile, fileNameCrFileCopy);
 
     BOOL attrsChange = FALSE;
@@ -1935,7 +1935,7 @@ DWORD UncompressFile(char* fileName, DWORD attrs)
     // if the path ends with a space or dot, we must append '\\', otherwise CreateFile
     // trims the spaces/dots and works with a different path
     const char* fileNameCrFile = fileName;
-    char fileNameCrFileCopy[3 * MAX_PATH];
+    CPathBuffer fileNameCrFileCopy; // Heap-allocated for long path support
     MakeCopyWithBackslashIfNeeded(fileNameCrFile, fileNameCrFileCopy);
 
     BOOL attrsChange = FALSE;
@@ -1975,7 +1975,7 @@ DWORD MyEncryptFile(HWND hProgressDlg, char* fileName, DWORD attrs, DWORD finalA
     // if the path ends with a space or dot, we must append '\\', otherwise CreateFile
     // trims the spaces/dots and works with a different path
     const char* fileNameCrFile = fileName;
-    char fileNameCrFileCopy[3 * MAX_PATH];
+    CPathBuffer fileNameCrFileCopy; // Heap-allocated for long path support
     MakeCopyWithBackslashIfNeeded(fileNameCrFile, fileNameCrFileCopy);
 
     // if the file has the SYSTEM attribute, the EncryptFile API function reports "access denied"; handle it:
@@ -2072,7 +2072,7 @@ DWORD MyDecryptFile(char* fileName, DWORD attrs, BOOL preserveDate)
     // if the path ends with a space or dot, we must append '\\', otherwise CreateFile
     // trims the spaces/dots and works with a different path
     const char* fileNameCrFile = fileName;
-    char fileNameCrFileCopy[3 * MAX_PATH];
+    CPathBuffer fileNameCrFileCopy; // Heap-allocated for long path support
     MakeCopyWithBackslashIfNeeded(fileNameCrFile, fileNameCrFileCopy);
 
     BOOL attrsChange = FALSE;
@@ -2145,7 +2145,7 @@ BOOL CheckFileOrDirADS(const char* fileName, BOOL isDir, CQuadWord* adsSize, wch
         // if the path ends with a space or dot, we must append '\\', otherwise CreateFile
         // trims the spaces/dots and works with a different path
         const char* fileNameCrFile = fileName;
-        char fileNameCrFileCopy[3 * MAX_PATH];
+        CPathBuffer fileNameCrFileCopy; // Heap-allocated for long path support
         MakeCopyWithBackslashIfNeeded(fileNameCrFile, fileNameCrFileCopy);
 
         HANDLE file = SalCreateFileH(fileNameCrFile, 0, FILE_SHARE_READ | FILE_SHARE_WRITE,
@@ -5803,10 +5803,10 @@ BOOL DoMoveFile(COperation* op, HWND hProgressDlg, void* buffer,
         // if the path ends with a space or dot, we must append '\\', otherwise GetNamedSecurityInfo,
         // GetDirTime, SetFileAttributes, and MoveFile trim the spaces/dots and operate on a different path
         const char* sourceNameMvDir = op->SourceName;
-        char sourceNameMvDirCopy[3 * MAX_PATH];
+        CPathBuffer sourceNameMvDirCopy; // Heap-allocated for long path support
         MakeCopyWithBackslashIfNeeded(sourceNameMvDir, sourceNameMvDirCopy);
         const char* targetNameMvDir = op->TargetName;
-        char targetNameMvDirCopy[3 * MAX_PATH];
+        CPathBuffer targetNameMvDirCopy; // Heap-allocated for long path support
         MakeCopyWithBackslashIfNeeded(targetNameMvDir, targetNameMvDirCopy);
 
         int autoRetryAttempts = 0;
@@ -6540,7 +6540,7 @@ BOOL SalCreateDirectoryEx(const char* name, DWORD* err)
     // if the name ends with a space/dot we must append '\\', otherwise CreateDirectory
     // quietly trims the trailing spaces/dots and creates a different directory
     const char* nameCrDir = name;
-    char nameCrDirBuf[3 * MAX_PATH];
+    CPathBuffer nameCrDirBuf; // Heap-allocated for long path support
     MakeCopyWithBackslashIfNeeded(nameCrDir, nameCrDirBuf);
     // Use SalLPCreateDirectory for long path support
     if (SalLPCreateDirectory(nameCrDir, NULL))
@@ -6641,7 +6641,7 @@ BOOL DoCopyDirTime(HWND hProgressDlg, const char* targetName, FILETIME* modified
     // if the path ends with a space/dot, we must append '\\', otherwise CreateFile
     // trims the spaces/dots and works with a different path
     const char* targetNameCrFile = targetName;
-    char targetNameCrFileCopy[3 * MAX_PATH];
+    CPathBuffer targetNameCrFileCopy; // Heap-allocated for long path support
     MakeCopyWithBackslashIfNeeded(targetNameCrFile, targetNameCrFileCopy);
 
     BOOL showError = !quiet;
@@ -6723,10 +6723,10 @@ BOOL DoCreateDir(HWND hProgressDlg, char* name, DWORD attr,
     // if the path ends with a space/dot, we must append '\\'; otherwise SetFileAttributes
     // and RemoveDirectory trim the spaces/dots and operate on a different path
     const char* nameCrDir = name;
-    char nameCrDirCopy[3 * MAX_PATH];
+    CPathBuffer nameCrDirCopy; // Heap-allocated for long path support
     MakeCopyWithBackslashIfNeeded(nameCrDir, nameCrDirCopy);
     const char* sourceDirCrDir = sourceDir;
-    char sourceDirCrDirCopy[3 * MAX_PATH];
+    CPathBuffer sourceDirCrDirCopy; // Heap-allocated for long path support
     if (sourceDirCrDir != NULL)
         MakeCopyWithBackslashIfNeeded(sourceDirCrDir, sourceDirCrDirCopy);
 
@@ -7052,7 +7052,7 @@ BOOL DoDeleteDir(HWND hProgressDlg, char* name, const CQuadWord& size, COperatio
     // if the path ends with a space/dot, we must append '\\'; otherwise SetFileAttributes
     // and RemoveDirectory trim the spaces/dots and operate on a different path
     const char* nameRmDir = name;
-    char nameRmDirCopy[3 * MAX_PATH];
+    CPathBuffer nameRmDirCopy; // Heap-allocated for long path support
     MakeCopyWithBackslashIfNeeded(nameRmDir, nameRmDirCopy);
 
     while (1)
@@ -7300,7 +7300,7 @@ BOOL DeleteDirLink(const char* name, DWORD* err)
     // if the path ends with a space/dot, we must append '\\'; otherwise CreateFile
     // and RemoveDirectory trim the spaces/dots and operate on a different path
     const char* nameDelLink = name;
-    char nameDelLinkCopy[3 * MAX_PATH];
+    CPathBuffer nameDelLinkCopy; // Heap-allocated for long path support
     MakeCopyWithBackslashIfNeeded(nameDelLink, nameDelLinkCopy);
 
     return DoDeleteDirLinkAux(nameDelLink, err);
@@ -7312,7 +7312,7 @@ BOOL DoDeleteDirLink(HWND hProgressDlg, char* name, const CQuadWord& size, COper
     // if the path ends with a space/dot, we must append '\\'; otherwise CreateFile
     // and RemoveDirectory trim the spaces/dots and operate on a different path
     const char* nameDelLink = name;
-    char nameDelLinkCopy[3 * MAX_PATH];
+    CPathBuffer nameDelLinkCopy; // Heap-allocated for long path support
     MakeCopyWithBackslashIfNeeded(nameDelLink, nameDelLinkCopy);
 
     while (1)
@@ -7884,7 +7884,7 @@ BOOL DoChangeAttrs(HWND hProgressDlg, char* name, const CQuadWord& size, DWORD a
     // SetFileAttributes (and others) trims the spaces/dots and operates
     // on a different path
     const char* nameSetAttrs = name;
-    char nameSetAttrsCopy[3 * MAX_PATH];
+    CPathBuffer nameSetAttrsCopy; // Heap-allocated for long path support
     MakeCopyWithBackslashIfNeeded(nameSetAttrs, nameSetAttrsCopy);
 
     while (1)
