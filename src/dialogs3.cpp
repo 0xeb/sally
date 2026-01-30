@@ -638,9 +638,10 @@ CCopyMoveDialog::DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
             if (len > 0)
             {
                 // Convert ANSI to Unicode and set on overlay
-                wchar_t wideText[MAX_PATH];
-                MultiByteToWideChar(CP_ACP, 0, ansiText, -1, wideText, MAX_PATH);
-                SetWindowTextW(HUnicodeEdit, wideText);
+                std::wstring wideText(ansiText.Size(), L'\0');
+                int wideLen = MultiByteToWideChar(CP_ACP, 0, ansiText, -1, &wideText[0], (int)wideText.size());
+                wideText.resize(wideLen > 0 ? wideLen - 1 : 0);  // Remove null terminator from count
+                SetWindowTextW(HUnicodeEdit, wideText.c_str());
             }
         }
         // Fall through to base class for all WM_COMMAND messages (IDOK, IDCANCEL, etc.)
