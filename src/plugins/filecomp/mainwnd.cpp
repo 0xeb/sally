@@ -1228,8 +1228,8 @@ CMainWindow::WindowProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
 
         case CM_COMPARE:
         {
-            char path1[MAX_PATH];
-            char path2[MAX_PATH];
+            CPathBuffer path1; // Heap-allocated for long path support
+            CPathBuffer path2;
             if (DataValid)
             {
                 strcpy(path1, Path1);
@@ -1572,7 +1572,7 @@ CMainWindow::WindowProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
         {
             POINT pt;
             int count, view = -1;
-            char path1[MAX_PATH], path2[MAX_PATH];
+            CPathBuffer path1, path2; // Heap-allocated for long path support
             CCompareOptions options = DefCompareOptions;
 
             if (DragQueryPoint(drop, &pt))
@@ -1590,19 +1590,19 @@ CMainWindow::WindowProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
                 goto LDROPERROR;
             if (count >= 1)
             {
-                DragQueryFile(drop, 0, path1, MAX_PATH);
+                DragQueryFile(drop, 0, path1, path1.Size());
                 if (SG->SalGetFileAttributes(path1) & FILE_ATTRIBUTE_DIRECTORY)
                 {
-                    Error(HWindow, IDS_NOTVALIDFILE, path1);
+                    Error(HWindow, IDS_NOTVALIDFILE, path1.Get());
                     goto LDROPERROR;
                 }
             }
             if (count >= 2)
             {
-                DragQueryFile(drop, 1, path2, MAX_PATH);
+                DragQueryFile(drop, 1, path2, path2.Size());
                 if (SG->SalGetFileAttributes(path1) & FILE_ATTRIBUTE_DIRECTORY)
                 {
-                    Error(HWindow, IDS_NOTVALIDFILE, path2);
+                    Error(HWindow, IDS_NOTVALIDFILE, path2.Get());
                     goto LDROPERROR;
                 }
             }
