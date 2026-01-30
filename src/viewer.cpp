@@ -168,12 +168,8 @@ void DoHexValidation(HWND edit, const int textLen)
     CALL_STACK_MESSAGE2("DoHexValidation(, %d)", textLen);
     int start, end;
     SendMessage(edit, CB_GETEDITSEL, (WPARAM)&start, (LPARAM)&end);
-    char* text = new char[textLen];
-    if (text == NULL)
-    {
-        TRACE_E(LOW_MEMORY);
-        return;
-    }
+    std::unique_ptr<char[]> textBuffer = std::make_unique<char[]>(textLen); // RAII: auto-deleted
+    char* text = textBuffer.get(); // use raw pointer for arithmetic
     SendMessage(edit, WM_GETTEXT, textLen, (LPARAM)text);
     char* s = text;
     while (*s != 0 && *s == ' ')
@@ -266,7 +262,7 @@ void DoHexValidation(HWND edit, const int textLen)
     }
     SendMessage(edit, WM_SETTEXT, 0, (LPARAM)text);
     SendMessage(edit, CB_SETEDITSEL, 0, MAKELPARAM(start, end));
-    delete[] (text);
+    // RAII: textBuffer auto-deleted when scope exits
 }
 
 //
