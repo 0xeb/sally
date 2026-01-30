@@ -1,4 +1,4 @@
-﻿// SPDX-FileCopyrightText: 2023 Open Salamander Authors
+// SPDX-FileCopyrightText: 2023 Open Salamander Authors
 // SPDX-License-Identifier: GPL-2.0-or-later
 // CommentsTranslationProject: TRANSLATED
 
@@ -19,7 +19,7 @@
 #include "menu.h"
 #include "shellib.h"
 
-static char LastSelectedPluginDLLName[MAX_PATH] = {0}; // after reopening Plugins Manager, select the last chosen plugin
+static CPathBuffer LastSelectedPluginDLLName; // Heap-allocated for long path support // after reopening Plugins Manager, select the last chosen plugin
 
 //
 // ****************************************************************************
@@ -63,7 +63,7 @@ void CPluginsDlg::SetColumnWidths()
     // set optimal widths for all columns
     int i;
     for (i = 0; i <= 3; i++)
-        ListView_SetColumnWidth(HListView, i, i < 3 ? LVSCW_AUTOSIZE_USEHEADER : LVSCW_AUTOSIZE); // the last column shouldn’t stretch to fill the view; its content is wider than the header.
+        ListView_SetColumnWidth(HListView, i, i < 3 ? LVSCW_AUTOSIZE_USEHEADER : LVSCW_AUTOSIZE); // the last column shouldn�t stretch to fill the view; its content is wider than the header.
 
     // sum the widths of columns we want to show completely (everything after name, which we may shorten)
     int nameWidth = ListView_GetColumnWidth(HListView, 0);
@@ -213,9 +213,9 @@ void CPluginsDlg::OnSelChanged()
     if (p != NULL)
     {
         if (p->DLLName != NULL)
-            lstrcpyn(LastSelectedPluginDLLName, p->DLLName, MAX_PATH);
+            lstrcpyn(LastSelectedPluginDLLName, p->DLLName, LastSelectedPluginDLLName.Size());
         else
-            LastSelectedPluginDLLName[0] = 0;
+            *LastSelectedPluginDLLName = 0;
 
         if (!IsWindowVisible(showInBar))
             ShowWindow(showInBar, SW_SHOW);

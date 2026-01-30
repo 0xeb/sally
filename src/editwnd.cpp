@@ -945,7 +945,7 @@ CEditLine::WindowProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
             if (controlPressed && !altPressed)
             {
                 SkipCharacter = TRUE;
-                char path[MAX_PATH];
+                CPathBuffer path; // Heap-allocated for long path support
                 const char* s;
                 switch (wParam)
                 {
@@ -963,7 +963,7 @@ CEditLine::WindowProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
                 {
                     if (shiftPressed) // DOS path
                     {
-                        if (!GetShortPathName(s, path, MAX_PATH))
+                        if (!GetShortPathName(s, path.Get(), path.Size()))
                         {
                             strcpy(path, s);
                         }
@@ -972,7 +972,7 @@ CEditLine::WindowProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
                     {
                         strcpy(path, s);
                     }
-                    SalPathAddBackslash(path, MAX_PATH);
+                    SalPathAddBackslash(path, path.Size());
                     InsertText(path);
                 }
                 return 0;
