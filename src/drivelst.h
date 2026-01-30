@@ -1,4 +1,4 @@
-﻿// SPDX-FileCopyrightText: 2023 Open Salamander Authors
+// SPDX-FileCopyrightText: 2023 Open Salamander Authors
 // SPDX-License-Identifier: GPL-2.0-or-later
 // CommentsTranslationProject: TRANSLATED
 
@@ -37,8 +37,8 @@ public:
     BOOL Find(const char* displayName, const char** userFolder);
 };
 
-extern char DropboxPath[MAX_PATH];
-extern char OneDrivePath[MAX_PATH];                        // for personal account only
+extern CPathBuffer DropboxPath;
+extern CPathBuffer OneDrivePath;                        // for personal account only
 extern COneDriveBusinessStorages OneDriveBusinessStorages; // for business accounts only
 
 void InitOneDrivePath();

@@ -1,4 +1,4 @@
-﻿// SPDX-FileCopyrightText: 2023 Open Salamander Authors
+// SPDX-FileCopyrightText: 2023 Open Salamander Authors
 // SPDX-License-Identifier: GPL-2.0-or-later
 // CommentsTranslationProject: TRANSLATED
 
@@ -1374,7 +1374,7 @@ extern HINSTANCE Shell32DLL;          // handle to shell32.dll (icons)
 extern HINSTANCE ImageResDLL;         // handle to imageres.dll (icons - Vista+)
 extern HINSTANCE User32DLL;           // handle to user32.dll (DisableProcessWindowsGhosting)
 extern HINSTANCE HLanguage;           // handle to language-dependent resources (path: Configuration.LoadedSLGName)
-extern char CurrentHelpDir[MAX_PATH]; // after first use of help contains path to help directory (location of all .chm files)
+extern CPathBuffer CurrentHelpDir; // after first use of help contains path to help directory (location of all .chm files)
 extern WORD LanguageID;               // language-id of language-dependent resources (.SLG file)
 
 extern BOOL UseCustomPanelFont; // if TRUE, Font and FontUL come from LogFont structure; otherwise from system font (default)
@@ -1713,7 +1713,7 @@ extern char RTCErrorDescription[RTC_ERROR_DESCRIPTION_SIZE];
 extern char BugReportPath[MAX_PATH];
 
 // file name that will be imported (if exists) to registry
-extern char ConfigurationName[MAX_PATH];
+extern CPathBuffer ConfigurationName;
 extern BOOL ConfigurationNameIgnoreIfNotExists;
 
 extern HWND PluginProgressDialog; // if plug-in opens progress dialog, its HWND is here, otherwise NULL

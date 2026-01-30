@@ -1,4 +1,4 @@
-﻿// SPDX-FileCopyrightText: 2023 Open Salamander Authors
+// SPDX-FileCopyrightText: 2023 Open Salamander Authors
 // SPDX-License-Identifier: GPL-2.0-or-later
 // CommentsTranslationProject: TRANSLATED
 
@@ -1324,14 +1324,14 @@ BOOL base64_decode(char* data, int input_length, int* output_length, const char*
 }
 
 // a path to the local Dropbox directory
-char DropboxPath[MAX_PATH] = "";
+CPathBuffer DropboxPath; // Heap-allocated for long path support
 
 void InitDropboxPath()
 {
     static BOOL alreadyCalled = FALSE;
     if (!alreadyCalled) // it makes sense to find the path only once, then we just ignore it
     {
-        DropboxPath[0] = 0;
+        *DropboxPath = 0;
         CPathBuffer sDbPath; // Heap-allocated for long path support
         BOOL cfgAlreadyFound = FALSE;
         if (SHGetFolderPath(NULL, CSIDL_APPDATA, NULL, 0 /* SHGFP_TYPE_CURRENT */, sDbPath) == S_OK)
@@ -1383,7 +1383,7 @@ void InitDropboxPath()
                                         ConvertU2A(widePath, -1, mbPath, mbPath.Size()))
                                     {
                                         TRACE_I("Dropbox path: " << mbPath);
-                                        strcpy_s(DropboxPath, mbPath);
+                                        strcpy_s(DropboxPath.Get(), DropboxPath.Size(), mbPath);
                                     }
                                     else
                                         TRACE_E("Dropbox path is too big or not convertible to ANSI string.");
@@ -1417,7 +1417,7 @@ void InitDropboxPath()
 my_DEFINE_KNOWN_FOLDER(my_FOLDERID_SkyDrive, 0xa52bba46, 0xe9e1, 0x435f, 0xb3, 0xd9, 0x28, 0xda, 0xa6, 0x48, 0xc0, 0xf6);
 
 // the path to the local OneDrive folder - Personal (only for personal accounts, for business accounts we have OneDriveBusinessStorages)
-char OneDrivePath[MAX_PATH] = "";
+CPathBuffer OneDrivePath; // Heap-allocated for long path support
 
 // the paths to local OneDrive folders - Business (only for business accounts, for personal accounts we have OneDrivePath)
 COneDriveBusinessStorages OneDriveBusinessStorages;
@@ -1459,7 +1459,7 @@ BOOL COneDriveBusinessStorages::Find(const char* displayName, const char** userF
 
 void InitOneDrivePath()
 {
-    OneDrivePath[0] = 0; // we find out the path to OneDrive over and over again, because after the commend "Unlink OneDrive" (from OneDrive) we should stop showing it
+    *OneDrivePath = 0; // we find out the path to OneDrive over and over again, because after the commend "Unlink OneDrive" (from OneDrive) we should stop showing it
 
     BOOL done = FALSE;
     if (WindowsVistaAndLater) // SHGetKnownFolderPath has existed since Vista
@@ -1477,9 +1477,9 @@ void InitOneDrivePath()
             {
                 if (path[0] != 0) // FOLDERID_SkyDrive was introduced in Windows 8.1 = we should not need to hunt it in the registry
                 {
-                    done = ConvertU2A(path, -1, OneDrivePath, _countof(OneDrivePath)) != 0;
+                    done = ConvertU2A(path, -1, OneDrivePath, OneDrivePath.Size()) != 0;
                     if (!done)
-                        OneDrivePath[0] = 0; // just for sync
+                        *OneDrivePath = 0; // just for sync
                                              //else TRACE_I("OneDrive path (FOLDERID_SkyDrive): " << OneDrivePath);
                 }
                 CoTaskMemFree(path);
@@ -1503,7 +1503,7 @@ void InitOneDrivePath()
                 type == REG_SZ && size > 1)
             {
                 //TRACE_I("OneDrive path (UserFolder): " << path);
-                strcpy_s(OneDrivePath, path); // we have needed path
+                strcpy_s(OneDrivePath.Get(), OneDrivePath.Size(), path); // we have needed path
                 done = TRUE;
             }
             HANDLES(RegCloseKey(hKey));
@@ -1553,7 +1553,7 @@ void InitOneDrivePath()
 
 int GetOneDriveStorages()
 {
-    return (OneDrivePath[0] != 0 ? 1 : 0) + OneDriveBusinessStorages.Count;
+    return (*OneDrivePath != 0 ? 1 : 0) + OneDriveBusinessStorages.Count;
 }
 
 void CDrivesList::AddToDrives(CDriveData& drv, int textResId, char hotkey, CDriveTypeEnum driveType,
@@ -1980,7 +1980,7 @@ BOOL CDrivesList::BuildData(BOOL noTimeout, TDirectArray<CDriveData>* copyDrives
         }
 
         InitDropboxPath();
-        if (DropboxPath[0] != 0)
+        if (*DropboxPath != 0)
         {
             CachedCloudStoragesMask |= 0x02 /* Dropbox */;
             AddToDrives(drv, IDS_DROPBOX, 0, drvtDropbox, getGrayIcons,
@@ -1989,9 +1989,9 @@ BOOL CDrivesList::BuildData(BOOL noTimeout, TDirectArray<CDriveData>* copyDrives
 
         InitOneDrivePath();
         int c = GetOneDriveStorages();
-        if (c == 1 && OneDrivePath[0] != 0)
+        if (c == 1 && *OneDrivePath != 0)
             CachedCloudStoragesMask |= 0x04 /* only one OneDrive storage - Personal */;
-        if (c == 1 && OneDrivePath[0] == 0)
+        if (c == 1 && *OneDrivePath == 0)
             CachedCloudStoragesMask |= 0x08 /* only one OneDrive storage - Business */;
         if (c > 1)
             CachedCloudStoragesMask |= 0x10 /* more OneDrive storages - drop down menu on drive-bar */;
@@ -2006,7 +2006,7 @@ BOOL CDrivesList::BuildData(BOOL noTimeout, TDirectArray<CDriveData>* copyDrives
         }
         else // data for change drive menu || drive-bar && the only storage (we give a simple button on the drive-bar)
         {
-            if (OneDrivePath[0] != 0) // personal
+            if (*OneDrivePath != 0) // personal
             {
                 if (c == 1)
                     strcpy_s(itemText, LoadStr(IDS_ONEDRIVE)); // the only personal storage = we write only: OneDrive
@@ -2321,7 +2321,7 @@ BOOL CDrivesList::ExecuteItem(int index, HWND hwnd, const RECT* exclude, BOOL* f
             mii.Type = MENU_TYPE_STRING;
 
             char itemText[200 + ONEDRIVE_MAXBUSINESSDISPLAYNAME];
-            if (OneDrivePath[0] != 0) // personal
+            if (*OneDrivePath != 0) // personal
             {
                 sprintf_s(itemText, "%s - %s", LoadStr(IDS_ONEDRIVE), LoadStr(IDS_ONEDRIVEPERSONAL));
                 mii.String = itemText;

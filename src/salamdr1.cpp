@@ -1,4 +1,4 @@
-﻿// SPDX-FileCopyrightText: 2023 Open Salamander Authors
+// SPDX-FileCopyrightText: 2023 Open Salamander Authors
 // SPDX-License-Identifier: GPL-2.0-or-later
 // CommentsTranslationProject: TRANSLATED
 
@@ -157,7 +157,7 @@ BOOL RunningAsAdmin = FALSE;
 DWORD CCVerMajor = 0;
 DWORD CCVerMinor = 0;
 
-char ConfigurationName[MAX_PATH];
+CPathBuffer ConfigurationName; // Heap-allocated for long path support
 BOOL ConfigurationNameIgnoreIfNotExists = TRUE;
 
 int StopRefresh = 0;
@@ -237,10 +237,10 @@ HINSTANCE Shell32DLL = NULL;        // handle to shell32.dll (icons)
 HINSTANCE ImageResDLL = NULL;       // handle to imageres.dll (icons - Vista)
 HINSTANCE User32DLL = NULL;         // handle to user32.dll (DisableProcessWindowsGhosting)
 HINSTANCE HLanguage = NULL;         // handle to language-dependent resources (.SPL file)
-char CurrentHelpDir[MAX_PATH] = ""; // after first use of help, this contains path to help directory (location of all .chm files)
+CPathBuffer CurrentHelpDir; // Heap-allocated for long path support // after first use of help, this contains path to help directory (location of all .chm files)
 WORD LanguageID = 0;                // language-id of .SPL file
 
-char OpenReadmeInNotepad[MAX_PATH]; // used only when launched from installer: filename to open in notepad during IDLE (start notepad)
+CPathBuffer OpenReadmeInNotepad; // Heap-allocated for long path support // used only when launched from installer: filename to open in notepad during IDLE (start notepad)
 
 BOOL UseCustomPanelFont = FALSE;
 HFONT Font = NULL;
@@ -3431,17 +3431,17 @@ BOOL ParseCommandLineParameters(LPSTR cmdLine, CCommandLineParams* cmdLineParams
     int p = 20; // number of elements in argv array
 
     CPathBuffer curDir; // Heap-allocated for long path support
-    GetModuleFileName(HInstance, ConfigurationName, MAX_PATH);
-    *(strrchr(ConfigurationName, '\\') + 1) = 0;
+    GetModuleFileName(HInstance, ConfigurationName.Get(), ConfigurationName.Size());
+    *(strrchr(ConfigurationName.Get(), '\\') + 1) = 0;
     const char* configReg = "config.reg";
-    strcat(ConfigurationName, configReg);
+    strcat(ConfigurationName.Get(), configReg);
     if (!FileExists(ConfigurationName) && GetOurPathInRoamingAPPDATA(curDir) &&
         SalPathAppend(curDir, configReg, curDir.Size()) && FileExists(curDir))
     { // if config.reg file doesn't exist next to .exe, we also look for it in APPDATA
-        lstrcpyn(ConfigurationName, curDir, MAX_PATH);
+        lstrcpyn(ConfigurationName, curDir, ConfigurationName.Size());
         ConfigurationNameIgnoreIfNotExists = FALSE;
     }
-    OpenReadmeInNotepad[0] = 0;
+    *OpenReadmeInNotepad = 0;
     if (GetCmdLine(buf, _countof(buf), argv, p, cmdLine))
     {
         int i;
@@ -3495,17 +3495,17 @@ BOOL ParseCommandLineParameters(LPSTR cmdLine, CCommandLineParams* cmdLineParams
                     if (*s == '\\' && *(s + 1) == '\\' || // UNC full path
                         *s != 0 && *(s + 1) == ':')       // "c:\" full path
                     {                                     // full path
-                        lstrcpyn(ConfigurationName, argv[i + 1], MAX_PATH);
+                        lstrcpyn(ConfigurationName, argv[i + 1], ConfigurationName.Size());
                     }
                     else // relative path
                     {
-                        GetModuleFileName(HInstance, ConfigurationName, MAX_PATH);
-                        *(strrchr(ConfigurationName, '\\') + 1) = 0;
-                        SalPathAppend(ConfigurationName, s, MAX_PATH);
+                        GetModuleFileName(HInstance, ConfigurationName.Get(), ConfigurationName.Size());
+                        *(strrchr(ConfigurationName.Get(), '\\') + 1) = 0;
+                        SalPathAppend(ConfigurationName, s, ConfigurationName.Size());
                         if (!FileExists(ConfigurationName) && GetOurPathInRoamingAPPDATA(curDir) &&
                             SalPathAppend(curDir, s, MAX_PATH) && FileExists(curDir))
                         { // if relatively specified file after -C doesn't exist next to .exe, we also look for it in APPDATA
-                            lstrcpyn(ConfigurationName, curDir, MAX_PATH);
+                            lstrcpyn(ConfigurationName, curDir, ConfigurationName.Size());
                         }
                     }
                     ConfigurationNameIgnoreIfNotExists = FALSE;
@@ -3571,7 +3571,7 @@ BOOL ParseCommandLineParameters(LPSTR cmdLine, CCommandLineParams* cmdLineParams
 
             if (StrICmp(argv[i], "-run_notepad") == 0 && i + 1 < p)
             { // Vista+: after installation: installer (SFX7ZIP) executes Salamander and asks for execution of notepad with readme file
-                lstrcpyn(OpenReadmeInNotepad, argv[i + 1], MAX_PATH);
+                lstrcpyn(OpenReadmeInNotepad, argv[i + 1], OpenReadmeInNotepad.Size());
                 i++;
                 continue;
             }
@@ -4685,10 +4685,10 @@ FIND_NEW_SLG_FILE:
                                         goto TEST_IDLE; // try "idle" again (e.g. to process another posted command/unload/Pack/Unpack)
                                     }
                                 }
-                                if (!SalamanderBusy && OpenReadmeInNotepad[0] != 0)
+                                if (!SalamanderBusy && *OpenReadmeInNotepad != 0)
                                 { // start notepad with file 'OpenReadmeInNotepad' for installer on Vista+
                                     StartNotepad(OpenReadmeInNotepad);
-                                    OpenReadmeInNotepad[0] = 0;
+                                    *OpenReadmeInNotepad = 0;
                                 }
                                 CannotCloseSalMainWnd = FALSE;
                             }
