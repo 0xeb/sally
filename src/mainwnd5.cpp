@@ -990,15 +990,15 @@ BOOL CompareDirsAux(HWND hWindow, CCmpDirProgressDialog* progressDlg,
                             // build full paths to both files
                             pathAppended = TRUE;
 
-                            char leftFilePath[2 * MAX_PATH];
+                            CPathBuffer leftFilePath; // Heap-allocated for long path support
                             strcpy(leftFilePath, leftPanel->GetPath());
-                            pathAppended &= SalPathAppend(leftFilePath, leftSubDir, 2 * MAX_PATH);
-                            pathAppended &= SalPathAppend(leftFilePath, leftFile->Name, 2 * MAX_PATH);
+                            pathAppended &= SalPathAppend(leftFilePath, leftSubDir, leftFilePath.Size());
+                            pathAppended &= SalPathAppend(leftFilePath, leftFile->Name, leftFilePath.Size());
 
-                            char rightFilePath[2 * MAX_PATH];
+                            CPathBuffer rightFilePath; // Heap-allocated for long path support
                             strcpy(rightFilePath, rightPanel->GetPath());
-                            pathAppended &= SalPathAppend(rightFilePath, rightSubDir, 2 * MAX_PATH);
-                            pathAppended &= SalPathAppend(rightFilePath, rightFile->Name, 2 * MAX_PATH);
+                            pathAppended &= SalPathAppend(rightFilePath, rightSubDir, rightFilePath.Size());
+                            pathAppended &= SalPathAppend(rightFilePath, rightFile->Name, rightFilePath.Size());
 
                             if (!pathAppended)
                             {

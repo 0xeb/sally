@@ -1821,8 +1821,8 @@ BOOL CFilesWindow::CopyFocusedNameToClipboard(CCopyFocusedNameModeEnum mode)
     if (FocusedIndex < 0 || FocusedIndex >= Files->Count + Dirs->Count)
         return FALSE; // ignore an invalid index
 
-    char buff[2 * MAX_PATH];
-    buff[0] = 0;
+    CPathBuffer buff; // Heap-allocated for long path support
+    *buff = 0;
 
     if (mode == cfnmUNC)
     {
@@ -1831,8 +1831,8 @@ BOOL CFilesWindow::CopyFocusedNameToClipboard(CCopyFocusedNameModeEnum mode)
         if (Is(ptDisk) || Is(ptZIPArchive))
         {
             // obtain the current path in the panel
-            GetGeneralPath(buff, 2 * MAX_PATH);
-            SalPathAddBackslash(buff, 2 * MAX_PATH);
+            GetGeneralPath(buff, buff.Size());
+            SalPathAddBackslash(buff, buff.Size());
 
             CFileData* item = (FocusedIndex < Dirs->Count) ? &Dirs->At(FocusedIndex) : &Files->At(FocusedIndex - Dirs->Count);
             CPathBuffer itemName; // Heap-allocated for long path support
@@ -1849,8 +1849,8 @@ BOOL CFilesWindow::CopyFocusedNameToClipboard(CCopyFocusedNameModeEnum mode)
         // full name
         if (Is(ptDisk) || Is(ptZIPArchive))
         {
-            GetGeneralPath(buff, 2 * MAX_PATH);
-            SalPathAddBackslash(buff, 2 * MAX_PATH);
+            GetGeneralPath(buff, buff.Size());
+            SalPathAddBackslash(buff, buff.Size());
         }
     }
 
@@ -1860,9 +1860,9 @@ BOOL CFilesWindow::CopyFocusedNameToClipboard(CCopyFocusedNameModeEnum mode)
         // For Unicode filenames, use wide path to preserve non-ANSI characters
         if (file->UseWideName())
         {
-            wchar_t buffW[2 * MAX_PATH];
+            CWidePathBuffer buffW; // Heap-allocated for long path support
             // Convert path to wide
-            MultiByteToWideChar(CP_ACP, 0, buff, -1, buffW, 2 * MAX_PATH);
+            MultiByteToWideChar(CP_ACP, 0, buff, -1, buffW, buffW.Size());
             int l = (int)wcslen(buffW);
             // Append wide filename (no AlterFileName for wide yet - TODO)
             lstrcpynW(buffW + l, file->NameW.c_str(), 2 * MAX_PATH - l);
@@ -1898,9 +1898,9 @@ BOOL CFilesWindow::CopyCurrentPathToClipboard()
 {
     CALL_STACK_MESSAGE1("CFilesWindow::CopyCurrentPathToClipboard()");
 
-    char buff[2 * MAX_PATH];
-    buff[0] = 0;
-    GetGeneralPath(buff, 2 * MAX_PATH, TRUE);
+    CPathBuffer buff; // Heap-allocated for long path support
+    *buff = 0;
+    GetGeneralPath(buff, buff.Size(), TRUE);
     return CopyTextToClipboard(buff);
 }
 
