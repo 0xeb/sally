@@ -1,4 +1,4 @@
-﻿// SPDX-FileCopyrightText: 2023 Open Salamander Authors
+// SPDX-FileCopyrightText: 2023 Open Salamander Authors
 // SPDX-License-Identifier: GPL-2.0-or-later
 // CommentsTranslationProject: TRANSLATED
 
@@ -2732,7 +2732,7 @@ void CCfgPageHotPath::Validate(CTransferInfo& ti)
     }
 }
 
-extern char HotPathSetBufferName[MAX_PATH];
+extern CPathBuffer HotPathSetBufferName;
 extern char HotPathSetBufferPath[HOTPATHITEM_MAXPATH];
 
 void CCfgPageHotPath::Transfer(CTransferInfo& ti)

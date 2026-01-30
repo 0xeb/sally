@@ -1,4 +1,4 @@
-﻿// SPDX-FileCopyrightText: 2023 Open Salamander Authors
+// SPDX-FileCopyrightText: 2023 Open Salamander Authors
 // SPDX-License-Identifier: GPL-2.0-or-later
 // CommentsTranslationProject: TRANSLATED
 
@@ -1239,7 +1239,7 @@ void CMainWindow::RefreshDirs()
 }
 
 // for passing the path to the configuration dialog
-char HotPathSetBufferName[MAX_PATH];
+CPathBuffer HotPathSetBufferName; // Heap-allocated for long path support
 char HotPathSetBufferPath[HOTPATHITEM_MAXPATH];
 
 void CMainWindow::SetUnescapedHotPath(int index, const char* path)
@@ -1247,7 +1247,7 @@ void CMainWindow::SetUnescapedHotPath(int index, const char* path)
     if (Configuration.HotPathAutoConfig)
     {
         // switch to the buffer so that Cancel works
-        lstrcpyn(HotPathSetBufferName, path, MAX_PATH);
+        lstrcpyn(HotPathSetBufferName, path, HotPathSetBufferName.Size());
         lstrcpyn(HotPathSetBufferPath, path, HOTPATHITEM_MAXPATH);
         DuplicateDollars(HotPathSetBufferPath, HOTPATHITEM_MAXPATH);
         // open the HotPaths page and edit item index
@@ -2583,7 +2583,7 @@ MENU_TEMPLATE_ITEM InfoLineMenu[] =
                 if (panel->PluginData.NotEmpty()) // "always true"
                     panel->PluginData.ColumnFixedWidthShouldChange(leftPanel, column, column->FixedWidth ? 0 : 1);
             }
-            // user changed something in the view configuration - let’s rebuild the columns
+            // user changed something in the view configuration - let�s rebuild the columns
             if (leftPanel)
                 LeftPanel->SelectViewTemplate(LeftPanel->GetViewTemplateIndex(), TRUE, FALSE);
             else
