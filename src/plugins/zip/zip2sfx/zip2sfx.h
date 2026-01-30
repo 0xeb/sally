@@ -1,4 +1,4 @@
-﻿// SPDX-FileCopyrightText: 2023 Open Salamander Authors
+// SPDX-FileCopyrightText: 2023 Open Salamander Authors
 // SPDX-License-Identifier: GPL-2.0-or-later
 // CommentsTranslationProject: TRANSLATED
 
@@ -23,7 +23,7 @@ extern DWORD ArcSize;
 extern DWORD EOCentrDirOffs;
 extern BOOL Encrypt;
 
-extern char ExeName[MAX_PATH]; // exe
+extern CPathBuffer ExeName;
 extern HANDLE ExeFile;
 
 extern HANDLE SfxPackage; // sfx package

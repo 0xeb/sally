@@ -1,4 +1,4 @@
-﻿// SPDX-FileCopyrightText: 2023 Open Salamander Authors
+// SPDX-FileCopyrightText: 2023 Open Salamander Authors
 // SPDX-License-Identifier: GPL-2.0-or-later
 // CommentsTranslationProject: TRANSLATED
 
@@ -36,7 +36,7 @@ DWORD ArcSize;
 DWORD EOCentrDirOffs;
 BOOL Encrypt = FALSE;
 
-char ExeName[MAX_PATH]; // exe
+CPathBuffer ExeName; // Heap-allocated for long path support
 HANDLE ExeFile = INVALID_HANDLE_VALUE;
 
 char* Param = NULL; // pointer to parameter (either 'p' or 's' followed by a filename)
