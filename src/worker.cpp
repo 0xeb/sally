@@ -8,6 +8,7 @@
 #include "worker.h"
 #include "common/widepath.h"
 #include "common/IFileSystem.h"
+#include "common/unicode/helpers.h"
 
 #include <aclapi.h>
 #include <ntsecapi.h>

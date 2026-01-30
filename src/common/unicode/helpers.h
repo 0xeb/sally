@@ -4,6 +4,7 @@
 
 #include <string>
 #include <windows.h>
+#include "ui/IPrompter.h" // for gPrompter
 
 // UTF-16 conversion helpers used during decoupling and Unicode work.
 inline std::wstring AnsiToWide(const char* s)
