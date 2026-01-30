@@ -1906,10 +1906,10 @@ INT_PTR CVerifyDialog::DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
 
             if (SalamanderGeneral->SalamanderIsNotBusy(NULL))
             {
-                lstrcpyn(Focus_Path, fileList[i]->fileName, MAX_PATH);
+                lstrcpyn(Focus_Path, fileList[i]->fileName, Focus_Path.Size());
                 SalamanderGeneral->PostMenuExtCommand(CMD_FOCUSFILE, TRUE);
                 Sleep(500);        // switching to another window happens, so this Sleep should not hurt anything
-                Focus_Path[0] = 0; // after 0.5 seconds we no longer want the focus (handles hitting the start of Salamander's BUSY mode)
+                *Focus_Path = 0; // after 0.5 seconds we no longer want the focus (handles hitting the start of Salamander's BUSY mode)
             }
             else
                 SalamanderGeneral->SalMessageBox(HWindow, LoadStr(IDS_BUSY), LoadStr(IDS_VERIFYTITLE), MB_ICONINFORMATION);

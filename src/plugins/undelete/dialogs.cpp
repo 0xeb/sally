@@ -679,7 +679,7 @@ CConfigDialog::CConfigDialog(HWND parent)
 void CConfigDialog::Transfer(CTransferInfo& ti)
 {
     CALL_STACK_MESSAGE1("CConfigDialog::Transfer()");
-    ti.EditLine(IDC_EDIT_TEMPPATH, ConfigTempPath, MAX_PATH, FALSE);
+    ti.EditLine(IDC_EDIT_TEMPPATH, ConfigTempPath, ConfigTempPath.Size(), FALSE);
     ti.CheckBox(IDC_CHECK_ALWAYSREUSE, ConfigAlwaysReuseScanInfo);
     ti.CheckBox(IDC_CHECK_SAMEPARTITION, ConfigDontShowSamePartitionWarning);
     ti.CheckBox(IDC_CHECK_EFS, ConfigDontShowEncryptedWarning);

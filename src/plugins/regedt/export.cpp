@@ -4,7 +4,7 @@
 
 #include "precomp.h"
 
-char LastExportPath[MAX_PATH];
+CPathBuffer LastExportPath; // Heap-allocated for long path support
 
 BOOL ExportKey(LPWSTR fullName)
 {

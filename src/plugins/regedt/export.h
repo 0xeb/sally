@@ -4,6 +4,6 @@
 
 #pragma once
 
-extern char LastExportPath[MAX_PATH];
+extern CPathBuffer LastExportPath;
 
 BOOL ExportKey(LPWSTR fullName);

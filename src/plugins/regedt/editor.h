@@ -4,9 +4,9 @@
 
 #pragma once
 
-extern char Command[MAX_PATH];
-extern char Arguments[MAX_PATH];
-extern char InitDir[MAX_PATH];
+extern CPathBuffer Command;
+extern CPathBuffer Arguments;
+extern CPathBuffer InitDir;
 
 extern CSalamanderVarStrEntry ExpCommandVariables[];
 extern CSalamanderVarStrEntry ExpArgumentsVariables[];

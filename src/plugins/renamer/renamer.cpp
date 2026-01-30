@@ -287,9 +287,9 @@ void CPluginInterface::LoadConfiguration(HWND parent, HKEY regKey, CSalamanderRe
     LastRemoveSourcePath = FALSE;
     UseCustomFont = FALSE;
     ConfirmESCClose = TRUE;
-    strcpy(Command, "notepad");
-    strcpy(Arguments, "\"$(Name)\"");
-    strcpy(InitDir, "$(FullPath)");
+    lstrcpy(Command, "notepad");
+    lstrcpy(Arguments, "\"$(Name)\"");
+    lstrcpy(InitDir, "$(FullPath)");
     if (regKey)
     {
         char buffer[4096];
@@ -338,9 +338,9 @@ void CPluginInterface::LoadConfiguration(HWND parent, HKEY regKey, CSalamanderRe
             registry->CloseKey(subKey);
         }
 
-        registry->GetValue(regKey, CONFIG_COMMAND, REG_SZ, Command, MAX_PATH);
-        registry->GetValue(regKey, CONFIG_ARGUMENTS, REG_SZ, Arguments, MAX_PATH);
-        registry->GetValue(regKey, CONFIG_INITDIR, REG_SZ, InitDir, MAX_PATH);
+        registry->GetValue(regKey, CONFIG_COMMAND, REG_SZ, Command, Command.Size());
+        registry->GetValue(regKey, CONFIG_ARGUMENTS, REG_SZ, Arguments, Arguments.Size());
+        registry->GetValue(regKey, CONFIG_INITDIR, REG_SZ, InitDir, InitDir.Size());
 
         registry->GetValue(regKey, CONFIG_CONFIRMESCCLOSE, REG_DWORD, &ConfirmESCClose, sizeof(BOOL));
     }

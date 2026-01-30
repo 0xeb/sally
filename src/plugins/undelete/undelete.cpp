@@ -441,7 +441,7 @@ BOOL ConfigShowZeroFiles;
 BOOL ConfigShowEmptyDirs;
 BOOL ConfigShowMetafiles;
 BOOL ConfigEstimateDamage;
-char ConfigTempPath[MAX_PATH];
+CPathBuffer ConfigTempPath; // Heap-allocated for long path support
 BOOL ConfigDontShowEncryptedWarning;
 BOOL ConfigDontShowSamePartitionWarning;
 int ConditionFixedWidth = 0; // column Condition (FS): LO/HI-WORD: left/right panel: FixedWidth
@@ -472,7 +472,7 @@ void CPluginInterface::LoadConfiguration(HWND parent, HKEY regKey, CSalamanderRe
     ConfigShowEmptyDirs = TRUE;
     ConfigShowMetafiles = FALSE;
     ConfigEstimateDamage = TRUE;
-    ConfigTempPath[0] = 0;
+    *ConfigTempPath = 0;
     ConfigDontShowEncryptedWarning = FALSE;
     ConfigDontShowSamePartitionWarning = FALSE;
     ConditionFixedWidth = 0;
@@ -487,7 +487,7 @@ void CPluginInterface::LoadConfiguration(HWND parent, HKEY regKey, CSalamanderRe
         registry->GetValue(regKey, KEY_SHOWEMPTYDIRS, REG_DWORD, &ConfigShowEmptyDirs, sizeof(DWORD));
         registry->GetValue(regKey, KEY_SHOWMETAFILES, REG_DWORD, &ConfigShowMetafiles, sizeof(DWORD));
         registry->GetValue(regKey, KEY_ESTIMATEDAMAGE, REG_DWORD, &ConfigEstimateDamage, sizeof(DWORD));
-        registry->GetValue(regKey, KEY_TEMPPATH, REG_SZ, &ConfigTempPath, MAX_PATH);
+        registry->GetValue(regKey, KEY_TEMPPATH, REG_SZ, ConfigTempPath, ConfigTempPath.Size());
         registry->GetValue(regKey, KEY_DONTSHOWENCRYPTED, REG_DWORD, &ConfigDontShowEncryptedWarning, MAX_PATH);
         registry->GetValue(regKey, KEY_DONTSHOWSAMEPARTITION, REG_DWORD, &ConfigDontShowSamePartitionWarning, MAX_PATH);
         registry->GetValue(regKey, KEY_CONDITIONFIXEDWIDTH, REG_DWORD, &ConditionFixedWidth, sizeof(DWORD));
@@ -506,7 +506,7 @@ void CPluginInterface::SaveConfiguration(HWND parent, HKEY regKey, CSalamanderRe
     registry->SetValue(regKey, KEY_SHOWEMPTYDIRS, REG_DWORD, &ConfigShowEmptyDirs, sizeof(DWORD));
     registry->SetValue(regKey, KEY_SHOWMETAFILES, REG_DWORD, &ConfigShowMetafiles, sizeof(DWORD));
     registry->SetValue(regKey, KEY_ESTIMATEDAMAGE, REG_DWORD, &ConfigEstimateDamage, sizeof(DWORD));
-    registry->SetValue(regKey, KEY_TEMPPATH, REG_SZ, &ConfigTempPath, -1);
+    registry->SetValue(regKey, KEY_TEMPPATH, REG_SZ, ConfigTempPath.Get(), -1);
     registry->SetValue(regKey, KEY_DONTSHOWENCRYPTED, REG_DWORD, &ConfigDontShowEncryptedWarning, sizeof(DWORD));
     registry->SetValue(regKey, KEY_DONTSHOWSAMEPARTITION, REG_DWORD, &ConfigDontShowSamePartitionWarning, sizeof(DWORD));
     registry->SetValue(regKey, KEY_CONDITIONFIXEDWIDTH, REG_DWORD, &ConditionFixedWidth, sizeof(DWORD));

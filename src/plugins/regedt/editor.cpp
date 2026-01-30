@@ -4,9 +4,9 @@
 
 #include "precomp.h"
 
-char Command[MAX_PATH];
-char Arguments[MAX_PATH];
-char InitDir[MAX_PATH];
+CPathBuffer Command; // Heap-allocated for long path support
+CPathBuffer Arguments;
+CPathBuffer InitDir;
 
 const char* EXP_FULLNAME = "FullName";
 const char* EXP_DRIVE = "Drive";

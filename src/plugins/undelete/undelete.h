@@ -1,4 +1,4 @@
-﻿// SPDX-FileCopyrightText: 2023 Open Salamander Authors
+// SPDX-FileCopyrightText: 2023 Open Salamander Authors
 // SPDX-License-Identifier: GPL-2.0-or-later
 // CommentsTranslationProject: TRANSLATED
 
@@ -29,7 +29,7 @@ extern BOOL ConfigShowZeroFiles;
 extern BOOL ConfigShowEmptyDirs;
 extern BOOL ConfigShowMetafiles;
 extern BOOL ConfigEstimateDamage;
-extern char ConfigTempPath[MAX_PATH];
+extern CPathBuffer ConfigTempPath;
 extern BOOL ConfigDontShowEncryptedWarning;
 extern BOOL ConfigDontShowSamePartitionWarning;
 

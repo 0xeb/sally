@@ -317,10 +317,10 @@ void CPluginInterface::LoadConfiguration(HWND parent, HKEY regKey, CSalamanderRe
     // default values
     DialogWidth = DialogHeight = -1;
     wcscpy(RecentFullPath, L"\\");
-    strcpy(Command, "");
-    strcpy(Arguments, "\"$(Name)\"");
-    strcpy(InitDir, "$(FullPath)");
-    strcpy(LastExportPath, "");
+    *Command = 0;
+    lstrcpy(Arguments, "\"$(Name)\"");
+    lstrcpy(InitDir, "$(FullPath)");
+    *LastExportPath = 0;
     if (regKey)
     {
         registry->GetValue(regKey, CONFIG_RECENTPATH, REG_BINARY, RecentFullPath, MAX_FULL_KEYNAME * 2);
@@ -340,10 +340,10 @@ void CPluginInterface::LoadConfiguration(HWND parent, HKEY regKey, CSalamanderRe
             DialogWidth = DialogHeight = -1;
         }
         registry->GetValue(regKey, CONFIG_MAXIMIZED, REG_DWORD, &Maximized, sizeof(BOOL));
-        registry->GetValue(regKey, CONFIG_COMMAND, REG_SZ, Command, MAX_PATH);
-        registry->GetValue(regKey, CONFIG_ARGUMENTS, REG_SZ, Arguments, MAX_PATH);
-        registry->GetValue(regKey, CONFIG_INITDIR, REG_SZ, InitDir, MAX_PATH);
-        registry->GetValue(regKey, CONFIG_EXPORTDIR, REG_SZ, LastExportPath, MAX_PATH);
+        registry->GetValue(regKey, CONFIG_COMMAND, REG_SZ, Command, Command.Size());
+        registry->GetValue(regKey, CONFIG_ARGUMENTS, REG_SZ, Arguments, Arguments.Size());
+        registry->GetValue(regKey, CONFIG_INITDIR, REG_SZ, InitDir, InitDir.Size());
+        registry->GetValue(regKey, CONFIG_EXPORTDIR, REG_SZ, LastExportPath, LastExportPath.Size());
 
         registry->GetValue(regKey, CONFIG_TYPEDATECOLFW, REG_DWORD, &TypeDateColFW, sizeof(int));
         registry->GetValue(regKey, CONFIG_TYPEDATECOLW, REG_DWORD, &TypeDateColW, sizeof(int));

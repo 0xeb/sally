@@ -981,9 +981,9 @@ void CConfigDialog::Validate(CTransferInfo& ti)
 void CConfigDialog::Transfer(CTransferInfo& ti)
 {
     CALL_STACK_MESSAGE1("CConfigDialog::Transfer()");
-    ti.EditLine(IDE_COMMAND, Command, MAX_PATH);
-    ti.EditLine(IDE_ARGUMENTS, Arguments, MAX_PATH);
-    ti.EditLine(IDE_INITDIR, InitDir, MAX_PATH);
+    ti.EditLine(IDE_COMMAND, Command, Command.Size());
+    ti.EditLine(IDE_ARGUMENTS, Arguments, Arguments.Size());
+    ti.EditLine(IDE_INITDIR, InitDir, InitDir.Size());
     ti.CheckBox(IDC_CONFIRMESCCLOSE, ConfirmESCClose);
 }
 

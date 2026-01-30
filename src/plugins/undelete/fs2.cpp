@@ -1385,7 +1385,7 @@ BOOL CPluginFSInterface::GetTempDirOutsideRoot(HWND parent, char* buffer, char**
     GetTempPath(path.Size(), path); // get system TEMP
     if (!Volume.IsImage && SalamanderGeneral->PathsAreOnTheSameVolume(Root, path, NULL))
     {
-        while (ConfigTempPath[0] == 0 || SalamanderGeneral->PathsAreOnTheSameVolume(Root, ConfigTempPath, NULL))
+        while (*ConfigTempPath == 0 || SalamanderGeneral->PathsAreOnTheSameVolume(Root, ConfigTempPath, NULL))
         {
             char text[200];
             sprintf(text, String<char>::LoadStr(IDS_TEMPDIR), path[0], path[0]);

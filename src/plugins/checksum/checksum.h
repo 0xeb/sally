@@ -93,7 +93,7 @@ INT_PTR OnConfiguration(HWND hParent);
 
 // focus handling from the Verify dialog
 #define CMD_FOCUSFILE 99
-extern char Focus_Path[MAX_PATH];
+extern CPathBuffer Focus_Path;
 
 #define DUMP_MEM_OBJECTS
 

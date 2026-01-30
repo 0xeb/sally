@@ -973,9 +973,9 @@ void CConfigDialog::Validate(CTransferInfoEx& ti)
 void CConfigDialog::Transfer(CTransferInfoEx& ti)
 {
     CALL_STACK_MESSAGE1("CConfigDialog::Transfer()");
-    ti.EditLine(IDE_COMMAND, Command, MAX_PATH);
-    ti.EditLine(IDE_ARGUMENTS, Arguments, MAX_PATH);
-    ti.EditLine(IDE_INITDIR, InitDir, MAX_PATH);
+    ti.EditLine(IDE_COMMAND, Command, Command.Size());
+    ti.EditLine(IDE_ARGUMENTS, Arguments, Arguments.Size());
+    ti.EditLine(IDE_INITDIR, InitDir, InitDir.Size());
 }
 
 INT_PTR

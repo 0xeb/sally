@@ -65,7 +65,7 @@ extern LPTSTR PathFindExtension(LPTSTR pszPath);
 //
 
 HANDLE ArcFile = INVALID_HANDLE_VALUE;
-char ArcName[MAX_PATH];
+CPathBuffer ArcName; // Heap-allocated for long path support
 DWORD ArcFileSize;
 DWORD ArcFilePos;
 
@@ -682,14 +682,14 @@ void NextVolume(BOOL forceQuestion)
     ArcFile = INVALID_HANDLE_VALUE;
 
     CPathBuffer prevName; // Heap-allocated for long path support
-    char* ptr = strrchr(ArcName, '\\');
+    char* ptr = strrchr(ArcName.Get(), '\\');
     if (!ptr)
-        ptr = ArcName;
+        ptr = ArcName.Get();
     else
         ptr++;
     strcpy(prevName, ptr);
 
-    char* ext = PathFindExtension(ArcName);
+    char* ext = PathFindExtension(ArcName.Get());
     if (lstrcmpi(ext, ".arj") == 0)
     {
         lstrcpy(ext, ".a01");
