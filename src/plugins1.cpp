@@ -1662,7 +1662,7 @@ BOOL CSalamanderPluginEntry::SetBasicPluginData(const char* pluginName, DWORD fu
             if (!Plugin->FSNames.IsGood())
                 Plugin->FSNames.ResetState(); // deletion occurred, nothing else matters
 
-            char uniqueFSName[MAX_PATH];
+            CPathBuffer uniqueFSName;  // Heap-allocated for long path support
             Plugins.GetUniqueFSName(uniqueFSName, fsName, NULL, &OldFSNames);
             s = DupStr(uniqueFSName);
             if (s != NULL)
@@ -1867,7 +1867,7 @@ BOOL CSalamanderPluginEntry::AddFSName(const char* fsName, int* newFSNameIndex)
         return FALSE;
     }
 
-    char uniqueFSName[MAX_PATH];
+    CPathBuffer uniqueFSName;  // Heap-allocated for long path support
     Plugins.GetUniqueFSName(uniqueFSName, fsName, NULL, &OldFSNames);
     char* s = DupStr(uniqueFSName);
     if (s != NULL)

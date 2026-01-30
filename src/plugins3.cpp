@@ -529,9 +529,9 @@ void CSalamanderGUI::SetSubjectTruncatedText(HWND subjectWnd, const char* subjec
         return;
     }
 
-    char formatedFileName[MAX_PATH];
-    char tmpFileName[MAX_PATH];
-    lstrcpyn(tmpFileName, fileName, MAX_PATH);
+    CPathBuffer formatedFileName;  // Heap-allocated for long path support
+    CPathBuffer tmpFileName;        // Heap-allocated for long path support
+    lstrcpyn(tmpFileName, fileName, tmpFileName.Size());
     AlterFileName(formatedFileName, tmpFileName, -1, Configuration.FileNameFormat, 0, isDir);
 
     CTruncatedString subject;
