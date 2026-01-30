@@ -751,8 +751,8 @@ void CFilesWindow::UnpackZIPArchive(CFilesWindow* target, BOOL deleteOp, const c
                                                     &dirsCount, &filesCount);
                         if (dirsCount + filesCount > 0)
                         {
-                            char name[2 * MAX_PATH];
-                            strcpy(name, GetZIPArchive());
+                            CPathBuffer name;  // Heap-allocated for long path support
+                            lstrcpyn(name, GetZIPArchive(), name.Size());
                             if (GetZIPPath()[0] != 0)
                             {
                                 if (GetZIPPath()[0] != '\\')

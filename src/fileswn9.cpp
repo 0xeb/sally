@@ -61,11 +61,11 @@ BOOL CFilesWindow::ParsePath(char* path, int& type, BOOL& isDir, char*& secondPa
     CALL_STACK_MESSAGE3("CFilesWindow::ParsePath(%s, , , , %s, ,)", path, errorTitle);
 
     const char* curArchivePath = NULL;
-    char curPath[2 * MAX_PATH];
-    GetGeneralPath(curPath, 2 * MAX_PATH);
+    CPathBuffer curPath;  // Heap-allocated for long path support
+    GetGeneralPath(curPath, curPath.Size());
     if (Is(ptZIPArchive))
     {
-        SalPathAddBackslash(curPath, 2 * MAX_PATH);
+        SalPathAddBackslash(curPath, curPath.Size());
         curArchivePath = GetZIPArchive();
     }
 

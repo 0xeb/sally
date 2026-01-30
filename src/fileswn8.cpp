@@ -782,7 +782,7 @@ void CFilesWindow::FilesAction(CActionType type, CFilesWindow* target, int count
                                 // choose the FS that will perform the operation (order: active, detached, new)
                                 BOOL invalidPath = FALSE;
                                 BOOL unselect = FALSE;
-                                char targetPath[2 * MAX_PATH];
+                                CPathBuffer targetPath;  // Heap-allocated for long path support
                                 CDetachedFSList* list = MainWindow->DetachedFSList;
                                 int i;
                                 for (i = -1; i < list->Count; i++)
@@ -1420,14 +1420,14 @@ BOOL CFilesWindow::OpenFocusedInOtherPanel(BOOL activate)
     if (FocusedIndex < 0 || FocusedIndex >= Files->Count + Dirs->Count)
         return FALSE; // ignore invalid index
 
-    char buff[2 * MAX_PATH];
-    buff[0] = 0;
+    CPathBuffer buff;  // Heap-allocated for long path support
+    *buff = 0;
 
     CFileData* file = (FocusedIndex < Dirs->Count) ? &Dirs->At(FocusedIndex) : &Files->At(FocusedIndex - Dirs->Count);
 
     if (Is(ptDisk) || Is(ptZIPArchive))
     {
-        GetGeneralPath(buff, 2 * MAX_PATH);
+        GetGeneralPath(buff, buff.Size());
         BOOL nethoodPath = FALSE;
         if (FocusedIndex == 0 && 0 < Dirs->Count && strcmp(Dirs->At(0).Name, "..") == 0 &&
             IsUNCRootPath(buff)) // up-dir on a UNC root path => switch to Nethood
@@ -1436,7 +1436,7 @@ BOOL CFilesWindow::OpenFocusedInOtherPanel(BOOL activate)
             while (*s != 0 && *s != '\\')
                 s++;
             CPluginData* nethoodPlugin = NULL;
-            char doublePath[2 * MAX_PATH];
+            CPathBuffer doublePath;  // Heap-allocated for long path support
             if (*s == '\\' && Plugins.GetFirstNethoodPluginFSName(doublePath, &nethoodPlugin))
             {
                 nethoodPath = TRUE;
@@ -1507,8 +1507,8 @@ void CFilesWindow::ChangePathToOtherPanelPath()
         {
             if (panel->Is(ptPluginFS))
             {
-                char path[2 * MAX_PATH];
-                lstrcpyn(path, panel->GetPluginFS()->GetPluginFSName(), MAX_PATH - 1);
+                CPathBuffer path;  // Heap-allocated for long path support
+                lstrcpyn(path, panel->GetPluginFS()->GetPluginFSName(), path.Size() - 1);
                 strcat(path, ":");
                 if (panel->GetPluginFS()->GetCurrentPath(path + strlen(path)))
                     ChangeDir(path, -1, NULL, 3 /*change-dir*/, NULL, FALSE);
