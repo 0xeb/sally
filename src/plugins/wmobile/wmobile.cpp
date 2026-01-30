@@ -190,7 +190,7 @@ CPluginInterface::Release(HWND parent, BOOL force)
         ReleaseWinLib(DLLInstance);
 
         // remove all copies of FS files from the disk cache (theoretically redundant, every FS should delete its own copies)
-        char uniqueFileName[MAX_PATH];
+        CPathBuffer uniqueFileName; // Heap-allocated for long path support
         strcpy(uniqueFileName, AssignedFSName);
         strcat(uniqueFileName, ":");
         // disk names are case-insensitive while the disk cache is case-sensitive; converting

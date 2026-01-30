@@ -111,8 +111,8 @@ void CRemoteComparator::RecieveMessage(const CMessage* message)
         return;
     CRCMessage* msg = (CRCMessage*)message;
 
-    char Path1[MAX_PATH];
-    char Path2[MAX_PATH];
+    CPathBuffer Path1; // Heap-allocated for long path support
+    CPathBuffer Path2;
     strcpy(Path1, msg->Path1);
     strcpy(Path2, msg->Path2);
 

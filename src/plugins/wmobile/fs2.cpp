@@ -1578,7 +1578,7 @@ CPluginFSInterface::CopyOrMoveFromFS(BOOL copy, int mode, const char* fsName, HW
     }
 
     // Prepare buffers for names
-    char sourceName[MAX_PATH]; // buffer for the full disk name (the source resides on disk for CEFS)
+    CPathBuffer sourceName; // buffer for the full disk name (the source resides on disk for CEFS)
     strcpy(sourceName, Path);
     char* endSource = sourceName + strlen(sourceName); // space for names from the panel
     if (endSource > sourceName && *(endSource - 1) != '\\')
@@ -1589,14 +1589,14 @@ CPluginFSInterface::CopyOrMoveFromFS(BOOL copy, int mode, const char* fsName, HW
     int endSourceSize = MAX_PATH - (int)(endSource - sourceName); // maximum number of characters for a panel name
 
     char cefsSourceName[2 * MAX_PATH]; // buffer for the full CEFS name (for locating the operation source in the disk cache)
-    sprintf(cefsSourceName, "%s:%s", fsName, sourceName);
+    sprintf(cefsSourceName, "%s:%s", fsName, sourceName.Get());
     // Disk names are case-insensitive, the disk cache is case-sensitive; converting
     // to lowercase makes the disk cache behave case-insensitively as well
     SalamanderGeneral->ToLowerCase(cefsSourceName);
     char* endCEFSSource = cefsSourceName + strlen(cefsSourceName);                // space for names from the panel
     int endCEFSSourceSize = 2 * MAX_PATH - (int)(endCEFSSource - cefsSourceName); // maximum number of characters for a panel name
 
-    char targetName[MAX_PATH]; // buffer for the full disk name (if the target resides on disk)
+    CPathBuffer targetName; // buffer for the full disk name (if the target resides on disk)
     targetName[0] = 0;
     char* endTarget = targetName;
     int endTargetSize = MAX_PATH;
@@ -2062,9 +2062,9 @@ static BOOL FindAllFilesInTree(LPCTSTR rootPath, char (&path)[MAX_PATH], LPCTSTR
     HANDLE find = INVALID_HANDLE_VALUE;
 
     WIN32_FIND_DATA data;
-    char fullPath[MAX_PATH];
+    CPathBuffer fullPath;
     strcpy(fullPath, rootPath);
-    if (!SalamanderGeneral->SalPathAppend(fullPath, path, MAX_PATH) ||
+    if (!SalamanderGeneral->SalPathAppend(fullPath, path, fullPath.Size()) ||
 
         !SalamanderGeneral->SalPathAppend(fullPath, fileName, MAX_PATH))
         goto ONERROR_TOOLONG;
@@ -2077,7 +2077,7 @@ static BOOL FindAllFilesInTree(LPCTSTR rootPath, char (&path)[MAX_PATH], LPCTSTR
             return TRUE; // JR empty directory, stop
 
         char buf[2 * MAX_PATH + 100];
-        sprintf(buf, LoadStr(IDS_PATH_ERROR), fullPath, SalamanderGeneral->GetErrorText(err));
+        sprintf(buf, LoadStr(IDS_PATH_ERROR), fullPath.Get(), SalamanderGeneral->GetErrorText(err));
         SalamanderGeneral->ShowMessageBox(buf, TitleWMobileError, MSGBOX_ERROR);
         return FALSE;
     }
@@ -2313,7 +2313,7 @@ CPluginFSInterface::CopyOrMoveFromDiskToFS(BOOL copy, int mode, const char* fsNa
         if (*end == '\\')
             end++;
 
-        char newDirs[MAX_PATH];
+        CPathBuffer newDirs;
         if (SalamanderGeneral->SalSplitGeneralPath(parent, TitleWMobile, TitleWMobileError, sourceFiles + sourceDirs,
                                                    targetPath, afterRoot, end, pathIsDir,
                                                    backslashAtEnd, NULL, NULL, opMask, newDirs,
@@ -2348,7 +2348,7 @@ CPluginFSInterface::CopyOrMoveFromDiskToFS(BOOL copy, int mode, const char* fsNa
     // 'targetPath' is a path on this FS ('userPart' points to the user part of the FS path), 'opMask' is the operation mask
 
     // Prepare buffers for names
-    char sourceName[MAX_PATH]; // buffer for the full disk name
+    CPathBuffer sourceName; // buffer for the full disk name
     strcpy(sourceName, sourcePath);
     char* endSource = sourceName + strlen(sourceName); // space for names from the 'next' enumeration
     if (endSource > sourceName && *(endSource - 1) != '\\')
@@ -2358,7 +2358,7 @@ CPluginFSInterface::CopyOrMoveFromDiskToFS(BOOL copy, int mode, const char* fsNa
     }
     int endSourceSize = MAX_PATH - (int)(endSource - sourceName); // maximum number of characters for a 'next' name
 
-    char targetName[MAX_PATH]; // buffer for the full target disk name (the operation target resides on disk for CEFS)
+    CPathBuffer targetName; // buffer for the full target disk name (the operation target resides on disk for CEFS)
     strcpy(targetName, userPart);
     char* endTarget = targetName + strlen(targetName); // space for the destination name
     if (endTarget > targetName && *(endTarget - 1) != '\\')
@@ -2606,7 +2606,7 @@ CPluginFSInterface::CopyOrMoveFromDiskToFS(BOOL copy, int mode, const char* fsNa
                     {
                         targetPathChanged = TRUE;
 
-                        sprintf(cefsFileName, "%s:%s", fsName, targetName);
+                        sprintf(cefsFileName, "%s:%s", fsName, targetName.Get());
                         SalamanderGeneral->ToLowerCase(cefsFileName);
                         SalamanderGeneral->RemoveOneFileFromCache(cefsFileName);
 
@@ -2749,7 +2749,7 @@ CPluginFSInterface::ChangeAttributes(const char* fsName, HWND parent, int panel,
                                      int selectedFiles, int selectedDirs)
 {
     // Prepare buffers for names
-    char fileName[MAX_PATH]; // buffer for the full disk name (the source resides on disk for DFS)
+    CPathBuffer fileName; // buffer for the full disk name (the source resides on disk for DFS)
     strcpy(fileName, Path);
     char* end = fileName + strlen(fileName); // space for names from the panel
     if (end > fileName && *(end - 1) != '\\')

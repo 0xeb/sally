@@ -579,9 +579,9 @@ BOOL CRAPI::FindAllFilesInTree(LPCTSTR rootPath, char (&path)[MAX_PATH], LPCTSTR
     HANDLE find = INVALID_HANDLE_VALUE;
 
     RapiNS::CE_FIND_DATA data;
-    char fullPath[MAX_PATH];
+    CPathBuffer fullPath; // Heap-allocated for long path support
     strcpy(fullPath, rootPath);
-    if (!PathAppend(fullPath, path, MAX_PATH) || !PathAppend(fullPath, fileName, MAX_PATH))
+    if (!PathAppend(fullPath, path, fullPath.Size()) || !PathAppend(fullPath, fileName, fullPath.Size()))
         goto ONERROR_TOOLONG;
 
     find = FindFirstFile(fullPath, &data);
@@ -594,7 +594,7 @@ BOOL CRAPI::FindAllFilesInTree(LPCTSTR rootPath, char (&path)[MAX_PATH], LPCTSTR
 
         char buf[2 * MAX_PATH + 100];
         DWORD err = GetLastError();
-        sprintf(buf, LoadStr(IDS_PATH_ERROR), fullPath, SalamanderGeneral->GetErrorText(err));
+        sprintf(buf, LoadStr(IDS_PATH_ERROR), fullPath.Get(), SalamanderGeneral->GetErrorText(err));
         SalamanderGeneral->ShowMessageBox(buf, TitleWMobileError, MSGBOX_ERROR);
         return FALSE;
     }
@@ -613,9 +613,9 @@ BOOL CRAPI::FindAllFilesInTree(LPCTSTR rootPath, char (&path)[MAX_PATH], LPCTSTR
             (data.cFileName[0] != '.' || // JR Windows Mobile does not return "." and ".." paths, but handle it just in case
              (data.cFileName[1] != 0 && (data.cFileName[1] != '.' || data.cFileName[2] != 0))))
         {
-            char cFileName[MAX_PATH];
-            WideCharToMultiByte(CP_ACP, 0, data.cFileName, -1, cFileName, MAX_PATH, NULL, NULL);
-            cFileName[MAX_PATH - 1] = 0;
+            CPathBuffer cFileName;
+            WideCharToMultiByte(CP_ACP, 0, data.cFileName, -1, cFileName, cFileName.Size(), NULL, NULL);
+            cFileName[cFileName.Size() - 1] = 0;
 
             CFileInfo fi;
             strcpy(fi.cFileName, path);
@@ -1034,7 +1034,7 @@ BOOL CRAPI::CheckAndCreateDirectory(const char* dir, HWND parent, BOOL quiet, ch
 
     DWORD attrs = GetFileAttributes(dir);
     char buf[MAX_PATH + 100];
-    char name[MAX_PATH];
+    CPathBuffer name;
     if (newDir != NULL)
         newDir[0] = 0;
     //  if (parent == NULL) parent = MainWindow->HWindow;
@@ -1046,7 +1046,7 @@ BOOL CRAPI::CheckAndCreateDirectory(const char* dir, HWND parent, BOOL quiet, ch
             sprintf(buf, LoadStr(IDS_ERR_CREATEDIR), dir);
             if (errBuf != NULL)
             {
-                int l = (int)strlen(buf);
+                int l = (int)lstrlen(buf);
                 l = min(l + 1, errBufSize);
                 memcpy(errBuf, buf, l);
                 errBuf[errBufSize - 1] = 0;
@@ -1069,7 +1069,7 @@ BOOL CRAPI::CheckAndCreateDirectory(const char* dir, HWND parent, BOOL quiet, ch
                     sprintf(buf, LoadStr(IDS_ERR_CREATEDIR), dir);
                     if (errBuf != NULL)
                     {
-                        int l = (int)strlen(buf);
+                        int l = (int)lstrlen(buf);
                         l = min(l + 1, errBufSize);
                         memcpy(errBuf, buf, l);
                         errBuf[errBufSize - 1] = 0;
@@ -1092,10 +1092,10 @@ BOOL CRAPI::CheckAndCreateDirectory(const char* dir, HWND parent, BOOL quiet, ch
                         break; // we will build from this directory
                     else       // it is a file, that would not work...
                     {
-                        sprintf(buf, LoadStr(IDS_ERR_DIRNAMEISFILE), name);
+                        sprintf(buf, LoadStr(IDS_ERR_DIRNAMEISFILE), name.Get());
                         if (errBuf != NULL)
                         {
-                            int l = (int)strlen(buf);
+                            int l = (int)lstrlen(buf);
                             l = min(l + 1, errBufSize);
                             memcpy(errBuf, buf, l);
                             errBuf[errBufSize - 1] = 0;
@@ -1126,10 +1126,10 @@ BOOL CRAPI::CheckAndCreateDirectory(const char* dir, HWND parent, BOOL quiet, ch
                 name[len += (int)(slash - st)] = 0;
                 if (!CreateDirectory(name, NULL))
                 {
-                    sprintf(buf, LoadStr(IDS_ERR_CREATEDIR), name);
+                    sprintf(buf, LoadStr(IDS_ERR_CREATEDIR), name.Get());
                     if (errBuf != NULL)
                     {
-                        int l = (int)strlen(buf);
+                        int l = (int)lstrlen(buf);
                         l = min(l + 1, errBufSize);
                         memcpy(errBuf, buf, l);
                         errBuf[errBufSize - 1] = 0;
@@ -1160,7 +1160,7 @@ BOOL CRAPI::CheckAndCreateDirectory(const char* dir, HWND parent, BOOL quiet, ch
         sprintf(buf, LoadStr(IDS_ERR_DIRNAMEISFILE), dir);
         if (errBuf != NULL)
         {
-            int l = (int)strlen(buf);
+            int l = (int)lstrlen(buf);
             l = min(l + 1, errBufSize);
             memcpy(errBuf, buf, l);
             errBuf[errBufSize - 1] = 0;
