@@ -529,7 +529,6 @@ void CFilesWindow::UnpackZIPArchive(CFilesWindow* target, BOOL deleteOp, const c
             int pathType;
             BOOL pathIsDir;
             char* secondPart;
-            char textBuf[2 * MAX_PATH + 200];
             if (ParsePath(path, pathType, pathIsDir, secondPart, LoadStr(IDS_ERRORCOPY), NULL, NULL, MAX_PATH))
             {
                 // instead of a 'switch', use 'if' so that 'break' and 'continue' work correctly
@@ -815,14 +814,13 @@ void CFilesWindow::DeleteFromZIPArchive()
     UnpackZIPArchive(NULL, TRUE); // almost the same operation
 }
 
-BOOL _ReadDirectoryTree(HWND parent, char (&path)[MAX_PATH], char* name, CSalamanderDirectory* dir,
+BOOL _ReadDirectoryTree(HWND parent, CPathBuffer& path, char* name, CSalamanderDirectory* dir,
                         int* errorOccured, BOOL getLinkTgtFileSize, BOOL* errGetFileSizeOfLnkTgtIgnAll,
                         int* containsDirLinks, char* linkName)
 {
-    CALL_STACK_MESSAGE4("_ReadDirectoryTree(, %s, %s, , , %d, , ,)", path, name, getLinkTgtFileSize);
+    CALL_STACK_MESSAGE4("_ReadDirectoryTree(, %s, %s, , , %d, , ,)", path.Get(), name, getLinkTgtFileSize);
     char* end = path + strlen(path);
-    char text[2 * MAX_PATH + 100];
-    if ((end - path) + (*(end - 1) != '\\' ? 1 : 0) + strlen(name) + 2 >= _countof(path))
+    if ((end - path) + (*(end - 1) != '\\' ? 1 : 0) + strlen(name) + 2 >= path.Size())
         return TRUE; // path too long: continue without reporting the error until enumeration is complete
     if (*(end - 1) != '\\')
     {
@@ -909,7 +907,7 @@ BOOL _ReadDirectoryTree(HWND parent, char (&path)[MAX_PATH], char* name, CSalama
                     (file.dwFileAttributes & FILE_ATTRIBUTE_REPARSE_POINT) != 0) // it's a link
                 {                                                                // for a symlink determine the target file size
                     CQuadWord size;
-                    if (SalPathAppend(path, file.cFileName, _countof(path)))
+                    if (SalPathAppend(path, file.cFileName, path.Size()))
                     { // only if the path is not too long (any resulting error will be reported during enumeration)
                         if (GetLinkTgtFileSize(parent, path, NULL, &size, &cancel, errGetFileSizeOfLnkTgtIgnAll))
                             newF.Size = size;
@@ -991,7 +989,7 @@ BOOL _ReadDirectoryTree(HWND parent, char (&path)[MAX_PATH], char* name, CSalama
                     {
                         *containsDirLinks = 1; // after finding one simulate an error to end the search immediately
                         *end2 = 0;
-                        _snprintf_s(linkName, MAX_PATH, _TRUNCATE, "%s\\%s", path, file.cFileName); // truncation is fine, it is only for the message text
+                        _snprintf_s(linkName, MAX_PATH, _TRUNCATE, "%s\\%s", path.Get(), file.cFileName); // truncation is fine, it is only for the message text
                         ok = FALSE;
                         testFindNextErr = FALSE;
                         break;
@@ -1103,6 +1101,7 @@ CSalamanderDirectory* ReadDirectoryTree(HWND parent, CPanelTmpEnumData* data, in
         memset(&newF, 0, sizeof(newF));
     while (index < data->IndexesCount)
     {
+        CPathBuffer path;  // Heap-allocated for long path support
         int i = data->Indexes[index++];
         BOOL isDir = i < data->Dirs->Count;
         CFileData* f = &(isDir ? data->Dirs->At(i) : data->Files->At(i - data->Dirs->Count));
@@ -1132,7 +1131,6 @@ CSalamanderDirectory* ReadDirectoryTree(HWND parent, CPanelTmpEnumData* data, in
             newF.IsOffline = f->IsOffline;
         }
 
-        char path[MAX_PATH]; // Cannot use CPathBuffer due to goto and _ReadDirectoryTree signature
         if (isDir) // directory
         {
             CSalamanderDirectory* salDir = NULL;
@@ -1155,7 +1153,7 @@ CSalamanderDirectory* ReadDirectoryTree(HWND parent, CPanelTmpEnumData* data, in
                     *containsDirLinks = 1;
                     strcpy(path, data->WorkPath);
                     SalPathRemoveBackslash(path);
-                    _snprintf_s(linkName, MAX_PATH, _TRUNCATE, "%s\\%s", path, f->Name); // truncation is fine, it is only for the message text
+                    _snprintf_s(linkName, MAX_PATH, _TRUNCATE, "%s\\%s", path.Get(), f->Name); // truncation is fine, it is only for the message text
                     break;
                 }
             }
@@ -1175,7 +1173,7 @@ CSalamanderDirectory* ReadDirectoryTree(HWND parent, CPanelTmpEnumData* data, in
                 { // for a symlink determine the target file size
                     CQuadWord size;
                     strcpy(path, data->WorkPath);
-                    if (SalPathAppend(path, newF.Name, MAX_PATH))
+                    if (SalPathAppend(path, newF.Name, path.Size()))
                     { // only if the path is not too long (any resulting error will be reported during enumeration)
                         if (GetLinkTgtFileSize(parent, path, NULL, &size, &cancel, &errGetFileSizeOfLnkTgtIgnAll))
                             newF.Size = size;
