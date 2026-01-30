@@ -1307,7 +1307,7 @@ BOOL CFilesWindow::OnSysKeyDown(UINT uMsg, WPARAM wParam, LPARAM lParam, LRESULT
         }
         if (networkNeighborhood)
         {
-            char path[MAX_PATH];
+            CPathBuffer path; // Heap-allocated for long path support
             if (Plugins.GetFirstNethoodPluginFSName(path))
             {
                 TopIndexMem.Clear(); // long jump

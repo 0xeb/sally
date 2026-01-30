@@ -624,11 +624,11 @@ CFilesWindow::WindowProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
                             if (setWait)
                                 oldCur = SetCursor(LoadCursor(NULL, IDC_WAIT));
                         }
-                        char pathBackup[MAX_PATH];
+                        CPathBuffer pathBackup; // Heap-allocated for long path support
                         CPanelType typeBackup;
                         if (isInactiveRefresh)
                         {
-                            lstrcpyn(pathBackup, GetPath(), MAX_PATH); // we're only interested in disk paths and paths to archives (for plugin-FS the snooper doesn't inform us about changes)
+                            lstrcpyn(pathBackup, GetPath(), pathBackup.Size()); // we're only interested in disk paths and paths to archives (for plugin-FS the snooper doesn't inform us about changes)
                             typeBackup = GetPanelType();
                             LastInactiveRefreshStart = GetTickCount();
                         }
