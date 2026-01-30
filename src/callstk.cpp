@@ -798,7 +798,7 @@ int CCallStack::HandleException(EXCEPTION_POINTERS* e, DWORD shellExtCrashID, co
         return EXCEPTION_CONTINUE_SEARCH; // pass the exception on ... the debugger will catch it
 #endif
 
-    static char bugReportPath[MAX_PATH];
+    static CPathBuffer bugReportPath;
 
     // request salmon to generate the minidump
     SalmonFireAndWait(e, bugReportPath);

@@ -791,7 +791,7 @@ void CFilesWindow::ViewFile(char* name, BOOL altView, DWORD handlerID, int enumF
                         }
                     }
 
-                    char nameInArchive[2 * MAX_PATH];
+                    CPathBuffer nameInArchive;  // Heap-allocated for long path support
                     strcpy(nameInArchive, dcFileName + strlen(GetZIPArchive()) + 1);
 
                     // besides itself, compare the file with all the others and look for a case-sensitive identical name;
@@ -1062,12 +1062,12 @@ BOOL ViewFileInt(HWND parent, const char* name, BOOL altView, DWORD handlerID, B
                               STARTF_USESHOWWINDOW;
                 si.wShowWindow = SW_SHOWNORMAL;
 
-                char cmdLine[2 * MAX_PATH];
-                lstrcpyn(cmdLine, expCommand, 2 * MAX_PATH);
-                AddDoubleQuotesIfNeeded(cmdLine, 2 * MAX_PATH); // CreateProcess wants the name with spaces in quotes (otherwise it tries various variants, see help)
+                CPathBuffer cmdLine;  // Heap-allocated for long path support
+                lstrcpyn(cmdLine, expCommand, cmdLine.Size());
+                AddDoubleQuotesIfNeeded(cmdLine, cmdLine.Size()); // CreateProcess wants the name with spaces in quotes (otherwise it tries various variants, see help)
                 int len = (int)strlen(cmdLine);
                 int lArgs = (int)strlen(expArguments);
-                if (len + lArgs + 2 <= 2 * MAX_PATH)
+                if (len + lArgs + 2 <= cmdLine.Size())
                 {
                     cmdLine[len] = ' ';
                     memcpy(cmdLine + len + 1, expArguments, lArgs + 1);
@@ -1083,8 +1083,8 @@ BOOL ViewFileInt(HWND parent, const char* name, BOOL altView, DWORD handlerID, B
                                                NORMAL_PRIORITY_CLASS, NULL, expInitDir, &si, &pi)))
                     {
                         DWORD err = GetLastError();
-                        char buff[4 * MAX_PATH];
-                        sprintf(buff, LoadStr(IDS_ERROREXECVIEW), expCommand.Get(), GetErrorText(err));
+                        CPathBuffer buff;  // Heap-allocated for long path support
+                        sprintf(buff.Get(), LoadStr(IDS_ERROREXECVIEW), expCommand.Get(), GetErrorText(err));
                         if (gPrompter != NULL)
                             ShowErrorViaPrompter(LoadStrW(IDS_ERRORTITLE), AnsiToWide(buff).c_str());
                     }
@@ -1382,12 +1382,12 @@ void CFilesWindow::EditFile(char* name, DWORD handlerID)
                           STARTF_USESHOWWINDOW;
             si.wShowWindow = SW_SHOWNORMAL;
 
-            char cmdLine[2 * MAX_PATH];
-            lstrcpyn(cmdLine, expCommand, 2 * MAX_PATH);
-            AddDoubleQuotesIfNeeded(cmdLine, 2 * MAX_PATH); // CreateProcess wants the name with spaces in quotes (otherwise it tries various variants, see help)
+            CPathBuffer cmdLine;  // Heap-allocated for long path support
+            lstrcpyn(cmdLine, expCommand, cmdLine.Size());
+            AddDoubleQuotesIfNeeded(cmdLine, cmdLine.Size()); // CreateProcess wants the name with spaces in quotes (otherwise it tries various variants, see help)
             int len = (int)strlen(cmdLine);
             int lArgs = (int)strlen(expArguments);
-            if (len + lArgs + 2 <= 2 * MAX_PATH)
+            if (len + lArgs + 2 <= cmdLine.Size())
             {
                 cmdLine[len] = ' ';
                 memcpy(cmdLine + len + 1, expArguments, lArgs + 1);
@@ -1403,8 +1403,8 @@ void CFilesWindow::EditFile(char* name, DWORD handlerID)
                                            NORMAL_PRIORITY_CLASS, NULL, expInitDir, &si, &pi)))
                 {
                     DWORD err = GetLastError();
-                    char buff[4 * MAX_PATH];
-                    sprintf(buff, LoadStr(IDS_ERROREXECEDIT), expCommand.Get(), GetErrorText(err));
+                    CPathBuffer buff;  // Heap-allocated for long path support
+                    sprintf(buff.Get(), LoadStr(IDS_ERROREXECEDIT), expCommand.Get(), GetErrorText(err));
                     if (gPrompter != NULL)
                         ShowErrorViaPrompter(LoadStrW(IDS_ERRORTITLE), AnsiToWide(buff).c_str());
                 }
@@ -1910,9 +1910,9 @@ void CFilesWindow::CreateDir(CFilesWindow* target)
     CALL_STACK_MESSAGE1("CFilesWindow::CreateDir()");
     BeginStopRefresh(); // snooper takes a break
 
-    char path[2 * MAX_PATH], nextFocus[MAX_PATH];
-    path[0] = 0;
-    nextFocus[0] = 0;
+    CPathBuffer path, nextFocus;  // Heap-allocated for long path support
+    *path = 0;
+    *nextFocus = 0;
 
     // restore DefaultDir
     MainWindow->UpdateDefaultDir(MainWindow->GetActivePanel() == this);
@@ -1921,7 +1921,7 @@ void CFilesWindow::CreateDir(CFilesWindow* target)
     {
         CTruncatedString subject;
         subject.Set(LoadStr(IDS_CREATEDIRECTORY_TEXT), NULL);
-        CCopyMoveDialog dlg(HWindow, path, MAX_PATH, LoadStr(IDS_CREATEDIRECTORY_TITLE),
+        CCopyMoveDialog dlg(HWindow, path, path.Size(), LoadStr(IDS_CREATEDIRECTORY_TITLE),
                             &subject, IDD_CREATEDIRDIALOG,
                             Configuration.CreateDirHistory, CREATEDIR_HISTORY_SIZE,
                             FALSE);
@@ -1939,8 +1939,8 @@ void CFilesWindow::CreateDir(CFilesWindow* target)
             // we do this only for the last component; the previous ones already exist and it doesn't matter
             // (the system handles it) or they are checked during creation and an error is shown
             // (we don't clean them, we let the user do some work, it's easy enough)
-            char* lastCompName = strrchr(path, '\\');
-            MakeValidFileName(lastCompName != NULL ? lastCompName + 1 : path);
+            char* lastCompName = strrchr(path.Get(), '\\');
+            MakeValidFileName(lastCompName != NULL ? lastCompName + 1 : path.Get());
 
             int errTextID;
             if (!SalGetFullName(path, &errTextID, Is(ptDisk) ? GetPath() : NULL, nextFocus) ||
@@ -1987,7 +1987,7 @@ void CFilesWindow::CreateDir(CFilesWindow* target)
                     if (!invalidName && SalCreateDirectoryEx(path, &err))
                     {
                         SetCursor(oldCur);
-                        if (nextFocus[0] != 0)
+                        if (*nextFocus != 0)
                             strcpy(NextFocusName, nextFocus);
 
                         // change only in the directory where the directory was created
@@ -2028,7 +2028,7 @@ void CFilesWindow::CreateDir(CFilesWindow* target)
                 {
                     CTruncatedString subject;
                     subject.Set(LoadStr(IDS_CREATEDIRECTORY_TEXT), NULL);
-                    CCopyMoveDialog dlg(HWindow, path, 2 * MAX_PATH, LoadStr(IDS_CREATEDIRECTORY_TITLE),
+                    CCopyMoveDialog dlg(HWindow, path, path.Size(), LoadStr(IDS_CREATEDIRECTORY_TITLE),
                                         &subject, IDD_CREATEDIRDIALOG,
                                         Configuration.CreateDirHistory, CREATEDIR_HISTORY_SIZE,
                                         FALSE);
@@ -2076,8 +2076,8 @@ void CFilesWindow::RenameFileInternal(CFileData* f, const char* formatedFileName
         s++;
     if (formatedFileName[0] != 0 && *s == 0)
     {
-        char finalName[2 * MAX_PATH];
-        MaskName(finalName, 2 * MAX_PATH, f->Name, formatedFileName);
+        CPathBuffer finalName;  // Heap-allocated for long path support
+        MaskName(finalName, finalName.Size(), f->Name, formatedFileName);
 
         // clean the name from undesirable characters at the beginning and end
         MakeValidFileName(finalName);
