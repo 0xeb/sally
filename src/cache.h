@@ -479,6 +479,54 @@ protected:
 
 //****************************************************************************
 //
+// CDiskCacheNameGuard - RAII wrapper for DiskCache name release
+//
+// Usage:
+//   const char* name = DiskCache.GetName(...);
+//   CDiskCacheNameGuard guard(DiskCache, name); // Will call ReleaseName in destructor
+//   if (error) return; // No goto needed, guard handles cleanup
+//   guard.Release(); // Call before AssignName to prevent double-release
+//   DiskCache.AssignName(name, ...);
+//
+
+class CDiskCacheNameGuard
+{
+public:
+    CDiskCacheNameGuard(CDiskCache& cache, const char* name, BOOL storeInCache = FALSE)
+        : Cache(cache), Name(name), StoreInCache(storeInCache), Released(false) {}
+
+    ~CDiskCacheNameGuard()
+    {
+        if (!Released && Name != nullptr)
+            Cache.ReleaseName(Name, StoreInCache);
+    }
+
+    // Call before AssignName() or NamePrepared() to prevent destructor from calling ReleaseName
+    void Dismiss() { Released = true; }
+
+    // Explicitly release now (e.g., for error paths where you want to release early)
+    void ReleaseNow()
+    {
+        if (!Released && Name != nullptr)
+        {
+            Cache.ReleaseName(Name, StoreInCache);
+            Released = true;
+        }
+    }
+
+    // Non-copyable
+    CDiskCacheNameGuard(const CDiskCacheNameGuard&) = delete;
+    CDiskCacheNameGuard& operator=(const CDiskCacheNameGuard&) = delete;
+
+private:
+    CDiskCache& Cache;
+    const char* Name;
+    BOOL StoreInCache;
+    bool Released;
+};
+
+//****************************************************************************
+//
 // CDeleteManager
 //
 

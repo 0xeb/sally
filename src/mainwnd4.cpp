@@ -787,11 +787,10 @@ MENU_TEMPLATE_ITEM MsgBoxButtons[] =
             char batUniqueName[50]; // we need a unique name for the batch file in the cache
             DWORD lastErr;
 
-        _TRY_AGAIN:
-
-            sprintf(batUniqueName, "Usermenu %X", GetTickCount());
-            if (buildBat)
+            // Try to get a unique name for the batch file (retry loop replaces goto _TRY_AGAIN)
+            while (buildBat)
             {
+                sprintf(batUniqueName, "Usermenu %X", GetTickCount());
                 BOOL exists;
                 batName = (char*)DiskCache.GetName(batUniqueName, "usermenu.bat", &exists, TRUE, NULL, FALSE, NULL, NULL);
                 if (batName == NULL) // error (if 'exists' is TRUE -> fatal, otherwise "file already exists")
@@ -799,16 +798,26 @@ MENU_TEMPLATE_ITEM MsgBoxButtons[] =
                     if (!exists) // file exists -> almost impossible, handle anyway
                     {
                         Sleep(100);
-                        goto _TRY_AGAIN;
+                        continue; // retry with new name
                     }
                     return; // fatal error
                 }
+                break; // got a unique name
+            }
+
+            // RAII guard for DiskCache name - will call ReleaseName in destructor if not dismissed
+            CDiskCacheNameGuard cacheGuard(DiskCache, buildBat ? batUniqueName : nullptr, FALSE);
+
+            if (buildBat)
+            {
                 file = HANDLES_Q(CreateFile(batName, GENERIC_WRITE, 0, NULL, CREATE_NEW,
                                             FILE_ATTRIBUTE_TEMPORARY, NULL));
                 if (file == INVALID_HANDLE_VALUE)
                 {
                     lastErr = GetLastError();
-                    goto ERROR_LABEL;
+                    gPrompter->ShowError(LoadStrW(IDS_ERRORTITLE), GetErrorTextW(lastErr));
+                    UpdateWindow(parent);
+                    return; // cacheGuard destructor will call ReleaseName
                 }
             }
 
@@ -817,11 +826,11 @@ MENU_TEMPLATE_ITEM MsgBoxButtons[] =
             index = 0;
             char cmdLine[USRMNUCMDLINE_MAXLEN];
             char arguments[USRMNUARGS_MAXLEN];
-            char initDir[MAX_PATH]; // Cannot use CPathBuffer due to goto ERROR_LABEL
-            char prevInitDir[MAX_PATH]; // Cannot use CPathBuffer due to goto ERROR_LABEL
-            initDir[0] = 0;
+            CPathBuffer initDir;     // Heap-allocated for long path support (now possible without goto)
+            CPathBuffer prevInitDir; // Heap-allocated for long path support
+            *initDir = 0;
             arguments[0] = 0;
-            char path[MAX_PATH], name[MAX_PATH]; // Cannot use CPathBuffer due to goto ERROR_LABEL
+            CPathBuffer path, name;  // Heap-allocated for long path support
             BOOL error;
             error = FALSE;
             BOOL skipErrorMessage;
@@ -882,7 +891,7 @@ MENU_TEMPLATE_ITEM MsgBoxButtons[] =
                         // additionally, launch restrictions will be handled
 
                         // set correct default directories for individual drives
-                        MainWindow->SetDefaultDirectories((initDir[0] != 0) ? initDir : NULL);
+                        MainWindow->SetDefaultDirectories((initDir[0] != 0) ? initDir.Get() : NULL);
 
                         // to work with old configurations, remove the " character from the start and end of cmdLine
                         int cmdLen = (int)strlen(cmdLine);
@@ -901,7 +910,7 @@ MENU_TEMPLATE_ITEM MsgBoxButtons[] =
                         sei.hwnd = shellExecuteWnd.Create(parent, "SEW: CMainWindow::UserMenu"); // handle to any message boxes that the system might produce while executing
                         sei.lpFile = cmdLine;
                         sei.lpParameters = arguments;
-                        sei.lpDirectory = (initDir[0] != 0) ? initDir : NULL;
+                        sei.lpDirectory = (initDir[0] != 0) ? initDir.Get() : NULL;
                         sei.nShow = SW_SHOWNORMAL;
 
                         if (!ShellExecuteEx(&sei))
@@ -934,7 +943,7 @@ MENU_TEMPLATE_ITEM MsgBoxButtons[] =
                 {
                     if (batNotEmpty)
                     {
-                        MainWindow->SetDefaultDirectories((initDir[0] != 0) ? initDir : NULL);
+                        MainWindow->SetDefaultDirectories((initDir[0] != 0) ? initDir.Get() : NULL);
 
                         STARTUPINFO si;
                         memset(&si, 0, sizeof(STARTUPINFO));
@@ -976,26 +985,25 @@ MENU_TEMPLATE_ITEM MsgBoxButtons[] =
                             if (strlen(cmdLine) > 2 * MAX_PATH)
                                 strcpy(cmdLine + 2 * MAX_PATH, "..."); // shorten just in case (probably never needed)
                             std::wstring msg = FormatStrW(LoadStrW(IDS_EXECERROR), AnsiToWide(cmdLine).c_str(), GetErrorTextW(err));
-                            DiskCache.ReleaseName(batUniqueName, FALSE);
+                            cacheGuard.ReleaseNow();
                             gPrompter->ShowError(LoadStrW(IDS_ERRORTITLE), msg.c_str());
                         }
                         else
                         {
                             DiskCache.AssignName(batUniqueName, pi.hProcess, TRUE, crtDirect);
+                            cacheGuard.Dismiss(); // ownership transferred to AssignName
                             //            HANDLES(CloseHandle(pi.hProcess));   // handled by DiskCache
                             HANDLES(CloseHandle(pi.hThread));
                         }
                     }
                     else // an empty .BAT is not worth running (in case of low memory or other crazy errors)
                     {
-                        DiskCache.ReleaseName(batUniqueName, FALSE);
+                        cacheGuard.ReleaseNow();
                     }
                 }
-                else
+                else // error occurred during script building
                 {
-                ERROR_LABEL:
-
-                    DiskCache.ReleaseName(batUniqueName, FALSE);
+                    cacheGuard.ReleaseNow();
                     if (!skipErrorMessage)
                     {
                         gPrompter->ShowError(LoadStrW(IDS_ERRORTITLE), GetErrorTextW(lastErr));
