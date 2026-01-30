@@ -2183,8 +2183,8 @@ void CFilesWindow::GotoRoot()
         {
             if (GetPluginFS()->GetRootPath(root))
             {
-                char fsname[MAX_PATH];
-                strcpy(fsname, GetPluginFS()->GetPluginFSName()); // in case of changes, a local copy of the name
+                CPathBuffer fsname;  // Heap-allocated for long path support
+                lstrcpyn(fsname, GetPluginFS()->GetPluginFSName(), fsname.Size()); // in case of changes, a local copy of the name
                 ChangePathToPluginFS(fsname, root);
             }
         }
@@ -2207,8 +2207,8 @@ void CFilesWindow::SetUnescapedHotPath(int index)
     CALL_STACK_MESSAGE2("CFilesWindow::SetUnescapedHotPath(%d)", index);
     if (index < 0 || index >= HOT_PATHS_COUNT)
         return;
-    char path[2 * MAX_PATH];
-    GetGeneralPath(path, 2 * MAX_PATH, TRUE);
+    CPathBuffer path;  // Heap-allocated for long path support
+    GetGeneralPath(path, path.Size(), TRUE);
     MainWindow->SetUnescapedHotPath(index, path);
 }
 

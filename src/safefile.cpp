@@ -151,14 +151,14 @@ CSalamanderSafeFile::SafeFileCreate(const char* fileName,
                 if (StrICmp(tgtName, data.cAlternateFileName) == 0 && // match only for the DOS name
                     StrICmp(tgtName, data.cFileName) != 0)            // (the full name is different)
                 {
-                    // rename ("clean up") the file/directory with the conflicting DOS name to a temporary 8.3 name (which doesn’t require an extra DOS name)
-                    char tmpName[MAX_PATH + 20];
-                    char origFullName[MAX_PATH];
-                    lstrcpyn(tmpName, fileName, MAX_PATH);
+                    // rename ("clean up") the file/directory with the conflicting DOS name to a temporary 8.3 name (which doesn't require an extra DOS name)
+                    CPathBuffer tmpName;       // Heap-allocated for long path support
+                    CPathBuffer origFullName;  // Heap-allocated for long path support
+                    lstrcpyn(tmpName, fileName, tmpName.Size());
                     CutDirectory(tmpName);
-                    SalPathAddBackslash(tmpName, MAX_PATH + 20);
+                    SalPathAddBackslash(tmpName, tmpName.Size());
                     char* tmpNamePart = tmpName + strlen(tmpName);
-                    if (SalPathAppend(tmpName, data.cFileName, MAX_PATH))
+                    if (SalPathAppend(tmpName, data.cFileName, tmpName.Size()))
                     {
                         strcpy(origFullName, tmpName);
                         DWORD num = (GetTickCount() / 10) % 0xFFF;
@@ -170,11 +170,11 @@ CSalamanderSafeFile::SafeFileCreate(const char* fileName,
                             DWORD e = GetLastError();
                             if (e != ERROR_FILE_EXISTS && e != ERROR_ALREADY_EXISTS)
                             {
-                                tmpName[0] = 0;
+                                *tmpName = 0;
                                 break;
                             }
                         }
-                        if (tmpName[0] != 0) // if we managed to "clean up" the conflicting file/directory, try creating the target
+                        if (*tmpName != 0) // if we managed to "clean up" the conflicting file/directory, try creating the target
                         {                    // file/directory and then restore the original name to the "cleaned" file/directory
                             hFile = INVALID_HANDLE_VALUE;
                             //              if (!isDir)   // file
@@ -411,8 +411,8 @@ CSalamanderSafeFile::SafeFileCreate(const char* fileName,
             return INVALID_HANDLE_VALUE;
         }
 
-        char namecopy[MAX_PATH];
-        strcpy(namecopy, fileName);
+        CPathBuffer namecopy;  // Heap-allocated for long path support
+        lstrcpyn(namecopy, fileName, namecopy.Size());
         // if it is a file, obtain the directory name
         if (!isDir)
         {
@@ -491,8 +491,8 @@ CSalamanderSafeFile::SafeFileCreate(const char* fileName,
             return INVALID_HANDLE_VALUE;
         }
         char* ptr;
-        char namecpy2[MAX_PATH];
-        strcpy(namecpy2, namecopy);
+        CPathBuffer namecpy2;  // Heap-allocated for long path support
+        lstrcpyn(namecpy2, namecopy, namecpy2.Size());
         // find the first existing directory
         while (1)
         {
