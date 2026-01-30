@@ -1186,8 +1186,8 @@ void CMainWindow::EditWindowSetDirectory()
          panel->Is(ptPluginFS) && panel->GetPluginFS()->NotEmpty() &&
              panel->GetPluginFS()->IsServiceSupported(FS_SERVICE_COMMANDLINE)))
     {
-        char dir[2 * MAX_PATH];
-        panel->GetGeneralPath(dir, 2 * MAX_PATH);
+        CPathBuffer dir; // Heap-allocated for long path support
+        panel->GetGeneralPath(dir, dir.Size());
         EditWindow->Enable(TRUE); // cached in EditWindow
         EditWindow->SetDirectory(dir);
     }
@@ -2248,7 +2248,7 @@ MENU_TEMPLATE_ITEM ToolbarsCtxMenu[] =
         }
     }
 
-    char HotText[2 * MAX_PATH];
+    CPathBuffer HotText; // Heap-allocated for long path support
     int HeaderLineItem = -1; // will be filled with the item index if the user clicked on one
 
     if (panelClass)
@@ -2376,7 +2376,7 @@ MENU_TEMPLATE_ITEM InfoLineMenu[] =
 
             menu.InsertItem(0xffffffff, TRUE, &miiSep);
 
-            panel->DirectoryLine->GetHotText(HotText, _countof(HotText));
+            panel->DirectoryLine->GetHotText(HotText, HotText.Size());
             if (strlen(HotText) > 0)
             {
                 CMenuPopup* popup = new CMenuPopup();
@@ -2403,7 +2403,7 @@ MENU_TEMPLATE_ITEM InfoLineMenu[] =
         // handle hot text in the info line
         if (hit == mwhteLeftStatusLine || hit == mwhteRightStatusLine)
         {
-            panel->StatusLine->GetHotText(HotText, _countof(HotText));
+            panel->StatusLine->GetHotText(HotText, HotText.Size());
             if (strlen(HotText) > 0)
             {
                 mii.String = LoadStr(IDS_COPYTOCLIPBOARD);
@@ -2583,7 +2583,7 @@ MENU_TEMPLATE_ITEM InfoLineMenu[] =
                 if (panel->PluginData.NotEmpty()) // "always true"
                     panel->PluginData.ColumnFixedWidthShouldChange(leftPanel, column, column->FixedWidth ? 0 : 1);
             }
-            // user changed something in the view configuration - let’s rebuild the columns
+            // user changed something in the view configuration - letï¿½s rebuild the columns
             if (leftPanel)
                 LeftPanel->SelectViewTemplate(LeftPanel->GetViewTemplateIndex(), TRUE, FALSE);
             else

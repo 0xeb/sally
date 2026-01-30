@@ -252,8 +252,8 @@ CFilesWindow::WindowProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
                 BOOL copy = (operation == SALSHEXT_COPY);
                 BOOL operationMask = FALSE;
                 BOOL cancelOrHandlePath = FALSE;
-                char targetPath[2 * MAX_PATH];
-                lstrcpyn(targetPath, tgtPath, 2 * MAX_PATH - 1);
+                CPathBuffer targetPath; // Heap-allocated for long path support
+                lstrcpyn(targetPath, tgtPath, targetPath.Size() - 1);
                 if (tgtPath[0] == '\\' && tgtPath[1] == '\\' || // UNC path
                     tgtPath[0] != 0 && tgtPath[1] == ':')       // classic disk path (C:\path)
                 {

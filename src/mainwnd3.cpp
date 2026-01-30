@@ -3765,10 +3765,10 @@ MENU_TEMPLATE_ITEM AddToSystemMenu[] =
             //}
 
             // if both panels point to the same path, exit
-            char leftPath[2 * MAX_PATH];
-            char rightPath[2 * MAX_PATH];
-            LeftPanel->GetGeneralPath(leftPath, 2 * MAX_PATH);
-            RightPanel->GetGeneralPath(rightPath, 2 * MAX_PATH);
+            CPathBuffer leftPath;  // Heap-allocated for long path support
+            CPathBuffer rightPath; // Heap-allocated for long path support
+            LeftPanel->GetGeneralPath(leftPath, leftPath.Size());
+            RightPanel->GetGeneralPath(rightPath, rightPath.Size());
             if (strcmp(leftPath, rightPath) == 0) // case sensitive; if this condition fails, it's fine
             {
                 gPrompter->ShowInfo(LoadStrW(IDS_COMPAREDIRSTITLE), LoadStrW(IDS_COMPARE_SAMEPATH));

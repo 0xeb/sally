@@ -114,9 +114,9 @@ void CFilesWindow::PluginFSFilesAction(CPluginFSActionType type)
             BOOL operationMask = FALSE;
             BOOL cancelOrHandlePath = FALSE;
 
-            char targetPath[2 * MAX_PATH];
+            CPathBuffer targetPath; // Heap-allocated for long path support
             if (target->Is(ptDisk))
-                target->GetGeneralPath(targetPath, 2 * MAX_PATH);
+                target->GetGeneralPath(targetPath, targetPath.Size());
             else
                 targetPath[0] = 0;
 
@@ -128,7 +128,7 @@ void CFilesWindow::PluginFSFilesAction(CPluginFSActionType type)
             {
                 if (!cancelOrHandlePath) // standard dialog
                 {
-                    if (CCopyMoveDialog(HWindow, targetPath, 2 * MAX_PATH,
+                    if (CCopyMoveDialog(HWindow, targetPath, targetPath.Size(),
                                         LoadStr(copy ? IDS_COPY : IDS_MOVE), &str,
                                         copy ? IDD_COPYDIALOG : IDD_MOVEDIALOG,
                                         Configuration.CopyHistory, COPY_HISTORY_SIZE,
@@ -213,7 +213,7 @@ void CFilesWindow::PluginFSFilesAction(CPluginFSActionType type)
                                                  LoadStrW(pathType == PATH_TYPE_ARCHIVE ? IDS_FSCOPYMOVE_ONLYDISK_A : IDS_FSCOPYMOVE_ONLYDISK_FS));
                             if (pathType == PATH_TYPE_ARCHIVE && (backslashAtEnd || mustBePath))
                             {
-                                SalPathAddBackslash(targetPath, 2 * MAX_PATH);
+                                SalPathAddBackslash(targetPath, targetPath.Size());
                             }
                             pathError = TRUE; // path error -> mode==4
                         }
@@ -648,7 +648,7 @@ void CFilesWindow::DragDropToArcOrFS(CTmpDragDropOperData* data)
                 SetThreadPriority(GetCurrentThread(), THREAD_PRIORITY_NORMAL);
 
                 // select the FS that performs the operation (priority: active, then new)
-                char targetPath[2 * MAX_PATH];
+                CPathBuffer targetPath; // Heap-allocated for long path support
                 BOOL done = FALSE;
                 CPluginFSInterfaceEncapsulation* fs = NULL;
                 if (Is(ptPluginFS))
@@ -659,7 +659,7 @@ void CFilesWindow::DragDropToArcOrFS(CTmpDragDropOperData* data)
                     fs->IsFSNameFromSamePluginAsThisFS(data->ArchiveOrFSName, fsNameIndex)) // FS name is from the same plugin (otherwise it's not worth trying)
                 {
                     BOOL invalidPathOrCancel;
-                    _snprintf_s(targetPath, _TRUNCATE, "%s:%s", data->ArchiveOrFSName, data->ArchivePathOrUserPart);
+                    _snprintf_s(targetPath.Get(), targetPath.Size(), _TRUNCATE, "%s:%s", data->ArchiveOrFSName, data->ArchivePathOrUserPart);
                     if (fs->CopyOrMoveFromDiskToFS(data->Copy, 3, fs->GetPluginFSName(),
                                                    HWindow, data->Data->SrcPath,
                                                    PanelEnumDiskSelection, &dataEnum,
@@ -699,7 +699,7 @@ void CFilesWindow::DragDropToArcOrFS(CTmpDragDropOperData* data)
                             {
                                 Plugins.SetWorkingPluginFS(&pluginFS);
                                 BOOL invalidPathOrCancel;
-                                _snprintf_s(targetPath, _TRUNCATE, "%s:%s", data->ArchiveOrFSName, data->ArchivePathOrUserPart);
+                                _snprintf_s(targetPath.Get(), targetPath.Size(), _TRUNCATE, "%s:%s", data->ArchiveOrFSName, data->ArchivePathOrUserPart);
                                 if (!pluginFS.CopyOrMoveFromDiskToFS(data->Copy, 3, pluginFS.GetPluginFSName(),
                                                                      HWindow, data->Data->SrcPath,
                                                                      PanelEnumDiskSelection, &dataEnum,
