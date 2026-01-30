@@ -2251,7 +2251,7 @@ void CFilesWindow::OpenActiveFolder()
         //  (except for a group of directories excluded from the redirector that thus point back to System32)
         CPathBuffer dirName; // Heap-allocated for long path support
         dirName[0] = 0;
-        if (Windows64Bit && WindowsDirectory[0] != 0)
+        if (Windows64Bit && *WindowsDirectory != 0)
         {
             BOOL done = FALSE;
             lstrcpyn(dirName, WindowsDirectory, dirName.Size());

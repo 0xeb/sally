@@ -37,7 +37,7 @@ const char* FIRST_SALAMANDER_MUTEX_NAME = "AltapSalamanderFirstInstance";     //
 const char* LOADSAVE_REGISTRY_MUTEX_NAME = "AltapSalamanderLoadSaveRegistry"; // introduced since AS 2.52 beta 1
 
 // path where we save bug report and minidump; later Salmon packs it into 7z and uploads to server
-char BugReportPath[MAX_PATH] = "";
+CPathBuffer BugReportPath; // Heap-allocated for long path support
 
 CRITICAL_SECTION CommandLineParamsCS;
 CCommandLineParams CommandLineParams;

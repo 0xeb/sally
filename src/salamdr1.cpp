@@ -194,7 +194,7 @@ const char* CommonFileTypeName = NULL;
 int CommonFileTypeNameLen = 0;
 const char* CommonFileTypeName2 = NULL;
 
-char WindowsDirectory[MAX_PATH] = "";
+CPathBuffer WindowsDirectory; // Heap-allocated for long path support
 
 // to ensure escape from removed drives to fixed drive (after device ejection - USB flash disk, etc.)
 BOOL ChangeLeftPanelToFixedWhenIdleInProgress = FALSE; // TRUE = path is currently being changed, setting ChangeLeftPanelToFixedWhenIdle to TRUE is unnecessary
@@ -3754,8 +3754,8 @@ int WinMainBody(HINSTANCE hInstance, HINSTANCE /*hPrevInstance*/, LPSTR cmdLine,
         pGNSI(&si);
     Windows64Bit = si.wProcessorArchitecture == PROCESSOR_ARCHITECTURE_AMD64;
 
-    if (!EnvGetWindowsDirectoryA(gEnvironment, WindowsDirectory, MAX_PATH).success)
-        WindowsDirectory[0] = 0;
+    if (!EnvGetWindowsDirectoryA(gEnvironment, WindowsDirectory, WindowsDirectory.Size()).success)
+        *WindowsDirectory = 0;
 
     // we're interested in the ITaskbarList3 interface, which MS introduced from Windows 7 - for example progress in taskbar buttons
     if (Windows7AndLater)

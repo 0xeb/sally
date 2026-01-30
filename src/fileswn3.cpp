@@ -134,7 +134,7 @@ BOOL CFilesWindow::ReadDirectory(HWND parent, BOOL isRefresh)
         EnvSetCurrentDirectoryA(gEnvironment, GetPath()); // so that it works better
 
 #ifndef _WIN64
-        BOOL isWindows64BitDir = Windows64Bit && WindowsDirectory[0] != 0 && IsTheSamePath(GetPath(), WindowsDirectory);
+        BOOL isWindows64BitDir = Windows64Bit && *WindowsDirectory != 0 && IsTheSamePath(GetPath(), WindowsDirectory);
 #endif // _WIN64
 
         RefreshDiskFreeSpace(FALSE);
@@ -1788,7 +1788,7 @@ BOOL IsWin64RedirectedDirAux(const char* subDir, const char* redirectedDir, cons
 
 BOOL IsWin64RedirectedDir(const char* path, char** lastSubDir, BOOL failIfDirWithSameNameExists)
 {
-    if (Windows64Bit && WindowsDirectory[0] != 0)
+    if (Windows64Bit && *WindowsDirectory != 0)
     {
         CPathBuffer winDir; // Heap-allocated for long path support
         strcpy(winDir, WindowsDirectory);
@@ -1816,7 +1816,7 @@ BOOL IsWin64RedirectedDir(const char* path, char** lastSubDir, BOOL failIfDirWit
 BOOL ContainsWin64RedirectedDir(CFilesWindow* panel, int* indexes, int count, char* redirectedDir, BOOL onlyAdded)
 {
     redirectedDir[0] = 0;
-    if (Windows64Bit && WindowsDirectory[0] != 0)
+    if (Windows64Bit && *WindowsDirectory != 0)
     {
         CPathBuffer path(panel->GetPath());
         char* pathEnd = path + strlen(path);
@@ -1912,7 +1912,7 @@ BOOL AddWin64RedirectedDir(const char* path, CFilesArray* dirs, WIN32_FIND_DATA*
                            int* index, BOOL* dirWithSameNameExists)
 {
     *dirWithSameNameExists = FALSE;
-    if (Windows64Bit && WindowsDirectory[0] != 0)
+    if (Windows64Bit && *WindowsDirectory != 0)
     {
         CPathBuffer winDir; // Heap-allocated for long path support
         strcpy(winDir, WindowsDirectory);

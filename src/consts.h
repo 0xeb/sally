@@ -1702,7 +1702,7 @@ extern const char* CommonFileTypeName;  // LoadStr(IDS_COMMONFILETYPE) - used to
 extern int CommonFileTypeNameLen;       // CommonFileTypeName string length
 extern const char* CommonFileTypeName2; // LoadStr(IDS_COMMONFILETYPE2) - used too often, we cache it
 
-extern char WindowsDirectory[MAX_PATH]; // cached result of GetWindowsDirectory
+extern CPathBuffer WindowsDirectory; // cached result of GetWindowsDirectory (heap-allocated)
 
 //#ifdef MSVC_RUNTIME_CHECKS
 #define RTC_ERROR_DESCRIPTION_SIZE 2000 // buffer for run-time check error description
@@ -1710,7 +1710,7 @@ extern char RTCErrorDescription[RTC_ERROR_DESCRIPTION_SIZE];
 //#endif // MSVC_RUNTIME_CHECKS
 
 // path where we create bug report and minidump, location: up to Vista near salamand.exe, in Vista (and later) in CSIDL_APPDATA + "\\Open Salamander"
-extern char BugReportPath[MAX_PATH];
+extern CPathBuffer BugReportPath; // Heap-allocated for long path support
 
 // file name that will be imported (if exists) to registry
 extern CPathBuffer ConfigurationName;
