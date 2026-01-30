@@ -146,20 +146,11 @@ BOOL CFilesWindow::MakeFileList(HANDLE hFile)
     else
         alloc = count;
 
-    int* indexes;
-    indexes = new int[alloc];
-    if (indexes == NULL)
-    {
-        TRACE_E(LOW_MEMORY);
-        FilesActionInProgress = FALSE;
-        return FALSE;
-    }
+    std::unique_ptr<int[]> indexes = std::make_unique<int[]>(alloc); // RAII: auto-deleted when scope exits
+    if (count > 0)
+        GetSelItems(count, indexes.get());
     else
-    {
-        if (count > 0)
-            GetSelItems(count, indexes);
-        else
-            indexes[0] = focusIndex;
+        indexes[0] = focusIndex;
 
         int files = 0;
         int dirs = 0;
@@ -180,8 +171,8 @@ BOOL CFilesWindow::MakeFileList(HANDLE hFile)
                                         indexes[i] < Dirs->Count, NULL, 0, TRUE, maxSizes, maxSizesCount,
                                         ValidFileData, GetPath(), i != 0))
                 {
-                    ret = FALSE;
-                    goto exitus;
+                    FilesActionInProgress = FALSE;
+                    return FALSE;
                 }
             }
         }
@@ -205,23 +196,21 @@ BOOL CFilesWindow::MakeFileList(HANDLE hFile)
                         if (!WriteFile(hFile, buff, len, &written, NULL) || written != len)
                         {
                             gPrompter->ShowError(LoadStrW(IDS_ERRORTITLE), GetErrorTextW(GetLastError()));
-                            ret = FALSE;
-                            goto exitus;
+                            FilesActionInProgress = FALSE;
+                            return FALSE;
                         }
                     }
                 }
                 else
                 {
-                    ret = FALSE;
-                    goto exitus;
+                    FilesActionInProgress = FALSE;
+                    return FALSE;
                 }
             }
         }
-    exitus:
-        delete[] (indexes);
-    }
+    // RAII: indexes auto-deleted when scope exits
     FilesActionInProgress = FALSE;
-    return ret;
+    return TRUE;
 }
 
 DWORD GetPathFlagsForCopyOp(const char* path, DWORD netFlag, DWORD fixedFlag)

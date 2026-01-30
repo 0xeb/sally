@@ -86,20 +86,13 @@ void CFilesWindow::Convert()
                 }
 
                 //---  determine which directories and files are selected
-                int* indexes = NULL;
+                std::unique_ptr<int[]> indexes; // RAII: auto-deleted when scope exits
                 CFileData* f = NULL;
                 int count = GetSelCount();
                 if (count != 0)
                 {
-                    indexes = new int[count];
-                    if (indexes == NULL)
-                    {
-                        TRACE_E(LOW_MEMORY);
-                        FilesActionInProgress = FALSE;
-                        EndStopRefresh(); // snooper will start again now
-                        return;
-                    }
-                    GetSelItems(count, indexes);
+                    indexes = std::make_unique<int[]>(count);
+                    GetSelItems(count, indexes.get());
                 }
                 else // nothing is selected
                 {
@@ -131,7 +124,7 @@ void CFilesWindow::Convert()
                     HCURSOR oldCur = SetCursor(LoadCursor(NULL, IDC_WAIT));
 
                     BOOL res = BuildScriptMain(script, convertDlg.SubDirs ? atRecursiveConvert : atConvert,
-                                               NULL, NULL, count, indexes, f, NULL, NULL, FALSE, &filter);
+                                               NULL, NULL, count, indexes.get(), f, NULL, NULL, FALSE, &filter);
                     if (script->Count == 0)
                         res = FALSE;
                     // reordered to allow the main window to activate (must not be disabled), otherwise it switches to another app
@@ -175,9 +168,7 @@ void CFilesWindow::Convert()
                         UpdateWindow(MainWindow->HWindow);
                     }
                 }
-                //---
-                if (indexes != NULL)
-                    delete[] (indexes);
+                // RAII: indexes auto-deleted when scope exits
             }
             UpdateWindow(MainWindow->HWindow);
             break;
@@ -453,22 +444,13 @@ void CFilesWindow::ChangeAttr(BOOL setCompress, BOOL compressed, BOOL setEncrypt
                     LocalFileTimeToFileTime(&ft, &dlgData.TimeAccessed);
                 }
                 //---  determine which directories and files are selected
-                int* indexes = NULL;
+                std::unique_ptr<int[]> indexes; // RAII: auto-deleted when scope exits
                 CFileData* f = NULL;
                 int count = GetSelCount();
                 if (count != 0)
                 {
-                    indexes = new int[count];
-                    if (indexes == NULL)
-                    {
-                        TRACE_E(LOW_MEMORY);
-                        // if we selected an item, we deselect it again
-                        UnselectItemWithName(temporarySelected);
-                        FilesActionInProgress = FALSE;
-                        EndStopRefresh(); // snooper will start again now
-                        return;
-                    }
-                    GetSelItems(count, indexes);
+                    indexes = std::make_unique<int[]>(count);
+                    GetSelItems(count, indexes.get());
                 }
                 else // nothing is selected
                 {
@@ -573,7 +555,7 @@ void CFilesWindow::ChangeAttr(BOOL setCompress, BOOL compressed, BOOL setEncrypt
 
                     script->ClearReadonlyMask = 0xFFFFFFFF;
                     BOOL res = BuildScriptMain(script, atChangeAttrs, NULL, NULL, count,
-                                               indexes, f, &attrsData, NULL, FALSE, NULL);
+                                               indexes.get(), f, &attrsData, NULL, FALSE, NULL);
                     if (script->Count == 0)
                         res = FALSE;
                     // reordered to allow the main window to activate (must not be disabled), otherwise it switches to another app
@@ -609,10 +591,7 @@ void CFilesWindow::ChangeAttr(BOOL setCompress, BOOL compressed, BOOL setEncrypt
                         UpdateWindow(MainWindow->HWindow);
                     }
                 }
-                //---
-                if (indexes != NULL)
-                    delete[] (indexes);
-                //---  if a Salamander window is active, end suspend mode
+                // RAII: indexes auto-deleted when scope exits
             }
             UpdateWindow(MainWindow->HWindow);
             FilesActionInProgress = FALSE;
