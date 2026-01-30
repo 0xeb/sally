@@ -2678,8 +2678,8 @@ void CFilesWindow::AdjustQuickRenameWindow()
     GetWindowRect(QuickRenameWindow.HWindow, &r);
     MapWindowPoints(NULL, HWindow, (POINT*)&r, 2);
 
-    char buff[3 * MAX_PATH];
-    GetWindowText(QuickRenameWindow.HWindow, buff, 3 * MAX_PATH);
+    CPathBuffer buff; // Heap-allocated for long path support
+    GetWindowText(QuickRenameWindow.HWindow, buff, buff.Size());
     AdjustQuickRenameRect(buff, &r);
     SetWindowPos(QuickRenameWindow.HWindow, NULL, 0, 0,
                  r.right - r.left, r.bottom - r.top,
