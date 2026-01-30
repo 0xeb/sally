@@ -1,4 +1,4 @@
-﻿// SPDX-FileCopyrightText: 2023 Open Salamander Authors
+// SPDX-FileCopyrightText: 2023 Open Salamander Authors
 // SPDX-License-Identifier: GPL-2.0-or-later
 // CommentsTranslationProject: TRANSLATED
 
@@ -153,10 +153,10 @@ BOOL CPluginInterfaceForMenuExt::ExecuteMenuItem(CSalamanderForOperationsAbstrac
 
     case FTPCMD_CHANGETGTPANELPATH:
     {
-        if (TargetPanelPath[0] != 0)
+        if (*TargetPanelPath != 0)
         {
             SalamanderGeneral->ChangePanelPath(TargetPanelPathPanel, TargetPanelPath);
-            TargetPanelPath[0] = 0;
+            *TargetPanelPath = 0;
         }
         return FALSE; // do not uncheck
     }

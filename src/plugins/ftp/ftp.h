@@ -1,4 +1,4 @@
-﻿// SPDX-FileCopyrightText: 2023 Open Salamander Authors
+// SPDX-FileCopyrightText: 2023 Open Salamander Authors
 // SPDX-License-Identifier: GPL-2.0-or-later
 // CommentsTranslationProject: TRANSLATED
 
@@ -132,7 +132,7 @@ extern BOOL WindowsVistaAndLater; // Windows Vista or later from the NT line
 
 // global variables for the FTPCMD_CHANGETGTPANELPATH command
 extern int TargetPanelPathPanel;
-extern char TargetPanelPath[MAX_PATH];
+extern CPathBuffer TargetPanelPath;
 
 extern char UserDefinedSuffix[100]; // preloaded string for marking user-defined "server types"
 

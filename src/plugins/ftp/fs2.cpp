@@ -1,4 +1,4 @@
-﻿// SPDX-FileCopyrightText: 2023 Open Salamander Authors
+// SPDX-FileCopyrightText: 2023 Open Salamander Authors
 // SPDX-License-Identifier: GPL-2.0-or-later
 // CommentsTranslationProject: TRANSLATED
 
@@ -384,7 +384,7 @@ BOOL CPluginFSInterface::ChangePath(int currentFSNameIndex, char* fsName, int fs
 
     if (lastErrorState == fesFatal)
     {
-        TargetPanelPath[0] = 0; // the connection failed, no path change in the target panel
+        *TargetPanelPath = 0; // the connection failed, no path change in the target panel
         return FALSE;           // fatal error, stop
     }
 
@@ -407,7 +407,7 @@ BOOL CPluginFSInterface::ChangePath(int currentFSNameIndex, char* fsName, int fs
     char newUserPart[FTP_USERPART_SIZE + 1];
     if (ControlConnection == NULL) // opening the connection (opening the path on the FTP server)
     {
-        TargetPanelPath[0] = 0;
+        *TargetPanelPath = 0;
         TotalConnectAttemptNum = 1; // opening the connection = first attempt to open it
         InformAboutUnknownSrvType = TRUE;
 
@@ -422,7 +422,7 @@ BOOL CPluginFSInterface::ChangePath(int currentFSNameIndex, char* fsName, int fs
             }
             else
                 TRACE_E(LOW_MEMORY);
-            TargetPanelPath[0] = 0; // the connection failed, no path change in the target panel
+            *TargetPanelPath = 0; // the connection failed, no path change in the target panel
             return FALSE;           // fatal error
         }
 
@@ -443,7 +443,7 @@ BOOL CPluginFSInterface::ChangePath(int currentFSNameIndex, char* fsName, int fs
                 else
                 {
                     TRACE_E("Unexpected situation in CPluginFSInterface::ChangePath().");
-                    TargetPanelPath[0] = 0; // the connection failed, no path change in the target panel
+                    *TargetPanelPath = 0; // the connection failed, no path change in the target panel
                     return FALSE;
                 }
             }
@@ -467,7 +467,7 @@ BOOL CPluginFSInterface::ChangePath(int currentFSNameIndex, char* fsName, int fs
             parsedPath = FALSE; // path entered by the user (never trim '/' or '\\' at the beginning)
 
             if (server->TargetPanelPath != NULL)
-                lstrcpyn(TargetPanelPath, server->TargetPanelPath, MAX_PATH);
+                lstrcpyn(TargetPanelPath, server->TargetPanelPath, TargetPanelPath.Size());
 
             BOOL useListingsCache = Config.UseListingsCache;
             if (server->UseListingsCache != 2)
@@ -558,7 +558,7 @@ BOOL CPluginFSInterface::ChangePath(int currentFSNameIndex, char* fsName, int fs
             // Verify that any password for the default proxy can be decrypted (we may call SetConnectionParameters() only if it can)
             if (!Config.FTPProxyServerList.EnsurePasswordCanBeDecrypted(SalamanderGeneral->GetMsgBoxParent(), Config.DefaultProxySrvUID))
             {
-                TargetPanelPath[0] = 0; // the connection failed, no path change in the target panel
+                *TargetPanelPath = 0; // the connection failed, no path change in the target panel
                 return FALSE;           // fatal error
             }
 
@@ -576,7 +576,7 @@ BOOL CPluginFSInterface::ChangePath(int currentFSNameIndex, char* fsName, int fs
                 SalamanderGeneral->ShowMessageBox(LoadStr(IDS_HOSTNAMEMISSING),
                                                   LoadStr(IDS_FTPERRORTITLE), MSGBOX_ERROR);
                 memset(newUserPart, 0, FTP_USERPART_SIZE + 1); // erase the memory that contained the password
-                TargetPanelPath[0] = 0;                        // the connection failed, no path change in the target panel
+                *TargetPanelPath = 0;                        // the connection failed, no path change in the target panel
                 return FALSE;                                  // fatal error
             }
             char user[USER_MAX_SIZE];
@@ -596,7 +596,7 @@ BOOL CPluginFSInterface::ChangePath(int currentFSNameIndex, char* fsName, int fs
                     SalamanderGeneral->ShowMessageBox(LoadStr(IDS_INVALIDPORT),
                                                       LoadStr(IDS_FTPERRORTITLE), MSGBOX_ERROR);
                     memset(newUserPart, 0, FTP_USERPART_SIZE + 1); // erase the memory that contained the password
-                    TargetPanelPath[0] = 0;                        // the connection failed, no path change in the target panel
+                    *TargetPanelPath = 0;                        // the connection failed, no path change in the target panel
                     return FALSE;                                  // fatal error
                 }
             }
@@ -638,7 +638,7 @@ BOOL CPluginFSInterface::ChangePath(int currentFSNameIndex, char* fsName, int fs
             DeleteSocket(ControlConnection);
             ControlConnection = NULL;
             Logs.RefreshListOfLogsInLogsDlg();
-            TargetPanelPath[0] = 0; // the connection failed, no path change in the target panel
+            *TargetPanelPath = 0; // the connection failed, no path change in the target panel
             return FALSE;
         }
         lstrcpyn(HomeDir, RescuePath, FTP_MAX_PATH); // save the current path after logging into the server (home dir)
@@ -671,14 +671,14 @@ BOOL CPluginFSInterface::ChangePath(int currentFSNameIndex, char* fsName, int fs
             PathListingStartTime = pathListingStartTime;
         }
 
-        if (ret && TargetPanelPath[0] != 0)
+        if (ret && *TargetPanelPath != 0)
         {
             TargetPanelPathPanel = SalamanderGeneral->GetSourcePanel();
             TargetPanelPathPanel = (TargetPanelPathPanel == PANEL_RIGHT) ? PANEL_LEFT : PANEL_RIGHT;
             SalamanderGeneral->PostMenuExtCommand(FTPCMD_CHANGETGTPANELPATH, TRUE); // send later in "idle"
         }
         if (!ret)
-            TargetPanelPath[0] = 0;              // the connection failed, no path change in the target panel
+            *TargetPanelPath = 0;              // the connection failed, no path change in the target panel
         ControlConnection->ActivateWelcomeMsg(); // if any message box deactivated the welcome-msg window, activate it again
         return ret;
     }
@@ -771,7 +771,7 @@ BOOL CPluginFSInterface::ChangePath(int currentFSNameIndex, char* fsName, int fs
                 PathListingStartTime = pathListingStartTime;
             }
             if (!ret)
-                TargetPanelPath[0] = 0; // the connection failed, no path change in the target panel
+                *TargetPanelPath = 0; // the connection failed, no path change in the target panel
         }
         else // when refreshing because of server-type or column configuration changes we stay on the same path with the same listing text (even if it is NULL)
         {

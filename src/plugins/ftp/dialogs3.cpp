@@ -1,4 +1,4 @@
-﻿// SPDX-FileCopyrightText: 2023 Open Salamander Authors
+// SPDX-FileCopyrightText: 2023 Open Salamander Authors
 // SPDX-License-Identifier: GPL-2.0-or-later
 // CommentsTranslationProject: TRANSLATED
 
@@ -146,11 +146,11 @@ void CConfigPageServers::MoveItem(HWND list, int fromIndex, int toIndex)
         TmpServerTypeList->ResetState();
 }
 
-char ImpExpInitDir[MAX_PATH] = "";
+CPathBuffer ImpExpInitDir; // Heap-allocated for long path support
 
 void CConfigPageServers::OnExportServer(CServerType* serverType)
 {
-    if (ImpExpInitDir[0] == 0)
+    if (*ImpExpInitDir == 0)
         GetMyDocumentsPath(ImpExpInitDir);
     CPathBuffer fileName; // Heap-allocated for long path support
     lstrcpyn(fileName, serverType->TypeName[0] == '*' ? serverType->TypeName + 1 : serverType->TypeName,
@@ -187,8 +187,8 @@ void CConfigPageServers::OnExportServer(CServerType* serverType)
         s = strrchr(fileName.Get(), '\\');
         if (s != NULL)
         {
-            memcpy(ImpExpInitDir, fileName.Get(), s - fileName.Get());
-            ImpExpInitDir[s - fileName.Get()] = 0;
+            memcpy(ImpExpInitDir.Get(), fileName.Get(), s - fileName.Get());
+            ImpExpInitDir.Get()[s - fileName.Get()] = 0;
         }
 
         if (SalamanderGeneral->SalGetFileAttributes(fileName) != 0xFFFFFFFF) // so a read-only file can be overwritten
@@ -231,7 +231,7 @@ void CConfigPageServers::OnImportServer()
     CServerType* serverType = new CServerType;
     if (TmpServerTypeList != NULL && serverType != NULL)
     {
-        if (ImpExpInitDir[0] == 0)
+        if (*ImpExpInitDir == 0)
             GetMyDocumentsPath(ImpExpInitDir);
         CPathBuffer fileName; // Heap-allocated for long path support
         fileName[0] = 0;
@@ -262,8 +262,8 @@ void CConfigPageServers::OnImportServer()
             s = strrchr(fileName.Get(), '\\');
             if (s != NULL)
             {
-                memcpy(ImpExpInitDir, fileName.Get(), s - fileName.Get());
-                ImpExpInitDir[s - fileName.Get()] = 0;
+                memcpy(ImpExpInitDir.Get(), fileName.Get(), s - fileName.Get());
+                ImpExpInitDir.Get()[s - fileName.Get()] = 0;
             }
 
             HANDLE file = HANDLES_Q(CreateFile(fileName, GENERIC_READ,
@@ -1229,7 +1229,7 @@ CEditRulesControlWindow::WindowProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
                         "add_string_to_column(<column-id>, string-expression)",
                         "month_3(<column-id>, \"jan feb mar apr may jun jul aug sep oct nov dec\")",
                         "month_txt(<column-id>)",
-                        "month_txt(<column-id>, \"Jan. Feb. März Apr. Mai Juni Juli Aug. Sept. Okt. Nov. Dez.\")",
+                        "month_txt(<column-id>, \"Jan. Feb. M�rz Apr. Mai Juni Juli Aug. Sept. Okt. Nov. Dez.\")",
                         "positive_number(<column-id>)",
                         "cut_end_of_string(<column-id>, number)",
                         "skip_to_number()",

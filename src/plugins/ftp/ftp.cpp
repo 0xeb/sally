@@ -1,4 +1,4 @@
-﻿// SPDX-FileCopyrightText: 2023 Open Salamander Authors
+// SPDX-FileCopyrightText: 2023 Open Salamander Authors
 // SPDX-License-Identifier: GPL-2.0-or-later
 // CommentsTranslationProject: TRANSLATED
 
@@ -228,7 +228,7 @@ BOOL WindowsVistaAndLater = FALSE; // Windows Vista or later from the NT family
 
 // global variables for the FTPCMD_CHANGETGTPANELPATH command
 int TargetPanelPathPanel = PANEL_LEFT;
-char TargetPanelPath[MAX_PATH] = "";
+CPathBuffer TargetPanelPath; // Heap-allocated for long path support
 
 char UserDefinedSuffix[100] = ""; // preloaded string for marking user-defined "server type"
 
