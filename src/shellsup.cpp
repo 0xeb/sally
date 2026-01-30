@@ -1235,7 +1235,7 @@ void ShellAction(CFilesWindow* panel, CShellAction action, BOOL useSelection,
 
     BeginStopRefresh(); // zadne refreshe nepotrebujeme
 
-    int* indexes = NULL;
+    std::unique_ptr<int[]> indexes; // RAII: auto-deleted when scope exits
     int index = 0;
     int count = 0;
     if (useSelection)
@@ -1249,8 +1249,8 @@ void ShellAction(CFilesWindow* panel, CShellAction action, BOOL useSelection,
         count = panel->GetSelCount();
         if (count != 0)
         {
-            indexes = new int[count];
-            panel->GetSelItems(count, indexes, action == saContextMenu); // we backed off from this (see GetSelItems): for context menus we start from focused item and end with item before focus (there's intermediate return to beginning of name list) (system does it too, see Add To Windows Media Player List on MP3 files)
+            indexes = std::make_unique<int[]>(count);
+            panel->GetSelItems(count, indexes.get(), action == saContextMenu); // we backed off from this (see GetSelItems): for context menus we start from focused item and end with item before focus (there's intermediate return to beginning of name list) (system does it too, see Add To Windows Media Player List on MP3 files)
         }
         else
         {
@@ -1302,9 +1302,7 @@ void ShellAction(CFilesWindow* panel, CShellAction action, BOOL useSelection,
             int operation = SALSHEXT_NONE;
             DoDragFromArchiveOrFS(panel, dropDone, targetPath, operation, realDraggedPath,
                                   DROPEFFECT_COPY, 1 /* archiv */, NULL, action == saLeftDragFiles);
-
-            if (indexes != NULL)
-                delete[] (indexes);
+            // RAII: indexes auto-deleted when scope exits
             EndStopRefresh();
 
             if (dropDone) // let the operation be performed
@@ -1360,7 +1358,7 @@ void ShellAction(CFilesWindow* panel, CShellAction action, BOOL useSelection,
                                                 if (SalShExtPastedData.SetData(panel->GetZIPArchive(), panel->GetZIPPath(),
                                                                                panel->Files, panel->Dirs,
                                                                                panel->IsCaseSensitive(),
-                                                                               (count == 0) ? &index : indexes,
+                                                                               (count == 0) ? &index : indexes.get(),
                                                                                (count == 0) ? 1 : count))
                                                 {
                                                     BOOL clearSalShExtPastedData = TRUE;
@@ -1452,8 +1450,7 @@ void ShellAction(CFilesWindow* panel, CShellAction action, BOOL useSelection,
                     else
                         TRACE_E("Unable to create fake directory in TEMP for copy&paste from archive!");
                 }
-                if (indexes != NULL)
-                    delete[] (indexes);
+                // RAII: indexes auto-deleted when scope exits
                 EndStopRefresh();
                 return;
             }
@@ -1603,17 +1600,14 @@ void ShellAction(CFilesWindow* panel, CShellAction action, BOOL useSelection,
 
         // raise thread priority again, operation finished
         SetThreadPriority(GetCurrentThread(), THREAD_PRIORITY_ABOVE_NORMAL);
-
-        if (indexes != NULL)
-            delete[] (indexes);
+        // RAII: indexes auto-deleted when scope exits
         EndStopRefresh();
         return;
     }
 
     if (!panel->Is(ptDisk) && !panel->Is(ptZIPArchive))
     {
-        if (indexes != NULL)
-            delete[] (indexes);
+        // RAII: indexes auto-deleted when scope exits
         EndStopRefresh();
         return; // just to be safe, don't let other panel types through
     }
@@ -1631,7 +1625,7 @@ void ShellAction(CFilesWindow* panel, CShellAction action, BOOL useSelection,
         if (useSelection)
         {
 #ifndef _WIN64
-            if (ContainsWin64RedirectedDir(panel, (count == 0) ? &index : indexes, (count == 0) ? 1 : count, redirectedDir, TRUE))
+            if (ContainsWin64RedirectedDir(panel, (count == 0) ? &index : indexes.get(), (count == 0) ? 1 : count, redirectedDir, TRUE))
             {
                 std::wstring errMsg = FormatStrW(LoadStrW(IDS_ERROPENPROPSELCONTW64ALIAS), AnsiToWide(redirectedDir).c_str());
                 gPrompter->ShowError(LoadStrW(IDS_ERRORTITLE), errMsg.c_str());
@@ -1640,7 +1634,7 @@ void ShellAction(CFilesWindow* panel, CShellAction action, BOOL useSelection,
             {
 #endif // _WIN64
                 CTmpEnumData data;
-                data.Indexes = (count == 0) ? &index : indexes;
+                data.Indexes = (count == 0) ? &index : indexes.get();
                 data.Panel = panel;
                 IContextMenu2* menu = CreateIContextMenu2(MainWindow->HWindow, panel->GetPath(),
                                                           (count == 0) ? 1 : count,
@@ -1683,7 +1677,7 @@ void ShellAction(CFilesWindow* panel, CShellAction action, BOOL useSelection,
         {
 #ifndef _WIN64
             if (action == saCutToClipboard &&
-                ContainsWin64RedirectedDir(panel, (count == 0) ? &index : indexes, (count == 0) ? 1 : count, redirectedDir, FALSE))
+                ContainsWin64RedirectedDir(panel, (count == 0) ? &index : indexes.get(), (count == 0) ? 1 : count, redirectedDir, FALSE))
             {
                 std::wstring errMsg = FormatStrW(LoadStrW(IDS_ERRCUTSELCONTW64ALIAS), AnsiToWide(redirectedDir).c_str());
                 gPrompter->ShowError(LoadStrW(IDS_ERRORTITLE), errMsg.c_str());
@@ -1692,7 +1686,7 @@ void ShellAction(CFilesWindow* panel, CShellAction action, BOOL useSelection,
             {
 #endif // _WIN64
                 CTmpEnumData data;
-                data.Indexes = (count == 0) ? &index : indexes;
+                data.Indexes = (count == 0) ? &index : indexes.get();
                 data.Panel = panel;
                 IContextMenu2* menu = CreateIContextMenu2(MainWindow->HWindow, panel->GetPath(), (count == 0) ? 1 : count,
                                                           EnumFileNames, &data);
@@ -1736,7 +1730,7 @@ void ShellAction(CFilesWindow* panel, CShellAction action, BOOL useSelection,
                     {
                         // in CUT case set file's CutToClip bit (ghosted)
                         int idxCount = count;
-                        int* idxs = (idxCount == 0) ? &index : indexes;
+                        int* idxs = (idxCount == 0) ? &index : indexes.get();
                         if (idxCount == 0)
                             idxCount = 1;
                         int i;
@@ -1808,7 +1802,7 @@ void ShellAction(CFilesWindow* panel, CShellAction action, BOOL useSelection,
         if (useSelection)
         {
             CTmpEnumData data;
-            data.Indexes = (count == 0) ? &index : indexes;
+            data.Indexes = (count == 0) ? &index : indexes.get();
             data.Panel = panel;
             IDataObject* dataObject = CreateIDataObject(MainWindow->HWindow, panel->GetPath(),
                                                         (count == 0) ? 1 : count,
@@ -1959,7 +1953,7 @@ void ShellAction(CFilesWindow* panel, CShellAction action, BOOL useSelection,
                     if (useSelection)
                     {
 #ifndef _WIN64
-                        if (ContainsWin64RedirectedDir(panel, (count == 0) ? &index : indexes, (count == 0) ? 1 : count, redirectedDir, TRUE))
+                        if (ContainsWin64RedirectedDir(panel, (count == 0) ? &index : indexes.get(), (count == 0) ? 1 : count, redirectedDir, TRUE))
                         {
                             std::wstring errMsg = FormatStrW(LoadStrW(IDS_ERROPENMENUSELCONTW64ALIAS), AnsiToWide(redirectedDir).c_str());
                             gPrompter->ShowError(LoadStrW(IDS_ERRORTITLE), errMsg.c_str());
@@ -1968,7 +1962,7 @@ void ShellAction(CFilesWindow* panel, CShellAction action, BOOL useSelection,
                         {
 #endif // _WIN64
                             CTmpEnumData data;
-                            data.Indexes = (count == 0) ? &index : indexes;
+                            data.Indexes = (count == 0) ? &index : indexes.get();
                             data.Panel = panel;
                             panel->ContextMenu = CreateIContextMenu2(MainWindow->HWindow, panel->GetPath(), (count == 0) ? 1 : count,
                                                                      EnumFileNames, &data);
@@ -2394,10 +2388,7 @@ MENU_TEMPLATE_ITEM PanelBkgndMenu[] =
         break;
     }
     }
-
-    if (count != 0)
-        delete[] (indexes);
-
+    // RAII: indexes auto-deleted when scope exits
     EndStopRefresh();
 }
 
