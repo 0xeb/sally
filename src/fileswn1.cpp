@@ -1704,7 +1704,7 @@ void CFilesWindow::DirectoryLineSetText()
 
     if (FilterEnabled)
     {
-        char buf[3 * MAX_PATH]; // zip path (2x) + filter (1x) = 3x MAX_PATH
+        CPathBuffer buf; // Heap-allocated for long path support
         int pathLen = (int)strlen(path);
         if (Is(ptDisk) || Is(ptZIPArchive))
         {

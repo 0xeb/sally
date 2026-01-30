@@ -135,7 +135,7 @@ BOOL CMainWindow::CloseDetachedFS(HWND parent, CPluginFSInterfaceEncapsulation* 
     if (!detachedFS->TryCloseOrDetach(CriticalShutdown, FALSE, dummy, FSTRYCLOSE_UNLOADCLOSEDETACHEDFS) &&
         !CriticalShutdown) // test close; forceClose==TRUE only during a "critical shutdown"
     {                      // ask the user whether to close it even against the FS wishes
-        char path[2 * MAX_PATH];
+        CPathBuffer path; // Heap-allocated for long path support
         strcpy(path, detachedFS->GetPluginFSName());
         strcat(path, ":");
         char* s = path + strlen(path);

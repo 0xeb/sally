@@ -1326,8 +1326,8 @@ MENU_TEMPLATE_ITEM AddToSystemMenu[] =
         }
 
         // convert PIDL to a path
-        char szPath[2 * MAX_PATH];
-        szPath[0] = 0; // an empty path means everything changed
+        CPathBuffer szPath; // Heap-allocated for long path support
+        *szPath = 0; // an empty path means everything changed
         if (ppidl != NULL)
         {
             switch (wEventId)
