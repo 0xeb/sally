@@ -1,4 +1,4 @@
-ï»¿// SPDX-FileCopyrightText: 2023 Open Salamander Authors
+// SPDX-FileCopyrightText: 2023 Open Salamander Authors
 // SPDX-License-Identifier: GPL-2.0-or-later
 // CommentsTranslationProject: TRANSLATED
 
@@ -444,7 +444,7 @@ void CControlConnectionSocket::CheckCtrlConClose(BOOL notInPanel, BOOL leftPanel
     char* auxConnectionLostMsg = ConnectionLostMsg;
     HANDLES(LeaveCriticalSection(&EventCritSect));
 
-    if (found ||                      // the ccsevClosed event is waiting for usâ€”the user still does not know that the connection is closed
+    if (found ||                      // the ccsevClosed event is waiting for us—the user still does not know that the connection is closed
         auxConnectionLostMsg != NULL) // we cached the message captured when the connection closed (at that moment it only went into the log)
     {
         char errBuf[300];
@@ -728,7 +728,7 @@ BOOL CControlConnectionSocket::Write(const char* buffer, int bytesToWrite, DWORD
                 }
             }
         }
-        else // not everything has been sent yet â€” incorrect use of Write
+        else // not everything has been sent yet — incorrect use of Write
         {
             TRACE_E("Incorrect use of CControlConnectionSocket::Write(): called again before waiting for ccsevWriteDone event.");
         }
@@ -1171,7 +1171,7 @@ void CControlConnectionSocket::ReceiveNetEvent(LPARAM lParam, int index)
                 {
                     // May occur: the main thread manages to call CloseSocket() before FD_WRITE is delivered
                     //TRACE_E("Unexpected situation in CControlConnectionSocket::ReceiveNetEvent(FD_WRITE): Socket is not connected.");
-                    BytesToWriteCount = 0; // error â€” reset the buffer
+                    BytesToWriteCount = 0; // error — reset the buffer
                     BytesToWriteOffset = 0;
                     // do not generate an event for this unexpected error (solution: the user presses ESC)
                 }
@@ -1181,7 +1181,7 @@ void CControlConnectionSocket::ReceiveNetEvent(LPARAM lParam, int index)
         {
             genEvent = TRUE;
             err = eventError;
-            BytesToWriteCount = 0; // error â€” reset the buffer
+            BytesToWriteCount = 0; // error — reset the buffer
             BytesToWriteOffset = 0;
         }
         if (genEvent && (KeepAliveMode == kamProcessing || KeepAliveMode == kamWaitingForEndOfProcessing))
@@ -1391,7 +1391,7 @@ public:
 
             SetForegroundWindow(dlg);
 
-            // Message loop â€“ wait until the modeless dialog ends
+            // Message loop – wait until the modeless dialog ends
             MSG msg;
             while (GetMessage(&msg, NULL, 0, 0))
             {
@@ -1911,8 +1911,8 @@ void CLogs::RefreshListOfLogsInLogsDlg()
 
 void CLogs::SaveLog(HWND parent, const char* itemName, int uid)
 { // itemName == NULL - "save all as..."
-    static char initDir[MAX_PATH] = "";
-    if (initDir[0] == 0)
+    static CPathBuffer initDir;
+    if (*initDir == 0)
         GetMyDocumentsPath(initDir);
     CPathBuffer fileName; // Heap-allocated for long path support
     lstrcpyn(fileName, "ftp.log", fileName.Size());

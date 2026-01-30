@@ -1,4 +1,4 @@
-﻿// SPDX-FileCopyrightText: 2023 Open Salamander Authors
+// SPDX-FileCopyrightText: 2023 Open Salamander Authors
 // SPDX-License-Identifier: GPL-2.0-or-later
 // CommentsTranslationProject: TRANSLATED
 
@@ -667,8 +667,8 @@ char* CPluginFSInterface::FixDamagedName(char* name)
     if (name[0] != 0xE5)
         return name;
 
-    static char buffer[MAX_PATH];
-    lstrcpyn(buffer, name, MAX_PATH);
+    static CPathBuffer buffer;
+    lstrcpyn(buffer, name, buffer.Size());
     if (AllSubstChar)
     {
         buffer[0] = AllSubstChar;

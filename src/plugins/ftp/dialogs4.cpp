@@ -1,4 +1,4 @@
-﻿// SPDX-FileCopyrightText: 2023 Open Salamander Authors
+// SPDX-FileCopyrightText: 2023 Open Salamander Authors
 // SPDX-License-Identifier: GPL-2.0-or-later
 // CommentsTranslationProject: TRANSLATED
 
@@ -871,8 +871,8 @@ void CSrvTypeTestParserDlg::ParseListingToListView()
 
 void CSrvTypeTestParserDlg::LoadTextFromFile()
 {
-    static char initDir[MAX_PATH] = "";
-    if (initDir[0] == 0)
+    static CPathBuffer initDir;
+    if (*initDir == 0)
         GetMyDocumentsPath(initDir);
     CPathBuffer fileName; // Heap-allocated for long path support
     fileName[0] = 0;

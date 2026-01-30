@@ -1,4 +1,4 @@
-﻿// SPDX-FileCopyrightText: 2023 Open Salamander Authors
+// SPDX-FileCopyrightText: 2023 Open Salamander Authors
 // SPDX-License-Identifier: GPL-2.0-or-later
 // CommentsTranslationProject: TRANSLATED
 
@@ -23,7 +23,7 @@ BOOL GetOpenFileName(HWND parent, const char* title, const char* filter,
     CALL_STACK_MESSAGE4("GetOpenFileName(, %s, %s, , %d)", title, filter, save);
     OPENFILENAME ofn;
     char buf[200];
-    char fileName[MAX_PATH];
+    CPathBuffer fileName; // Heap-allocated for long path support
     lstrcpyn(buf, filter, 200);
     Replace(buf, '\t', '\0');
 
@@ -34,13 +34,13 @@ BOOL GetOpenFileName(HWND parent, const char* title, const char* filter,
     DWORD attr = SG->SalGetFileAttributes(buffer);
     if (attr != 0xFFFFFFFF && (attr & FILE_ATTRIBUTE_DIRECTORY))
     {
-        fileName[0] = 0;
+        *fileName = 0;
         ofn.lpstrInitialDir = buffer;
     }
     else
         strcpy(fileName, buffer);
     ofn.lpstrFile = fileName;
-    ofn.nMaxFile = MAX_PATH;
+    ofn.nMaxFile = fileName.Size();
     ofn.lpstrTitle = title;
     //ofn.lpfnHook = OFNHookProc;
     ofn.Flags = OFN_EXPLORER | OFN_HIDEREADONLY | OFN_NOCHANGEDIR /*| OFN_ENABLEHOOK*/;
