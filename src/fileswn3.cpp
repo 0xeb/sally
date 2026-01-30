@@ -373,7 +373,7 @@ BOOL CFilesWindow::ReadDirectory(HWND parent, BOOL isRefresh)
                             GetRootPath(CheckPathRootWithRetryMsgBox, GetPath());
                         sprintf(buf, LoadStr(IDS_NODISKINDRIVE), drive.Get());
                         int msgboxRes = (int)CDriveSelectErrDlg(parent, buf, GetPath()).Execute();
-                        CheckPathRootWithRetryMsgBox[0] = 0;
+                        *CheckPathRootWithRetryMsgBox = 0;
                         UpdateWindow(MainWindow->HWindow);
                         if (msgboxRes == IDRETRY)
                             goto _TRY_AGAIN;
@@ -2472,7 +2472,7 @@ CHANGE_AGAIN:
                                                 GetRootPath(CheckPathRootWithRetryMsgBox, copy);
                                             _snprintf_s(errBuf, errBuf.Size(), _TRUNCATE, LoadStr(IDS_NODISKINDRIVE), (const char*)drive);
                                             int msgboxRes = (int)CDriveSelectErrDlg(HWindow, errBuf, copy).Execute();
-                                            CheckPathRootWithRetryMsgBox[0] = 0;
+                                            *CheckPathRootWithRetryMsgBox = 0;
                                             UpdateWindow(MainWindow->HWindow);
                                             if (msgboxRes == IDRETRY)
                                                 goto _TRY_AGAIN;

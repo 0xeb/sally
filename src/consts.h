@@ -2311,7 +2311,7 @@ extern BOOL OpenCfgToChangeIfPathIsInaccessibleGoTo; // TRUE = in idle opens con
 
 // drive root (including UNC), for which "drive not ready" messagebox with Retry+Cancel
 // buttons is displayed (used for automatic Retry after inserting media into drive)
-extern char CheckPathRootWithRetryMsgBox[MAX_PATH];
+extern CPathBuffer CheckPathRootWithRetryMsgBox; // Heap-allocated for long path support
 // "drive not ready" dialog with Retry+Cancel buttons (used for automatic Retry after
 // inserting media into drive)
 extern HWND LastDriveSelectErrDlgHWnd;

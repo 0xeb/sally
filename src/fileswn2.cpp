@@ -1916,7 +1916,7 @@ BOOL CFilesWindow::ChangePathToDisk(HWND parent, const char* path, int suggested
                     lstrcpyn(changedPath, CheckPathRootWithRetryMsgBox, changedPath.Size());
                     msgboxRes = IDRETRY;
                 }
-                CheckPathRootWithRetryMsgBox[0] = 0;
+                *CheckPathRootWithRetryMsgBox = 0;
                 UpdateWindow(MainWindow->HWindow);
                 if (msgboxRes == IDRETRY)
                     goto _TRY_AGAIN;

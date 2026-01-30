@@ -1259,7 +1259,7 @@ struct CMyEnumFileNamesData
     int LastIndex;
 };
 
-static char MyEnumFileNamesBuffer[MAX_PATH]; // function is called from the GUI => cannot be called from multiple threads => we can afford a static buffer
+static CPathBuffer MyEnumFileNamesBuffer; // Heap-allocated for long path support (GUI-only, single-threaded)
 const char* MyEnumFileNames(int index, void* param)
 {
     CMyEnumFileNamesData* data = (CMyEnumFileNamesData*)param;
@@ -1273,10 +1273,10 @@ const char* MyEnumFileNames(int index, void* param)
         if (*p != 0)
         {
             lstrcpy(MyEnumFileNamesBuffer, p);
-            SalPathAddBackslash(MyEnumFileNamesBuffer, MAX_PATH);
+            SalPathAddBackslash(MyEnumFileNamesBuffer, MyEnumFileNamesBuffer.Size());
         }
         else
-            MyEnumFileNamesBuffer[0] = 0;
+            *MyEnumFileNamesBuffer = 0;
         lstrcat(MyEnumFileNamesBuffer, data->FindDialog->GetName(foundIndex));
         return MyEnumFileNamesBuffer;
     }

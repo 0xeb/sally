@@ -1389,7 +1389,7 @@ MENU_TEMPLATE_ITEM AddToSystemMenu[] =
                 // (if it is displayed for the drive with inserted media)
                 if (wEventId == SHCNE_MEDIAINSERTED)
                 {
-                    if (CheckPathRootWithRetryMsgBox[0] != 0 &&
+                    if (*CheckPathRootWithRetryMsgBox != 0 &&
                         HasTheSameRootPath(CheckPathRootWithRetryMsgBox, szPath))
                     {
                         if (LastDriveSelectErrDlgHWnd != NULL)

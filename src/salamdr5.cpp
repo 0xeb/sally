@@ -37,7 +37,7 @@ HANDLE CPFirstStart = NULL;    // event for starting the first check-path thread
 HANDLE CPFirstEnd = NULL;      // event for testing completion of first check-path thread
 DWORD CPFirstExit;             // replacement for exit-code of first check-path thread (does not terminate)
 
-char CheckPathRootWithRetryMsgBox[MAX_PATH] = ""; // root of drive (including UNC), for which "drive not ready" messagebox with Retry+Cancel buttons is displayed (used for automatic Retry after inserting media into drive)
+CPathBuffer CheckPathRootWithRetryMsgBox; // Heap-allocated for long path support (UNC roots can exceed MAX_PATH)
 HWND LastDriveSelectErrDlgHWnd = NULL;            // "drive not ready" dialog with Retry+Cancel buttons (used for automatic Retry after inserting media into drive)
 
 DWORD WINAPI ThreadCheckPathF(void* param);
@@ -507,7 +507,7 @@ RETRY:
                 GetRootPath(CheckPathRootWithRetryMsgBox, path);
             sprintf(text, LoadStr(IDS_NODISKINDRIVE), drive.Get());
             int msgboxRes = (int)CDriveSelectErrDlg(parent, text, path).Execute();
-            CheckPathRootWithRetryMsgBox[0] = 0;
+            *CheckPathRootWithRetryMsgBox = 0;
             UpdateWindow(MainWindow->HWindow);
             if (msgboxRes == IDRETRY)
                 goto RETRY;
