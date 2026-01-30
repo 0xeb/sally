@@ -1076,9 +1076,9 @@ int CUDF::UnpackFile(CSalamanderForOperationsAbstract* salamander, const char* s
             throw UNPACK_CANCEL;
         }
 
-        char name[MAX_PATH];
-        strncpy_s(name, path, _TRUNCATE);
-        if (!SalamanderGeneral->SalPathAppend(name, fileData->Name, MAX_PATH))
+        CPathBuffer name; // Heap-allocated for long path support
+        lstrcpyn(name, path, name.Size());
+        if (!SalamanderGeneral->SalPathAppend(name, fileData->Name, name.Size()))
         {
             Error(IDS_ERR_TOO_LONG_NAME, silent == 1);
             throw UNPACK_ERROR;

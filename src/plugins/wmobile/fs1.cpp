@@ -95,7 +95,7 @@ CPluginInterfaceForFS::ExecuteOnFS(int panel, CPluginFSInterfaceAbstract* plugin
     CPluginFSInterface* fs = (CPluginFSInterface*)pluginFS;
     if (isDir) // subdirectory or up-dir
     {
-        char newPath[MAX_PATH];
+        CPathBuffer newPath; // Heap-allocated for long path support
         strcpy(newPath, fs->Path);
 
         if (isDir == 2) // up-dir
@@ -114,11 +114,11 @@ CPluginInterfaceForFS::ExecuteOnFS(int panel, CPluginFSInterfaceAbstract* plugin
         else // subdirectory
         {
             // backup of data for TopIndexMem (backupPath + topIndex)
-            char backupPath[MAX_PATH];
+            CPathBuffer backupPath;
             strcpy(backupPath, newPath);
             int topIndex = SalamanderGeneral->GetPanelTopIndex(panel);
 
-            if (CRAPI::PathAppend(newPath, file.Name, MAX_PATH))
+            if (CRAPI::PathAppend(newPath, file.Name, newPath.Size()))
             {
                 // change the path in the panel
                 if (SalamanderGeneral->ChangePanelPathToPluginFS(panel, pluginFSName, newPath))

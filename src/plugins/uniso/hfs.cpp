@@ -456,13 +456,14 @@ int CHFS::UnpackFile(CSalamanderForOperationsAbstract* salamander, const char* s
         UInt64 size = fileData->Size.Value;
         DWORD attrs = fileData->Attr;
         HANDLE hFile;
-        char name[MAX_PATH], fileInfo[100];
+        CPathBuffer name; // Heap-allocated for long path support
+        char fileInfo[100];
         FILETIME ft;
         BOOL bFileComplete = TRUE;
         CQuadWord qwSize;
 
-        strncpy_s(name, path, _TRUNCATE);
-        if (!SalamanderGeneral->SalPathAppend(name, fileData->Name, MAX_PATH))
+        lstrcpyn(name, path, name.Size());
+        if (!SalamanderGeneral->SalPathAppend(name, fileData->Name, name.Size()))
         {
             Error(IDS_ERR_TOO_LONG_NAME, FALSE);
             return UNPACK_ERROR;

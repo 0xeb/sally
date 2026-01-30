@@ -405,7 +405,7 @@ BOOL CISO9660::AddBootRecord(char* path, int session,
         //    dr.RecordingDateAndTime = ;
         dr.DataLength = BootRecordInfo->Length;
 
-        char fileName[MAX_PATH];
+        CPathBuffer fileName; // Heap-allocated for long path support
         if (session == -1)
         {
             session = 1;
@@ -574,9 +574,9 @@ int CISO9660::UnpackFile(CSalamanderForOperationsAbstract* salamander, const cha
     CALL_STACK_MESSAGE6("CISO9660::UnpackFile( , %s, %s, %s, , %u, %d)", srcPath, path, nameInArc, silent, toSkip);
 
     ///
-    char name[MAX_PATH];
-    strncpy_s(name, path, _TRUNCATE);
-    if (!SalamanderGeneral->SalPathAppend(name, fileData->Name, MAX_PATH))
+    CPathBuffer name; // Heap-allocated for long path support
+    lstrcpyn(name, path, name.Size());
+    if (!SalamanderGeneral->SalPathAppend(name, fileData->Name, name.Size()))
     {
         Error(IDS_ERR_TOO_LONG_NAME);
         return UNPACK_ERROR;

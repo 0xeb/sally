@@ -115,9 +115,9 @@ CPluginFSInterface::ChangePath(int currentFSNameIndex, char* fsName, int fsNameI
         EmptyCache();
 
     char buf[2 * MAX_PATH + 100];
-    char errBuf[MAX_PATH];
+    CPathBuffer errBuf; // Heap-allocated for long path support
     errBuf[0] = 0;
-    char path[MAX_PATH];
+    CPathBuffer path;
     int err = 0;
 
     lstrcpyn(path, userPart, MAX_PATH);
@@ -139,7 +139,7 @@ CPluginFSInterface::ChangePath(int currentFSNameIndex, char* fsName, int fsNameI
         {
             if (errBuf[0] != 0) // if we have a message, print it here (it arose during trimming)
             {
-                sprintf(buf, LoadStr(IDS_PATH_ERROR), userPart, errBuf);
+                sprintf(buf, LoadStr(IDS_PATH_ERROR), userPart, errBuf.Get());
                 SalamanderGeneral->ShowMessageBox(buf, TitleWMobileError, MSGBOX_ERROR);
             }
             strcpy(Path, path);
@@ -192,7 +192,7 @@ CPluginFSInterface::ChangePath(int currentFSNameIndex, char* fsName, int fsNameI
         }
     }
 
-    sprintf(buf, LoadStr(IDS_PATH_ERROR), userPart, errBuf);
+    sprintf(buf, LoadStr(IDS_PATH_ERROR), userPart, errBuf.Get());
     SalamanderGeneral->ShowMessageBox(buf, TitleWMobileError, MSGBOX_ERROR);
     PathError = FALSE;
     return FALSE; // fatal path error
@@ -262,7 +262,7 @@ CPluginFSInterface::ListCurrentPath(CSalamanderDirectoryAbstract* dir,
             (data.cFileName[0] != '.' || //JR Windows Mobile does not return "." or ".." paths, but handle it just in case
              (data.cFileName[1] != 0 && (data.cFileName[1] != '.' || data.cFileName[2] != 0))))
         {
-            char cFileName[MAX_PATH];
+            CPathBuffer cFileName;
             WideCharToMultiByte(CP_ACP, 0, data.cFileName, -1, cFileName, MAX_PATH, NULL, NULL);
             cFileName[MAX_PATH - 1] = 0;
 
@@ -535,8 +535,8 @@ CPluginFSInterface::QuickRename(const char* fsName, int mode, HWND parent, CFile
     lstrcpyn(newName, buf, MAX_PATH);
 
     // perform the rename operation
-    char nameFrom[MAX_PATH];
-    char nameTo[MAX_PATH];
+    CPathBuffer nameFrom;
+    CPathBuffer nameTo;
     strcpy(nameFrom, Path);
     strcpy(nameTo, Path);
     if (!CRAPI::PathAppend(nameFrom, file.Name, MAX_PATH) ||
@@ -565,7 +565,7 @@ CPluginFSInterface::QuickRename(const char* fsName, int mode, HWND parent, CFile
         if (SalamanderGeneral->StrICmp(nameFrom, nameTo) != 0)
         { // if it is more than just a case change (CEFS is case-insensitive)
             // remove the source file from the disk cache (the original name is no longer valid)
-            sprintf(cefsFileName, "%s:%s", fsName, nameFrom);
+            sprintf(cefsFileName, "%s:%s", fsName, nameFrom.Get());
             // disk names are case-insensitive while the disk cache is case-sensitive; converting
             // to lowercase makes the disk cache behave case-insensitively as well
             SalamanderGeneral->ToLowerCase(cefsFileName);
@@ -611,7 +611,7 @@ CPluginFSInterface::CreateDir(const char* fsName, int mode, HWND parent, char* n
     int type;
     BOOL isDir;
     char* secondPart;
-    char nextFocus[MAX_PATH];
+    CPathBuffer nextFocus;
     char path[2 * MAX_PATH];
     int error;
     nextFocus[0] = 0;
@@ -630,7 +630,7 @@ CPluginFSInterface::CreateDir(const char* fsName, int mode, HWND parent, char* n
             int errTextID;
             if (!SalamanderGeneral->SalGetFullName(newName, &errTextID, Path, nextFocus))
             {
-                char errBuf[MAX_PATH];
+                CPathBuffer errBuf;
                 errBuf[0] = 0;
                 SalamanderGeneral->GetGFNErrorText(errTextID, errBuf, MAX_PATH);
                 SalamanderGeneral->ShowMessageBox(errBuf, TitleWMobileError, MSGBOX_ERROR);
@@ -813,7 +813,7 @@ CPluginFSInterface::Delete(const char* fsName, int mode, HWND parent, int panel,
 
     char buf[2 * MAX_PATH]; // buffer for error messages
 
-    char rootPath[MAX_PATH], fileName[MAX_PATH], dfsFileName[2 * MAX_PATH];
+    CPathBuffer rootPath, fileName, dfsFileName;
 
     strcpy(rootPath, Path);
 
@@ -1014,7 +1014,7 @@ CPluginFSInterface::Delete(const char* fsName, int mode, HWND parent, int panel,
                         }
                         else
                         {
-                            sprintf(dfsFileName, "%s:%s", fsName, fileName);
+                            sprintf(dfsFileName, "%s:%s", fsName, fileName.Get());
                             // disk names are case-insensitive while the disk cache is case-sensitive; converting
                             // to lowercase makes the disk cache behave case-insensitively as well
                             SalamanderGeneral->ToLowerCase(dfsFileName);
@@ -1099,7 +1099,7 @@ CPluginFSInterface::Delete(const char* fsName, int mode, HWND parent, int panel,
                         }
                         else
                         {
-                            sprintf(dfsFileName, "%s:%s", fsName, fileName);
+                            sprintf(dfsFileName, "%s:%s", fsName, fileName.Get());
                             // disk names are case-insensitive while the disk cache is case-sensitive; converting
                             // to lowercase makes the disk cache behave case-insensitively as well
                             SalamanderGeneral->ToLowerCase(dfsFileName);
@@ -1228,7 +1228,7 @@ CPluginFSInterface::CopyOrMoveFromFS(BOOL copy, int mode, const char* fsName, HW
     }
 
     char buf[3 * MAX_PATH + 100];
-    char nextFocus[MAX_PATH];
+    CPathBuffer nextFocus;
     nextFocus[0] = 0;
 
     BOOL diskPath = TRUE;  // when 'mode'==3 'targetPath' holds a Windows path (FALSE = path on this FS)
@@ -1446,7 +1446,8 @@ CPluginFSInterface::CopyOrMoveFromFS(BOOL copy, int mode, const char* fsName, HW
                         curPath = path;
                     }
 
-                    char newDirs[MAX_PATH], *mask;
+                    CPathBuffer newDirs;
+                    char *mask;
                     if (SalamanderGeneral->SalSplitGeneralPath(parent, TitleWMobile, TitleWMobileError, selectedFiles + selectedDirs,
                                                                targetPath, afterRoot, end, pathIsDir,
                                                                backslashAtEnd, dirName, curPath, mask, newDirs,
