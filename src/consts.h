@@ -208,6 +208,10 @@ BOOL MakeValidFileName(char* path);
 // than we want, appended '\\' at the end solves this
 void MakeCopyWithBackslashIfNeeded(const char*& name, char (&nameCopy)[3 * MAX_PATH]);
 
+// Overload for CPathBuffer - works the same way but with heap buffer
+class CPathBuffer; // forward declaration
+void MakeCopyWithBackslashIfNeeded(const char*& name, CPathBuffer& nameCopy);
+
 // Returns TRUE if name ends with backslash ('\\' added at end solves invalid names)
 BOOL NameEndsWithBackslash(const char* name);
 std::wstring MakeCopyWithBackslashIfNeededW(const wchar_t* name);

@@ -1199,6 +1199,20 @@ void MakeCopyWithBackslashIfNeeded(const char*& name, char (&nameCopy)[3 * MAX_P
     }
 }
 
+// CPathBuffer overload - same logic but uses heap buffer with Size() method
+void MakeCopyWithBackslashIfNeeded(const char*& name, CPathBuffer& nameCopy)
+{
+    int nameLen = (int)strlen(name);
+    if (nameLen > 0 && (name[nameLen - 1] <= ' ' || name[nameLen - 1] == '.') &&
+        nameLen + 1 < nameCopy.Size())
+    {
+        memcpy(nameCopy.Get(), name, nameLen);
+        nameCopy.Get()[nameLen] = '\\';
+        nameCopy.Get()[nameLen + 1] = 0;
+        name = nameCopy.Get();
+    }
+}
+
 BOOL NameEndsWithBackslash(const char* name)
 {
     int nameLen = (int)strlen(name);
