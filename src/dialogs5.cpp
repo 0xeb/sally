@@ -63,7 +63,7 @@ void CPluginsDlg::SetColumnWidths()
     // set optimal widths for all columns
     int i;
     for (i = 0; i <= 3; i++)
-        ListView_SetColumnWidth(HListView, i, i < 3 ? LVSCW_AUTOSIZE_USEHEADER : LVSCW_AUTOSIZE); // the last column shouldn’t stretch to fill the view; its content is wider than the header.
+        ListView_SetColumnWidth(HListView, i, i < 3 ? LVSCW_AUTOSIZE_USEHEADER : LVSCW_AUTOSIZE); // the last column shouldnï¿½t stretch to fill the view; its content is wider than the header.
 
     // sum the widths of columns we want to show completely (everything after name, which we may shorten)
     int nameWidth = ListView_GetColumnWidth(HListView, 0);
@@ -1454,29 +1454,22 @@ CArchiveUpdateDlg::DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
             int selCount = (int)SendMessage(list, LB_GETSELCOUNT, 0, 0);
             if (selCount > 0)
             {
-                int* indexes = new int[selCount];
-                if (indexes != NULL)
-                {
-                    SendMessage(list, LB_GETSELITEMS, selCount, (LPARAM)indexes);
-                    IntSort(indexes, 0, selCount - 1); // indexes may not be sorted, so sort them just in case
+                std::unique_ptr<int[]> indexes = std::make_unique<int[]>(selCount); // RAII: auto-deleted
+                SendMessage(list, LB_GETSELITEMS, selCount, (LPARAM)indexes.get());
+                IntSort(indexes.get(), 0, selCount - 1); // indexes may not be sorted, so sort them just in case
 
-                    CPathBuffer path; // Heap-allocated for long path support
-                    char* initPath;
-                    strcpy(path, FileStamps->GetZIPFile());
-                    if (!CutDirectory(path))
-                        initPath = NULL;
-                    else
-                        initPath = path;
-                    if (Panel->CheckPath(TRUE, initPath) != ERROR_SUCCESS)
-                        initPath = NULL;
-
-                    // let the selected files be copied
-                    FileStamps->CopyFilesTo(HWindow, indexes, selCount, initPath);
-
-                    delete indexes;
-                }
+                CPathBuffer path; // Heap-allocated for long path support
+                char* initPath;
+                strcpy(path, FileStamps->GetZIPFile());
+                if (!CutDirectory(path))
+                    initPath = NULL;
                 else
-                    TRACE_E(LOW_MEMORY);
+                    initPath = path;
+                if (Panel->CheckPath(TRUE, initPath) != ERROR_SUCCESS)
+                    initPath = NULL;
+
+                // let the selected files be copied
+                FileStamps->CopyFilesTo(HWindow, indexes.get(), selCount, initPath);
             }
             return 0;
         }
@@ -1489,27 +1482,20 @@ CArchiveUpdateDlg::DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
             {
                 if (gPrompter->AskYesNo(LoadStrW(IDS_QUESTION), LoadStrW(IDS_ARCREALLYIGNORESEL)).type == PromptResult::kYes)
                 {
-                    int* indexes = new int[selCount];
-                    if (indexes != NULL)
+                    std::unique_ptr<int[]> indexes = std::make_unique<int[]>(selCount); // RAII: auto-deleted
+                    SendMessage(list, LB_GETSELITEMS, selCount, (LPARAM)indexes.get());
+                    IntSort(indexes.get(), 0, selCount - 1);     // indexes may not be sorted, so sort them just in case
+                    FileStamps->Remove(indexes.get(), selCount); // remove selected files
+
+                    // refill the listbox
+                    SendMessage(list, LB_RESETCONTENT, 0, 0);
+                    FileStamps->AddFilesToListBox(list);
+                    PostMessage(HWindow, WM_COMMAND, MAKELONG(IDL_UPDATEDFILES, LBN_SELCHANGE), (LPARAM)list);
+
+                    if (SendMessage(list, LB_GETCOUNT, 0, 0) == 0) // this was "ignore all"
                     {
-                        SendMessage(list, LB_GETSELITEMS, selCount, (LPARAM)indexes);
-                        IntSort(indexes, 0, selCount - 1);     // indexes may not be sorted, so sort them just in case
-                        FileStamps->Remove(indexes, selCount); // remove selected files
-
-                        // refill the listbox
-                        SendMessage(list, LB_RESETCONTENT, 0, 0);
-                        FileStamps->AddFilesToListBox(list);
-                        PostMessage(HWindow, WM_COMMAND, MAKELONG(IDL_UPDATEDFILES, LBN_SELCHANGE), (LPARAM)list);
-
-                        if (SendMessage(list, LB_GETCOUNT, 0, 0) == 0) // this was "ignore all"
-                        {
-                            PostMessage(HWindow, WM_COMMAND, IDCANCEL, 0);
-                        }
-
-                        delete indexes;
+                        PostMessage(HWindow, WM_COMMAND, IDCANCEL, 0);
                     }
-                    else
-                        TRACE_E(LOW_MEMORY);
                 }
             }
             return 0;
