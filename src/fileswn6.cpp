@@ -609,14 +609,14 @@ BOOL CFilesWindow::BuildScriptMain2(COperations* script, BOOL copy, char* target
     }
 
     CActionType type = (copy ? atCopy : atMove);
-    char sourcePath[2 * MAX_PATH];     // + MAX_PATH is a reserve (Windows create paths longer than MAX_PATH)
-    char lastSourcePath[2 * MAX_PATH]; // + MAX_PATH is a reserve (Windows create paths longer than MAX_PATH)
-    lastSourcePath[0] = 0;
+    CPathBuffer sourcePath;     // Heap-allocated for long path support
+    CPathBuffer lastSourcePath; // Heap-allocated for long path support
+    *lastSourcePath = 0;
     BOOL sourceSupADS = FALSE;
-    char targetPath[2 * MAX_PATH + 200]; // +200 is a reserve (Windows create paths longer than MAX_PATH)
-    char mapNameBuf[2 * MAX_PATH];       // + MAX_PATH  is a reserve (Windows create paths longer than MAX_PATH)
+    CPathBuffer targetPath;  // Heap-allocated for long path support
+    CPathBuffer mapNameBuf;  // Heap-allocated for long path support
     strcpy(targetPath, targetDir);
-    SalPathAddBackslash(targetPath, 2 * MAX_PATH);
+    SalPathAddBackslash(targetPath, targetPath.Size());
     BOOL targetIsFAT32 /*, targetSupEFS*/;
     BOOL targetSupADS = IsPathOnVolumeSupADS(targetPath, &targetIsFAT32);
     script->TargetPathSupADS = targetSupADS;
@@ -1243,10 +1243,10 @@ BOOL CFilesWindow::BuildScriptMain(COperations* script, CActionType type,
         script->ClearReadonlyMask = 0xFFFFFFFF;
 
     // the mask must not be modified via PrepareMask !!! see MaskName()
-    char nameMask[2 * MAX_PATH]; // + MAX_PATH is a reserve (Windows create paths longer than MAX_PATH)
+    CPathBuffer nameMask; // Heap-allocated for long path support
     if (mask != NULL)
     {
-        lstrcpyn(nameMask, mask, 2 * MAX_PATH);
+        lstrcpyn(nameMask, mask, nameMask.Size());
         mask = nameMask;
     }
 
@@ -1256,7 +1256,7 @@ BOOL CFilesWindow::BuildScriptMain(COperations* script, CActionType type,
 
     GetAsyncKeyState(VK_ESCAPE); // initialize GetAsyncKeyState - see help
 
-    char sourcePath[2 * MAX_PATH + 10]; // +extra space for mask ("\\*"), + MAX_PATH is a reserve (Windows create paths longer than MAX_PATH)
+    CPathBuffer sourcePath; // Heap-allocated for long path support
     strcpy(sourcePath, GetPath());
 
     BOOL sourceSupADS = FALSE;
@@ -2830,7 +2830,7 @@ BOOL CFilesWindow::BuildScriptFile(COperations* script, CActionType type, char* 
                 script->BytesPerCluster = d1 * d2;
         }
 
-        char name[2 * MAX_PATH]; // + MAX_PATH is a reserve (Windows makes paths longer than MAX_PATH)
+        CPathBuffer name; // Heap-allocated for long path support
         int l = (int)strlen(sourcePath);
         memmove(name, sourcePath, l);
         if (name[l - 1] != '\\')
@@ -3037,7 +3037,7 @@ void CFilesWindow::ExecuteFromArchive(int index, BOOL edit, HWND editWithMenuPar
     }
 
     //---  get the full long name
-    char dcFileName[2 * MAX_PATH]; // ZIP: name for disk cache
+    CPathBuffer dcFileName; // ZIP: name for disk cache (heap-allocated for long path support)
     CFileData* f = &Files->At(index - Dirs->Count);
 
     if (!SalIsValidFileNameComponent(f->Name))
