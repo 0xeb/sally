@@ -625,9 +625,9 @@ BOOL CFilesWindow::BuildScriptMain2(COperations* script, BOOL copy, char* target
     CTargetPathState targetPathState = GetTargetPathState(tpsUnknown, targetPath);
     char* targetName = targetPath + strlen(targetPath);
     BOOL makeCopyOfName = data->MakeCopyOfName;
-    TIndirectArray<char>* usedNames = NULL; // list of all newly created names (used when makeCopyOfName==TRUE)
+    std::unique_ptr<TIndirectArray<char>> usedNames; // RAII: auto-deleted when scope exits
     if (makeCopyOfName)
-        usedNames = new TIndirectArray<char>(100, 50);
+        usedNames = std::make_unique<TIndirectArray<char>>(100, 50);
 
     DWORD d1, d2, d3, d4;
     if (MyGetDiskFreeSpace(targetPath, &d1, &d2, &d3, &d4))
@@ -680,11 +680,11 @@ BOOL CFilesWindow::BuildScriptMain2(COperations* script, BOOL copy, char* target
                     strcpy(targetName, s + 1); // copy the proposed full target name into targetPath
                     BOOL isKnown;
                     // mapName must be NULL here, otherwise data->MakeCopyOfName could not be TRUE
-                    if ((isKnown = ContainsString(usedNames, targetName)) != 0 ||
+                    if ((isKnown = ContainsString(usedNames.get(), targetName)) != 0 ||
                         SalGetFileAttributes(targetPath) != 0xFFFFFFFF)
                     { // name already exists, we must generate a new one
                         if (!isKnown)
-                            AddStringToNames(usedNames, targetName);
+                            AddStringToNames(usedNames.get(), targetName);
                         char copyTxt[100];
                         lstrcpyn(copyTxt, LoadStr(IDS_NEWNAME_COPY), 100);
                         char ofTxt[100];
@@ -775,11 +775,11 @@ BOOL CFilesWindow::BuildScriptMain2(COperations* script, BOOL copy, char* target
 
                             if (strlen(targetName) < MAX_PATH) // name assembly succeeded, otherwise we ignore the result
                             {
-                                if ((isKnown = ContainsString(usedNames, targetName)) != 0 ||
+                                if ((isKnown = ContainsString(usedNames.get(), targetName)) != 0 ||
                                     SalGetFileAttributes(targetPath) != 0xFFFFFFFF)
                                 {
                                     if (!isKnown)
-                                        AddStringToNames(usedNames, targetName);
+                                        AddStringToNames(usedNames.get(), targetName);
                                     goto _VISTA_NEXT_1;
                                 }
                                 else
@@ -808,11 +808,11 @@ BOOL CFilesWindow::BuildScriptMain2(COperations* script, BOOL copy, char* target
                                     lstrcpyn(targetName + strlen(targetName), num + 1, (int)(1 + MAX_PATH - strlen(targetName))); // "1 +" ensures that overly long names result in exactly MAX_PATH
                                     if (strlen(targetName) < MAX_PATH)                                                            // name assembly succeeded, otherwise we ignore the result
                                     {
-                                        if ((isKnown = ContainsString(usedNames, targetName)) != 0 ||
+                                        if ((isKnown = ContainsString(usedNames.get(), targetName)) != 0 ||
                                             SalGetFileAttributes(targetPath) != 0xFFFFFFFF)
                                         {
                                             if (!isKnown)
-                                                AddStringToNames(usedNames, targetName);
+                                                AddStringToNames(usedNames.get(), targetName);
                                             goto _NEXT_1;
                                         }
                                         else
@@ -863,11 +863,11 @@ BOOL CFilesWindow::BuildScriptMain2(COperations* script, BOOL copy, char* target
                                     }
                                     if (strlen(targetName) < MAX_PATH) // name assembly succeeded, otherwise we ignore the result
                                     {
-                                        if ((isKnown = ContainsString(usedNames, targetName)) != 0 ||
+                                        if ((isKnown = ContainsString(usedNames.get(), targetName)) != 0 ||
                                             SalGetFileAttributes(targetPath) != 0xFFFFFFFF)
                                         {
                                             if (!isKnown)
-                                                AddStringToNames(usedNames, targetName);
+                                                AddStringToNames(usedNames.get(), targetName);
                                             goto _NEXT_2;
                                         }
                                         else
@@ -897,11 +897,11 @@ BOOL CFilesWindow::BuildScriptMain2(COperations* script, BOOL copy, char* target
                                 lstrcpyn(targetName + strlen(targetName), s + 1, 1 + MAX_PATH - (int)strlen(targetName)); // "1 +" ensures that overly long names result in exactly MAX_PATH
                                 if (strlen(targetName) < MAX_PATH)                                                        // name assembly succeeded, otherwise we ignore the result
                                 {
-                                    if ((isKnown = ContainsString(usedNames, targetName)) != 0 ||
+                                    if ((isKnown = ContainsString(usedNames.get(), targetName)) != 0 ||
                                         SalGetFileAttributes(targetPath) != 0xFFFFFFFF)
                                     {
                                         if (!isKnown)
-                                            AddStringToNames(usedNames, targetName);
+                                            AddStringToNames(usedNames.get(), targetName);
                                         goto _NEXT_3;
                                     }
                                     else
@@ -918,7 +918,7 @@ BOOL CFilesWindow::BuildScriptMain2(COperations* script, BOOL copy, char* target
                     // store all names of newly created files
                     if (usedNames != NULL)
                     {
-                        AddStringToNames(usedNames, mapName == NULL ? s + 1 : mapName);
+                        AddStringToNames(usedNames.get(), mapName == NULL ? s + 1 : mapName);
                     }
                 }
 
@@ -931,9 +931,7 @@ BOOL CFilesWindow::BuildScriptMain2(COperations* script, BOOL copy, char* target
                                         wideNameOnly))
                     {
                         SetCurrentDirectoryToSystem();
-                        if (usedNames != NULL)
-                            delete usedNames;
-                        return FALSE;
+                        return FALSE; // usedNames auto-deleted by unique_ptr
                     }
                 }
                 else
@@ -967,9 +965,7 @@ BOOL CFilesWindow::BuildScriptMain2(COperations* script, BOOL copy, char* target
                                                  NULL, srcAndTgtPathsFlags, wideNameOnly))
                             {
                                 SetCurrentDirectoryToSystem();
-                                if (usedNames != NULL)
-                                    delete usedNames;
-                                return FALSE;
+                                return FALSE; // usedNames auto-deleted by unique_ptr
                             }
                         }
                         else
@@ -986,9 +982,7 @@ BOOL CFilesWindow::BuildScriptMain2(COperations* script, BOOL copy, char* target
                         std::wstring errTextW = GetErrorTextW(err);
                         SetCurrentDirectoryToSystem();
                         gPrompter->ShowError(LoadStrW(IDS_ERRORTITLE), (fileNameW + L": " + errTextW).c_str());
-                        if (usedNames != NULL)
-                            delete usedNames;
-                        return FALSE;
+                        return FALSE; // usedNames auto-deleted by unique_ptr
                     }
                 }
             }
@@ -997,23 +991,17 @@ BOOL CFilesWindow::BuildScriptMain2(COperations* script, BOOL copy, char* target
                 std::wstring errFileW = fileNameW ? std::wstring(fileNameW) : AnsiToWide(fileName);
                 SetCurrentDirectoryToSystem();
                 gPrompter->ShowError(LoadStrW(IDS_ERRORTITLE), (errFileW + L": " + GetErrorTextW(ERROR_INVALID_DATA)).c_str());
-                if (usedNames != NULL)
-                    delete usedNames;
-                return FALSE;
+                return FALSE; // usedNames auto-deleted by unique_ptr
             }
         }
         else
         {
             std::wstring errFileW = fileNameW ? std::wstring(fileNameW) : AnsiToWide(fileName);
             DWORD lastErr = GetLastError();
-            //      SetCurrentDirectoryToSystem();
             gPrompter->ShowError(LoadStrW(IDS_ERRORTITLE), (errFileW + L": " + GetErrorTextW(lastErr)).c_str());
-            //      if (usedNames != NULL) delete usedNames;
-            //      return FALSE;
         }
     }
-    if (usedNames != NULL)
-        delete usedNames;
+    // usedNames auto-deleted by unique_ptr when scope exits
 
     SetCurrentDirectoryToSystem();
 
