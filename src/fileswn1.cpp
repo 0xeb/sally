@@ -148,7 +148,7 @@ BOOL CFilesWindowAncestor::GetGeneralPath(char* buf, int bufSize, BOOL convertFS
     if (bufSize == 0)
         return FALSE;
     BOOL ret = TRUE;
-    char buf2[2 * MAX_PATH];
+    CPathBuffer buf2;  // Heap-allocated for long path support
     if (Is(ptDisk))
     {
         int l = (int)strlen(GetPath());
@@ -1659,11 +1659,11 @@ void CFilesWindow::RedrawFocusedIndex()
 void CFilesWindow::DirectoryLineSetText()
 {
     CALL_STACK_MESSAGE1("CFilesWindow::DirectoryLineSetText()");
-    char ZIPbuf[2 * MAX_PATH];
+    CPathBuffer ZIPbuf;  // Heap-allocated for long path support
     const char* path = NULL;
     if (Is(ptZIPArchive))
     {
-        strcpy(ZIPbuf, GetZIPArchive());
+        lstrcpyn(ZIPbuf, GetZIPArchive(), ZIPbuf.Size());
         if (GetZIPPath()[0] != 0)
         {
             if (GetZIPPath()[0] != '\\')
@@ -2218,8 +2218,8 @@ BOOL CFilesWindow::SetUnescapedHotPathToEmptyPos()
     int index = MainWindow->GetUnassignedHotPathIndex();
     if (index != -1)
     {
-        char path[2 * MAX_PATH];
-        GetGeneralPath(path, 2 * MAX_PATH, TRUE);
+        CPathBuffer path;  // Heap-allocated for long path support
+        GetGeneralPath(path, path.Size(), TRUE);
         MainWindow->SetUnescapedHotPath(index, path);
         return TRUE;
     }

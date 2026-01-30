@@ -2249,8 +2249,8 @@ void CFilesWindow::RefreshDirectory(BOOL probablyUselessRefresh, BOOL forceReloa
     //  if (QuickSearchMode) EndQuickSearch();   // We will try to make the quick search mode survive a refresh.
 
 #ifdef _DEBUG
-    char t_path[2 * MAX_PATH];
-    GetGeneralPath(t_path, 2 * MAX_PATH);
+    CPathBuffer t_path;  // Heap-allocated for long path support
+    GetGeneralPath(t_path, t_path.Size());
     TRACE_I("RefreshDirectory: " << (MainWindow->LeftPanel == this ? "left" : "right") << ": " << t_path);
 #endif // _DEBUG
 
