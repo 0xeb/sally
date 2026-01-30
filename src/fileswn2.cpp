@@ -1321,8 +1321,8 @@ BOOL CFilesWindow::PrepareCloseCurrentPath(HWND parent, BOOL canForce, BOOL canD
                     }
                     else // ask the user whether to close it against the FS's will
                     {
-                        char path[2 * MAX_PATH];
-                        GetGeneralPath(path, 2 * MAX_PATH);
+                        CPathBuffer path;  // Heap-allocated for long path support
+                        GetGeneralPath(path, path.Size());
                         std::wstring msg = FormatStrW(LoadStrW(IDS_FSFORCECLOSE), AnsiToWide(path).c_str());
                         if (gPrompter->AskYesNo(LoadStrW(IDS_QUESTION), msg.c_str()).type == PromptResult::kYes) // user chooses "Close"
                         {

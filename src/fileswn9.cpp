@@ -547,7 +547,7 @@ BOOL CFilesWindow::IsTextOnClipboard()
     return gClipboard->HasText() ? TRUE : FALSE;
 }
 
-BOOL CFilesWindow::PostProcessPathFromUser(HWND parent, char (&buff)[2 * MAX_PATH])
+BOOL CFilesWindow::PostProcessPathFromUser(HWND parent, CPathBuffer& buff)
 {
     if (!IsFileURLPath(buff) && IsPluginFSPath(buff))
         return TRUE; // let the FS plugin handle the processing
@@ -563,7 +563,7 @@ BOOL CFilesWindow::PostProcessPathFromUser(HWND parent, char (&buff)[2 * MAX_PAT
         CPathBuffer path; // Heap-allocated for long path support
         DWORD pathLen = path.Size();
         if (PathCreateFromUrl(buff, path, &pathLen, 0) == S_OK)
-            strcpy_s(buff, path);
+            lstrcpyn(buff, path, buff.Size());
         else
         {
             gPrompter->ShowError(LoadStrW(IDS_ERRORCHANGINGDIR), LoadStrW(IDS_THEPATHISINVALID));
@@ -579,16 +579,16 @@ BOOL CFilesWindow::PostProcessPathFromUser(HWND parent, char (&buff)[2 * MAX_PAT
 
     // expand ENV variables (as frequently requested on the forum and for internal use)
     // if an ENV variable does not exist, a directory with the same name gets a chance to be expanded
-    char expandedBuff[_countof(buff) + 1];
-    DWORD auxRes = ExpandEnvironmentStrings(buff, expandedBuff, _countof(expandedBuff));
-    if (auxRes == 0 || auxRes > _countof(buff))
+    CPathBuffer expandedBuff;  // Heap-allocated for long path support
+    DWORD auxRes = ExpandEnvironmentStrings(buff, expandedBuff, expandedBuff.Size());
+    if (auxRes == 0 || auxRes > buff.Size())
     {
         TRACE_E("ExpandEnvironmentStrings failed.");
         return FALSE;
     }
     else
     {
-        strcpy(buff, expandedBuff);
+        lstrcpyn(buff, expandedBuff, buff.Size());
     }
 
     return TRUE;
@@ -619,9 +619,9 @@ void CFilesWindow::ClipboardPastePath()
         return;
 
     // Convert to ANSI for ChangeDir (existing code expects ANSI)
-    char buff[2 * MAX_PATH];
+    CPathBuffer buff;  // Heap-allocated for long path support
     std::string ansiPath = WideToAnsi(pathW);
-    lstrcpyn(buff, ansiPath.c_str(), _countof(buff));
+    lstrcpyn(buff, ansiPath.c_str(), buff.Size());
 
     if (PostProcessPathFromUser(HWindow, buff))
         ChangeDir(buff); // change path

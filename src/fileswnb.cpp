@@ -802,8 +802,8 @@ CFilesWindow::WindowProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
     case WM_USER_CHANGEDIR:
     {
         // perform post-processing only for paths we obtained as text (not directly by dropping a directory)
-        char buff[2 * MAX_PATH];
-        strcpy_s(buff, (char*)lParam);
+        CPathBuffer buff;  // Heap-allocated for long path support
+        lstrcpyn(buff, (char*)lParam, buff.Size());
         if (!(BOOL)wParam || PostProcessPathFromUser(HWindow, buff))
             ChangeDir(buff, -1, NULL, 3 /*change-dir*/, NULL, (BOOL)wParam);
         return 0;

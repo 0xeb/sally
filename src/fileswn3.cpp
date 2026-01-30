@@ -1978,8 +1978,8 @@ CHANGE_AGAIN:
         {
             convertFSPathToInternal = TRUE; // after input from user, conversion to internal format is necessary
             // postprocessing will be done only for path, which is not to be sent directly to plugin
-            char tempPathBuff[2 * MAX_PATH];
-            lstrcpyn(tempPathBuff, path, 2 * MAX_PATH);
+            CPathBuffer tempPathBuff;  // Heap-allocated for long path support
+            lstrcpyn(tempPathBuff, path, tempPathBuff.Size());
             if (!sendDirectlyToPlugin && !PostProcessPathFromUser(HWindow, tempPathBuff))
                 goto CHANGE_AGAIN;
             lstrcpyn(path, tempPathBuff, path.Size());

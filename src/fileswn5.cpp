@@ -2018,8 +2018,8 @@ void CFilesWindow::CreateDir(CFilesWindow* target)
             // lower the thread priority to "normal" (so operations don't overload the machine)
             SetThreadPriority(GetCurrentThread(), THREAD_PRIORITY_NORMAL);
 
-            char newName[2 * MAX_PATH];
-            newName[0] = 0;
+            CPathBuffer newName;  // Heap-allocated for long path support
+            *newName = 0;
             BOOL cancel = FALSE;
             BOOL ret = GetPluginFS()->CreateDir(GetPluginFS()->GetPluginFSName(), 1, HWindow, newName, cancel);
             if (!cancel) // not a cancel of the operation
