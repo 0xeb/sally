@@ -314,10 +314,10 @@ int GetCmdLineLimit()
 
     if (WindowsXP64AndLater) // XP64 + Vista + Win7 + ...
     {
-        char cmd[MAX_PATH];
-        if (!GetEnvironmentVariable("COMSPEC", cmd, MAX_PATH))
+        CPathBuffer cmd;
+        if (!GetEnvironmentVariable("COMSPEC", cmd, cmd.Size()))
             cmd[0] = 0;
-        AddDoubleQuotesIfNeeded(cmd, MAX_PATH); // CreateProcess expects names with spaces quoted (otherwise it tries various variants; see help)
+        AddDoubleQuotesIfNeeded(cmd, cmd.Size()); // CreateProcess expects names with spaces quoted (otherwise it tries various variants; see help)
         return 8191 - lstrlen(cmd) - 6;         // 6 = strlen(" /K ") + 2 (two quotation marks around the command itself)
     }
     else
@@ -1434,7 +1434,7 @@ public:
         }
         else
         {
-            char path[2 * MAX_PATH];
+            CPathBuffer path;
             if (GetNameFromDataObject(pDataObject, path)) // at most MAX_PATH characters are placed into 'path'
             {
                 // change the path
@@ -1547,8 +1547,8 @@ CInnerText::WindowProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
             r.right -= TXEL_SPACE - 1; // bold fonts make the text overflow - hence this correction
 
             // PathCompactPath() works better than combining DT_PATH_ELLIPSIS with DT_END_ELLIPSIS (because the last character misbehaves)
-            char buff[2 * MAX_PATH];
-            strncpy_s(buff, _countof(buff), Message, _TRUNCATE);
+            CPathBuffer buff;
+            strncpy_s(buff, buff.Size(), Message, _TRUNCATE);
             PathCompactPath(dc, buff, r.right - r.left);
 
             DrawText(dc, buff, -1, &r,

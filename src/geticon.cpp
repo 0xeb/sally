@@ -71,7 +71,7 @@ BOOL SalGetIconFromPIDL(IShellFolder* psf, const char* path, LPCITEMIDLIST pidl,
     HICON hIconSmall = NULL;
     HICON hIconLarge = NULL;
 
-    char iconFile[MAX_PATH];
+    CPathBuffer iconFile;
     WCHAR iconFileW[MAX_PATH];
     int iconIndex;
     UINT wFlags = 0; // clear because the DWGIcon.dll shell extension just ORs these bits
@@ -83,7 +83,7 @@ BOOL SalGetIconFromPIDL(IShellFolder* psf, const char* path, LPCITEMIDLIST pidl,
     HRESULT hres = psf->GetUIObjectOf(NULL, 1, &pidl, IID_IExtractIconA, NULL, (void**)&pxi);
     if (SUCCEEDED(hres))
     {
-        hres = pxi->GetIconLocation(GIL_FORSHELL, iconFile, MAX_PATH, &iconIndex, &wFlags);
+        hres = pxi->GetIconLocation(GIL_FORSHELL, iconFile, iconFile.Size(), &iconIndex, &wFlags);
         //TRACE_I("  SalGetIconFromPIDL() IID_IExtractIconA iconFile="<<iconFile<<" iconIndex="<<iconIndex<<" wFlags="<<wFlags);
     }
     else
@@ -97,8 +97,8 @@ BOOL SalGetIconFromPIDL(IShellFolder* psf, const char* path, LPCITEMIDLIST pidl,
             if (SUCCEEDED(hres))
             {
                 // Convert the UNICODE string to ANSI
-                WideCharToMultiByte(CP_ACP, 0, iconFileW, -1, iconFile, MAX_PATH, NULL, NULL);
-                iconFile[MAX_PATH - 1] = 0;
+                WideCharToMultiByte(CP_ACP, 0, iconFileW, -1, iconFile, iconFile.Size(), NULL, NULL);
+                iconFile[iconFile.Size() - 1] = 0;
                 //TRACE_I("  SalGetIconFromPIDL() IID_IExtractIconW iconFile="<<iconFile<<" iconIndex="<<iconIndex<<" wFlags="<<wFlags);
             }
         }

@@ -383,8 +383,8 @@ CFakeCopyPasteDataObject::Release(void)
                 SalShExtSharedMemView->PasteFakeDirName[0] = 0;
                 ReleaseMutex(SalShExtSharedMemMutex);
             }
-            char dir[MAX_PATH];
-            lstrcpyn(dir, FakeDir, MAX_PATH);
+            CPathBuffer dir;
+            lstrcpyn(dir, FakeDir, dir.Size());
             //      TRACE_I("CFakeCopyPasteDataObject::Release(): removedir");
             char* cutDir;
             if (CutDirectory(dir, &cutDir) && cutDir != NULL && strcmp(cutDir, "CLIPFAKE") == 0)
@@ -820,8 +820,8 @@ void CSalShExtPastedData::DoPasteOperation(BOOL copy, const char* tgtPath)
                     data.EnumLastDir = NULL;
                     data.EnumLastIndex = -1;
 
-                    char pathBuf[MAX_PATH];
-                    lstrcpyn(pathBuf, tgtPath, MAX_PATH);
+                    CPathBuffer pathBuf;
+                    lstrcpyn(pathBuf, tgtPath, pathBuf.Size());
                     int l = (int)strlen(pathBuf);
                     if (l > 3 && pathBuf[l - 1] == '\\')
                         pathBuf[l - 1] = 0; // except "c:\" we remove trailing backslash
@@ -840,7 +840,7 @@ void CSalShExtPastedData::DoPasteOperation(BOOL copy, const char* tgtPath)
                     // files/directories)
                     MainWindow->PostChangeOnPathNotification(pathBuf, TRUE);
                     // change in directory where archive is located (shouldn't happen during unpack, but better refresh)
-                    lstrcpyn(pathBuf, ArchiveFileName, MAX_PATH);
+                    lstrcpyn(pathBuf, ArchiveFileName, pathBuf.Size());
                     CutDirectory(pathBuf);
                     MainWindow->PostChangeOnPathNotification(pathBuf, FALSE);
 

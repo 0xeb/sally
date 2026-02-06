@@ -1461,12 +1461,12 @@ void CDiskCache::PrematureDeleteByPlugin(CPluginInterfaceAbstract* ownDeletePlug
 
 void CDiskCache::ClearTEMPIfNeeded(HWND parent, HWND hActivePanel)
 {
-    char tmpDir[2 * MAX_PATH];
-    if (EnvGetTempPathA(gEnvironment, tmpDir, 2 * MAX_PATH).success)
+    CPathBuffer tmpDir;
+    if (EnvGetTempPathA(gEnvironment, tmpDir, tmpDir.Size()).success)
     {
-        SalPathAddBackslash(tmpDir, 2 * MAX_PATH);
+        SalPathAddBackslash(tmpDir, tmpDir.Size());
         char* tmpDirEnd = tmpDir + strlen(tmpDir);
-        if (SalPathAppend(tmpDir, "SAL*.tmp", 2 * MAX_PATH)) // we will add a mask (it won't fit = no sense in searching anything)
+        if (SalPathAppend(tmpDir, "SAL*.tmp", tmpDir.Size())) // we will add a mask (it won't fit = no sense in searching anything)
         {
             TIndirectArray<char> tmpDirs(10, 50);
 
@@ -1522,14 +1522,14 @@ void CDiskCache::ClearTEMPIfNeeded(HWND parent, HWND hActivePanel)
                 {
                     for (int i = 0; i < tmpDirs.Count; i++)
                     {
-                        lstrcpyn(tmpDirEnd, tmpDirs[i], (int)(2 * MAX_PATH - (tmpDirEnd - tmpDir)));
+                        lstrcpyn(tmpDirEnd, tmpDirs[i], (int)(tmpDir.Size() - (tmpDirEnd - (char*)tmpDir)));
                         RemoveTemporaryDir(tmpDir);
                     }
                 }
                 if (ret == IDIGNORE) // focus
                 {
-                    lstrcpyn(tmpDirEnd, tmpDirs[0], (int)(2 * MAX_PATH - (tmpDirEnd - tmpDir)));
-                    SendMessage(hActivePanel, WM_USER_FOCUSFILE, (WPARAM) "", (LPARAM)tmpDir);
+                    lstrcpyn(tmpDirEnd, tmpDirs[0], (int)(tmpDir.Size() - (tmpDirEnd - (char*)tmpDir)));
+                    SendMessage(hActivePanel, WM_USER_FOCUSFILE, (WPARAM) "", (LPARAM)(char*)tmpDir);
                 }
             }
         }

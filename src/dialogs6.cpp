@@ -1156,7 +1156,7 @@ void CDisconnectDialog::EnumConnections()
                         i2 == 1 && addFSItemForNonactivePanelFS)
                     {
                         CPluginFSInterfaceEncapsulation* fs = i2 == 0 ? activePanelFS : nonactivePanelFS;
-                        char path[2 * MAX_PATH];
+                        CPathBuffer path;
                         sprintf(path, "%s:", fs->GetPluginFSName());
                         char* userPart = path + strlen(path);
                         if (!fs->GetRootPath(userPart))

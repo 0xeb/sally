@@ -2683,13 +2683,13 @@ void CFindDialog::OnCopyNameToClipboard(CCopyNameToClipboardModeEnum mode)
     if (index < 0)
         return;
     CFoundFilesData* data = FoundFilesListView->At(index);
-    char buff[2 * MAX_PATH];
+    CPathBuffer buff;
     buff[0] = 0;
     switch (mode)
     {
     case cntcmFullName:
     {
-        strcpy(buff, data->Path);
+        lstrcpyn(buff, data->Path, buff.Size());
         int len = (int)strlen(buff);
         if (len > 0 && buff[len - 1] != '\\')
             strcat(buff, "\\");
@@ -2705,7 +2705,7 @@ void CFindDialog::OnCopyNameToClipboard(CCopyNameToClipboardModeEnum mode)
 
     case cntcmFullPath:
     {
-        strcpy(buff, data->Path);
+        lstrcpyn(buff, data->Path, buff.Size());
         break;
     }
 
@@ -3967,8 +3967,8 @@ MENU_TEMPLATE_ITEM FindLookInBrowseMenu[] =
 
                         // DT_PATH_ELLIPSIS doesn't work on some strings and causing clipped text to be printed
                         // PathCompactPath() requires a copy in a local buffer but doesn't clip text
-                        char buff[2 * MAX_PATH];
-                        strncpy_s(buff, _countof(buff), item2->Path, _TRUNCATE);
+                        CPathBuffer buff;
+                        strncpy_s(buff, buff.Size(), item2->Path, _TRUNCATE);
                         PathCompactPath(CacheBitmap->HMemDC, buff, r2.right - r2.left);
                         DrawText(CacheBitmap->HMemDC, buff, -1, &r2,
                                  DT_VCENTER | DT_LEFT | DT_NOPREFIX | DT_SINGLELINE);
