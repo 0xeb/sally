@@ -2179,6 +2179,24 @@ void GetSystemDPI(HDC hDC)
         ReleaseDC(NULL, hTmpDC);
 }
 
+// Helper to isolate SEH from functions that use C++ objects (CPathBuffer, std::wstring).
+// SEH (__try/__except) cannot coexist with objects that require unwinding.
+static HICON GetDirectoryIconSEH(const char* path, CIconSizeEnum sizeIndex)
+{
+    HICON hIcon = NULL;
+    __try
+    {
+        if (!GetFileIcon(path, FALSE, &hIcon, sizeIndex, FALSE, FALSE))
+            hIcon = NULL;
+    }
+    __except (CCallStack::HandleException(GetExceptionInformation(), 15))
+    {
+        FGIExceptionHasOccured++;
+        hIcon = NULL;
+    }
+    return hIcon;
+}
+
 BOOL InitializeGraphics(BOOL colorsOnly)
 {
     // 48x48 only from XP
@@ -2426,24 +2444,14 @@ BOOL InitializeGraphics(BOOL colorsOnly)
                     TRACE_E("Cannot retrieve icon from IMAGERES.DLL or SHELL32.DLL resID=" << resID[i]);
             }
         }
-        char systemDir[MAX_PATH]; // Cannot use CPathBuffer due to __try block
-        EnvGetSystemDirectoryA(gEnvironment, systemDir, MAX_PATH);
+        CPathBuffer systemDir;
+        EnvGetSystemDirectoryA(gEnvironment, systemDir, systemDir.Size());
         // 16x16, 32x32, 48x48
         int sizeIndex;
         for (sizeIndex = ICONSIZE_16; sizeIndex < ICONSIZE_COUNT; sizeIndex++)
         {
             // directory icon
-            hIcon = NULL;
-            __try
-            {
-                if (!GetFileIcon(systemDir, FALSE, &hIcon, (CIconSizeEnum)sizeIndex, FALSE, FALSE))
-                    hIcon = NULL;
-            }
-            __except (CCallStack::HandleException(GetExceptionInformation(), 15))
-            {
-                FGIExceptionHasOccured++;
-                hIcon = NULL;
-            }
+            hIcon = GetDirectoryIconSEH(systemDir, (CIconSizeEnum)sizeIndex);
             if (hIcon != NULL) // if we can't get the icon, there's still the 4th one from shell32.dll
             {
                 SimpleIconLists[sizeIndex]->ReplaceIcon(symbolsDirectory, hIcon);

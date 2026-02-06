@@ -697,10 +697,10 @@ void CIconCache::SetIconSize(CIconSizeEnum iconSize)
 // CAssociations
 //
 
-BOOL ReadDirectoryIconAndTypeAux(CIconList* iconList, int index, CIconSizeEnum iconSize)
+// SEH wrapper: shell calls may crash due to buggy shell extensions.
+// Kept in a separate function because SEH prevents C++ object unwinding.
+static BOOL ReadDirectoryIconAndTypeSEH(const char* systemDir, CIconList* iconList, int index, CIconSizeEnum iconSize)
 {
-    char systemDir[MAX_PATH];
-    EnvGetSystemDirectoryA(gEnvironment, systemDir, MAX_PATH);
     SHFILEINFO shi;
     HICON hIcon;
     __try
@@ -722,6 +722,13 @@ BOOL ReadDirectoryIconAndTypeAux(CIconList* iconList, int index, CIconSizeEnum i
         FGIExceptionHasOccured++;
     }
     return FALSE;
+}
+
+BOOL ReadDirectoryIconAndTypeAux(CIconList* iconList, int index, CIconSizeEnum iconSize)
+{
+    CPathBuffer systemDir;
+    EnvGetSystemDirectoryA(gEnvironment, systemDir, systemDir.Size());
+    return ReadDirectoryIconAndTypeSEH(systemDir, iconList, index, iconSize);
 }
 
 BOOL GetIconFromAssocAux(BOOL initFlagAndIndexes, HKEY root, const char* keyName, LONG size,
