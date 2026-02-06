@@ -1388,7 +1388,7 @@ BOOL GetReparsePointDestination(const char* repPointDir, char* repPointDstBuf, D
     // if the path ends with a space/dot we must append '\\', otherwise GetFileAttributes
     // and CreateFile will trim spaces/dots and operate on a different path
     const char* repPointDirCrFile = repPointDir;
-    char repPointDirCrFileCopy[3 * MAX_PATH];
+    CPathBuffer repPointDirCrFileCopy; // Heap-allocated for long path support
     MakeCopyWithBackslashIfNeeded(repPointDirCrFile, repPointDirCrFileCopy);
 
     DWORD attrs = GetFileAttributes(repPointDirCrFile);

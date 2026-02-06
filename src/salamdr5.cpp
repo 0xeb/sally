@@ -1266,9 +1266,9 @@ BOOL SalMoveFile(const char* srcName, const char* destName)
 {
     // if name ends with space/dot, we must append '\\', otherwise MoveFile
     // trims spaces/dots and thus works with different name
-    char srcNameCopy[3 * MAX_PATH];
+    CPathBuffer srcNameCopy; // Heap-allocated for long path support
     MakeCopyWithBackslashIfNeeded(srcName, srcNameCopy);
-    char destNameCopy[3 * MAX_PATH];
+    CPathBuffer destNameCopy; // Heap-allocated for long path support
     MakeCopyWithBackslashIfNeeded(destName, destNameCopy);
 
     if (!MoveFileA(gFileSystem, srcName, destName).success)
@@ -1368,9 +1368,9 @@ BOOL CSystemPolicies::LoadList(TDirectArray<char*>* list, HKEY hRootKey, const c
                 char valueName[2];
                 DWORD valueNameLen = 2;
                 DWORD type;
-                char data[2 * MAX_PATH];
-                DWORD dataLen = 2 * MAX_PATH;
-                res = RegEnumValue(hKey, i, valueName, &valueNameLen, 0, &type, (BYTE*)data, &dataLen);
+                CPathBuffer data;
+                DWORD dataLen = data.Size();
+                res = RegEnumValue(hKey, i, valueName, &valueNameLen, 0, &type, (BYTE*)data.Get(), &dataLen);
                 if (res == ERROR_SUCCESS && type == REG_SZ)
                 {
                     int len = lstrlen(data);

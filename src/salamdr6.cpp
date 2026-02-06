@@ -867,7 +867,7 @@ BOOL CNames::LoadFromClipboard(HWND hWindow)
 
     // search from the left for CR | LF | CRLF or the end of memory
     // add the found file and directory names to the array
-    char name[2 * MAX_PATH];
+    CPathBuffer name;
     const char* s = text;
     const char* begin = s;
     while (s <= textEnd)
@@ -877,7 +877,7 @@ BOOL CNames::LoadFromClipboard(HWND hWindow)
         {
             if (s - begin > 0)
             {
-                if (s - begin < 2 * MAX_PATH - 1)
+                if (s - begin < name.Size() - 1)
                 {
                     memcpy(name, begin, s - begin);
                     name[s - begin] = 0;
@@ -1654,11 +1654,11 @@ BOOL SafeGetOpenFileName(LPOPENFILENAME lpofn)
     {
         // Windows refuse to open the dialog for a path like "C:\" or for a non-existent path.
         // In that case, force Documents
-        char initDir[MAX_PATH];
+        CPathBuffer initDir;
         const char* oldInitDir = lpofn->lpstrInitialDir;
         lpofn->lpstrInitialDir = initDir;
-        if (!GetMyDocumentsOrDesktopPath(initDir, MAX_PATH))
-            strcpy(initDir, "");
+        if (!GetMyDocumentsOrDesktopPath(initDir, initDir.Size()))
+            initDir[0] = 0;
         strcpy(lpofn->lpstrFile, "");
         ret = GetOpenFileName(lpofn);
         lpofn->lpstrInitialDir = oldInitDir;
@@ -1675,11 +1675,11 @@ BOOL SafeGetSaveFileName(LPOPENFILENAME lpofn)
     {
         // Windows refuse to open the dialog for a path like "C:\" or for a non-existent path.
         // In that case, force Documents
-        char initDir[MAX_PATH];
+        CPathBuffer initDir;
         const char* oldInitDir = lpofn->lpstrInitialDir;
         lpofn->lpstrInitialDir = initDir;
-        if (!GetMyDocumentsOrDesktopPath(initDir, MAX_PATH))
-            strcpy(initDir, "");
+        if (!GetMyDocumentsOrDesktopPath(initDir, initDir.Size()))
+            initDir[0] = 0;
         strcpy(lpofn->lpstrFile, "");
         ret = GetSaveFileName(lpofn);
         lpofn->lpstrInitialDir = oldInitDir;

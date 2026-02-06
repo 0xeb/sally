@@ -1,4 +1,4 @@
-﻿// SPDX-FileCopyrightText: 2023 Open Salamander Authors
+// SPDX-FileCopyrightText: 2023 Open Salamander Authors
 // SPDX-License-Identifier: GPL-2.0-or-later
 // CommentsTranslationProject: TRANSLATED
 
@@ -1794,14 +1794,14 @@ BOOL CPathHistoryItem::Execute(CFilesWindow* panel)
 
 BOOL CPathHistoryItem::IsTheSamePath(CPathHistoryItem& item, CPluginFSInterfaceEncapsulation* curPluginFS)
 {
-    char buf1[2 * MAX_PATH];
-    char buf2[2 * MAX_PATH];
+    CPathBuffer buf1;
+    CPathBuffer buf2;
     if (Type == item.Type)
     {
         if (Type == 0) // disk
         {
-            GetPath(buf1, 2 * MAX_PATH);
-            item.GetPath(buf2, 2 * MAX_PATH);
+            GetPath(buf1, buf1.Size());
+            item.GetPath(buf2, buf2.Size());
             if (StrICmp(buf1, buf2) == 0)
                 return TRUE;
         }
@@ -1889,7 +1889,7 @@ void CPathHistory::ClearPluginFSFromHistory(CPluginFSInterfaceAbstract* fs)
 void CPathHistory::FillBackForwardPopupMenu(CMenuPopup* popup, BOOL forward)
 {
     // item IDs must be in the range <1..?>
-    char buffer[2 * MAX_PATH];
+    CPathBuffer buffer;
 
     MENU_ITEM_INFO mii;
     mii.Mask = MENU_MASK_TYPE | MENU_MASK_ID | MENU_MASK_STRING;
@@ -1903,7 +1903,7 @@ void CPathHistory::FillBackForwardPopupMenu(CMenuPopup* popup, BOOL forward)
             int i;
             for (i = ForwardIndex; i < Paths.Count; i++)
             {
-                Paths[i]->GetPath(buffer, 2 * MAX_PATH);
+                Paths[i]->GetPath(buffer, buffer.Size());
                 mii.String = buffer;
                 mii.ID = id++;
                 popup->InsertItem(-1, TRUE, &mii);
@@ -1917,7 +1917,7 @@ void CPathHistory::FillBackForwardPopupMenu(CMenuPopup* popup, BOOL forward)
         int i;
         for (i = count - 2; i >= 0; i--)
         {
-            Paths[i]->GetPath(buffer, 2 * MAX_PATH);
+            Paths[i]->GetPath(buffer, buffer.Size());
             mii.String = buffer;
             mii.ID = id++;
             popup->InsertItem(-1, TRUE, &mii);
@@ -1928,7 +1928,7 @@ void CPathHistory::FillBackForwardPopupMenu(CMenuPopup* popup, BOOL forward)
 void CPathHistory::FillHistoryPopupMenu(CMenuPopup* popup, DWORD firstID, int maxCount,
                                         BOOL separator)
 {
-    char buffer[2 * MAX_PATH];
+    CPathBuffer buffer;
 
     MENU_ITEM_INFO mii;
     mii.Mask = MENU_MASK_TYPE | MENU_MASK_ID | MENU_MASK_STRING | MENU_MASK_ICON;
@@ -1945,7 +1945,7 @@ void CPathHistory::FillHistoryPopupMenu(CMenuPopup* popup, DWORD firstID, int ma
     {
         if (maxCount != -1 && added >= maxCount)
             break;
-        Paths[i]->GetPath(buffer, 2 * MAX_PATH);
+        Paths[i]->GetPath(buffer, buffer.Size());
         mii.String = buffer;
         mii.HIcon = Paths[i]->GetIcon();
         mii.ID = id++;
@@ -2232,7 +2232,7 @@ void CPathHistory::SaveToRegistry(HKEY hKey, const char* name, BOOL onlyClear)
         {
             int index = 0;
             char buf[10];
-            char path[2 * MAX_PATH];
+            CPathBuffer path;
             int i;
             for (i = 0; i < Paths.Count; i++)
             {
@@ -2250,10 +2250,10 @@ void CPathHistory::SaveToRegistry(HKEY hKey, const char* name, BOOL onlyClear)
                 case 1: // archive
                 case 2: // FS
                 {
-                    strcpy(path, item->PathOrArchiveOrFSName);
-                    StrNCat(path, ":", 2 * MAX_PATH);
+                    lstrcpyn(path, item->PathOrArchiveOrFSName, path.Size());
+                    StrNCat(path, ":", path.Size());
                     if (item->ArchivePathOrFSUserPart != NULL)
-                        StrNCat(path, item->ArchivePathOrFSUserPart, 2 * MAX_PATH);
+                        StrNCat(path, item->ArchivePathOrFSUserPart, path.Size());
                     break;
                 }
                 default:
@@ -2277,7 +2277,7 @@ void CPathHistory::LoadFromRegistry(HKEY hKey, const char* name)
     HKEY historyKey;
     if (OpenKey(hKey, name, historyKey))
     {
-        char path[2 * MAX_PATH];
+        CPathBuffer path;
         char fsName[MAX_PATH];
         const char* pathOrArchiveOrFSName = path;
         const char* archivePathOrFSUserPart = NULL;
@@ -2287,7 +2287,7 @@ void CPathHistory::LoadFromRegistry(HKEY hKey, const char* name)
         for (i = 0;; i++)
         {
             itoa(i + 1, buf, 10);
-            if (GetValue(historyKey, buf, REG_SZ, path, 2 * MAX_PATH))
+            if (GetValue(historyKey, buf, REG_SZ, path, path.Size()))
             {
                 if (strlen(path) >= 2)
                 {
@@ -3669,7 +3669,7 @@ BOOL CFileHistory::FillPopupMenu(CMenuPopup* popup)
     CALL_STACK_MESSAGE1("CFileHistory::FillPopupMenu()");
 
     // fill items
-    char name[2 * MAX_PATH];
+    CPathBuffer name;
     MENU_ITEM_INFO mii;
     mii.Mask = MENU_MASK_TYPE | MENU_MASK_ID | MENU_MASK_ICON | MENU_MASK_STRING;
     mii.Type = MENU_TYPE_STRING;
