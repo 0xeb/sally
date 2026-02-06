@@ -1265,9 +1265,9 @@ void ShellAction(CFilesWindow* panel, CShellAction action, BOOL useSelection,
     else
         index = -1;
 
-    char targetPath[2 * MAX_PATH];
+    CPathBuffer targetPath;
     targetPath[0] = 0;
-    char realDraggedPath[2 * MAX_PATH];
+    CPathBuffer realDraggedPath;
     realDraggedPath[0] = 0;
     if (panel->Is(ptZIPArchive) && SalShExtRegistered)
     {
@@ -1578,8 +1578,8 @@ void ShellAction(CFilesWindow* panel, CShellAction action, BOOL useSelection,
                     int operation = SALSHEXT_NONE;
                     DWORD allowedEffects = (panel->GetPluginFS()->IsServiceSupported(FS_SERVICE_MOVEFROMFS) ? DROPEFFECT_MOVE : 0) |
                                            (panel->GetPluginFS()->IsServiceSupported(FS_SERVICE_COPYFROMFS) ? DROPEFFECT_COPY : 0);
-                    char srcFSPath[2 * MAX_PATH];
-                    strcpy(srcFSPath, panel->GetPluginFS()->GetPluginFSName());
+                    CPathBuffer srcFSPath;
+                    lstrcpyn(srcFSPath, panel->GetPluginFS()->GetPluginFSName(), srcFSPath.Size());
                     strcat(srcFSPath, ":");
                     if (!panel->GetPluginFS()->GetCurrentPath(srcFSPath + strlen(srcFSPath)))
                         srcFSPath[0] = 0;

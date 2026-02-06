@@ -254,14 +254,14 @@ BOOL CShares::GetUNCPath(const char* path, char* uncPath, int uncPathMax)
     {
         CSharesItem* item = Data[longestIndex];
         // insert the name of our computer
-        char unc[2 * MAX_PATH];
-        strcpy(unc, "\\\\");
-        DWORD len = MAX_PATH;
+        CPathBuffer unc;
+        lstrcpyn(unc, "\\\\", unc.Size());
+        DWORD len = unc.Size() - 2;
         GetComputerName(unc + 2, &len);
         strcat(unc, "\\");
         // append the share name
         strcat(unc, item->RemoteName);
-        SalPathAddBackslash(unc, 2 * MAX_PATH); // we want backslash at the end
+        SalPathAddBackslash(unc, unc.Size()); // we want backslash at the end
         // from the original path, append directories from the share onwards
         if (strlen(item->LocalPath) < strlen(path))
         {

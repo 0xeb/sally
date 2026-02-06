@@ -573,7 +573,7 @@ void AddDirectory(CFilesWindow* win, const char* path, BOOL registerDevNotificat
                                                    //---  now data belongs to main thread, snooper is waiting
     // if the path ends with space/dot, we must append '\\', otherwise FindFirstChangeNotification
     // trims spaces/dots and thus works with a different path
-    char pathCopy[3 * MAX_PATH];
+    CPathBuffer pathCopy; // Heap-allocated for long path support
     MakeCopyWithBackslashIfNeeded(path, pathCopy);
     HANDLE h = HANDLES_Q(FindFirstChangeNotification(path, FALSE,
                                                      FILE_NOTIFY_CHANGE_FILE_NAME |
@@ -715,7 +715,7 @@ void ChangeDirectory(CFilesWindow* win, const char* newPath, BOOL registerDevNot
 
             // if the path ends with a space/dot, we must append '\\', otherwise FindFirstChangeNotification
             // trims spaces/dots and works with a different path
-            char newPathCopy[3 * MAX_PATH];
+            CPathBuffer newPathCopy; // Heap-allocated for long path support
             MakeCopyWithBackslashIfNeeded(newPath, newPathCopy);
             ObjectArray[i] = HANDLES_Q(FindFirstChangeNotification(newPath, FALSE,
                                                                    FILE_NOTIFY_CHANGE_FILE_NAME |
@@ -745,7 +745,7 @@ void ChangeDirectory(CFilesWindow* win, const char* newPath, BOOL registerDevNot
     {
         // if the path ends with a space/dot, we must append '\\', otherwise FindFirstChangeNotification
         // trims spaces/dots and works with a different path
-        char newPathCopy[3 * MAX_PATH];
+        CPathBuffer newPathCopy; // Heap-allocated for long path support
         MakeCopyWithBackslashIfNeeded(newPath, newPathCopy);
         HANDLE h = HANDLES_Q(FindFirstChangeNotification(newPath, FALSE,
                                                          FILE_NOTIFY_CHANGE_FILE_NAME |

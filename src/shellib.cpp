@@ -1081,8 +1081,8 @@ STDMETHODIMP CImpDropTarget::Drop(IDataObject* pDataObject, DWORD grfKeyState,
     }
 
     int dataObjectSrcType;
-    char dataObjectSrcFSPath[2 * MAX_PATH];
-    BOOL isFake = IsFakeDataObject(pDataObject, &dataObjectSrcType, dataObjectSrcFSPath, 2 * MAX_PATH);
+    CPathBuffer dataObjectSrcFSPath;
+    BOOL isFake = IsFakeDataObject(pDataObject, &dataObjectSrcType, dataObjectSrcFSPath, dataObjectSrcFSPath.Size());
     BOOL tgtFile = TRUE; // is the operation target a file?
     CDragDropOperData* namesList = new CDragDropOperData;
     if (GetCurDir != NULL)
@@ -2202,10 +2202,10 @@ void OpenFolderAndFocusItem(HWND hOwnerWindow, const char* dir, const char* item
     // if path contains components ending with spaces/dots, shell won't return
     // pidl for the requested path, but for the path created by trimming these
     // spaces/dots, so we'd better give up on it early...
-    char mydir[2 * MAX_PATH];
-    strcpy(mydir, dir);
+    CPathBuffer mydir;
+    lstrcpyn(mydir, dir, mydir.Size());
     if (item[0] != 0)
-        SalPathAppend(mydir, item, 2 * MAX_PATH);
+        SalPathAppend(mydir, item, mydir.Size());
     if (PathContainsValidComponents((char*)mydir, FALSE))
     {
         BOOL useOldMethod = TRUE; // SHOpenFolderAndSelectItems is supported since XP and we still run on W2K and XP without SPx
@@ -2747,7 +2747,7 @@ STDMETHODIMP CTextDataObject::GetData(FORMATETC* formatEtc, STGMEDIUM* medium)
 
 BOOL GetMyDocumentsOrDesktopPath(char* path, int pathLen)
 {
-    char buff[2 * MAX_PATH];
+    CPathBuffer buff;
 
     BOOL ret = FALSE;
     ITEMIDLIST* pidl = NULL;
