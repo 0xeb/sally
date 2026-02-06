@@ -1190,10 +1190,10 @@ void CMainWindow::CompareDirectories(DWORD flags)
     if (displayDialogBox)
     {
         // set texts in the progress dialog
-        char message[2 * MAX_PATH];
-        LeftPanel->GetGeneralPath(message, 2 * MAX_PATH);
+        CPathBuffer message;
+        LeftPanel->GetGeneralPath(message, message.Size());
         progressDlg.SetSource(message);
-        RightPanel->GetGeneralPath(message, 2 * MAX_PATH);
+        RightPanel->GetGeneralPath(message, message.Size());
         progressDlg.SetTarget(message);
 
         hFocusedWnd = GetFocus();

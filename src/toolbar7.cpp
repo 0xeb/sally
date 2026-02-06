@@ -43,8 +43,8 @@ CHotPathsBar::CHotPathsBar(HWND hNotifyWindow, CObjectOrigin origin)
     int i;
     for (i = 0; i < HOT_PATHS_COUNT; i++)
     {
-        char srcName[MAX_PATH];
-        MainWindow->HotPaths.GetName(i, srcName, MAX_PATH);
+        CPathBuffer srcName;
+        MainWindow->HotPaths.GetName(i, srcName, srcName.Size());
         if (srcName[0] != 0)
         {
             tii.Mask = TLBI_MASK_STYLE | TLBI_MASK_TEXT | TLBI_MASK_ICON | TLBI_MASK_ID;

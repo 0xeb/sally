@@ -468,15 +468,15 @@ BOOL PackUniversalCompress(HWND parent, const char* command, TPackErrorTable* co
     // if we used a temporary DOS name, rename all files of that name (name.*) to the desired long name
     if (DOSTmpName[0] != 0)
     {
-        char src[2 * MAX_PATH];
-        strcpy(src, DOSTmpName);
+        CPathBuffer src;
+        lstrcpyn(src, DOSTmpName, src.Size());
         char* tmpOrigName;
         CutDirectory(src, &tmpOrigName);
-        tmpOrigName = DOSTmpName + (tmpOrigName - src);
-        SalPathAddBackslash(src, 2 * MAX_PATH);
+        tmpOrigName = DOSTmpName + (tmpOrigName - (char*)src);
+        SalPathAddBackslash(src, src.Size());
         char* srcName = src + strlen(src);
-        char dstNameBuf[2 * MAX_PATH];
-        strcpy(dstNameBuf, archiveFileName);
+        CPathBuffer dstNameBuf;
+        lstrcpyn(dstNameBuf, archiveFileName, dstNameBuf.Size());
         char* dstExt = dstNameBuf + strlen(dstNameBuf);
         //    while (--dstExt > dstNameBuf && *dstExt != '\\' && *dstExt != '.');
         while (--dstExt >= dstNameBuf && *dstExt != '\\' && *dstExt != '.')
@@ -524,7 +524,7 @@ BOOL PackUniversalCompress(HWND parent, const char* command, TPackErrorTable* co
                         if (SalGetFileAttributes(dst) != 0xffffffff)
                         {
                             HANDLES(FindClose(find)); // this name already exists with some extension, searching further
-                            (*PackErrorHandlerPtr)(parent, IDS_PACKERR_UNABLETOREN, src, dst);
+                            (*PackErrorHandlerPtr)(parent, IDS_PACKERR_UNABLETOREN, src.Get(), dst);
                             return TRUE; // succeeded, only the resulting archive names differ slightly (even multivolume)
                         }
                     }

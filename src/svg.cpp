@@ -89,8 +89,8 @@ char* ReadSVGFile(const char* fileName)
 // render icons for which we have SVG representation
 void RenderSVGImage(NSVGrasterizer* rast, HDC hDC, int x, int y, const char* svgName, int iconSize, COLORREF bkColor, BOOL enabled)
 {
-    char svgFile[2 * MAX_PATH];
-    GetModuleFileName(NULL, svgFile, _countof(svgFile));
+    CPathBuffer svgFile;
+    GetModuleFileName(NULL, svgFile, svgFile.Size());
     char* s = strrchr(svgFile, '\\');
     if (s != NULL)
         sprintf(s + 1, "toolbars\\%s.svg", svgName);

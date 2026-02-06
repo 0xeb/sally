@@ -142,7 +142,7 @@ void CDriveBar::Execute(DWORD id)
             if (DriveType != drvtPluginCmd)
                 panel->TopIndexMem.Clear(); // large jump
 
-            char path[MAX_PATH];
+            CPathBuffer path;
             switch (DriveType)
             {
             case drvtMyDocuments:
