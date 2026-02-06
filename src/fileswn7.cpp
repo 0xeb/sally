@@ -1575,7 +1575,7 @@ _PACK_AGAIN:
                 char filesDirs[200];
                 ExpandPluralFilesDirs(filesDirs, 200, files, data.IndexesCount - files, epfdmNormal, FALSE);
 
-                char buff[3 * MAX_PATH];
+                CPathBuffer buff;
                 sprintf(buff, LoadStr(IDS_CONFIRM_ADDTOARCHIVE), "%s", filesDirs);
 
                 char* namePart = strrchr(fileBuf, '\\');

@@ -1404,8 +1404,8 @@ HWND CShellExecuteWnd::Create(HWND hParent, const char* format, ...)
     else
     {
         CanClose = FALSE;
-        char buff[2 * MAX_PATH];
-        _vsnprintf_s(buff, _TRUNCATE, format, args);
+        CPathBuffer buff;
+        _vsnprintf_s(buff.Get(), buff.Size(), _TRUNCATE, format, args);
 
         // we inherit the size of the parent window because some users complained that emails
         // opened from SS (via Mozilla) are displayed in a tiny window; some shell extensions probably

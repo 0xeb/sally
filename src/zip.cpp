@@ -983,7 +983,7 @@ BOOL CSalamanderGeneral::GetPanelPath(int panel, char* buffer, int bufferSize, i
     CFilesWindow* p = GetPanel(panel);
     if (p != NULL)
     {
-        char buf[2 * MAX_PATH];
+        CPathBuffer buf;
         int offset = -1; // offset into the buffer for computing archiveOrFS (-1 means NULL)
         if (p->Is(ptZIPArchive))
         {

@@ -690,7 +690,7 @@ MENU_TEMPLATE_ITEM EditNewFileDialogMenu[] =
 */
             HMENU hMenu = CreatePopupMenu();
             InsertMenu(hMenu, 0xFFFFFFFF, MF_BYCOMMAND | MF_STRING, 1, LoadStr(IDS_EDITNEWFILE_SAVEASDEFAULT));
-            char buff[2 * MAX_PATH];
+            CPathBuffer buff;
             wsprintf(buff, LoadStr(IDS_EDITNEWFILE_REVERTDEFAULT), LoadStr(IDS_EDITNEWFILE_DEFAULTNAME));
             InsertMenu(hMenu, 0xFFFFFFFF, MF_BYCOMMAND | MF_STRING, 2, buff);
 

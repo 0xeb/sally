@@ -465,8 +465,8 @@ BOOL CFindIgnore::Prepare(CFindIgnore* source)
                      LowerCase[path[0]] >= 'a' && LowerCase[path[0]] <= 'z' && path[1] == ':')
                 type = fiitFull;
 
-            char buff[3 * MAX_PATH];
-            if (strlen(path) >= 2 * MAX_PATH)
+            CPathBuffer buff;
+            if (strlen(path) >= (size_t)buff.Size() - MAX_PATH)
             {
                 TRACE_E("CFindIgnore::Prepare() Path too long!");
                 return FALSE;

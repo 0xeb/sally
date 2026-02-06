@@ -2621,7 +2621,7 @@ COPY_ADS_AGAIN:
 
         int bufferSize = script->RemovableSrcDisk || script->RemovableTgtDisk ? REMOVABLE_DISK_COPY_BUFFER : OPERATION_BUFFER;
 
-        char nameBuf[2 * MAX_PATH];
+        CPathBuffer nameBuf;
         BOOL endProcessing = FALSE;
         CQuadWord operationDone;
         int i;
@@ -2768,8 +2768,8 @@ COPY_ADS_AGAIN:
                                         char* data[4];
                                         data[0] = (char*)&ret;
                                         data[1] = LoadStr(IDS_ERRORWRITINGADS);
-                                        WideCharToMultiByte(CP_ACP, 0, tgtName, -1, nameBuf, 2 * MAX_PATH, NULL, NULL);
-                                        nameBuf[2 * MAX_PATH - 1] = 0;
+                                        WideCharToMultiByte(CP_ACP, 0, tgtName, -1, nameBuf, nameBuf.Size(), NULL, NULL);
+                                        nameBuf[nameBuf.Size() - 1] = 0;
                                         CutADSNameSuffix(nameBuf);
                                         data[2] = nameBuf;
                                         if (err == NO_ERROR && read != written)
@@ -2884,8 +2884,8 @@ COPY_ADS_AGAIN:
                                     char* data[4];
                                     data[0] = (char*)&ret;
                                     data[1] = LoadStr(IDS_ERRORREADINGADS);
-                                    WideCharToMultiByte(CP_ACP, 0, srcName, -1, nameBuf, 2 * MAX_PATH, NULL, NULL);
-                                    nameBuf[2 * MAX_PATH - 1] = 0;
+                                    WideCharToMultiByte(CP_ACP, 0, srcName, -1, nameBuf, nameBuf.Size(), NULL, NULL);
+                                    nameBuf[nameBuf.Size() - 1] = 0;
                                     CutADSNameSuffix(nameBuf);
                                     data[2] = nameBuf;
                                     data[3] = GetErrorText(err);
@@ -3006,8 +3006,8 @@ COPY_ADS_AGAIN:
                             char* data[4];
                             data[0] = (char*)&ret;
                             data[1] = LoadStr(IDS_ERROROPENINGADS);
-                            WideCharToMultiByte(CP_ACP, 0, tgtName, -1, nameBuf, 2 * MAX_PATH, NULL, NULL);
-                            nameBuf[2 * MAX_PATH - 1] = 0;
+                            WideCharToMultiByte(CP_ACP, 0, tgtName, -1, nameBuf, nameBuf.Size(), NULL, NULL);
+                            nameBuf[nameBuf.Size() - 1] = 0;
                             CutADSNameSuffix(nameBuf);
                             data[2] = nameBuf;
                             data[3] = GetErrorText(err);
@@ -3079,8 +3079,8 @@ COPY_ADS_AGAIN:
                     char* data[4];
                     data[0] = (char*)&ret;
                     data[1] = LoadStr(IDS_ERROROPENINGADS);
-                    WideCharToMultiByte(CP_ACP, 0, srcName, -1, nameBuf, 2 * MAX_PATH, NULL, NULL);
-                    nameBuf[2 * MAX_PATH - 1] = 0;
+                    WideCharToMultiByte(CP_ACP, 0, srcName, -1, nameBuf, nameBuf.Size(), NULL, NULL);
+                    nameBuf[nameBuf.Size() - 1] = 0;
                     CutADSNameSuffix(nameBuf);
                     data[2] = nameBuf;
                     data[3] = GetErrorText(err);
