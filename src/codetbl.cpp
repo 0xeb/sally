@@ -341,7 +341,7 @@ CCodeTable::CCodeTable(HWND hWindow, const char* dirName)
                                         NULL));
     if (hFile != INVALID_HANDLE_VALUE)
     {
-        char textBuf[MAX_PATH + 500];
+        CPathBuffer textBuf;
         DWORD err = NO_ERROR;
         DWORD fileSize = GetFileSize(hFile, NULL);
         if (fileSize != 0xFFFFFFFF)

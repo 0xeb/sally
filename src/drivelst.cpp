@@ -539,9 +539,9 @@ BOOL RestoreNetworkConnection(HWND parent, const char* name, const char* remoteN
     uiInfo.cbSize = sizeof(uiInfo);
     uiInfo.hwndParent = parent;
 
-    char captionBuf[MAX_PATH + 100];
+    CPathBuffer captionBuf;
     captionBuf[0] = 0;
-    char messageBuf[MAX_PATH + 100];
+    CPathBuffer messageBuf;
     messageBuf[0] = 0;
 
     if (name == NULL) // mapping UNC paths to "none"
@@ -598,8 +598,8 @@ BOOL RestoreNetworkConnection(HWND parent, const char* name, const char* remoteN
     {
         if (!Windows7AndLater)
         {
-            _snprintf_s(captionBuf, _TRUNCATE, LoadStr(IDS_RECONNET_TITLE), remoteName);
-            _snprintf_s(messageBuf, _TRUNCATE, LoadStr(IDS_RECONNET_TEXT), remoteName);
+            _snprintf_s(captionBuf, captionBuf.Size(), _TRUNCATE, LoadStr(IDS_RECONNET_TITLE), remoteName);
+            _snprintf_s(messageBuf, messageBuf.Size(), _TRUNCATE, LoadStr(IDS_RECONNET_TEXT), remoteName);
             uiInfo.pszMessageText = messageBuf;
             uiInfo.pszCaptionText = captionBuf;
         }
@@ -865,7 +865,7 @@ BOOL CheckAndConnectUNCNetworkPath(HWND parent, const char* UNCPath, BOOL& pathI
     if (!IsUNCPath(UNCPath) || UNCPath[2] == '?')
         return FALSE; // no basic format UNC path
 
-    char root[MAX_PATH + 4];
+    CPathBuffer root;
     char* s = root + GetRootPath(root, UNCPath);
     strcpy(s, "*.*");
 
@@ -1130,7 +1130,7 @@ unsigned ReadCDVolNameThreadFBody(void* param) // directory accessibility test
     UINT_PTR uid = (UINT_PTR)param;
     CPathBuffer root;  // Heap-allocated for long path support
     root[0] = 0;
-    char buf[MAX_PATH];  // Volume name buffer - standard size
+    CPathBuffer buf;
     buf[0] = 0;
 
     HANDLES(EnterCriticalSection(&ReadCDVolNameCS));
@@ -1146,14 +1146,14 @@ unsigned ReadCDVolNameThreadFBody(void* param) // directory accessibility test
     {
         DWORD dummy;
         char fileSystem[11];
-        if (!GetVolumeInformation(root, buf, MAX_PATH, NULL, &dummy, &dummy, fileSystem, 10))
+        if (!GetVolumeInformation(root, buf, buf.Size(), NULL, &dummy, &dummy, fileSystem, 10))
             buf[0] = 0; // error GetVolumeInformation
         if (buf[0] == 0)
-            GetDisplayNameFromSystem(root, buf, MAX_PATH);
+            GetDisplayNameFromSystem(root, buf, buf.Size());
 
         HANDLES(EnterCriticalSection(&ReadCDVolNameCS));
         if (uid == ReadCDVolNameReqUID) // someone is still waiting for an answer
-            lstrcpyn(ReadCDVolNameBuffer, buf, MAX_PATH);
+            lstrcpyn(ReadCDVolNameBuffer, buf, buf.Size());
         HANDLES(LeaveCriticalSection(&ReadCDVolNameCS));
     }
     return 0;
@@ -1694,7 +1694,7 @@ BOOL CDrivesList::BuildData(BOOL noTimeout, TDirectArray<CDriveData>* copyDrives
                 }
                 drv.Shared = FALSE;
                 drv.Accessible = (mask & i) != 0;
-                char volumeName[MAX_PATH + 50];
+                CPathBuffer volumeName;
                 DWORD dummy;
                 freeSpace = CQuadWord(-1, -1);
                 switch (drv.DriveType)
@@ -1719,11 +1719,11 @@ BOOL CDrivesList::BuildData(BOOL noTimeout, TDirectArray<CDriveData>* copyDrives
                             break;
                         default:
                         {
-                            GetDisplayNameFromSystem(root, volumeName, MAX_PATH);
+                            GetDisplayNameFromSystem(root, volumeName, volumeName.Size());
                             if (volumeName[0] == 0)
                                 strcpy(volumeName, LoadStr(IDS_REMOVABLE_DISK));
                             else
-                                DuplicateAmpersands(volumeName, MAX_PATH);
+                                DuplicateAmpersands(volumeName, volumeName.Size());
                             break;
                         }
                         }
@@ -1735,12 +1735,12 @@ BOOL CDrivesList::BuildData(BOOL noTimeout, TDirectArray<CDriveData>* copyDrives
                 case drvtRAMDisk:
                 {
                     DWORD flags;
-                    if (GetVolumeInformation(root, volumeName, MAX_PATH, NULL, &dummy, &flags, NULL, 0))
+                    if (GetVolumeInformation(root, volumeName, volumeName.Size(), NULL, &dummy, &flags, NULL, 0))
                     {
                         CQuadWord t;                              // total disk space
                         freeSpace = MyGetDiskFreeSpace(root, &t); // free disk space
                         // double '&' so that it is not displayed as an underline
-                        DuplicateAmpersands(volumeName, MAX_PATH);
+                        DuplicateAmpersands(volumeName, volumeName.Size());
                         if (volumeName[0] == 0)
                             strcpy(volumeName, LoadStr(IDS_LOCAL_DISK));
                     }
@@ -1754,24 +1754,24 @@ BOOL CDrivesList::BuildData(BOOL noTimeout, TDirectArray<CDriveData>* copyDrives
 
                 case drvtRemote:
                 {
-                    DWORD size = MAX_PATH;
+                    DWORD size = volumeName.Size();
                     char device[3] = " :";
                     device[0] = drive;
                     if (netDrives & i)
                     {
                         int l = (int)strlen(netRemotePath[drive - 'A']);
-                        l = min(l, MAX_PATH - 1);
+                        l = min(l, (int)volumeName.Size() - 1);
                         memmove(volumeName, netRemotePath[drive - 'A'], l);
                         volumeName[l] = 0;
                     }
                     else if (!drv.Accessible ||
                              WNetGetConnection(device, volumeName, &size) != NO_ERROR)
                     {
-                        if (!GetSubstInformation(drive - 'A', volumeName, MAX_PATH))
+                        if (!GetSubstInformation(drive - 'A', volumeName, volumeName.Size()))
                             volumeName[0] = 0;
                     }
                     // double '&' so that it is not displayed as an underline
-                    DuplicateAmpersands(volumeName, MAX_PATH);
+                    DuplicateAmpersands(volumeName, volumeName.Size());
                     break;
                 }
 
@@ -1790,7 +1790,7 @@ BOOL CDrivesList::BuildData(BOOL noTimeout, TDirectArray<CDriveData>* copyDrives
 
                     { // give it 500ms to find out the volume-name
                         HANDLES(EnterCriticalSection(&ReadCDVolNameCS));
-                        lstrcpyn(volumeName, ReadCDVolNameBuffer, MAX_PATH + 50);
+                        lstrcpyn(volumeName, ReadCDVolNameBuffer, volumeName.Size());
                         HANDLES(LeaveCriticalSection(&ReadCDVolNameCS));
                     }
                     else
@@ -1802,7 +1802,7 @@ BOOL CDrivesList::BuildData(BOOL noTimeout, TDirectArray<CDriveData>* copyDrives
                     else
                     {
                         // double '&' so that it is not displayed as an underline
-                        DuplicateAmpersands(volumeName, MAX_PATH);
+                        DuplicateAmpersands(volumeName, volumeName.Size());
                     }
                     break;
                 }
@@ -2163,13 +2163,13 @@ BOOL CDrivesList::BuildData(BOOL noTimeout, TDirectArray<CDriveData>* copyDrives
                     Drives->Add(drvSeparator);
                     addSeparator = FALSE;
                 }
-                char text[MAX_PATH + 10];
+                CPathBuffer text;
                 if (i < 10)
                     sprintf(text, "%d\t%s", i == 9 ? 0 : i + 1, srcName.Get());
                 else
                     sprintf(text, "\t%s", srcName.Get());
                 // double '&' so that it is not displayed as an underline
-                DuplicateAmpersands(text + 2, MAX_PATH);
+                DuplicateAmpersands(text + 2, text.Size() - 2);
 
                 char* alloc = DupStr(text);
                 if (alloc != NULL)
@@ -2569,7 +2569,7 @@ BOOL CDrivesList::GetDriveBarToolTip(int index, char* text)
 
     text[0] = 0;
 
-    char volumeName[MAX_PATH + 50];
+    CPathBuffer volumeName;
     CQuadWord freeSpace;
     char freeSpaceText[100];
     char root[10] = " :\\";
@@ -2598,7 +2598,7 @@ BOOL CDrivesList::GetDriveBarToolTip(int index, char* text)
                 break;
             default:
             {
-                GetDisplayNameFromSystem(root, volumeName, MAX_PATH);
+                GetDisplayNameFromSystem(root, volumeName, volumeName.Size());
                 if (volumeName[0] == 0)
                     strcpy(volumeName, LoadStr(IDS_REMOVABLE_DISK));
 
@@ -2615,14 +2615,14 @@ BOOL CDrivesList::GetDriveBarToolTip(int index, char* text)
     {
         root[0] = item->DriveText[0];
         DWORD dummy, flags;
-        if (GetVolumeInformation(root, volumeName, MAX_PATH, NULL, &dummy, &flags, NULL, 0))
+        if (GetVolumeInformation(root, volumeName, volumeName.Size(), NULL, &dummy, &flags, NULL, 0))
         {
             CQuadWord t;                              // total disk space
             freeSpace = MyGetDiskFreeSpace(root, &t); // free disk space
             PrintDiskSize(freeSpaceText, freeSpace, 0);
             if (volumeName[0] == 0)
                 strcpy(volumeName, LoadStr(IDS_LOCAL_DISK));
-            sprintf(text, "%s (%s)", volumeName, freeSpaceText);
+            sprintf(text, "%s (%s)", (char*)volumeName, freeSpaceText);
         }
         break;
     }
@@ -2642,7 +2642,7 @@ BOOL CDrivesList::GetDriveBarToolTip(int index, char* text)
         if (thread != NULL && WaitForSingleObject(thread, 500) == WAIT_OBJECT_0)
         { // give it 500ms to find out the volume-name
             HANDLES(EnterCriticalSection(&ReadCDVolNameCS));
-            lstrcpyn(volumeName, ReadCDVolNameBuffer, MAX_PATH + 50);
+            lstrcpyn(volumeName, ReadCDVolNameBuffer, volumeName.Size());
             HANDLES(LeaveCriticalSection(&ReadCDVolNameCS));
         }
         else
