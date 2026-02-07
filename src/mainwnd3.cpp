@@ -2312,16 +2312,16 @@ MENU_TEMPLATE_ITEM AddToSystemMenu[] =
 
                 if (LeftPanel->Is(ptDisk))
                 {
-                    lstrcpyn(userMenuAdvancedData.FullPathLeft, LeftPanel->GetPath(), MAX_PATH);
-                    if (!SalPathAddBackslash(userMenuAdvancedData.FullPathLeft, MAX_PATH))
+                    lstrcpyn(userMenuAdvancedData.FullPathLeft, LeftPanel->GetPath(), userMenuAdvancedData.FullPathLeft.Size());
+                    if (!SalPathAddBackslash(userMenuAdvancedData.FullPathLeft, userMenuAdvancedData.FullPathLeft.Size()))
                         userMenuAdvancedData.FullPathLeft[0] = 0;
                 }
                 else
                     userMenuAdvancedData.FullPathLeft[0] = 0;
                 if (RightPanel->Is(ptDisk))
                 {
-                    lstrcpyn(userMenuAdvancedData.FullPathRight, RightPanel->GetPath(), MAX_PATH);
-                    if (!SalPathAddBackslash(userMenuAdvancedData.FullPathRight, MAX_PATH))
+                    lstrcpyn(userMenuAdvancedData.FullPathRight, RightPanel->GetPath(), userMenuAdvancedData.FullPathRight.Size());
+                    if (!SalPathAddBackslash(userMenuAdvancedData.FullPathRight, userMenuAdvancedData.FullPathRight.Size()))
                         userMenuAdvancedData.FullPathRight[0] = 0;
                 }
                 else
@@ -2414,15 +2414,15 @@ MENU_TEMPLATE_ITEM AddToSystemMenu[] =
                 }
                 if (f1 != NULL)
                 {
-                    lstrcpyn(userMenuAdvancedData.CompareName1, activePanel->GetPath(), MAX_PATH);
-                    if (!SalPathAppend(userMenuAdvancedData.CompareName1, f1->Name, MAX_PATH))
+                    lstrcpyn(userMenuAdvancedData.CompareName1, activePanel->GetPath(), userMenuAdvancedData.CompareName1.Size());
+                    if (!SalPathAppend(userMenuAdvancedData.CompareName1, f1->Name, userMenuAdvancedData.CompareName1.Size()))
                         userMenuAdvancedData.CompareName1[0] = 0;
                 }
                 if (f2 != NULL)
                 {
                     lstrcpyn(userMenuAdvancedData.CompareName2,
-                             (f2FromInactPanel ? inactivePanel : activePanel)->GetPath(), MAX_PATH);
-                    if (!SalPathAppend(userMenuAdvancedData.CompareName2, f2->Name, MAX_PATH))
+                             (f2FromInactPanel ? inactivePanel : activePanel)->GetPath(), userMenuAdvancedData.CompareName2.Size());
+                    if (!SalPathAppend(userMenuAdvancedData.CompareName2, f2->Name, userMenuAdvancedData.CompareName2.Size()))
                         userMenuAdvancedData.CompareName2[0] = 0;
                     else
                     {

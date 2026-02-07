@@ -2651,8 +2651,8 @@ void CFindDialog::OnUserMenu()
         {
             CFoundFilesData* file = FoundFilesListView->At(comp1);
             userMenuAdvancedData.CompareNamesAreDirs = file->IsDir;
-            lstrcpyn(userMenuAdvancedData.CompareName1, file->Path, MAX_PATH);
-            if (!SalPathAppend(userMenuAdvancedData.CompareName1, file->Name, MAX_PATH))
+            lstrcpyn(userMenuAdvancedData.CompareName1, file->Path, userMenuAdvancedData.CompareName1.Size());
+            if (!SalPathAppend(userMenuAdvancedData.CompareName1, file->Name, userMenuAdvancedData.CompareName1.Size()))
                 userMenuAdvancedData.CompareName1[0] = 0;
         }
         if (comp2 == -1)
@@ -2661,8 +2661,8 @@ void CFindDialog::OnUserMenu()
         {
             CFoundFilesData* file = FoundFilesListView->At(comp2);
             userMenuAdvancedData.CompareNamesAreDirs = file->IsDir;
-            lstrcpyn(userMenuAdvancedData.CompareName2, file->Path, MAX_PATH);
-            if (!SalPathAppend(userMenuAdvancedData.CompareName2, file->Name, MAX_PATH))
+            lstrcpyn(userMenuAdvancedData.CompareName2, file->Path, userMenuAdvancedData.CompareName2.Size());
+            if (!SalPathAppend(userMenuAdvancedData.CompareName2, file->Name, userMenuAdvancedData.CompareName2.Size()))
                 userMenuAdvancedData.CompareName2[0] = 0;
         }
 

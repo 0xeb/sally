@@ -1185,8 +1185,8 @@ void CCompareArgsDlg::Validate(CTransferInfo& ti)
 
 void CCompareArgsDlg::Transfer(CTransferInfo& ti)
 {
-    ti.EditLine(IDE_UMC_NAME1, CompareName1, MAX_PATH);
-    ti.EditLine(IDE_UMC_NAME2, CompareName2, MAX_PATH);
+    ti.EditLine(IDE_UMC_NAME1, CompareName1, SAL_MAX_LONG_PATH);
+    ti.EditLine(IDE_UMC_NAME2, CompareName2, SAL_MAX_LONG_PATH);
 
     int c = !*CnfrmShowNamesToCompare;
     ti.CheckBox(IDC_UMC_SHOWTHISDLG, c);

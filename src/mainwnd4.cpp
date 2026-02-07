@@ -761,8 +761,8 @@ MENU_TEMPLATE_ITEM MsgBoxButtons[] =
                     {
                         CPathBuffer swap; // Heap-allocated for long path support
                         lstrcpyn(swap, userMenuAdvancedData->CompareName1, swap.Size());
-                        lstrcpyn(userMenuAdvancedData->CompareName1, userMenuAdvancedData->CompareName2, MAX_PATH);
-                        lstrcpyn(userMenuAdvancedData->CompareName2, swap, MAX_PATH);
+                        lstrcpyn(userMenuAdvancedData->CompareName1, userMenuAdvancedData->CompareName2, userMenuAdvancedData->CompareName1.Size());
+                        lstrcpyn(userMenuAdvancedData->CompareName2, swap, userMenuAdvancedData->CompareName2.Size());
                     }
                 }
                 if (Configuration.CnfrmShowNamesToCompare ||

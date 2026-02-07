@@ -112,11 +112,11 @@ struct CUserMenuAdvancedData // additional data used only for the User Menu: arr
     BOOL ListOfSelNamesIsEmpty;                 // TRUE = ListOfSelNames is empty
     char ListOfSelFullNames[USRMNUARGS_MAXLEN]; // empty string = empty or too long list (longer than USRMNUARGS_MAXLEN); see ListOfSelFullNamesIsEmpty
     BOOL ListOfSelFullNamesIsEmpty;             // TRUE = ListOfSelFullNames is empty
-    char FullPathLeft[MAX_PATH];                // empty string = not defined (we are in Find or the panel shows archive/FS)
-    char FullPathRight[MAX_PATH];               // empty string = not defined (we are in Find or the panel shows archive/FS)
+    CPathBuffer FullPathLeft;                   // empty string = not defined (we are in Find or the panel shows archive/FS)
+    CPathBuffer FullPathRight;                  // empty string = not defined (we are in Find or the panel shows archive/FS)
     const char* FullPathInactive;               // points to FullPathLeft or FullPathRight: empty string = not defined (we are in Find or the panel shows archive/FS)
-    char CompareName1[MAX_PATH];                // first full name for compare (file or directory)
-    char CompareName2[MAX_PATH];                // second full name for compare (file or directory)
+    CPathBuffer CompareName1;                   // first full name for compare (file or directory)
+    CPathBuffer CompareName2;                   // second full name for compare (file or directory)
     BOOL CompareNamesAreDirs;                   // TRUE = CompareName1 and CompareName2 are directories (otherwise they're files)
     BOOL CompareNamesReversed;                  // TRUE = names for compare come from different panels + CompareName1 is from the right panel
 };
