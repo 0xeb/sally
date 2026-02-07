@@ -1,4 +1,4 @@
-﻿// SPDX-FileCopyrightText: 2023 Open Salamander Authors
+// SPDX-FileCopyrightText: 2023 Open Salamander Authors
 // SPDX-License-Identifier: GPL-2.0-or-later
 // CommentsTranslationProject: TRANSLATED
 
@@ -171,13 +171,13 @@ void CFilesWindow::DrawIcon(HDC hDC, CFileData* f, BOOL isDir, BOOL isItemUpDir,
             *dstExt++ = LowerCase[*srcExt++];
         *((DWORD*)dstExt) = 0;
 
-        if (*(DWORD*)lowerExtension == *(DWORD*)"exe" ||
-            *(DWORD*)lowerExtension == *(DWORD*)"bat" ||
-            *(DWORD*)lowerExtension == *(DWORD*)"pif" ||
-            *(DWORD*)lowerExtension == *(DWORD*)"com" ||
-            *(DWORD*)lowerExtension == *(DWORD*)"scf" ||
-            *(DWORD*)lowerExtension == *(DWORD*)"scr" ||
-            *(DWORD*)lowerExtension == *(DWORD*)"cmd")
+        if (*(DWORD*)lowerExtension.Get() == *(DWORD*)"exe" ||
+            *(DWORD*)lowerExtension.Get() == *(DWORD*)"bat" ||
+            *(DWORD*)lowerExtension.Get() == *(DWORD*)"pif" ||
+            *(DWORD*)lowerExtension.Get() == *(DWORD*)"com" ||
+            *(DWORD*)lowerExtension.Get() == *(DWORD*)"scf" ||
+            *(DWORD*)lowerExtension.Get() == *(DWORD*)"scr" ||
+            *(DWORD*)lowerExtension.Get() == *(DWORD*)"cmd")
             symbolIndex = symbolsExecutable;
         else
             symbolIndex = (f->Association) ? (f->Archive ? symbolsArchive : symbolsAssociated) : symbolsNonAssociated;
@@ -225,7 +225,7 @@ void CFilesWindow::DrawIcon(HDC hDC, CFileData* f, BOOL isDir, BOOL isItemUpDir,
                 {
                     int icon;
                     memmove(fileName, f->Name, f->NameLen);
-                    *(DWORD*)(fileName + f->NameLen) = 0;
+                    *(DWORD*)(fileName.Get() + f->NameLen) = 0;
 
                     if (!IconCache->GetIndex(fileName, icon, NULL, NULL) ||                             // the icon-thread isn't loading it
                         IconCache->At(icon).GetFlag() != 1 && IconCache->At(icon).GetFlag() != 2 ||     // neither new nor old icon is loaded
@@ -241,9 +241,9 @@ void CFilesWindow::DrawIcon(HDC hDC, CFileData* f, BOOL isDir, BOOL isItemUpDir,
                 else // it's a file
                 {
                     int index;
-                    BOOL exceptions = *(DWORD*)lowerExtension == *(DWORD*)"scr" || // icons in the file,
-                                      *(DWORD*)lowerExtension == *(DWORD*)"pif" || // even though it isn't visible
-                                      *(DWORD*)lowerExtension == *(DWORD*)"lnk";   // in the Registry
+                    BOOL exceptions = *(DWORD*)lowerExtension.Get() == *(DWORD*)"scr" || // icons in the file,
+                                      *(DWORD*)lowerExtension.Get() == *(DWORD*)"pif" || // even though it isn't visible
+                                      *(DWORD*)lowerExtension.Get() == *(DWORD*)"lnk";   // in the Registry
 
                     if (exceptions || Associations.GetIndex(lowerExtension, index)) // the extension has an icon (association)
                     {
@@ -253,19 +253,19 @@ void CFilesWindow::DrawIcon(HDC hDC, CFileData* f, BOOL isDir, BOOL isItemUpDir,
                         {                                                             // icon in the file
                             int icon;
                             memmove(fileName, f->Name, f->NameLen);
-                            *(DWORD*)(fileName + f->NameLen) = 0;
+                            *(DWORD*)(fileName.Get() + f->NameLen) = 0;
                             if (!IconCache->GetIndex(fileName, icon, NULL, NULL) ||                         // the icon-thread isn't loading it
                                 IconCache->At(icon).GetFlag() != 1 && IconCache->At(icon).GetFlag() != 2 || // neither new nor old icon is loaded
                                 !IconCache->GetIcon(IconCache->At(icon).GetIndex(),
                                                     &iconList, &iconListIndex)) // failed to obtain loaded icon
                             {                                                   // we will display a simple symbol
-                                if (*(DWORD*)lowerExtension == *(DWORD*)"pif" ||
-                                    *(DWORD*)lowerExtension == *(DWORD*)"exe" ||
-                                    *(DWORD*)lowerExtension == *(DWORD*)"com" ||
-                                    *(DWORD*)lowerExtension == *(DWORD*)"bat" ||
-                                    *(DWORD*)lowerExtension == *(DWORD*)"scf" ||
-                                    *(DWORD*)lowerExtension == *(DWORD*)"scr" ||
-                                    *(DWORD*)lowerExtension == *(DWORD*)"cmd")
+                                if (*(DWORD*)lowerExtension.Get() == *(DWORD*)"pif" ||
+                                    *(DWORD*)lowerExtension.Get() == *(DWORD*)"exe" ||
+                                    *(DWORD*)lowerExtension.Get() == *(DWORD*)"com" ||
+                                    *(DWORD*)lowerExtension.Get() == *(DWORD*)"bat" ||
+                                    *(DWORD*)lowerExtension.Get() == *(DWORD*)"scf" ||
+                                    *(DWORD*)lowerExtension.Get() == *(DWORD*)"scr" ||
+                                    *(DWORD*)lowerExtension.Get() == *(DWORD*)"cmd")
                                     icon = ASSOC_ICON_SOME_EXE;
                                 else
                                     icon = (exceptions || Associations[index].GetFlag() != 0) ? ASSOC_ICON_SOME_FILE : ASSOC_ICON_NO_ASSOC;
@@ -1499,7 +1499,7 @@ void CFilesWindow::DrawIconThumbnailItem(HDC hTgtDC, int itemIndex, RECT* itemRe
                 int icon;
                 CPathBuffer fileName;
                 memmove(fileName, f->Name, f->NameLen);
-                *(DWORD*)(fileName + f->NameLen) = 0;
+                *(DWORD*)(fileName.Get() + f->NameLen) = 0;
 
                 if (IconCache->GetIndex(fileName, icon, NULL, NULL))
                 {

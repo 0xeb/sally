@@ -439,7 +439,7 @@ void CFilesWindow::FilesAction(CActionType type, CFilesWindow* target, int count
         if (resID != 0)
         {
             sprintf(subject, LoadStr(resID), expanded);
-            str.Set(subject, count > 1 ? NULL : formatedFileName);
+            str.Set(subject, count > 1 ? NULL : formatedFileName.Get());
         }
 
         //---
@@ -507,7 +507,7 @@ void CFilesWindow::FilesAction(CActionType type, CFilesWindow* target, int count
                 CPathBuffer textBuf;
                 if (ParsePath(path, pathType, pathIsDir, secondPart,
                               type == atCopy ? LoadStr(IDS_ERRORCOPY) : LoadStr(IDS_ERRORMOVE),
-                              count <= 1 ? nextFocus : NULL, NULL, path.Size()))
+                              count <= 1 ? nextFocus.Get() : NULL, NULL, path.Size()))
                 {
                     // use 'if' instead of a 'switch' to ensure that 'break' and 'continue' work correctly
                     if (pathType == PATH_TYPE_WINDOWS) // Windows path (drive + UNC)
@@ -774,7 +774,7 @@ void CFilesWindow::FilesAction(CActionType type, CFilesWindow* target, int count
                                         fs->IsFSNameFromSamePluginAsThisFS(fsName, fsNameIndex)) // the FS name comes from the same plugin (otherwise there's no point in trying)
                                     {
                                         BOOL invalidPathOrCancel;
-                                        lstrcpyn(targetPath, path, 2 * MAX_PATH); // risk of exceeding 2 * MAX_PATH
+                                        lstrcpyn(targetPath, path, targetPath.Size());
                                         // convert the path to internal format
                                         fs->GetPluginInterfaceForFS()->ConvertPathToInternal(fsName, fsNameIndex,
                                                                                              targetPath + strlen(fsName) + 1);
@@ -823,7 +823,7 @@ void CFilesWindow::FilesAction(CActionType type, CFilesWindow* target, int count
                                             {
                                                 Plugins.SetWorkingPluginFS(&pluginFS);
                                                 BOOL invalidPathOrCancel;
-                                                lstrcpyn(targetPath, path, 2 * MAX_PATH); // risk of exceeding 2 * MAX_PATH
+                                                lstrcpyn(targetPath, path, targetPath.Size());
                                                 // convert the path to internal format
                                                 pluginFS.GetPluginInterfaceForFS()->ConvertPathToInternal(fsName, fsNameIndex,
                                                                                                           targetPath + strlen(fsName) + 1);
@@ -962,7 +962,7 @@ void CFilesWindow::FilesAction(CActionType type, CFilesWindow* target, int count
                     {
                         char format[300];
                         sprintf(format, LoadStr(type == atCopy ? IDS_COPYDLGTITLE : IDS_MOVEDLGTITLE), expanded);
-                        sprintf(subject, format, formatedFileName);
+                        sprintf(subject, format, formatedFileName.Get());
                     }
                     else
                         sprintf(subject, LoadStr(type == atCopy ? IDS_COPYDLGTITLE : IDS_MOVEDLGTITLE), expanded);

@@ -1,4 +1,4 @@
-﻿// SPDX-FileCopyrightText: 2023 Open Salamander Authors
+// SPDX-FileCopyrightText: 2023 Open Salamander Authors
 // SPDX-License-Identifier: GPL-2.0-or-later
 // CommentsTranslationProject: TRANSLATED
 
@@ -405,8 +405,8 @@ void CFilesWindow::UnpackZIPArchive(CFilesWindow* target, BOOL deleteOp, const c
     BeginStopRefresh(); // the snooper takes a break
 
     //---  obtain the files and directories to work with
-    char subject[MAX_PATH + 100]; // text for the Unpack dialog (which is being unpacked)
-    char path[MAX_PATH + 200];
+    CPathBuffer subject; // text for the Unpack dialog (which is being unpacked)
+    CPathBuffer path;
     char expanded[200];
     CPanelTmpEnumData data;
     BOOL subDir;
@@ -476,7 +476,7 @@ void CFilesWindow::UnpackZIPArchive(CFilesWindow* target, BOOL deleteOp, const c
     }
     sprintf(subject, LoadStr(deleteOp ? IDS_CONFIRM_DELETEFROMARCHIVE : IDS_COPYFROMARCHIVETO), expanded);
     CTruncatedString str;
-    str.Set(subject, data.IndexesCount > 1 ? NULL : path);
+    str.Set(subject, data.IndexesCount > 1 ? NULL : path.Get());
 
     data.CurrentIndex = 0;
     data.ZIPPath = GetZIPPath();
@@ -501,7 +501,7 @@ void CFilesWindow::UnpackZIPArchive(CFilesWindow* target, BOOL deleteOp, const c
         else
             path[0] = 0;
 
-        CCopyMoveDialog dlg(HWindow, path, MAX_PATH, LoadStr(IDS_UNPACKCOPY), &str, IDD_COPYDIALOG,
+        CCopyMoveDialog dlg(HWindow, path, path.Size(), LoadStr(IDS_UNPACKCOPY), &str, IDD_COPYDIALOG,
                             Configuration.CopyHistory, COPY_HISTORY_SIZE, TRUE);
 
     _DLG_AGAIN:
@@ -509,7 +509,7 @@ void CFilesWindow::UnpackZIPArchive(CFilesWindow* target, BOOL deleteOp, const c
         if (tgtPath != NULL || dlg.Execute() == IDOK)
         {
             if (tgtPath != NULL)
-                lstrcpyn(path, tgtPath, MAX_PATH);
+                lstrcpyn(path, tgtPath, path.Size());
             UpdateWindow(MainWindow->HWindow);
             //---  for disk paths, convert '/' to '\\' and remove duplicate '\\'
             if (!IsPluginFSPath(path) &&
@@ -529,7 +529,7 @@ void CFilesWindow::UnpackZIPArchive(CFilesWindow* target, BOOL deleteOp, const c
             int pathType;
             BOOL pathIsDir;
             char* secondPart;
-            if (ParsePath(path, pathType, pathIsDir, secondPart, LoadStr(IDS_ERRORCOPY), NULL, NULL, MAX_PATH))
+            if (ParsePath(path, pathType, pathIsDir, secondPart, LoadStr(IDS_ERRORCOPY), NULL, NULL, path.Size()))
             {
                 // instead of a 'switch', use 'if' so that 'break' and 'continue' work correctly
                 if (pathType == PATH_TYPE_WINDOWS) // Windows path (disk + UNC)
@@ -567,7 +567,7 @@ void CFilesWindow::UnpackZIPArchive(CFilesWindow* target, BOOL deleteOp, const c
                                 Configuration.CnfrmCreatePath = !dontShow;
                                 if (cont)
                                 {
-                                    SalPathAddBackslash(path, MAX_PATH + 200);
+                                    SalPathAddBackslash(path, path.Size());
                                     if (tgtPath != NULL)
                                     {
                                         UpdateWindow(MainWindow->HWindow);
@@ -633,7 +633,7 @@ void CFilesWindow::UnpackZIPArchive(CFilesWindow* target, BOOL deleteOp, const c
                                 // choose a completely different path next time); the new path is kept (almost dead code)
                                 MainWindow->PostChangeOnPathNotification(changesRoot, TRUE);
 
-                                SalPathAddBackslash(path, MAX_PATH + 200);
+                                SalPathAddBackslash(path, path.Size());
                                 if (tgtPath != NULL)
                                 {
                                     UpdateWindow(MainWindow->HWindow);
@@ -651,7 +651,7 @@ void CFilesWindow::UnpackZIPArchive(CFilesWindow* target, BOOL deleteOp, const c
                     {
                         gPrompter->ShowError(LoadStrW(IDS_ERRORCOPY), LoadStrW(IDS_UNPACK_OPMASKSNOTSUP));
                         if (backslashAtEnd || mustBePath)
-                            SalPathAddBackslash(path, MAX_PATH + 200);
+                            SalPathAddBackslash(path, path.Size());
                         if (tgtPath != NULL)
                         {
                             UpdateWindow(MainWindow->HWindow);
@@ -692,7 +692,7 @@ void CFilesWindow::UnpackZIPArchive(CFilesWindow* target, BOOL deleteOp, const c
                     gPrompter->ShowError(LoadStrW(IDS_ERRORCOPY), LoadStrW(IDS_UNPACK_ONLYDISK));
                     if (pathType == PATH_TYPE_ARCHIVE && (backslashAtEnd || mustBePath))
                     {
-                        SalPathAddBackslash(path, MAX_PATH + 200);
+                        SalPathAddBackslash(path, path.Size());
                     }
                     if (tgtPath != NULL)
                     {
@@ -1290,7 +1290,7 @@ void CFilesWindow::Pack(CFilesWindow* target, int pluginIndex, const char* plugi
     BeginStopRefresh(); // the snooper takes a break
 
     //---  obtain the files and directories to work with
-    char subject[MAX_PATH + 100]; // text for the Unpack dialog (that is being unpacked)
+    CPathBuffer subject; // text for the Unpack dialog (that is being unpacked)
     CPathBuffer path; // Heap-allocated for long path support
     char text[1000];
     BOOL nameByItem;
@@ -1301,7 +1301,7 @@ void CFilesWindow::Pack(CFilesWindow* target, int pluginIndex, const char* plugi
     else
         subDir = FALSE;
     data.IndexesCount = GetSelCount();
-    char expanded[MAX_PATH + 100];
+    CPathBuffer expanded;
     int files = 0;             // number of selected files
     if (data.IndexesCount > 1) // valid selection
     {
@@ -1326,7 +1326,7 @@ void CFilesWindow::Pack(CFilesWindow* target, int pluginIndex, const char* plugi
             }
         }
         // build the subject for the dialog
-        ExpandPluralFilesDirs(expanded, MAX_PATH + 100, files, data.IndexesCount - files, epfdmNormal, FALSE);
+        ExpandPluralFilesDirs(expanded, expanded.Size(), files, data.IndexesCount - files, epfdmNormal, FALSE);
     }
     else // take the selected file or directory
     {
@@ -1375,7 +1375,7 @@ void CFilesWindow::Pack(CFilesWindow* target, int pluginIndex, const char* plugi
             }
         }
     }
-    sprintf(subject, LoadStr(IDS_PACKTOARCHIVE), expanded);
+    sprintf(subject, LoadStr(IDS_PACKTOARCHIVE), expanded.Get());
     CTruncatedString str;
     str.Set(subject, data.IndexesCount > 1 ? NULL : path.Get());
 
@@ -1520,7 +1520,7 @@ _PACK_AGAIN:
         if (dlg.IsUnicodeMode())
         {
             std::string ansiPath = WideToAnsi(dlg.GetUnicodeResult());
-            lstrcpyn(fileBuf, ansiPath.c_str(), 2 * MAX_PATH);
+            lstrcpyn(fileBuf, ansiPath.c_str(), fileBuf.Size());
         }
         UpdateWindow(MainWindow->HWindow);
         //--- adjust the archive name to its full form
@@ -1678,7 +1678,7 @@ void CFilesWindow::Unpack(CFilesWindow* target, int pluginIndex, const char* plu
         CPathBuffer path; // Heap-allocated for long path support
         CPathBuffer pathAlt; // alternate path displayed in the UnPack dialog combo box
         CPathBuffer mask; // Heap-allocated for long path support
-        char subject[MAX_PATH + 100];
+        CPathBuffer subject;
         path[0] = 0;
         pathAlt[0] = 0;
         if (target->Is(ptDisk))
@@ -1779,7 +1779,7 @@ void CFilesWindow::Unpack(CFilesWindow* target, int pluginIndex, const char* plu
             if (unpackDlg.IsUnicodeMode())
             {
                 std::string ansiPath = WideToAnsi(unpackDlg.GetUnicodeResult());
-                lstrcpyn(path, ansiPath.c_str(), 2 * MAX_PATH);
+                lstrcpyn(path, ansiPath.c_str(), path.Size());
             }
             UpdateWindow(MainWindow->HWindow);
             //--- adjust the archive name to its full form

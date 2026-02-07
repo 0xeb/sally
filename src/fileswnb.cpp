@@ -700,7 +700,7 @@ CFilesWindow::WindowProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
             if (file != NULL && !isDir &&                                   // it's a file
                 (!Is(ptPluginFS) || GetPluginIconsType() != pitFromPlugin)) // it's not an icon from plug-in
             {
-                char buf[MAX_PATH + 4]; // extension in lowercase
+                CPathBuffer buf; // extension in lowercase
                 char *s1 = buf, *s2 = file->Ext;
                 while (*s2 != 0)
                     *s1++ = LowerCase[*s2++];

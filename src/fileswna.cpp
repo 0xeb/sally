@@ -48,8 +48,8 @@ void CFilesWindow::PluginFSFilesAction(CPluginFSActionType type)
     else
         count = 0;
 
-    char subject[MAX_PATH + 100 + 200];    // +200 is a reserve (Windows creates paths longer than MAX_PATH)
-    char formatedFileName[MAX_PATH + 200]; // +200 is a reserve (Windows creates paths longer than MAX_PATH)
+    CPathBuffer subject;    // +200 is a reserve (Windows creates paths longer than MAX_PATH)
+    CPathBuffer formatedFileName; // +200 is a reserve (Windows creates paths longer than MAX_PATH)
     char expanded[200];
     if (count <= 1) // one selected item or none
     {
@@ -96,7 +96,7 @@ void CFilesWindow::PluginFSFilesAction(CPluginFSActionType type)
         lstrcpyn(templ, LoadStr(resID), 200);
         RemoveAmpersands(templ);
         sprintf(subject, templ, expanded);
-        str.Set(subject, count > 1 ? NULL : formatedFileName);
+        str.Set(subject, count > 1 ? NULL : formatedFileName.Get());
     }
 
     switch (type)
@@ -367,11 +367,11 @@ void CFilesWindow::DragDropToArcOrFS(CTmpDragDropOperData* data)
     }
 
     // load complete data about files and directories, their names are in data->Data
-    char path[MAX_PATH + 10];
-    lstrcpyn(path, data->Data->SrcPath, MAX_PATH);
+    CPathBuffer path;
+    lstrcpyn(path, data->Data->SrcPath, path.Size());
     char* end = path + strlen(path);
-    SalPathAppend(path, "*", MAX_PATH + 10);
-    char text[2 * MAX_PATH + 100];
+    SalPathAppend(path, "*", path.Size());
+    CPathBuffer text;
     WIN32_FIND_DATA file;
     HANDLE find = HANDLES_Q(FindFirstFile(path, &file));
     *end = 0; // fix the path
@@ -623,7 +623,7 @@ void CFilesWindow::DragDropToArcOrFS(CTmpDragDropOperData* data)
 
                     //---  refresh non-automatically refreshed directories
                     // change in the directory with the target archive (archive file is modified)
-                    lstrcpyn(text, data->ArchiveOrFSName, MAX_PATH);
+                    lstrcpyn(text, data->ArchiveOrFSName, text.Size());
                     CutDirectory(text); // 'text' is the archive name -> must always succeed
                     MainWindow->PostChangeOnPathNotification(text, FALSE);
                     if (!data->Copy)
