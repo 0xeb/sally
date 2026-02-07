@@ -248,9 +248,9 @@ BOOL CFilesWindow::ClipboardPaste(BOOL onlyLinks, BOOL onlyTest, const char* pas
         if (ownRutine) // execute our own routine - copy or move
         {
             if (pastePath != NULL)
-                strcpy(DropPath, pastePath);
+                lstrcpyn(DropPath, pastePath, DropPath.Size());
             else
-                strcpy(DropPath, GetPath());
+                lstrcpyn(DropPath, GetPath(), DropPath.Size());
             CImpDropTarget* dropTarget = new CImpDropTarget(MainWindow->HWindow, DoCopyMove, this,
                                                             GetCurrentDirClipboard, this,
                                                             DropEnd, this, NULL, NULL, NULL, NULL,

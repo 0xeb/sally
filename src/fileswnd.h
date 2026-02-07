@@ -769,7 +769,7 @@ public:
     BOOL SortedWithRegSet;    // used to monitor changes of the global variable Configuration.SortUsesLocale
     BOOL SortedWithDetectNum; // used to monitor changes of the global variable Configuration.SortDetectNumbers
 
-    char DropPath[2 * MAX_PATH];  // buffer for the current directory used in a drop operation
+    CPathBuffer DropPath;  // buffer for the current directory used in a drop operation
     CPathBuffer NextFocusName; // the name that will receive focus on the next refresh
     BOOL DontClearNextFocusName;  // TRUE = do not clear NextFocusName when the main Salamander window is activated
     BOOL FocusFirstNewItem;       // refresh: should the newly added item be selected? (for system New)

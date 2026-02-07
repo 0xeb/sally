@@ -284,7 +284,7 @@ const char* GetCurrentDir(POINTL& pt, void* param, DWORD* effect, BOOL rButton, 
                     {
                         panel->SetDropTarget(index);
                         int l = (int)strlen(panel->GetZIPPath());
-                        memcpy(panel->DropPath, panel->GetZIPPath(), l);
+                        memcpy(panel->DropPath.Get(), panel->GetZIPPath(), l);
                         if (index == 0 && strcmp(panel->Dirs->At(index).Name, "..") == 0)
                         {
                             if (l > 0 && panel->DropPath[l - 1] == '\\')
@@ -295,13 +295,13 @@ const char* GetCurrentDir(POINTL& pt, void* param, DWORD* effect, BOOL rButton, 
                                 tgtType = idtttWindows;
                                 *effect = origEffect;
                                 l = (int)strlen(panel->GetZIPArchive());
-                                memcpy(panel->DropPath, panel->GetZIPArchive(), l);
+                                memcpy(panel->DropPath.Get(), panel->GetZIPArchive(), l);
                                 backSlash = 1;
                             }
                             char* s = panel->DropPath + l;
-                            while (--s >= panel->DropPath && *s != '\\')
+                            while (--s >= (char*)panel->DropPath && *s != '\\')
                                 ;
-                            if (s > panel->DropPath)
+                            if (s > (char*)panel->DropPath)
                                 *(s + backSlash) = 0;
                             else
                                 panel->DropPath[0] = 0;
@@ -310,14 +310,14 @@ const char* GetCurrentDir(POINTL& pt, void* param, DWORD* effect, BOOL rButton, 
                         {
                             if (l > 0 && panel->DropPath[l - 1] != '\\')
                                 panel->DropPath[l++] = '\\';
-                            if (l + panel->Dirs->At(index).NameLen >= MAX_PATH)
+                            if (l + panel->Dirs->At(index).NameLen >= panel->DropPath.Size())
                             {
                                 TRACE_E("GetCurrentDir(): too long file name!");
                                 tgtType = idtttWindows;
                                 panel->SetDropTarget(-1); // hide marker
                                 return NULL;
                             }
-                            strcpy(panel->DropPath + l, panel->Dirs->At(index).Name);
+                            lstrcpyn(panel->DropPath + l, panel->Dirs->At(index).Name, panel->DropPath.Size() - l);
                         }
                         return panel->DropPath;
                     }
@@ -337,7 +337,7 @@ const char* GetCurrentDir(POINTL& pt, void* param, DWORD* effect, BOOL rButton, 
                 {
                     tgtType = idtttFullPluginFSPath;
                     int l = (int)strlen(panel->GetPluginFS()->GetPluginFSName());
-                    memcpy(panel->DropPath, panel->GetPluginFS()->GetPluginFSName(), l);
+                    memcpy(panel->DropPath.Get(), panel->GetPluginFS()->GetPluginFSName(), l);
                     panel->DropPath[l++] = ':';
                     if (index >= 0 && index < panel->Dirs->Count) // drop on directory
                     {
@@ -367,7 +367,7 @@ const char* GetCurrentDir(POINTL& pt, void* param, DWORD* effect, BOOL rButton, 
 
                         if (panel->GetPluginFS()->GetFullName(panel->Dirs->At(index),
                                                               (index == 0 && strcmp(panel->Dirs->At(0).Name, "..") == 0) ? 2 : 1,
-                                                              panel->DropPath + l, MAX_PATH))
+                                                              panel->DropPath + l, panel->DropPath.Size() - l))
                         {
                             if (DropSourcePanel != NULL && DropSourcePanel->Is(ptPluginFS) &&
                                 DropSourcePanel->GetPluginFS()->NotEmpty() && effect != NULL)
@@ -422,7 +422,7 @@ const char* GetCurrentDir(POINTL& pt, void* param, DWORD* effect, BOOL rButton, 
                     {
                         if (panel->GetPluginFS()->GetFullName(panel->Dirs->At(index),
                                                               (index == 0 && strcmp(panel->Dirs->At(0).Name, "..") == 0) ? 2 : 1,
-                                                              panel->DropPath, MAX_PATH))
+                                                              panel->DropPath, panel->DropPath.Size()))
                         {
                             panel->SetDropTarget(index);
                             return panel->DropPath;
@@ -462,28 +462,28 @@ const char* GetCurrentDir(POINTL& pt, void* param, DWORD* effect, BOOL rButton, 
 
         panel->SetDropTarget(index);
         int l = (int)strlen(panel->GetPath());
-        memcpy(panel->DropPath, panel->GetPath(), l);
+        memcpy(panel->DropPath.Get(), panel->GetPath(), l);
         if (strcmp(panel->Dirs->At(index).Name, "..") == 0)
         {
             char* s = panel->DropPath + l;
             if (l > 0 && *(s - 1) == '\\')
                 s--;
-            while (--s > panel->DropPath && *s != '\\')
+            while (--s > (char*)panel->DropPath && *s != '\\')
                 ;
-            if (s > panel->DropPath)
+            if (s > (char*)panel->DropPath)
                 *(s + 1) = 0;
         }
         else
         {
             if (panel->GetPath()[l - 1] != '\\')
                 panel->DropPath[l++] = '\\';
-            if (l + panel->Dirs->At(index).NameLen >= MAX_PATH)
+            if (l + panel->Dirs->At(index).NameLen >= panel->DropPath.Size())
             {
                 TRACE_E("GetCurrentDir(): too long file name!");
                 panel->SetDropTarget(-1); // hide marker
                 return NULL;
             }
-            strcpy(panel->DropPath + l, panel->Dirs->At(index).Name);
+            lstrcpyn(panel->DropPath + l, panel->Dirs->At(index).Name, panel->DropPath.Size() - l);
         }
         return panel->DropPath;
     }
@@ -554,7 +554,7 @@ const char* GetCurrentDir(POINTL& pt, void* param, DWORD* effect, BOOL rButton, 
             if (linkIsDir) // link leads to directory, path is o.k., switch to it
             {
                 panel->SetDropTarget(index);
-                strcpy(panel->DropPath, linkTgt);
+                lstrcpyn(panel->DropPath, linkTgt, panel->DropPath.Size());
                 return panel->DropPath;
             }
 
@@ -568,7 +568,7 @@ const char* GetCurrentDir(POINTL& pt, void* param, DWORD* effect, BOOL rButton, 
                     tgtType = idtttArchiveOnWinPath;
                     *effect &= (DROPEFFECT_MOVE | DROPEFFECT_COPY); // trim effect to copy+move
                     panel->SetDropTarget(index);
-                    strcpy(panel->DropPath, linkIsFile ? linkTgt : fullName);
+                    lstrcpyn(panel->DropPath, linkIsFile ? linkTgt : fullName, panel->DropPath.Size());
                     return panel->DropPath;
                 }
                 panel->SetDropTarget(-1); // hide marker
@@ -579,7 +579,7 @@ const char* GetCurrentDir(POINTL& pt, void* param, DWORD* effect, BOOL rButton, 
             {
                 isTgtFile = TRUE; // drop target file -> shell must handle it
                 panel->SetDropTarget(index);
-                strcpy(panel->DropPath, fullName);
+                lstrcpyn(panel->DropPath, fullName, panel->DropPath.Size());
                 return panel->DropPath;
             }
         }
