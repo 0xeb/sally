@@ -2072,8 +2072,8 @@ void CFindDialog::StartSearch(WORD command)
     SearchingText.SetDirty(TRUE);
     PostMessage(HWindow, WM_TIMER, IDT_REPAINT, 0);
 
-    char buff[MAX_PATH + 100];
-    _snprintf_s(buff, _TRUNCATE, NORMAL_FINDING_CAPTION, LoadStr(IDS_FF_NAME), LoadStr(IDS_FF_NAMED), SearchForData[0]->MasksGroup.GetMasksString());
+    CPathBuffer buff;
+    _snprintf_s(buff, buff.Size(), _TRUNCATE, NORMAL_FINDING_CAPTION, LoadStr(IDS_FF_NAME), LoadStr(IDS_FF_NAMED), SearchForData[0]->MasksGroup.GetMasksString());
     SetWindowText(HWindow, buff);
 
     EnableControls();
@@ -2321,10 +2321,10 @@ void CFindDialog::UpdateListViewItems()
         // when minimized, display the item count in the title
         if (IsIconic(HWindow))
         {
-            char buf[MAX_PATH + 100];
+            CPathBuffer buf;
             if (SearchInProgress)
             {
-                _snprintf_s(buf, _TRUNCATE, MINIMIZED_FINDING_CAPTION, FoundFilesListView->GetCount(),
+                _snprintf_s(buf, buf.Size(), _TRUNCATE, MINIMIZED_FINDING_CAPTION, FoundFilesListView->GetCount(),
                             LoadStr(IDS_FF_NAME), LoadStr(IDS_FF_NAMED), SearchForData[0]->MasksGroup.GetMasksString());
             }
             else
@@ -2998,11 +2998,11 @@ CFindDialog::DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
     {
         if (wParam == IDT_REPAINT)
         {
-            char buf[MAX_PATH + 50];
+            CPathBuffer buf;
             if (SearchingText.GetDirty())
             {
                 SearchingText.SetDirty(FALSE); // already being redrawn - Get will be called; better to refresh twice than not at all
-                                               //          SearchingText.Get(buf, MAX_PATH + 50);
+                                               //          SearchingText.Get(buf, buf.Size());
                 SendMessage(HStatusBar, SB_SETTEXT, 1 | SBT_NOBORDERS | SBT_OWNERDRAW, 0);
             }
             if (SearchingText2.GetDirty())
@@ -3010,7 +3010,7 @@ CFindDialog::DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
                 if (!TwoParts)
                     SetTwoStatusParts(TRUE);
                 SearchingText2.SetDirty(FALSE); // already being redrawn - Get will be called; better to refresh twice than not at all
-                SearchingText2.Get(buf, MAX_PATH + 50);
+                SearchingText2.Get(buf, buf.Size());
                 int pos = buf[0]; // extract the value directly instead of the string
                 SendMessage(HProgressBar, PBM_SETPOS, pos, 0);
             }
@@ -3218,8 +3218,8 @@ CFindDialog::DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
         // when restoring, refresh the window title
         if (SearchInProgress && (wParam == SIZE_RESTORED || wParam == SIZE_MAXIMIZED)) // restore
         {
-            char buff[MAX_PATH + 100];
-            _snprintf_s(buff, _TRUNCATE, NORMAL_FINDING_CAPTION, LoadStr(IDS_FF_NAME), LoadStr(IDS_FF_NAMED),
+            CPathBuffer buff;
+            _snprintf_s(buff, buff.Size(), _TRUNCATE, NORMAL_FINDING_CAPTION, LoadStr(IDS_FF_NAME), LoadStr(IDS_FF_NAMED),
                         SearchForData[0]->MasksGroup.GetMasksString());
             SetWindowText(HWindow, buff);
         }
@@ -3531,7 +3531,7 @@ MENU_TEMPLATE_ITEM FindLookInBrowseMenu[] =
                 if (cmd == 1)
                 {
                     // Browse...
-                    char path[MAX_PATH + 200];
+                    CPathBuffer path;
                     char buff[1024];
                     DWORD start, end;
                     EditLine->GetSel(&start, &end);
@@ -3800,8 +3800,8 @@ MENU_TEMPLATE_ITEM FindLookInBrowseMenu[] =
         {
             DRAWITEMSTRUCT* di = (DRAWITEMSTRUCT*)lParam;
             int prevBkMode = SetBkMode(di->hDC, TRANSPARENT);
-            char buff[MAX_PATH + 50];
-            SearchingText.Get(buff, MAX_PATH + 50);
+            CPathBuffer buff;
+            SearchingText.Get(buff, buff.Size());
             DrawText(di->hDC, buff, (int)strlen(buff), &di->rcItem, DT_VCENTER | DT_SINGLELINE | DT_NOPREFIX | DT_PATH_ELLIPSIS);
             SetBkMode(di->hDC, prevBkMode);
             return TRUE;

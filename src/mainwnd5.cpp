@@ -286,7 +286,7 @@ BOOL CompareFilesByContent(HWND hWindow, CCmpDirProgressDialog* progressDlg,
                            const char* file1, const char* file2, const CQuadWord& bothFileSize,
                            BOOL* different, BOOL* canceled)
 {
-    char message[2 * MAX_PATH + 200]; // we need 2*MAX_PATH for the path plus room for an error message
+    CPathBuffer message;
     BOOL ret = FALSE;
     *canceled = FALSE;
 
@@ -546,7 +546,7 @@ BOOL ReadDirsAndFilesAux(HWND hWindow, DWORD flags, CCmpDirProgressDialog* progr
                          CFilesWindow* panel, const char* subPath,
                          CFilesArray* dirs, CFilesArray* files, BOOL* canceled, BOOL getTotal)
 {
-    char message[2 * MAX_PATH + 200];
+    CPathBuffer message;
     CPathBuffer path; // Heap-allocated for long path support
 
     BOOL ignFileNames = (flags & COMPARE_DIRECTORIES_IGNFILENAMES) != 0;
@@ -801,12 +801,12 @@ BOOL CompareDirsAux(HWND hWindow, CCmpDirProgressDialog* progressDlg,
         // set texts in the progress dialog
         BOOL pathAppended = TRUE;
 
-        char message[MAX_PATH + 200];
+        CPathBuffer message;
         strcpy(message, leftPanel->GetPath());
-        pathAppended &= SalPathAppend(message, leftSubDir, MAX_PATH + 200);
+        pathAppended &= SalPathAppend(message, leftSubDir, message.Size());
         progressDlg->SetSource(message);
         strcpy(message, rightPanel->GetPath());
-        pathAppended &= SalPathAppend(message, rightSubDir, MAX_PATH + 200);
+        pathAppended &= SalPathAppend(message, rightSubDir, message.Size());
         progressDlg->SetTarget(message);
 
         if (!pathAppended)

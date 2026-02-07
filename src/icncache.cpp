@@ -1155,17 +1155,17 @@ void CAssociations::ReadAssociations(BOOL showWaitWnd)
     //---  clear array + cache
     Release();
     //---  iterate through registry records about classes (extensions)
-    char ext[MAX_PATH + 4];
+    CPathBuffer ext;
     CPathBuffer extType; // Heap-allocated for long path support
     char *s, *e;
 
-    char iconLocation[MAX_PATH + 10];
+    CPathBuffer iconLocation;
     CPathBuffer type; // Heap-allocated for long path support
     HKEY extKey, openKey;
     LONG size;
     CAssociationData data;
 
-    char errBuf[200 + MAX_PATH];
+    CPathBuffer errBuf;
 
     HKEY systemFileAssoc = NULL;
     if (HANDLES_Q(RegOpenKey(HKEY_CLASSES_ROOT, "SystemFileAssociations", &systemFileAssoc)) != ERROR_SUCCESS)
@@ -1187,7 +1187,7 @@ void CAssociations::ReadAssociations(BOOL showWaitWnd)
     FILETIME ft;
     while (1)
     { // sequentially enumerate all extensions
-        DWORD extS = MAX_PATH;
+        DWORD extS = ext.Size();
         if ((enumRet = RegEnumKeyEx(HKEY_CLASSES_ROOT, i, ext, &extS, NULL, NULL, NULL, &ft)) == ERROR_SUCCESS)
         { // open extension key
             if (ext[0] == '.' && HANDLES_Q(RegOpenKey(HKEY_CLASSES_ROOT, ext, &extKey)) == ERROR_SUCCESS)
@@ -1264,7 +1264,7 @@ void CAssociations::ReadAssociations(BOOL showWaitWnd)
         i = 0;
         while (1)
         { // sequentially enumerate all extensions
-            DWORD extS = MAX_PATH;
+            DWORD extS = ext.Size();
             if ((enumRet = RegEnumKeyEx(systemFileAssoc, i, ext, &extS, NULL, NULL, NULL, &ft)) == ERROR_SUCCESS)
             { // open extension key
                 if (ext[0] == '.')
@@ -1308,7 +1308,7 @@ void CAssociations::ReadAssociations(BOOL showWaitWnd)
         i = 0;
         while (1)
         { // sequentially enumerate all extensions
-            DWORD extS = MAX_PATH;
+            DWORD extS = ext.Size();
             if (RegEnumKeyEx(explorerFileExts, i, ext, &extS, NULL, NULL, NULL, &ft) == ERROR_SUCCESS)
             { // open extension key
                 if (ext[0] == '.' && HANDLES_Q(RegOpenKey(explorerFileExts, ext, &extKey)) == ERROR_SUCCESS)

@@ -80,7 +80,7 @@ void CHotPathItems::FillHotPathsMenu(CMenuPopup* menu, int minCommand, BOOL empt
                                      BOOL customize, BOOL topSeparator, BOOL forAssign)
 {
     CALL_STACK_MESSAGE1("CHotPathItems::FillMenu()");
-    char root[MAX_PATH + 100];
+    CPathBuffer root;
     BOOL menuIsEmpty = TRUE;
     int firstIndex = menu->GetItemCount();
     MENU_ITEM_INFO mii;
@@ -1855,7 +1855,7 @@ void CMainWindow::SetWindowTitle(const char* text)
     ::GetWindowText(HWindow, buff, 1000);
     buff[999] = 0;
 
-    char stdWndName[2 * MAX_PATH + 300];
+    CPathBuffer stdWndName;
     if (text == NULL)
     {
         // provide default content

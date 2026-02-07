@@ -847,7 +847,7 @@ BOOL CDuplicateCandidates::GetMD5Digest(CGrepData* data, CFoundFilesData* file,
                 DWORD err = GetLastError();
                 HANDLES(CloseHandle(hFile));
 
-                char buf[MAX_PATH + 100];
+                CPathBuffer buf;
                 sprintf(buf, LoadStr(IDS_ERROR_READING_FILE2), GetErrorText(err));
                 FIND_LOG_ITEM log;
                 log.Flags = FLI_ERROR;
@@ -899,7 +899,7 @@ BOOL CDuplicateCandidates::GetMD5Digest(CGrepData* data, CFoundFilesData* file,
         // error occured while opening the file
         DWORD err = GetLastError();
 
-        char buf[MAX_PATH + 100];
+        CPathBuffer buf;
         sprintf(buf, LoadStr(IDS_ERROR_OPENING_FILE2), GetErrorText(err));
         FIND_LOG_ITEM log;
         log.Flags = FLI_ERROR;
@@ -1428,7 +1428,7 @@ BOOL TestFileContent(DWORD sizeLow, DWORD sizeHigh, const char* path, CGrepData*
 
         if (err != ERROR_SUCCESS || getLinkFileSizeErr)
         {
-            char buf[MAX_PATH + 100];
+            CPathBuffer buf;
             sprintf(buf, LoadStr(getLinkFileSizeErr ? IDS_GETLINKTGTFILESIZEERROR : IDS_ERROR_OPENING_FILE2),
                     GetErrorText(err));
             FIND_LOG_ITEM log;
