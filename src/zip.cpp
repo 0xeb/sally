@@ -4659,7 +4659,7 @@ void CSalamanderGeneral::SetHelpFileName(const char* chmName)
     if (chmName == NULL || *chmName == 0)
         TRACE_E("CSalamanderGeneral::SetHelpFileName(): invalid parameter 'chmName'.");
     else
-        lstrcpyn(HelpFileName, chmName, MAX_PATH);
+        lstrcpyn(HelpFileName.Get(), chmName, SAL_MAX_LONG_PATH);
 }
 
 BOOL CSalamanderGeneral::OpenHtmlHelp(HWND parent, CHtmlHelpCommand command, DWORD_PTR dwData, BOOL quiet)

@@ -74,7 +74,7 @@ protected:
     CEditLBEdit* EditLine;
     HWND HDlg;
     EDTLB_DISPINFO DispInfo;
-    char Buffer[MAX_PATH];
+    CPathBuffer Buffer;
     int ItemsCount;
     BOOL SaveDisabled;
     DWORD Flags;

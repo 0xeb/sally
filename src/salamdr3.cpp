@@ -2342,9 +2342,9 @@ void CPathHistory::LoadFromRegistry(HKEY hKey, const char* name)
 
 CUserMenuIconData::CUserMenuIconData(const char* fileName, DWORD iconIndex, const char* umCommand)
 {
-    strcpy_s(FileName, fileName);
+    lstrcpyn(FileName.Get(), fileName, SAL_MAX_LONG_PATH);
     IconIndex = iconIndex;
-    strcpy_s(UMCommand, umCommand);
+    lstrcpyn(UMCommand.Get(), umCommand, SAL_MAX_LONG_PATH);
     LoadedIcon = NULL;
 }
 

@@ -1242,7 +1242,7 @@ CHyperLink::CHyperLink(HWND hDlg, int ctrlID, DWORD flags)
 void CHyperLink::SetActionOpen(const char* file)
 {
     EnableHintToolTip(FALSE);
-    lstrcpyn(File, file, MAX_PATH);
+    lstrcpyn(File.Get(), file, SAL_MAX_LONG_PATH);
 }
 
 void CHyperLink::SetActionPostCommand(WORD command)

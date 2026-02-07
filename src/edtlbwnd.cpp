@@ -491,13 +491,13 @@ void CEditListBox::OnBeginEdit(int start, int end)
         DispInfo.ItemID = (INT_PTR)SendMessage(HWindow, LB_GETITEMDATA, index, 0);
         DispInfo.Buffer = Buffer;
         DispInfo.Index = index;
-        DispInfo.BufferLen = MAX_PATH - 1;
+        DispInfo.BufferLen = Buffer.Size() - 1;
         DispInfo.Buffer[0] = 0;
         NotifyParent(&DispInfo, EDTLBN_GETDISPINFO);
-        DispInfo.Buffer[MAX_PATH - 1] = 0;
+        DispInfo.Buffer[Buffer.Size() - 1] = 0;
         SetWindowText(EditLine->HWindow, Buffer);
     }
-    SendMessage(EditLine->HWindow, EM_SETLIMITTEXT, MAX_PATH, 0);
+    SendMessage(EditLine->HWindow, EM_SETLIMITTEXT, Buffer.Size(), 0);
     SendMessage(EditLine->HWindow, EM_SETSEL, start, end);
     ShowWindow(EditLine->HWindow, SW_SHOW);
     if (Flags & ELB_RIGHTARROW)
@@ -535,8 +535,8 @@ BOOL CEditListBox::OnSaveEdit()
             DispInfo.ItemID = (INT_PTR)SendMessage(HWindow, LB_GETITEMDATA, index, 0);
             DispInfo.Index = index;
             DispInfo.Buffer = Buffer;
-            DispInfo.BufferLen = MAX_PATH - 1;
-            GetWindowText(EditLine->HWindow, DispInfo.Buffer, MAX_PATH);
+            DispInfo.BufferLen = Buffer.Size() - 1;
+            GetWindowText(EditLine->HWindow, DispInfo.Buffer, Buffer.Size());
             BOOL ret = !NotifyParent(&DispInfo, EDTLBN_GETDISPINFO);
             SaveDisabled = oldSD;
             return ret;
@@ -624,11 +624,11 @@ void CEditListBox::OnDrawItem(LPARAM lParam)
                 DispInfo.ItemID = itemID;
                 DispInfo.Index = lpdis->itemID;
                 DispInfo.Buffer = Buffer;
-                DispInfo.BufferLen = MAX_PATH - 1;
+                DispInfo.BufferLen = Buffer.Size() - 1;
                 DispInfo.Buffer[0] = 0;
                 DispInfo.Bold = FALSE;
                 NotifyParent(&DispInfo, EDTLBN_GETDISPINFO);
-                DispInfo.Buffer[MAX_PATH - 1] = 0;
+                DispInfo.Buffer[Buffer.Size() - 1] = 0;
 
                 if (Flags & ELB_SHOWICON)
                 {

@@ -1,4 +1,4 @@
-﻿// SPDX-FileCopyrightText: 2023 Open Salamander Authors
+// SPDX-FileCopyrightText: 2023 Open Salamander Authors
 // SPDX-License-Identifier: GPL-2.0-or-later
 // CommentsTranslationProject: TRANSLATED
 
@@ -892,7 +892,7 @@ protected:
     CPluginInterfaceForFSEncapsulation IfaceForFS; // plugin that created this interface (FS part)
     CPluginInterfaceAbstract* Iface;               // plugin that created this interface (base)
     DWORD SupportedServices;                       // last value returned by the Interface->GetSupportedServices() method
-    char PluginFSName[MAX_PATH];                   // name of the opened FS
+    CPathBuffer PluginFSName;                      // name of the opened FS
     int PluginFSNameIndex;                         // index of the opened FS name
 
     static DWORD PluginFSTime; // global "time" (counter) used to obtain the creation time of a FS
@@ -932,7 +932,7 @@ public:
         else
             SupportedServices = 0;
         if (pluginFSName != NULL)
-            lstrcpyn(PluginFSName, pluginFSName, MAX_PATH);
+            lstrcpyn(PluginFSName.Get(), pluginFSName, SAL_MAX_LONG_PATH);
         else
             PluginFSName[0] = 0;
         PluginFSNameIndex = pluginFSNameIndex;
@@ -963,7 +963,7 @@ public:
         else
             SupportedServices = 0;
         if (pluginFSName != NULL)
-            lstrcpyn(PluginFSName, pluginFSName, MAX_PATH);
+            lstrcpyn(PluginFSName.Get(), pluginFSName, SAL_MAX_LONG_PATH);
         else
             PluginFSName[0] = 0;
         PluginFSNameIndex = pluginFSNameIndex;
@@ -1005,7 +1005,7 @@ public:
     // change the FS name
     void SetPluginFS(const char* fsName, int fsNameIndex)
     {
-        lstrcpyn(PluginFSName, fsName, MAX_PATH);
+        lstrcpyn(PluginFSName.Get(), fsName, SAL_MAX_LONG_PATH);
         PluginFSNameIndex = fsNameIndex;
     }
 
@@ -1856,7 +1856,7 @@ protected:
     CPluginInterfaceAbstract* Plugin; // plug-in used by this iface; !!! note: may be NULL
                                       // (plugin not loaded) or -1 (during the plugin's entry point)
 
-    char HelpFileName[MAX_PATH]; // if not empty, this is the name (without path) of the .chm help file used by this plugin (optimization only, not stored anywhere)
+    CPathBuffer HelpFileName; // if not empty, this is the name (without path) of the .chm help file used by this plugin (optimization only, not stored anywhere)
 
 public:
     HINSTANCE LanguageModule; // if not NULL, it is the handle to the plugin's .SLG language module

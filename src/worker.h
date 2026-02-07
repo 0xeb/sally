@@ -454,9 +454,9 @@ public:
 
     BOOL SkipAllCountSizeErrors; // should all subsequent count-size errors be skipped?
 
-    char WorkPath1[MAX_PATH];  // when non-empty string first path processed (used for change notifications)
+    CPathBuffer WorkPath1;     // when non-empty string first path processed (used for change notifications)
     BOOL WorkPath1InclSubDirs; // TRUE/FALSE = with/without subdirectories (first path)
-    char WorkPath2[MAX_PATH];  // when non-empty string second path processed (used for change notifications)
+    CPathBuffer WorkPath2;     // when non-empty string second path processed (used for change notifications)
     BOOL WorkPath2InclSubDirs; // TRUE/FALSE = with/without subdirectories (second path)
 
     char* WaitInQueueSubject; // text for the "waiting in queue" state: dialog title
@@ -492,13 +492,13 @@ public:
 
     void SetWorkPath1(const char* path, BOOL inclSubDirs)
     {
-        lstrcpyn(WorkPath1, path, MAX_PATH);
+        lstrcpyn(WorkPath1.Get(), path, SAL_MAX_LONG_PATH);
         WorkPath1InclSubDirs = inclSubDirs;
     }
 
     void SetWorkPath2(const char* path, BOOL inclSubDirs)
     {
-        lstrcpyn(WorkPath2, path, MAX_PATH);
+        lstrcpyn(WorkPath2.Get(), path, SAL_MAX_LONG_PATH);
         WorkPath2InclSubDirs = inclSubDirs;
     }
 

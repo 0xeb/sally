@@ -157,7 +157,7 @@ protected:
     BOOL ExecuteIt();
 
 protected:
-    char File[MAX_PATH]; // if different from 0, passed to ShellExecute
+    CPathBuffer File; // if different from 0, passed to ShellExecute
     WORD Command;        // if different from 0, posted on action
     HWND HDialog;        // parent dialog
 };

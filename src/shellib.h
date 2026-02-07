@@ -57,7 +57,7 @@ void GetNewOrBackgroundMenu(HWND hOwnerWindow, const char* dir, CMenuNew* menu,
 
 struct CDragDropOperData
 {
-    char SrcPath[MAX_PATH];     // source path common to all files/dirs from Names ("" == failed conversion from Unicode)
+    CPathBuffer SrcPath;        // source path common to all files/dirs from Names ("" == failed conversion from Unicode)
     TIndirectArray<char> Names; // sorted allocated names of files/dirs (CF_HDROP does not distinguish file vs dir) ("" == failed conversion from Unicode)
 
     CDragDropOperData() : Names(200, 200) { SrcPath[0] = 0; }
@@ -263,7 +263,7 @@ private:
     BOOL OldDataObjectIsFake;
     int OldDataObjectIsSimple;                 // -1 (unknown value), TRUE/FALSE = is/is not simple (all names on one path)
     int OldDataObjectSrcType;                  // 0 (unknown type), 1/2 = archive/FS
-    char OldDataObjectSrcFSPath[2 * MAX_PATH]; // only for FS type: source FS path
+    CPathBuffer OldDataObjectSrcFSPath; // only for FS type: source FS path
 
     CDoCopyMove DoCopyMove;
     void* DoCopyMoveParam;
@@ -282,7 +282,7 @@ private:
 
     int TgtType; // values see CIDTTgtType; idtttWindows also for archives and FS without ability to drop current dataobject
     IDropTarget* CurDirDropTarget;
-    char CurDir[2 * MAX_PATH];
+    CPathBuffer CurDir;
 
     CEnterLeaveDrop EnterLeaveDrop;
     void* EnterLeaveDropParam;

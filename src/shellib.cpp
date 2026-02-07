@@ -453,9 +453,9 @@ BOOL IsSimpleSelection(IDataObject* pDataObject, CDragDropOperData* namesList)
                                                 TRACE_E("IsSimpleSelection(): WideCharToMultiByte: " << GetErrorText(err));
                                                 mulbyteName[0] = 0;
                                             }
-                                            strcpy(namesList->SrcPath, mulbyteName);
+                                            strcpy(namesList->SrcPath.Get(), mulbyteName);
                                             if (prefixLen < 3)
-                                                SalPathAddBackslash(namesList->SrcPath, MAX_PATH);
+                                                SalPathAddBackslash(namesList->SrcPath.Get(), SAL_MAX_LONG_PATH);
                                         }
                                         ret = TRUE;
                                         break;
@@ -551,9 +551,9 @@ BOOL IsSimpleSelection(IDataObject* pDataObject, CDragDropOperData* namesList)
                                     {
                                         if (namesList != NULL) // add common path of all names to namesList
                                         {
-                                            strcpy(namesList->SrcPath, prefix);
+                                            strcpy(namesList->SrcPath.Get(), prefix);
                                             if (prefixLen < 3)
-                                                SalPathAddBackslash(namesList->SrcPath, MAX_PATH);
+                                                SalPathAddBackslash(namesList->SrcPath.Get(), SAL_MAX_LONG_PATH);
                                         }
                                         ret = TRUE;
                                         break;
@@ -671,7 +671,7 @@ STDMETHODIMP CImpDropTarget::DragEnter(IDataObject* pDataObject,
         OldDataObject->Release();
     OldDataObject = pDataObject;
     OldDataObjectIsFake = IsFakeDataObject(OldDataObject, &OldDataObjectSrcType,
-                                           OldDataObjectSrcFSPath, 2 * MAX_PATH);
+                                           OldDataObjectSrcFSPath.Get(), SAL_MAX_LONG_PATH);
 
     OldDataObjectIsSimple = -1; // unknown value
     OldDataObject->AddRef();
@@ -1292,8 +1292,8 @@ STDMETHODIMP CImpDropTarget::Drop(IDataObject* pDataObject, DWORD grfKeyState,
                         namesList != NULL)
                     {
                         DoDragDropOper(*pdwEffect == DROPEFFECT_COPY, TgtType == idtttArchive || TgtType == idtttArchiveOnWinPath,
-                                       TgtType == idtttArchiveOnWinPath ? CurDir : NULL,
-                                       TgtType == idtttArchiveOnWinPath ? "" : CurDir, namesList, DoDragDropOperParam);
+                                       TgtType == idtttArchiveOnWinPath ? CurDir.Get() : (char*)NULL,
+                                       TgtType == idtttArchiveOnWinPath ? (char*)"" : CurDir.Get(), namesList, DoDragDropOperParam);
                         namesList = NULL; // DoDragDropOper will have it deallocated, we won't do it here anymore
                     }
                 }
