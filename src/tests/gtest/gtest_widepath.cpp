@@ -547,3 +547,142 @@ TEST(CWidePathBuffer, UnicodeContent)
     EXPECT_TRUE(buf.IsValid());
     EXPECT_STREQ(buf.Get(), L"C:\\\x6587\x4EF6\\\x30C6\x30B9\x30C8");
 }
+
+// ============================================================================
+// CPathBuffer struct member tests
+// ============================================================================
+
+struct TestStruct
+{
+    CPathBuffer path;
+    CPathBuffer name;
+    int value;
+};
+
+TEST(CPathBufferStructTest, ConstructionInStruct)
+{
+    TestStruct s;
+    s.value = 42;
+    lstrcpynA(s.path, "C:\\test\\path", s.path.Size());
+    lstrcpynA(s.name, "testfile.txt", s.name.Size());
+    EXPECT_STREQ(s.path, "C:\\test\\path");
+    EXPECT_STREQ(s.name, "testfile.txt");
+    EXPECT_EQ(s.value, 42);
+}
+
+TEST(CPathBufferStructTest, NullTerminationAtEnd)
+{
+    CPathBuffer buf;
+    // Simulate the pattern: buf[buf.Size()-1] = 0
+    memset(buf, 'A', 100);
+    buf[buf.Size() - 1] = 0;
+    // First 100 chars are 'A', rest is whatever, last char is null
+    EXPECT_EQ(buf[0], 'A');
+    EXPECT_EQ(buf[99], 'A');
+    EXPECT_EQ(buf[buf.Size() - 1], '\0');
+}
+
+TEST(CPathBufferStructTest, MultipleCPathBuffersIndependent)
+{
+    TestStruct s;
+    lstrcpynA(s.path, "C:\\alpha\\beta", s.path.Size());
+    lstrcpynA(s.name, "gamma.txt", s.name.Size());
+    // Modifying one must not affect the other
+    lstrcpynA(s.path, "D:\\other", s.path.Size());
+    EXPECT_STREQ(s.path, "D:\\other");
+    EXPECT_STREQ(s.name, "gamma.txt");
+}
+
+TEST(CPathBufferStructTest, PointerArithmetic)
+{
+    CPathBuffer buf("C:\\dir\\file.txt");
+    char* ptr = buf.Get();
+    // buf + offset should point into the buffer
+    char* offset = ptr + 3;
+    EXPECT_EQ(*offset, 'd'); // "C:\dir..." -> index 3 is 'd'
+    // Also works via implicit conversion
+    char* base = buf;
+    EXPECT_EQ(*(base + 0), 'C');
+    EXPECT_EQ(*(base + 1), ':');
+    EXPECT_EQ(*(base + 2), '\\');
+}
+
+TEST(CPathBufferStructTest, LstrcpynSafeCopy)
+{
+    CPathBuffer buf;
+    const char* longStr = "C:\\very\\long\\path\\that\\is\\still\\fine";
+    lstrcpynA(buf, longStr, buf.Size());
+    EXPECT_STREQ(buf, longStr);
+
+    // lstrcpynA truncates at count-1
+    CPathBuffer buf2;
+    lstrcpynA(buf2.Get(), "ABCDEFGHIJ", 5);
+    EXPECT_STREQ(buf2.Get(), "ABCD");
+}
+
+TEST(CPathBufferStructTest, LongStringBeyondMaxPath)
+{
+    CPathBuffer buf;
+    // Build a string longer than MAX_PATH (260)
+    std::string longPath = "C:\\";
+    for (int i = 0; i < 30; i++)
+        longPath += "longdirname\\";
+    longPath += "file.txt";
+    EXPECT_GT(longPath.size(), 260u);
+
+    lstrcpynA(buf, longPath.c_str(), buf.Size());
+    EXPECT_STREQ(buf, longPath.c_str());
+}
+
+// ============================================================================
+// CWidePathBuffer struct member tests
+// ============================================================================
+
+struct WideTestStruct
+{
+    CWidePathBuffer path;
+    CWidePathBuffer name;
+    int value;
+};
+
+TEST(CWidePathBufferStructTest, ConstructionInStruct)
+{
+    WideTestStruct s;
+    s.value = 99;
+    lstrcpynW(s.path, L"C:\\wide\\test", s.path.Size());
+    lstrcpynW(s.name, L"widefile.txt", s.name.Size());
+    EXPECT_STREQ(s.path, L"C:\\wide\\test");
+    EXPECT_STREQ(s.name, L"widefile.txt");
+    EXPECT_EQ(s.value, 99);
+}
+
+TEST(CWidePathBufferStructTest, NullTerminationAtEnd)
+{
+    CWidePathBuffer buf;
+    // Simulate the pattern: buf[buf.Size()-1] = 0
+    wmemset(buf, L'B', 100);
+    buf[buf.Size() - 1] = L'\0';
+    EXPECT_EQ(buf[0], L'B');
+    EXPECT_EQ(buf[99], L'B');
+    EXPECT_EQ(buf[buf.Size() - 1], L'\0');
+}
+
+TEST(CWidePathBufferStructTest, MultiByteToWideCharConversion)
+{
+    CWidePathBuffer wideBuf;
+    const char* ansiPath = "C:\\convert\\this\\path";
+    int len = MultiByteToWideChar(CP_ACP, 0, ansiPath, -1, wideBuf, wideBuf.Size());
+    EXPECT_GT(len, 0);
+    EXPECT_STREQ(wideBuf, L"C:\\convert\\this\\path");
+}
+
+TEST(CWidePathBufferStructTest, AppendMethod)
+{
+    CWidePathBuffer buf(L"C:\\root");
+    EXPECT_TRUE(buf.Append(L"sub1"));
+    EXPECT_STREQ(buf.Get(), L"C:\\root\\sub1");
+    EXPECT_TRUE(buf.Append(L"sub2"));
+    EXPECT_STREQ(buf.Get(), L"C:\\root\\sub1\\sub2");
+    EXPECT_TRUE(buf.Append(L"file.txt"));
+    EXPECT_STREQ(buf.Get(), L"C:\\root\\sub1\\sub2\\file.txt");
+}
