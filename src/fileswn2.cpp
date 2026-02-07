@@ -1186,7 +1186,7 @@ BOOL CFilesWindow::PrepareCloseCurrentPath(HWND parent, BOOL canForce, BOOL canD
 {
     CALL_STACK_MESSAGE4("CFilesWindow::PrepareCloseCurrentPath(, %d, %d, , %d)",
                         canForce, canDetach, tryCloseReason);
-    char buf[2 * MAX_PATH + 100];
+    CPathBuffer buf;
 
     if (Is(ptDisk))
     {
@@ -1204,7 +1204,7 @@ BOOL CFilesWindow::PrepareCloseCurrentPath(HWND parent, BOOL canForce, BOOL canD
                 if (Configuration.CnfrmCloseArchive && !CriticalShutdown)
                 {
                     char title[100];
-                    char text[MAX_PATH + 500];
+                    CPathBuffer text;
                     char checkText[200];
                     bool dontShow = !Configuration.CnfrmCloseArchive;
                     std::wstring msg = FormatStrW(LoadStrW(IDS_ARCHIVECLOSEEDIT), AnsiToWide(GetZIPArchive()).c_str());

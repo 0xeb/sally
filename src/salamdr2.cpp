@@ -858,7 +858,7 @@ BOOL DoExpandVarString(HWND msgParent, const char* varText, BOOL validateOnly, i
                             DWORD res = GetEnvironmentVariable(envVar, buf, buf.Size());
                             if (res == 0 || res >= buf.Size())
                             {
-                                char text[MAX_PATH + 100];
+                                CPathBuffer text;
                                 if (res == 0)
                                     sprintf(text, LoadStr(IDS_EXP_ENVVARNOTFOUND), envVar.Get());
                                 else
@@ -1042,9 +1042,9 @@ CQuadWord MyGetDiskFreeSpace(const char* path, CQuadWord* total)
     if (total != NULL)
         *total = CQuadWord(-1, -1);
     ULARGE_INTEGER availBytes, totalBytes, freeBytes;
-    char ourPath[MAX_PATH + 200];
-    lstrcpyn(ourPath, path, MAX_PATH + 200);
-    SalPathAddBackslash(ourPath, MAX_PATH + 200);
+    CPathBuffer ourPath;
+    lstrcpyn(ourPath, path, ourPath.Size());
+    SalPathAddBackslash(ourPath, ourPath.Size());
     if (GetDiskFreeSpaceEx(ourPath, &availBytes, &totalBytes, &freeBytes))
     {
         ret.Value = (unsigned __int64)availBytes /*freeBytes*/.QuadPart; // I used availBytes instead of freeBytes because a user Jan Kobr <jan.kobr@pvk.cz> reported that we were showing 35GB instead of 2GB of free space (it was a Novell network disk with quotas under XP)

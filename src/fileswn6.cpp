@@ -305,7 +305,7 @@ BOOL CFilesWindow::MoveFiles(const char* source, const char* target, const char*
         LastTickCount = GetTickCount();
 
         //---  enumerate files/directories of the source directory
-        char sourceDir[MAX_PATH + 4];
+        CPathBuffer sourceDir;
         int len = (int)strlen(source);
         if (source[len - 1] == '\\')
             len--;
@@ -527,7 +527,7 @@ BOOL CFilesWindow::BuildScriptMain2(COperations* script, BOOL copy, char* target
     ErrGetFileSizeOfLnkTgtIgnAll = FALSE;
 
     CPathBuffer root;  // Heap-allocated for long path support (UNC roots can exceed MAX_PATH)
-    char fsName[MAX_PATH];  // Filesystem names are short (NTFS, FAT32, etc.)
+    CPathBuffer fsName;  // Filesystem names are short (NTFS, FAT32, etc.)
     DWORD dummy, flags;
 
     //---  initialize the build interruption test
@@ -1149,7 +1149,7 @@ BOOL CFilesWindow::BuildScriptMain(COperations* script, CActionType type,
     ErrGetFileSizeOfLnkTgtIgnAll = FALSE;
 
     CPathBuffer root;  // Heap-allocated for long path support (UNC roots can exceed MAX_PATH)
-    char fsName[MAX_PATH];  // Filesystem names are short (NTFS, FAT32, etc.)
+    CPathBuffer fsName;  // Filesystem names are short (NTFS, FAT32, etc.)
 
     //---  initialize the build interruption test
     LastTickCount = GetTickCount();
@@ -1519,8 +1519,8 @@ BOOL CFilesWindow::BuildScriptDir(COperations* script, CActionType type, char* s
                               targetPathState, targetPathSupADS, targetPathIsFAT32,
                               mask, dirName, mapName, sourceDirAttr, firstLevelDir, onlySize,
                               fastDirectoryMove, srcAndTgtPathsFlags);
-    char text[2 * MAX_PATH + 100];
-    char finalName[2 * MAX_PATH + 200];                                      // +200 is a reserve (Windows creates paths longer than MAX_PATH)
+    CPathBuffer text;
+    CPathBuffer finalName;                                      // +200 is a reserve (Windows creates paths longer than MAX_PATH)
     BOOL sourcePathIsNet = (srcAndTgtPathsFlags & OPFL_SRCPATH_IS_NET) != 0; // valid only for atCopy and atMove
 
     script->DirsCount++;
@@ -2400,7 +2400,7 @@ BOOL CFilesWindow::BuildScriptFile(COperations* script, CActionType type, char* 
 
     script->FilesCount++;
     CQuadWord fileSizeLoc = fileSize;
-    char message[2 * MAX_PATH + 200];
+    CPathBuffer message;
     COperation op;
     switch (type)
     {
@@ -2443,7 +2443,7 @@ BOOL CFilesWindow::BuildScriptFile(COperations* script, CActionType type, char* 
             op.SourceName = NULL;
             return (resType == PromptResult::kSkip || resType == PromptResult::kSkipAll);
         }
-        char finalName[2 * MAX_PATH + 200]; // +200 is a reserve (Windows creates paths longer than MAX_PATH)
+        CPathBuffer finalName; // +200 is a reserve (Windows creates paths longer than MAX_PATH)
         if (mapName == NULL)
         {
             // Petr: a bit of a hack: the *.* mask doesn't create a copy of the source name, which is a problem when copying

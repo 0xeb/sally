@@ -1846,7 +1846,7 @@ void CMainWindow::SaveConfig(HWND parent)
                 SetValue(actKey, CONFIG_SHOWSPLASHSCREEN_REG, REG_DWORD,
                          &Configuration.ShowSplashScreen, sizeof(DWORD));
                 SetValue(actKey, CONFIG_CONVERSIONTABLE_REG, REG_SZ,
-                         &Configuration.ConversionTable, -1);
+                         Configuration.ConversionTable, -1);
                 SetValue(actKey, CONFIG_SKILLLEVEL_REG, REG_DWORD,
                          &Configuration.SkillLevel, sizeof(DWORD));
                 SetValue(actKey, CONFIG_TITLEBARSHOWPATH_REG, REG_DWORD,
@@ -3295,7 +3295,7 @@ BOOL CMainWindow::LoadConfig(BOOL importingOldConfig, const CCommandLineParams* 
             GetValue(actKey, CONFIG_INFOLINECONTENT_REG, REG_SZ,
                      Configuration.InfoLineContent, 200);
             GetValue(actKey, CONFIG_IFPATHISINACCESSIBLEGOTO_REG, REG_SZ,
-                     Configuration.IfPathIsInaccessibleGoTo, MAX_PATH);
+                     Configuration.IfPathIsInaccessibleGoTo, Configuration.IfPathIsInaccessibleGoTo.Size());
             if (!GetValue(actKey, CONFIG_IFPATHISINACCESSIBLEGOTOISMYDOCS_REG, REG_DWORD,
                           &Configuration.IfPathIsInaccessibleGoToIsMyDocs, sizeof(DWORD)))
             {
@@ -3361,7 +3361,7 @@ BOOL CMainWindow::LoadConfig(BOOL importingOldConfig, const CCommandLineParams* 
             //      GetValue(actKey, CONFIG_ALTLANGFORPLUGINS_REG, REG_SZ,
             //               Configuration.AltPluginSLGName, MAX_PATH);
             GetValue(actKey, CONFIG_CONVERSIONTABLE_REG, REG_SZ,
-                     &Configuration.ConversionTable, MAX_PATH);
+                     Configuration.ConversionTable, Configuration.ConversionTable.Size());
             GetValue(actKey, CONFIG_SKILLLEVEL_REG, REG_DWORD,
                      &Configuration.SkillLevel, sizeof(DWORD));
             GetValue(actKey, CONFIG_TITLEBARSHOWPATH_REG, REG_DWORD,
@@ -3433,7 +3433,7 @@ BOOL CMainWindow::LoadConfig(BOOL importingOldConfig, const CCommandLineParams* 
             GetValue(actKey, CONFIG_EDITNEWFILE_USEDEFAULT_REG, REG_DWORD,
                      &Configuration.UseEditNewFileDefault, sizeof(DWORD));
             GetValue(actKey, CONFIG_EDITNEWFILE_DEFAULT_REG, REG_SZ,
-                     Configuration.EditNewFileDefault, MAX_PATH);
+                     Configuration.EditNewFileDefault, Configuration.EditNewFileDefault.Size());
 
 #ifndef _WIN64 // FIXME_X64_WINSCP
             if (!GetValue(actKey, "Add x86-Only Plugins", REG_DWORD,
@@ -3724,7 +3724,7 @@ BOOL CMainWindow::LoadConfig(BOOL importingOldConfig, const CCommandLineParams* 
                 CloseKey(actSubKey);
             }
 
-            GetValue(actKey, CONFIG_FILELISTNAME_REG, REG_SZ, Configuration.FileListName, MAX_PATH);
+            GetValue(actKey, CONFIG_FILELISTNAME_REG, REG_SZ, Configuration.FileListName, Configuration.FileListName.Size());
             GetValue(actKey, CONFIG_FILELISTAPPEND_REG, REG_DWORD, &Configuration.FileListAppend, sizeof(DWORD));
             GetValue(actKey, CONFIG_FILELISTDESTINATION_REG, REG_DWORD, &Configuration.FileListDestination, sizeof(DWORD));
 

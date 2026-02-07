@@ -281,7 +281,7 @@ struct CConfiguration
     CMaskGroup CompareIgnoreDirsMasks;
 
     BOOL IfPathIsInaccessibleGoToIsMyDocs;   // TRUE = ignore IfPathIsInaccessibleGoTo and fetch Documents from the system directly
-    char IfPathIsInaccessibleGoTo[MAX_PATH]; // path used when the current one becomes inaccessible (network outage, media removed from the removable drive, ...)
+    CPathBuffer IfPathIsInaccessibleGoTo; // path used when the current one becomes inaccessible (network outage, media removed from the removable drive, ...)
 
     DWORD LastUsedSpeedLimit; // remembers the last used speed limit (users often repeat one number)
 
@@ -334,7 +334,7 @@ struct CConfiguration
     char* ConvertHistory[CONVERT_HISTORY_SIZE];
     char* FilterHistory[FILTER_HISTORY_SIZE];
 
-    char FileListName[MAX_PATH]; // file name
+    CPathBuffer FileListName; // file name
     BOOL FileListAppend;
     int FileListDestination; // 0=Clipboard 1=Viewer 2=File
 
@@ -399,7 +399,7 @@ struct CConfiguration
     int UseSimpleIconsInArchives;
 
     BOOL UseEditNewFileDefault;        // should the EditNewFileDefault value be used? (if not, it is loaded from resources, thus language switching works)
-    char EditNewFileDefault[MAX_PATH]; // used as the default for the EditNewFile command when UseEditNewFileDefault is enabled
+    CPathBuffer EditNewFileDefault; // used as the default for the EditNewFile command when UseEditNewFileDefault is enabled
 
     // Tip of the Day
     //  int  ShowTipOfTheDay;         // display Tip of the Day at program startup
@@ -443,15 +443,15 @@ struct CConfiguration
     int FindColNameWidth; // width of the Name column in the Find dialog
 
     // Language
-    char LoadedSLGName[MAX_PATH];    // xxxxx.slg that was loaded at Salamander start
-    char SLGName[MAX_PATH];          // xxxxx.slg to use next time Salamander starts
+    CPathBuffer LoadedSLGName;       // xxxxx.slg that was loaded at Salamander start
+    CPathBuffer SLGName;             // xxxxx.slg to use next time Salamander starts
     int DoNotDispCantLoadPluginSLG;  // TRUE = suppress warning that an SLG with the same name cannot be loaded into the plugin as in Salamander
     int DoNotDispCantLoadPluginSLG2; // TRUE = suppress warning that the SLG plugin used last time (either user-selected or auto-selected) cannot be loaded
     int UseAsAltSLGInOtherPlugins;   // TRUE = try to use AltSLGName for plugins
-    char AltPluginSLGName[MAX_PATH]; // only if UseAsAltSLGInOtherPlugins is TRUE: fallback SLG module for plugins (if LoadedSLGName for plugin does not exist)
+    CPathBuffer AltPluginSLGName; // only if UseAsAltSLGInOtherPlugins is TRUE: fallback SLG module for plugins (if LoadedSLGName for plugin does not exist)
 
     // Directory name convert\\XXX\\convert.cfg from which convert.cfg is loaded
-    char ConversionTable[MAX_PATH];
+    CPathBuffer ConversionTable;
 
     int TitleBarShowPath;                        // will we display the path in the title bar?
     int TitleBarMode;                            // title bar display mode (TITLE_BAR_MODE_xxx)

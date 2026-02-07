@@ -1127,7 +1127,7 @@ void SetCurrentDirectoryToSystem()
 
 void _RemoveTemporaryDir(const char* dir)
 {
-    char path[MAX_PATH + 2];
+    CPathBuffer path;
     WIN32_FIND_DATA file;
     strcpy(path, dir);
     char* end = path + strlen(path);
@@ -1140,7 +1140,7 @@ void _RemoveTemporaryDir(const char* dir)
         do
         {
             if (file.cFileName[0] != 0 && strcmp(file.cFileName, "..") && strcmp(file.cFileName, ".") &&
-                (end - path) + strlen(file.cFileName) < MAX_PATH)
+                (end - (char*)path) + strlen(file.cFileName) < path.Size() - 2)
             {
                 strcpy(end, file.cFileName);
                 ClearReadOnlyAttr(path, file.dwFileAttributes);
@@ -1172,7 +1172,7 @@ void RemoveTemporaryDir(const char* dir)
 
 void _RemoveEmptyDirs(const char* dir)
 {
-    char path[MAX_PATH + 2];
+    CPathBuffer path;
     WIN32_FIND_DATA file;
     strcpy(path, dir);
     char* end = path + strlen(path);
@@ -1187,7 +1187,7 @@ void _RemoveEmptyDirs(const char* dir)
             if (file.cFileName[0] != 0 && strcmp(file.cFileName, "..") && strcmp(file.cFileName, "."))
             {
                 if ((file.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY) &&
-                    (end - path) + strlen(file.cFileName) < MAX_PATH)
+                    (end - (char*)path) + strlen(file.cFileName) < path.Size() - 2)
                 {
                     strcpy(end, file.cFileName);
                     ClearReadOnlyAttr(path, file.dwFileAttributes);
@@ -1235,7 +1235,7 @@ AGAIN:
         return FALSE;
     }
     DWORD attrs = SalGetFileAttributes(dir);
-    char buf[2 * MAX_PATH + 200]; // for error messages (truncation OK)
+    CPathBuffer buf; // for error messages (truncation OK)
     CPathBuffer name;
     if (attrs == 0xFFFFFFFF) // probably doesn't exist, allow creating it
     {
@@ -1640,7 +1640,7 @@ void RemoveAmpersands(char* text)
 BOOL CPathHistoryItem::Execute(CFilesWindow* panel)
 {
     BOOL ret = TRUE; // normally return success
-    char errBuf[MAX_PATH + 200];
+    CPathBuffer errBuf;
     if (PathOrArchiveOrFSName != NULL) // valid data
     {
         int failReason;
@@ -2278,7 +2278,7 @@ void CPathHistory::LoadFromRegistry(HKEY hKey, const char* name)
     if (OpenKey(hKey, name, historyKey))
     {
         CPathBuffer path;
-        char fsName[MAX_PATH];
+        CPathBuffer fsName;
         const char* pathOrArchiveOrFSName = path;
         const char* archivePathOrFSUserPart = NULL;
         char buf[10];
@@ -3404,7 +3404,7 @@ void CFileTimeStamps::CheckAndPackAndClear(HWND parent, BOOL* someFilesChanged, 
         *someFilesChanged = FALSE;
     if (archMaybeUpdated != NULL)
         *archMaybeUpdated = FALSE;
-    char buf[MAX_PATH + 100];
+    CPathBuffer buf;
     WIN32_FIND_DATA data;
     int i;
     for (i = List.Count - 1; i >= 0; i--)

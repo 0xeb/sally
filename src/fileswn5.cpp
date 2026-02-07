@@ -339,7 +339,7 @@ void CFilesWindow::ChangeAttr(BOOL setCompress, BOOL compressed, BOOL setEncrypt
                 if (setCompress && Configuration.CnfrmNTFSPress || // ask whether to compress/decompress
                     setEncryption && Configuration.CnfrmNTFSCrypt) // ask whether to encrypt/decrypt
                 {
-                    char subject[MAX_PATH + 100];
+                    CPathBuffer subject;
                     char expanded[200];
                     int count = GetSelCount();
                     CPathBuffer path; // Heap-allocated for long path support
@@ -700,7 +700,7 @@ void CFilesWindow::ViewFile(char* name, BOOL altView, DWORD handlerID, int enumF
     // if viewing/editing from the panel, obtain the full long name
     BOOL useDiskCache = FALSE;          // TRUE only for ZIP - uses disk-cache
     BOOL arcCacheCacheCopies = TRUE;    // cache copies in disk-cache unless the archiver plugin requests otherwise
-    char dcFileName[3 * MAX_PATH + 50]; // ZIP: name for disk-cache
+    CPathBuffer dcFileName; // ZIP: name for disk-cache
     if (name == NULL)
     {
         int i = GetCaretIndex();
@@ -1161,7 +1161,7 @@ BOOL ViewFileInt(HWND parent, const char* name, BOOL altView, DWORD handlerID, B
     }
     else
     {
-        char buff[MAX_PATH + 300];
+        CPathBuffer buff;
         int textID = altView ? IDS_CANT_VIEW_FILE_ALT : IDS_CANT_VIEW_FILE;
         sprintf(buff, LoadStr(textID), name);
         if (gPrompter != NULL)
@@ -1180,7 +1180,7 @@ void CFilesWindow::EditFile(char* name, DWORD handlerID)
     }
 
     // verify that the file is on an accessible path
-    char path[MAX_PATH + 10];
+    CPathBuffer path;
     if (name == NULL)
     {
         if (CheckPath(TRUE) != ERROR_SUCCESS)
@@ -1209,13 +1209,13 @@ void CFilesWindow::EditFile(char* name, DWORD handlerID)
             CFileData* f = &Files->At(i - Dirs->Count);
             if (Is(ptDisk))
             {
-                lstrcpyn(path, GetPath(), MAX_PATH);
+                lstrcpyn(path, GetPath(), path.Size());
                 if (GetPath()[strlen(GetPath()) - 1] != '\\')
                     strcat(path, "\\");
                 char* s = path + strlen(path);
-                if ((s - path) + f->NameLen >= MAX_PATH)
+                if ((s - path) + f->NameLen >= (int)path.Size())
                 {
-                    if (f->DosName != NULL && strlen(f->DosName) + (s - path) < MAX_PATH)
+                    if (f->DosName != NULL && strlen(f->DosName) + (s - path) < (int)path.Size())
                         strcpy(s, f->DosName);
                     else
                     {
@@ -1233,12 +1233,12 @@ void CFilesWindow::EditFile(char* name, DWORD handlerID)
                     DWORD err = GetLastError();
                     if (err == ERROR_FILE_NOT_FOUND || err == ERROR_INVALID_NAME)
                     {
-                        if (strlen(f->DosName) + (s - path) < MAX_PATH)
+                        if (strlen(f->DosName) + (s - path) < (int)path.Size())
                         {
                             strcpy(s, f->DosName);
                             if (SalGetFileAttributes(path) == 0xffffffff) // still error -> revert to the long name
                             {
-                                if ((s - path) + f->NameLen < MAX_PATH)
+                                if ((s - path) + f->NameLen < (int)path.Size())
                                     strcpy(s, f->Name);
                             }
                         }
@@ -1395,7 +1395,7 @@ void CFilesWindow::EditFile(char* name, DWORD handlerID)
             }
             else
             {
-                char buff[4 * MAX_PATH];
+                CPathBuffer buff;
                 sprintf(buff, LoadStr(IDS_ERROREXECEDIT), expCommand.Get(), LoadStr(IDS_TOOLONGNAME));
                 if (gPrompter != NULL)
                     ShowErrorViaPrompter(LoadStrW(IDS_ERRORTITLE), AnsiToWide(buff).c_str());
@@ -1404,7 +1404,7 @@ void CFilesWindow::EditFile(char* name, DWORD handlerID)
     }
     else
     {
-        char buff[MAX_PATH + 300];
+        CPathBuffer buff;
         sprintf(buff, LoadStr(IDS_CANT_EDIT_FILE), name);
         if (gPrompter != NULL)
             ShowErrorViaPrompter(LoadStrW(IDS_ERRORTITLE), AnsiToWide(buff).c_str());
@@ -2148,13 +2148,13 @@ void CFilesWindow::RenameFileInternal(CFileData* f, const char* formatedFileName
                             StrICmp(tgtName, data.cFileName) != 0)            // (full name differs)
                         {
                             // rename ("clean up") the file/directory with the conflicting DOS name to a temporary 8.3 name (no extra DOS name needed)
-                            char tmpName[MAX_PATH + 20];
-                            lstrcpyn(tmpName, tgtPath, MAX_PATH);
+                            CPathBuffer tmpName;
+                            lstrcpyn(tmpName, tgtPath, tmpName.Size());
                             CutDirectory(tmpName);
-                            SalPathAddBackslash(tmpName, MAX_PATH + 20);
+                            SalPathAddBackslash(tmpName, tmpName.Size());
                             char* tmpNamePart = tmpName + strlen(tmpName);
                             CPathBuffer origFullName; // Heap-allocated for long path support
-                            if (SalPathAppend(tmpName, data.cFileName, MAX_PATH))
+                            if (SalPathAppend(tmpName, data.cFileName, tmpName.Size()))
                             {
                                 strcpy(origFullName, tmpName);
                                 DWORD num = (GetTickCount() / 10) % 0xFFF;

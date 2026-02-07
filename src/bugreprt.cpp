@@ -1442,7 +1442,7 @@ void CCallStack::PrintBugReport(EXCEPTION_POINTERS* Exception, DWORD ThreadID, D
         PrintLine(param, buf, TRUE);
         sprintf(buf, "AutoSave = %d", Configuration.AutoSave);
         PrintLine(param, buf, TRUE);
-        sprintf(buf, "IfPathIsInaccessibleGoTo (isMyDocs = %d) = %s", Configuration.IfPathIsInaccessibleGoToIsMyDocs, Configuration.IfPathIsInaccessibleGoTo);
+        sprintf(buf, "IfPathIsInaccessibleGoTo (isMyDocs = %d) = %s", Configuration.IfPathIsInaccessibleGoToIsMyDocs, Configuration.IfPathIsInaccessibleGoTo.Get());
         PrintLine(param, buf, TRUE);
         sprintf(buf, "NoDrives = 0x%08X", SystemPolicies.GetNoDrives());
         PrintLine(param, buf, TRUE);

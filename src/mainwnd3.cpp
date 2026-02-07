@@ -156,7 +156,7 @@ BOOL OpenHtmlHelp(char* helpFileName, HWND parent, CHtmlHelpCommand command, DWO
 
     HANDLES(EnterCriticalSection(&OpenHtmlHelpCS));
 
-    char helpPath[MAX_PATH + 50];
+    CPathBuffer helpPath;
     if (CurrentHelpDir[0] == 0)
     {
         CPathBuffer helpSubdir; // Heap-allocated for long path support
@@ -173,22 +173,22 @@ BOOL OpenHtmlHelp(char* helpFileName, HWND parent, CHtmlHelpCommand command, DWO
             strcpy(helpSubdir, "english");
         }
         BOOL ok = FALSE;
-        if (GetModuleFileName(HInstance, CurrentHelpDir, MAX_PATH) != 0 &&
+        if (GetModuleFileName(HInstance, CurrentHelpDir, CurrentHelpDir.Size()) != 0 &&
             CutDirectory(CurrentHelpDir) &&
-            SalPathAppend(CurrentHelpDir, "help", MAX_PATH) &&
+            SalPathAppend(CurrentHelpDir, "help", CurrentHelpDir.Size()) &&
             DirExists(CurrentHelpDir))
         {
-            lstrcpyn(helpPath, CurrentHelpDir, MAX_PATH);
-            if (!SalPathAppend(helpPath, helpSubdir, MAX_PATH) ||
+            lstrcpyn(helpPath, CurrentHelpDir, helpPath.Size());
+            if (!SalPathAppend(helpPath, helpSubdir, helpPath.Size()) ||
                 !DirExists(helpPath))
             { // the directory from the current .slg file does not exist
-                lstrcpyn(helpPath, CurrentHelpDir, MAX_PATH);
+                lstrcpyn(helpPath, CurrentHelpDir, helpPath.Size());
                 if (_stricmp(helpSubdir, "english") == 0 || // we already tested "english" and it does not exist so no point in trying again
-                    !SalPathAppend(helpPath, "english", MAX_PATH) ||
+                    !SalPathAppend(helpPath, "english", helpPath.Size()) ||
                     !DirExists(helpPath))
                 { // the ENGLISH directory does not exist
-                    lstrcpyn(helpPath, CurrentHelpDir, MAX_PATH);
-                    if (SalPathAppend(helpPath, "*", MAX_PATH))
+                    lstrcpyn(helpPath, CurrentHelpDir, helpPath.Size());
+                    if (SalPathAppend(helpPath, "*", helpPath.Size()))
                     { // try to find at least some other directory
                         WIN32_FIND_DATA data;
                         HANDLE find = HANDLES_Q(FindFirstFile(helpPath, &data));
@@ -199,8 +199,8 @@ BOOL OpenHtmlHelp(char* helpFileName, HWND parent, CHtmlHelpCommand command, DWO
                                 if (strcmp(data.cFileName, ".") != 0 && strcmp(data.cFileName, "..") != 0 &&
                                     (data.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY) != 0) // only if it is a directory
                                 {
-                                    lstrcpyn(helpPath, CurrentHelpDir, MAX_PATH);
-                                    if (SalPathAppend(helpPath, data.cFileName, MAX_PATH))
+                                    lstrcpyn(helpPath, CurrentHelpDir, helpPath.Size());
+                                    if (SalPathAppend(helpPath, data.cFileName, helpPath.Size()))
                                     {
                                         ok = TRUE;
                                         break;
@@ -217,7 +217,7 @@ BOOL OpenHtmlHelp(char* helpFileName, HWND parent, CHtmlHelpCommand command, DWO
             else
                 ok = TRUE;
             if (ok)
-                lstrcpyn(CurrentHelpDir, helpPath, MAX_PATH);
+                lstrcpyn(CurrentHelpDir, helpPath, CurrentHelpDir.Size());
         }
         if (!ok)
         {
@@ -281,8 +281,8 @@ BOOL OpenHtmlHelp(char* helpFileName, HWND parent, CHtmlHelpCommand command, DWO
     if (helpFileName != NULL) // plugin help: to open the window in the right position
     {                         // with remembered Favorites, we must open "salamand.chm" first (then
                               // the plugin help opens in this same window)
-        lstrcpyn(helpPath, CurrentHelpDir, MAX_PATH);
-        if (SalPathAppend(helpPath, "salamand.chm", MAX_PATH) &&
+        lstrcpyn(helpPath, CurrentHelpDir, helpPath.Size());
+        if (SalPathAppend(helpPath, "salamand.chm", helpPath.Size()) &&
             FileExists(helpPath))
         {
             HtmlHelp(NULL, helpPath, HH_DISPLAY_TOC, 0); // ignore potential error
@@ -291,8 +291,8 @@ BOOL OpenHtmlHelp(char* helpFileName, HWND parent, CHtmlHelpCommand command, DWO
 
     BOOL ret = FALSE;
 
-    lstrcpyn(helpPath, CurrentHelpDir, MAX_PATH);
-    if (SalPathAppend(helpPath, helpFileName == NULL ? "salamand.chm" : helpFileName, MAX_PATH) &&
+    lstrcpyn(helpPath, CurrentHelpDir, helpPath.Size());
+    if (SalPathAppend(helpPath, helpFileName == NULL ? "salamand.chm" : helpFileName, helpPath.Size()) &&
         FileExists(helpPath))
     {
         if (HtmlHelp(NULL, helpPath, uCommand, dwData) == NULL)

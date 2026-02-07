@@ -1,4 +1,4 @@
-﻿// SPDX-FileCopyrightText: 2023 Open Salamander Authors
+// SPDX-FileCopyrightText: 2023 Open Salamander Authors
 // SPDX-License-Identifier: GPL-2.0-or-later
 // CommentsTranslationProject: TRANSLATED
 
@@ -150,7 +150,7 @@ BOOL CFilesWindow::DeleteThroughRecycleBin(int* selection, int selCount, CFileDa
 
 void PluginFSConvertPathToExternal(char* path)
 {
-    char fsName[MAX_PATH];
+    CPathBuffer fsName;
     char* fsUserPart;
     int index;
     int fsNameIndex;
@@ -249,8 +249,8 @@ void CFilesWindow::FilesAction(CActionType type, CFilesWindow* target, int count
                                            count > 0 ? count : 1, redirectedDir, FALSE))
             {
                 // TODO: Use wide format strings when available
-                char msg[300 + MAX_PATH];
-                _snprintf_s(msg, _TRUNCATE,
+                CPathBuffer msg;
+                _snprintf_s(msg, msg.Size(), _TRUNCATE,
                             LoadStr(type == atMove ? IDS_ERRMOVESELCONTW64ALIAS : IDS_ERRDELETESELCONTW64ALIAS),
                             redirectedDir);
                 gPrompter->ShowError(LoadStrW(IDS_ERRORTITLE), AnsiToWide(msg).c_str());
@@ -264,17 +264,17 @@ void CFilesWindow::FilesAction(CActionType type, CFilesWindow* target, int count
 #endif // _WIN64
 
         //---  build the target path for copy/move
-        char path[2 * MAX_PATH + 200]; // +200 is a reserve (Windows can create paths longer than MAX_PATH)
-        target->GetGeneralPath(path, 2 * MAX_PATH + 200);
+        CPathBuffer path; // +200 is a reserve (Windows can create paths longer than MAX_PATH)
+        target->GetGeneralPath(path, path.Size());
         if (target->Is(ptDisk))
         {
-            SalPathAppend(path, "*.*", 2 * MAX_PATH + 200);
+            SalPathAppend(path, "*.*", path.Size());
         }
         else
         {
             if (target->Is(ptZIPArchive))
             {
-                SalPathAddBackslash(path, 2 * MAX_PATH + 200);
+                SalPathAddBackslash(path, path.Size());
 
                 // if packing to the archive in the other panel is not possible, leave the path empty
                 int format = PackerFormatConfig.PackIsArchive(target->GetZIPArchive());
@@ -359,7 +359,7 @@ void CFilesWindow::FilesAction(CActionType type, CFilesWindow* target, int count
         }
 
         CFileData* f = NULL;
-        char formatedFileName[MAX_PATH + 200]; // +200 is a reserve (Windows can create paths longer than MAX_PATH)
+        CPathBuffer formatedFileName; // +200 is a reserve (Windows can create paths longer than MAX_PATH)
         char expanded[200];
         BOOL deleteLink = FALSE;
         if (count <= 1) // one selected item or none
@@ -386,10 +386,10 @@ void CFilesWindow::FilesAction(CActionType type, CFilesWindow* target, int count
                 expanded[0] = 0;
                 if (type == atDelete && recycle != 1 && (f->Attr & FILE_ATTRIBUTE_REPARSE_POINT))
                 { // it's a link (junction, symlink or volume mount point)
-                    lstrcpyn(formatedFileName, GetPath(), MAX_PATH + 200);
+                    lstrcpyn(formatedFileName, GetPath(), formatedFileName.Size());
                     ResolveSubsts(formatedFileName);
                     int repPointType;
-                    if (SalPathAppend(formatedFileName, f->Name, MAX_PATH + 200) &&
+                    if (SalPathAppend(formatedFileName, f->Name, formatedFileName.Size()) &&
                         GetReparsePointDestination(formatedFileName, NULL, 0, &repPointType, TRUE))
                     {
                         lstrcpy(expanded, LoadStr(repPointType == 1 /* MOUNT POINT */ ? IDS_QUESTION_VOLMOUNTPOINT : repPointType == 2 /* JUNCTION POINT */ ? IDS_QUESTION_JUNCTION
@@ -435,7 +435,7 @@ void CFilesWindow::FilesAction(CActionType type, CFilesWindow* target, int count
         }
         }
         CTruncatedString str;
-        char subject[MAX_PATH + 100 + 200]; // + 200 is a reserve (Windows can create paths longer than MAX_PATH)
+        CPathBuffer subject; // + 200 is a reserve (Windows can create paths longer than MAX_PATH)
         if (resID != 0)
         {
             sprintf(subject, LoadStr(resID), expanded);
@@ -451,7 +451,7 @@ void CFilesWindow::FilesAction(CActionType type, CFilesWindow* target, int count
             criteria = *CopyMoveOptions.Get();
         CCriteriaData* criteriaPtr = NULL; // pointer to 'criteria'; if NULL, they are ignored
         BOOL copyToExistingDir = FALSE;
-        char nextFocus[MAX_PATH + 200]; // + 200 is a reserve (Windows can create paths longer than MAX_PATH)
+        CPathBuffer nextFocus; // + 200 is a reserve (Windows can create paths longer than MAX_PATH)
         nextFocus[0] = 0;
         char* mask = NULL;
         switch (type)
@@ -467,9 +467,9 @@ void CFilesWindow::FilesAction(CActionType type, CFilesWindow* target, int count
                 havePermissions = (flags & FS_PERSISTENT_ACLS) != 0;
             while (1)
             {
-                if (strlen(path) >= 2 * MAX_PATH)
+                if (strlen(path) >= path.Size())
                     path[0] = 0; // the path is too long; not an ideal solution but I'm not up for a better one now :(
-                CCopyMoveMoreDialog copyMoveDlg(HWindow, path, 2 * MAX_PATH,
+                CCopyMoveMoreDialog copyMoveDlg(HWindow, path, path.Size(),
                                                (type == atCopy) ? LoadStr(IDS_COPY) : LoadStr(IDS_MOVE), &str,
                                                (type == atCopy) ? IDD_COPYDIALOG : IDD_MOVEDIALOG,
                                                Configuration.CopyHistory, COPY_HISTORY_SIZE,
@@ -479,7 +479,7 @@ void CFilesWindow::FilesAction(CActionType type, CFilesWindow* target, int count
                 if (res == IDOK && copyMoveDlg.IsUnicodeMode())
                 {
                     std::string ansiPath = WideToAnsi(copyMoveDlg.GetUnicodeResult());
-                    lstrcpyn(path, ansiPath.c_str(), 2 * MAX_PATH);
+                    lstrcpyn(path, ansiPath.c_str(), path.Size());
                 }
                 if (!havePermissions)
                     criteria.CopySecurity = FALSE;
@@ -504,17 +504,17 @@ void CFilesWindow::FilesAction(CActionType type, CFilesWindow* target, int count
                 int pathType;
                 BOOL pathIsDir;
                 char* secondPart;
-                char textBuf[2 * MAX_PATH + 200];
+                CPathBuffer textBuf;
                 if (ParsePath(path, pathType, pathIsDir, secondPart,
                               type == atCopy ? LoadStr(IDS_ERRORCOPY) : LoadStr(IDS_ERRORMOVE),
-                              count <= 1 ? nextFocus : NULL, NULL, 2 * MAX_PATH))
+                              count <= 1 ? nextFocus : NULL, NULL, path.Size()))
                 {
                     // use 'if' instead of a 'switch' to ensure that 'break' and 'continue' work correctly
                     if (pathType == PATH_TYPE_WINDOWS) // Windows path (drive + UNC)
                     {
                         // Note: SalSplitWindowsPath now uses CPathBuffer (SAL_MAX_LONG_PATH)
                         // but the dialog path buffer is 2*MAX_PATH, so check against that
-                        if (strlen(path) >= 2 * MAX_PATH)
+                        if (strlen(path) >= path.Size())
                         {
                             gPrompter->ShowError(
                                 LoadStrW((type == atCopy) ? IDS_ERRORCOPY : IDS_ERRORMOVE),
@@ -684,7 +684,7 @@ void CFilesWindow::FilesAction(CActionType type, CFilesWindow* target, int count
                                 if (hasPath)
                                     *secondPart = '\\'; // restore the path - we will edit it in the Copy/Move dialog
                                 if (backslashAtEnd || mustBePath)
-                                    SalPathAddBackslash(path, 2 * MAX_PATH + 200);
+                                    SalPathAddBackslash(path, path.Size());
                                 continue; // back to the copy/move dialog
                             }
                             // RAII: indexes auto-deleted when scope exits
@@ -745,7 +745,7 @@ void CFilesWindow::FilesAction(CActionType type, CFilesWindow* target, int count
                                 data.EnumLastIndex = -1;
 
                                 // obtain the file-system name
-                                char fsName[MAX_PATH];
+                                CPathBuffer fsName;
                                 memcpy(fsName, path, (secondPart - path) - 1);
                                 fsName[(secondPart - path) - 1] = 0;
 
@@ -1185,7 +1185,7 @@ void CFilesWindow::FilesAction(CActionType type, CFilesWindow* target, int count
 BOOL EmailFilesAddDirectory(CSimpleMAPI* mapi, const char* path, BOOL* errGetFileSizeOfLnkTgtIgnAll)
 {
     WIN32_FIND_DATA file;
-    char myPath[MAX_PATH + 4];
+    CPathBuffer myPath;
     int l = (int)strlen(path);
     memmove(myPath, path, l);
     if (myPath[l - 1] != '\\')
@@ -1412,9 +1412,9 @@ BOOL CFilesWindow::OpenFocusedInOtherPanel(BOOL activate)
         }
         if (!nethoodPath)
         {
-            SalPathAddBackslash(buff, 2 * MAX_PATH);
+            SalPathAddBackslash(buff, buff.Size());
             int l = (int)strlen(buff);
-            lstrcpyn(buff + l, file->Name, 2 * MAX_PATH - l);
+            lstrcpyn(buff + l, file->Name, buff.Size() - l);
         }
     }
     else if (Is(ptPluginFS) && GetPluginFS()->NotEmpty())
@@ -1427,7 +1427,7 @@ BOOL CFilesWindow::OpenFocusedInOtherPanel(BOOL activate)
             isDir = 2;
         else
             isDir = (FocusedIndex < Dirs->Count ? 1 : 0);
-        if (!GetPluginFS()->GetFullName(*file, isDir, buff + l, 2 * MAX_PATH - l))
+        if (!GetPluginFS()->GetFullName(*file, isDir, buff + l, buff.Size() - l))
             buff[0] = 0;
     }
 

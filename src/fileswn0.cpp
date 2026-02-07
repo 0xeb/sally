@@ -275,7 +275,7 @@ void CFilesWindow::FocusShortcutTarget(CFilesWindow* panel)
                             else
                             {                           // we can try to open direct links to servers in the Network plugin (Nethood)
                                 BOOL linkIsNet = FALSE; // TRUE -> shortcut to network -> ChangePathToPluginFS
-                                char netFSName[MAX_PATH];
+                                CPathBuffer netFSName;
                                 if (Plugins.GetFirstNethoodPluginFSName(netFSName))
                                 {
                                     if (link->GetPath(fullName, MAX_PATH, NULL, SLGP_RAWPATH) != NOERROR)

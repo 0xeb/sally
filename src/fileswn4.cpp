@@ -133,7 +133,7 @@ void CFilesWindow::DrawIcon(HDC hDC, CFileData* f, BOOL isDir, BOOL isItemUpDir,
     BOOL drawSimpleSymbol = FALSE;
     int symbolIndex;                   // index in the Symbols bitmap...
     DWORD iconState = 0;               // flags for drawing the icon
-    char lowerExtension[MAX_PATH + 4]; // extension in lowercase, DWORD aligned
+    CPathBuffer lowerExtension; // extension in lowercase
 
     if (!(drawFlags & DRAWFLAG_NO_STATE))
     {
@@ -217,7 +217,7 @@ void CFilesWindow::DrawIcon(HDC hDC, CFileData* f, BOOL isDir, BOOL isItemUpDir,
         {
             CIconList* iconList = NULL;
             int iconListIndex = -1; // close it if not set
-            char fileName[MAX_PATH + 4];
+            CPathBuffer fileName;
 
             if (GetPluginIconsType() != pitFromPlugin || !Is(ptPluginFS))
             {
@@ -1497,7 +1497,7 @@ void CFilesWindow::DrawIconThumbnailItem(HDC hTgtDC, int itemIndex, RECT* itemRe
             if (Is(ptDisk) && !isDir)
             {
                 int icon;
-                char fileName[MAX_PATH + 4];
+                CPathBuffer fileName;
                 memmove(fileName, f->Name, f->NameLen);
                 *(DWORD*)(fileName + f->NameLen) = 0;
 

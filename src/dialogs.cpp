@@ -1861,7 +1861,7 @@ void CFileListDialog::Transfer(CTransferInfo& ti)
     ti.RadioButton(IDC_FL_CLIPBOARD, 0, Configuration.FileListDestination);
     ti.RadioButton(IDC_FL_VIEWER, 1, Configuration.FileListDestination);
     ti.RadioButton(IDC_FL_FILE, 2, Configuration.FileListDestination);
-    ti.EditLine(IDC_FL_FILENAME, Configuration.FileListName, MAX_PATH);
+    ti.EditLine(IDC_FL_FILENAME, Configuration.FileListName, Configuration.FileListName.Size());
     ti.CheckBox(IDC_FL_APPEND, Configuration.FileListAppend);
 
     char** history = Configuration.FileListHistory;

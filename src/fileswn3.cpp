@@ -1998,7 +1998,7 @@ CHANGE_AGAIN:
             suggestedFocusName = NULL;
         }
 
-        char fsName[MAX_PATH];
+        CPathBuffer fsName;
         char* fsUserPart;
         if (!sendDirectlyToPluginLocal && IsPluginFSPath(path, fsName, (const char**)&fsUserPart))
         {

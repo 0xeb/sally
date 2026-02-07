@@ -3819,11 +3819,11 @@ int WinMainBody(HINSTANCE hInstance, HINSTANCE /*hPrevInstance*/, LPSTR cmdLine,
             OpenKey(hSalamander, SALAMANDER_CONFIG_REG, actKey))
         {
             GetValue(actKey, CONFIG_LANGUAGE_REG, REG_SZ,
-                     Configuration.SLGName, MAX_PATH);
+                     Configuration.SLGName, Configuration.SLGName.Size());
             GetValue(actKey, CONFIG_USEALTLANGFORPLUGINS_REG, REG_DWORD,
                      &Configuration.UseAsAltSLGInOtherPlugins, sizeof(DWORD));
             GetValue(actKey, CONFIG_ALTLANGFORPLUGINS_REG, REG_SZ,
-                     Configuration.AltPluginSLGName, MAX_PATH);
+                     Configuration.AltPluginSLGName, Configuration.AltPluginSLGName.Size());
             GetValue(actKey, CONFIG_LANGUAGECHANGED_REG, REG_DWORD, &langChanged, sizeof(DWORD));
             CloseKey(actKey);
         }
@@ -3894,7 +3894,7 @@ FIND_NEW_SLG_FILE:
     CPathBuffer path; // Heap-allocated for long path support
     char errorText[MAX_PATH + 200];
     GetModuleFileName(NULL, path, path.Size());
-    sprintf(strrchr(path, '\\') + 1, "lang\\%s", Configuration.SLGName);
+    sprintf(strrchr(path, '\\') + 1, "lang\\%s", Configuration.SLGName.Get());
     HLanguage = HANDLES(LoadLibrary(path));
     LanguageID = 0;
     if (HLanguage == NULL || !IsSLGFileValid(HInstance, HLanguage, LanguageID, IsSLGIncomplete))

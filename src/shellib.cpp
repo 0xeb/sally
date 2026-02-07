@@ -2349,7 +2349,7 @@ BOOL GetTargetDirectoryAux(HWND parent, HWND hCenterWindow,
             pidl = NULL;
 
         // open dialog
-        char display[MAX_PATH];
+        char display[MAX_PATH]; // kept as char[] due to SEH __try constraint
         BROWSEINFO bi;
         ZeroMemory(&bi, sizeof(bi));
         bi.hwndOwner = parent;
