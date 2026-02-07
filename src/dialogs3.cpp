@@ -702,7 +702,7 @@ MENU_TEMPLATE_ITEM EditNewFileDialogMenu[] =
             if (cmd == 1)
             {
                 Configuration.UseEditNewFileDefault = TRUE;
-                SendDlgItemMessage(HWindow, IDE_PATH, WM_GETTEXT, MAX_PATH, (LPARAM)Configuration.EditNewFileDefault);
+                SendDlgItemMessage(HWindow, IDE_PATH, WM_GETTEXT, Configuration.EditNewFileDefault.Size(), (LPARAM)Configuration.EditNewFileDefault.Get());
             }
             if (cmd == 2)
             {
@@ -3004,7 +3004,7 @@ void CConversionTablesDialog::Transfer(CTransferInfo& ti)
         DWORD winCodePageIdentifier;
         const char* winCodePageDescription;
         const char* dirName;
-        char buff[MAX_PATH + 120];
+        CPathBuffer buff;
 
         CPathBuffer bestDirName; // Heap-allocated for long path support
         CodeTables.GetBestPreloadedConversion(DirName, bestDirName);

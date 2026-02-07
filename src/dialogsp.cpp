@@ -186,9 +186,8 @@ void CCfgPagePackers::StoreControls()
     EditLB->GetCurSel(index);
     if (!DisableNotification && index >= 0 && index < EditLB->GetCount())
     {
-        int len = MAX_PATH + 2;
-        char ext[MAX_PATH + 2];
-        SendDlgItemMessage(HWindow, IDC_P1_EXT, WM_GETTEXT, len, (LPARAM)ext);
+        CPathBuffer ext;
+        SendDlgItemMessage(HWindow, IDC_P1_EXT, WM_GETTEXT, ext.Size(), (LPARAM)(char*)ext);
         int cmbSel = (int)SendDlgItemMessage(HWindow, IDC_P1_TYPE, CB_GETCURSEL, 0, 0);
         int type;
         switch (cmbSel)
@@ -211,31 +210,31 @@ void CCfgPagePackers::StoreControls()
         }
         }
 
-        char execcopy[MAX_PATH + 2];
+        CPathBuffer execcopy;
         execcopy[0] = 0;
-        char argscopy[MAX_PATH + 2];
+        CPathBuffer argscopy;
         argscopy[0] = 0;
         DWORD supmove = FALSE;
-        char execmove[MAX_PATH + 2];
+        CPathBuffer execmove;
         execmove[0] = 0;
-        char argsmove[MAX_PATH + 2];
+        CPathBuffer argsmove;
         argsmove[0] = 0;
         DWORD suplong = FALSE;
         BOOL needANSIListFile = FALSE;
         if (type == CUSTOMPACKER_EXTERNAL)
         {
-            SendDlgItemMessage(HWindow, IDC_P1_CPCMD, WM_GETTEXT, len, (LPARAM)execcopy);
-            SendDlgItemMessage(HWindow, IDC_P1_CPARG, WM_GETTEXT, len, (LPARAM)argscopy);
+            SendDlgItemMessage(HWindow, IDC_P1_CPCMD, WM_GETTEXT, execcopy.Size(), (LPARAM)(char*)execcopy);
+            SendDlgItemMessage(HWindow, IDC_P1_CPARG, WM_GETTEXT, argscopy.Size(), (LPARAM)(char*)argscopy);
             supmove = (IsDlgButtonChecked(HWindow, IDC_P1_MOVE) == BST_CHECKED);
             if (supmove)
             {
-                SendDlgItemMessage(HWindow, IDC_P1_MVCMD, WM_GETTEXT, len, (LPARAM)execmove);
-                SendDlgItemMessage(HWindow, IDC_P1_MVARG, WM_GETTEXT, len, (LPARAM)argsmove);
+                SendDlgItemMessage(HWindow, IDC_P1_MVCMD, WM_GETTEXT, execmove.Size(), (LPARAM)(char*)execmove);
+                SendDlgItemMessage(HWindow, IDC_P1_MVARG, WM_GETTEXT, argsmove.Size(), (LPARAM)(char*)argsmove);
             }
             suplong = (IsDlgButtonChecked(HWindow, IDC_P1_LONG) == BST_CHECKED);
             needANSIListFile = (IsDlgButtonChecked(HWindow, IDC_P1_ANSI) == BST_CHECKED);
         }
-        char title[MAX_PATH + 2];
+        CPathBuffer title;
         strcpy(title, Config->GetPackerTitle(index));
         Config->SetPacker(index, type, title, ext, FALSE,
                           suplong, supmove,
@@ -623,9 +622,8 @@ void CCfgPageUnpackers::StoreControls()
     EditLB->GetCurSel(index);
     if (!DisableNotification && index >= 0 && index < EditLB->GetCount())
     {
-        int len = MAX_PATH + 2;
-        char ext[MAX_PATH + 2];
-        SendDlgItemMessage(HWindow, IDC_P2_EXT, WM_GETTEXT, len, (LPARAM)ext);
+        CPathBuffer ext;
+        SendDlgItemMessage(HWindow, IDC_P2_EXT, WM_GETTEXT, ext.Size(), (LPARAM)(char*)ext);
         int cmbSel = (int)SendDlgItemMessage(HWindow, IDC_P2_TYPE, CB_GETCURSEL, 0, 0);
         int type;
         switch (cmbSel)
@@ -648,20 +646,20 @@ void CCfgPageUnpackers::StoreControls()
         }
         }
 
-        char execcopy[MAX_PATH + 2];
+        CPathBuffer execcopy;
         execcopy[0] = 0;
-        char argscopy[MAX_PATH + 2];
+        CPathBuffer argscopy;
         argscopy[0] = 0;
         DWORD suplong = FALSE;
         BOOL needANSI = FALSE;
         if (type == CUSTOMUNPACKER_EXTERNAL)
         {
-            SendDlgItemMessage(HWindow, IDC_P2_EXCMD, WM_GETTEXT, len, (LPARAM)execcopy);
-            SendDlgItemMessage(HWindow, IDC_P2_EXARG, WM_GETTEXT, len, (LPARAM)argscopy);
+            SendDlgItemMessage(HWindow, IDC_P2_EXCMD, WM_GETTEXT, execcopy.Size(), (LPARAM)(char*)execcopy);
+            SendDlgItemMessage(HWindow, IDC_P2_EXARG, WM_GETTEXT, argscopy.Size(), (LPARAM)(char*)argscopy);
             suplong = (IsDlgButtonChecked(HWindow, IDC_P2_LONG) == BST_CHECKED);
             needANSI = (IsDlgButtonChecked(HWindow, IDC_P2_ANSI) == BST_CHECKED);
         }
-        char title[MAX_PATH + 2];
+        CPathBuffer title;
         strcpy(title, Config->GetUnpackerTitle(index));
         Config->SetUnpacker(index, type, title, ext, FALSE,
                             suplong,
@@ -962,15 +960,14 @@ void CCfgPageExternalArchivers::StoreControls()
 
     if (!DisableNotification)
     {
-        int len = MAX_PATH + 2;
-        char view[MAX_PATH + 2];
+        CPathBuffer view;
         view[0] = 0;
-        char edit[MAX_PATH + 2];
+        CPathBuffer edit;
         edit[0] = 0;
-        SendDlgItemMessage(HWindow, IDC_P3_VIEW, WM_GETTEXT, len, (LPARAM)view);
+        SendDlgItemMessage(HWindow, IDC_P3_VIEW, WM_GETTEXT, view.Size(), (LPARAM)(char*)view);
         BOOL same = Config->ArchiverExesAreSame(index);
         if (!same)
-            SendDlgItemMessage(HWindow, IDC_P3_EDIT, WM_GETTEXT, len, (LPARAM)edit);
+            SendDlgItemMessage(HWindow, IDC_P3_EDIT, WM_GETTEXT, edit.Size(), (LPARAM)(char*)edit);
         else
             strcpy(edit, view);
 
@@ -1039,12 +1036,12 @@ CCfgPageExternalArchivers::DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
                     BOOL same = Config->ArchiverExesAreSame(index);
                     if (!DisableNotification && same)
                     {
-                        char edit[MAX_PATH + 2];
+                        CPathBuffer edit;
                         edit[0] = 0;
-                        SendDlgItemMessage(HWindow, IDC_P3_VIEW, WM_GETTEXT, MAX_PATH, (LPARAM)edit);
+                        SendDlgItemMessage(HWindow, IDC_P3_VIEW, WM_GETTEXT, edit.Size(), (LPARAM)(char*)edit);
                         BOOL old = DisableNotification;
                         DisableNotification = TRUE;
-                        SendDlgItemMessage(HWindow, IDC_P3_EDIT, WM_SETTEXT, 0, (LPARAM)edit);
+                        SendDlgItemMessage(HWindow, IDC_P3_EDIT, WM_SETTEXT, 0, (LPARAM)(char*)edit);
                         DisableNotification = old;
                     }
                 }
@@ -1235,7 +1232,7 @@ void CCfgPageArchivesAssoc::StoreControls()
                 usePacker = FALSE;
         }
 
-        char ext[MAX_PATH + 2];
+        CPathBuffer ext;
         strcpy(ext, Config->GetExt(index));
         Config->SetFormat(index, ext, usePacker, packIndex, unpackIndex, FALSE);
     }

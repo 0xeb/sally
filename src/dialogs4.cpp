@@ -2340,7 +2340,7 @@ CCfgPageUserMenu::DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
 
         case IDB_UM_CHANGEICON:
         {
-            char fileName[MAX_PATH + 10];
+            CPathBuffer fileName;
             fileName[0] = 0;
             int resID = 0;
 
@@ -2367,7 +2367,7 @@ CCfgPageUserMenu::DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
                 BOOL error = FALSE;
                 if (fileName[0] == 0 && item->UMCommand != NULL)
                 {
-                    if (!ExpandCommand(MainWindow->HWindow, item->UMCommand, fileName, MAX_PATH, FALSE))
+                    if (!ExpandCommand(MainWindow->HWindow, item->UMCommand, fileName, fileName.Size(), FALSE))
                         error = TRUE;
                     else
                     {

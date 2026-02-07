@@ -322,7 +322,7 @@ void CPluginsDlg::OnSelChanged()
 
         SetWindowText(GetDlgItem(HWindow, IDC_PLUGINFUNCTIONS), buf);
 
-        char buff[MAX_PATH + 200];
+        CPathBuffer buff;
         char pluginName[300];
         lstrcpyn(pluginName, p->Name, 299);
         DuplicateAmpersands(pluginName, 299); // plugin name may contain the '&' character
@@ -1825,7 +1825,7 @@ void CCfgPageDrives::Transfer(CTransferInfo& ti)
             else
             {
                 Configuration.IfPathIsInaccessibleGoToIsMyDocs = FALSE;
-                lstrcpyn(Configuration.IfPathIsInaccessibleGoTo, newPath, MAX_PATH);
+                lstrcpyn(Configuration.IfPathIsInaccessibleGoTo, newPath, Configuration.IfPathIsInaccessibleGoTo.Size());
             }
         }
     }
