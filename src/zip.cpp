@@ -2025,12 +2025,12 @@ void CSalamanderGeneral::FocusNameInPanel(int panel, const char* path, const cha
         return;
     }
     CFilesWindow* p = GetPanel(panel);
-    char pathBackup[MAX_PATH + 200];
-    char nameBackup[MAX_PATH + 200];
-    lstrcpyn(pathBackup, path, MAX_PATH + 200);
-    lstrcpyn(nameBackup, name, MAX_PATH + 200);
+    CPathBuffer pathBackup;
+    CPathBuffer nameBackup;
+    lstrcpyn(pathBackup, path, pathBackup.Size());
+    lstrcpyn(nameBackup, name, nameBackup.Size());
     if (p != NULL)
-        SendMessage(p->HWindow, WM_USER_FOCUSFILE, (WPARAM)nameBackup, (LPARAM)pathBackup);
+        SendMessage(p->HWindow, WM_USER_FOCUSFILE, (WPARAM)nameBackup.Get(), (LPARAM)pathBackup.Get());
 }
 
 BOOL CSalamanderGeneral::ChangePanelPath(int panel, const char* path, int* failReason,
@@ -3911,11 +3911,11 @@ void CSalamanderGeneral::GetCommonFSOperSourceDescr(char* sourceDescr, int sourc
         int fileNameFormat;
         GetConfigParameter(SALCFG_FILENAMEFORMAT, &fileNameFormat,
                            sizeof(fileNameFormat), NULL);
-        char formatedFileName[MAX_PATH]; // CFileData::Name is at most MAX_PATH-5 characters long - Salamander's limit
+        CPathBuffer formatedFileName;
         ::AlterFileName(formatedFileName, name, -1, fileNameFormat, 0, nameIsDir);
         _snprintf_s(sourceDescr, sourceDescrSize, _TRUNCATE,
                     ::LoadStr(nameIsDir ? (forDlgCaption ? IDS_DLG_QUESTION_DIRECTORY : IDS_QUESTION_DIRECTORY) : (forDlgCaption ? IDS_DLG_QUESTION_FILE : IDS_QUESTION_FILE)),
-                    formatedFileName);
+                    formatedFileName.Get());
     }
     else // multiple directories and files
     {

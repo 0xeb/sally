@@ -149,7 +149,7 @@ BOOL SalmonStartProcess(const char* fileMappingName) //Configuration.LoadedSLGNa
 {
     STARTUPINFO si;
     PROCESS_INFORMATION pi;
-    char cmd[2 * MAX_PATH];
+    CPathBuffer cmd;
     CPathBuffer rtlDir;    // Heap-allocated for long path support
     CPathBuffer oldCurDir; // Heap-allocated for long path support
     CPathBuffer slgName;   // Heap-allocated for long path support
@@ -160,10 +160,10 @@ BOOL SalmonStartProcess(const char* fileMappingName) //Configuration.LoadedSLGNa
     HSalmonProcess = NULL;
 
     ret = FALSE;
-    GetModuleFileName(NULL, cmd, MAX_PATH);
+    GetModuleFileName(NULL, cmd, cmd.Size());
     *(strrchr(cmd, '\\') + 1) = 0;
     lstrcat(cmd, "utils\\salmon.exe");
-    AddDoubleQuotesIfNeeded(cmd, MAX_PATH); // CreateProcess wants the name with spaces in quotes (otherwise it tries various variants, see help)
+    AddDoubleQuotesIfNeeded(cmd, cmd.Size()); // CreateProcess wants the name with spaces in quotes (otherwise it tries various variants, see help)
     GetStartupSLGName(slgName, slgName.Size());
     wsprintf(cmd + strlen(cmd), " \"%s\" \"%s\"", fileMappingName, slgName.Get()); // slgName can be an empty string if configuration does not exist
     memset(&si, 0, sizeof(STARTUPINFO));

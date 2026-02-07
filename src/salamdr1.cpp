@@ -2021,10 +2021,10 @@ BOOL GetShortcutOverlay()
                                "SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Explorer\\Shell Icons",
                                0, KEY_QUERY_VALUE, &hKey)) == ERROR_SUCCESS)
     {
-        char buff[MAX_PATH + 10];
-        DWORD buffLen = sizeof(buff);
+        CPathBuffer buff;
+        DWORD buffLen = buff.Size();
         buff[0] = 0;
-        SalRegQueryValueEx(hKey, "29", NULL, NULL, (LPBYTE)buff, &buffLen);
+        SalRegQueryValueEx(hKey, "29", NULL, NULL, (LPBYTE)buff.Get(), &buffLen);
         if (buff[0] != 0)
         {
             char* num = strrchr(buff, ','); // icon number is after the last comma
@@ -3892,7 +3892,7 @@ FIND_NEW_SLG_FILE:
     }
 
     CPathBuffer path; // Heap-allocated for long path support
-    char errorText[MAX_PATH + 200];
+    CPathBuffer errorText;
     GetModuleFileName(NULL, path, path.Size());
     sprintf(strrchr(path, '\\') + 1, "lang\\%s", Configuration.SLGName.Get());
     HLanguage = HANDLES(LoadLibrary(path));

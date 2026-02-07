@@ -1713,7 +1713,7 @@ CSalamanderPluginEntry::LoadLanguageModule(HWND parent, const char* pluginName)
 {
     HINSTANCE lang = NULL;
     CPathBuffer path; // Heap-allocated for long path support
-    char errorText[MAX_PATH + 300];
+    CPathBuffer errorText;
 
     // obtain the path to the plugin's LANG directory
     char* s = Plugin->DLLName;
@@ -2133,7 +2133,7 @@ BOOL CPluginData::InitDLL(HWND parent, BOOL quiet, BOOL waitCursor, BOOL showUns
                         parent, quiet, waitCursor, showUnsupOnX64,
                         releaseDynMenuIcons, DLLName, Version);
 
-    char bufText[MAX_PATH + 200];
+    CPathBuffer bufText;
 
 #ifdef _WIN64 // FIXME_X64_WINSCP - this probably needs a different solution... (ignoring missing WinSCP in the x64 version of Salamander)
     const char* pluginNameEN;
@@ -3036,7 +3036,7 @@ BOOL CPluginData::Unload(HWND parent, BOOL ask)
     {
         if (MainWindow == NULL || MainWindow->CanUnloadPlugin(parent, PluginIface.GetInterface()))
         { // the plugin is no longer used by Salamander; it can be unloaded
-            char buf[MAX_PATH + 300];
+            CPathBuffer buf;
             BOOL skipUnload = FALSE;
             if (SupportLoadSave && ::Configuration.AutoSave)
             { // ask if the user wants to save configuration when "save on exit" is on

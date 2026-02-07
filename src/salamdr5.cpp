@@ -396,7 +396,7 @@ RETRY:
                 if (exit == STILL_ACTIVE) // take care of kill via ESC
                 {
                     // after 3 seconds we show "ESC to cancel" window
-                    char buf[MAX_PATH + 100];
+                    CPathBuffer buf;
                     sprintf(buf, LoadStr(IDS_CHECKINGPATHESC), path);
                     CreateSafeWaitWindow(buf, NULL, 4800 + 200, TRUE, NULL);
 
@@ -666,7 +666,7 @@ BOOL SalParsePath(HWND parent, char* path, int& type, BOOL& isDir, char*& second
     CALL_STACK_MESSAGE7("SalParsePath(%s, , , , %s, , %d, %s, %s, , %d)", path, errorTitle,
                         curPathIsDiskOrArchive, curPath, curArchivePath, pathBufSize);
 
-    char errBuf[3 * MAX_PATH + 300];
+    CPathBuffer errBuf;
     type = -1;
     secondPart = NULL;
     isDir = FALSE;
@@ -677,7 +677,7 @@ BOOL SalParsePath(HWND parent, char* path, int& type, BOOL& isDir, char*& second
 
 PARSE_AGAIN:
 
-    char fsName[MAX_PATH];
+    CPathBuffer fsName;
     char* fsUserPart;
     if (IsPluginFSPath(path, fsName, &fsUserPart)) // FS path
     {
@@ -1418,8 +1418,8 @@ BOOL CSystemPolicies::GetMyCanRun(const char* fileName)
         p++;
     if (strlen(p) >= MAX_PATH)
         return RestrictRun == 0; // deny execution if only selected commands are allowed (this one couldn't be separated from command line)
-    char name[MAX_PATH];
-    lstrcpyn(name, p, MAX_PATH);
+    CPathBuffer name;
+    lstrcpyn(name, p, name.Size());
     // trim spaces from right
     char* p2 = name + strlen(name) - 1;
     while (p2 >= name && *p2 == ' ')

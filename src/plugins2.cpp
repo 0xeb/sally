@@ -2777,12 +2777,12 @@ BOOL SearchForAddedSPLs(char* buf, char* s, TIndirectArray<char>& foundFiles)
     {
         BOOL isPluginVerNew = FALSE;
         int lastPluginVer = 0;
-        char line[MAX_PATH + 20];
+        CPathBuffer line;
         BOOL isEOF = FALSE;
         BOOL firstRow = TRUE;
         DWORD read, off;
         off = 0;
-        while (isEOF || ReadFile(file, line + off, firstRow ? 20 : MAX_PATH + 20 - off, &read, NULL))
+        while (isEOF || ReadFile(file, line + off, firstRow ? 20 : line.Size() - off, &read, NULL))
         {
             if (read == 0)
                 isEOF = TRUE;              // EOF, no point in reading the file further, just process the remaining buffer
@@ -2891,8 +2891,8 @@ BOOL CPlugins::ReadPluginsVer(HWND parent, BOOL importFromOldConfig)
     BOOL ret = FALSE;
 
     // obtain the "plugins" directory
-    char buf[MAX_PATH + 20];
-    GetModuleFileName(HInstance, buf, MAX_PATH);
+    CPathBuffer buf;
+    GetModuleFileName(HInstance, buf, buf.Size());
     char* s = strrchr(buf, '\\');
     if (s != NULL)
     {
@@ -3187,8 +3187,8 @@ void CPlugins::RemoveNoLongerExistingPlugins(BOOL canDelPluginRegKey, BOOL loadA
                                              int maxNotLoadedPluginNames, int* numOfSkippedNotLoadedPluginNames,
                                              HWND parent)
 {
-    char buf[MAX_PATH + 20];
-    GetModuleFileName(HInstance, buf, MAX_PATH);
+    CPathBuffer buf;
+    GetModuleFileName(HInstance, buf, buf.Size());
     char* s = strrchr(buf, '\\');
     if (s != NULL)
     {
@@ -3329,8 +3329,8 @@ void CPlugins::AutoInstallStdPluginsDir(HWND parent)
     CALL_STACK_MESSAGE1("CPlugins::AutoInstallStdPluginsDir()");
 
     // obtain the "plugins" directory
-    char buf[MAX_PATH + 20];
-    GetModuleFileName(HInstance, buf, MAX_PATH);
+    CPathBuffer buf;
+    GetModuleFileName(HInstance, buf, buf.Size());
     char* s = strrchr(buf, '\\');
     if (s != NULL)
     {

@@ -606,7 +606,7 @@ BOOL CStaticText::SetTextToDblQuotesIfNeeded(const char* text)
         int len = (int)strlen(text);
         if (len > 0 && (text[0] <= ' ' || text[len - 1] <= ' ') && len < 2 * MAX_PATH)
         {
-            char buf[2 * MAX_PATH + 2];
+            CPathBuffer buf;
             sprintf(buf, "\"%s\"", text); // spaces at the beginning and end will be visible in quotes (otherwise they are invisible)
             return SetText(buf);
         }

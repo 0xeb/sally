@@ -154,7 +154,7 @@ BOOL IsGoodPIDL(LPCITEMIDLIST pidl, int cb)
 const char* DumpPidl(LPCITEMIDLIST pidl)
 {
     static TCHAR szBuf[MAX_PATH];
-    TCHAR szTmp[MAX_PATH];
+    CPathBuffer szTmp;
     USHORT cb;
     LPCTSTR pszT;
 

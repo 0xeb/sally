@@ -400,10 +400,10 @@ CEditLine::WindowProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
                         // let the command fall through to the shell so the message box text stays simple
                     }
 
-                    char cmd[SALCMDLINE_MAXLEN + MAX_PATH]; // COMSPEC is likely only a few characters long; MAX_PATH is plenty (no extra needed for parameters /K, etc.)
-                    if (!GetEnvironmentVariable("COMSPEC", cmd, SALCMDLINE_MAXLEN + MAX_PATH))
+                    CPathBuffer cmd;
+                    if (!GetEnvironmentVariable("COMSPEC", cmd, cmd.Size()))
                         cmd[0] = 0;
-                    AddDoubleQuotesIfNeeded(cmd, SALCMDLINE_MAXLEN + MAX_PATH); // CreateProcess wants names with spaces quoted (or it tries alternatives, see help)
+                    AddDoubleQuotesIfNeeded(cmd, cmd.Size()); // CreateProcess wants names with spaces quoted (or it tries alternatives, see help)
 
                     if (SystemPolicies.GetMyRunRestricted() &&
                         (!SystemPolicies.GetMyCanRun(cmd) || !SystemPolicies.GetMyCanRun(cmdLine)))
@@ -845,7 +845,7 @@ CEditLine::WindowProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
             if (controlPressed && !altPressed) // filename of the selected file to the command line
             {
                 SkipCharacter = TRUE;
-                char path[MAX_PATH + 1];
+                CPathBuffer path;
                 const char* s;
                 int l;
                 CFilesWindow* p = MainWindow->GetActivePanel();

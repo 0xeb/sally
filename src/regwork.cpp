@@ -13,9 +13,9 @@ CRegistryWorkerThread RegistryWorkerThread;
 
 BOOL ClearKeyAux(HKEY key)
 {
-    char name[MAX_PATH];
+    CPathBuffer name;
     HKEY subKey;
-    while (RegEnumKey(key, 0, name, MAX_PATH) == ERROR_SUCCESS)
+    while (RegEnumKey(key, 0, name, name.Size()) == ERROR_SUCCESS)
     {
         if (HANDLES_Q(RegOpenKeyEx(key, name, 0, KEY_READ | KEY_WRITE, &subKey)) == ERROR_SUCCESS)
         {
@@ -28,7 +28,7 @@ BOOL ClearKeyAux(HKEY key)
             return FALSE;
     }
 
-    DWORD size = MAX_PATH;
+    DWORD size = name.Size();
     while (RegEnumValue(key, 0, name, &size, NULL, NULL, NULL, NULL) == ERROR_SUCCESS)
         if (RegDeleteValue(key, name) != ERROR_SUCCESS)
         {
@@ -36,7 +36,7 @@ BOOL ClearKeyAux(HKEY key)
             break;
         }
         else
-            size = MAX_PATH;
+            size = name.Size();
 
     return TRUE;
 }

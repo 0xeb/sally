@@ -617,9 +617,9 @@ const char* GetCurrentDirClipboard(POINTL& pt, void* param, DWORD* effect, BOOL 
 
 int CountNumberOfItemsOnPath(const char* path)
 {
-    char s[MAX_PATH + 10];
-    lstrcpyn(s, path, MAX_PATH + 10);
-    if (SalPathAppend(s, "*.*", MAX_PATH + 10))
+    CPathBuffer s;
+    lstrcpyn(s, path, s.Size());
+    if (SalPathAppend(s, "*.*", s.Size()))
     {
         WIN32_FIND_DATA fileData;
         HANDLE search = HANDLES_Q(FindFirstFile(s, &fileData));
@@ -1614,7 +1614,7 @@ void ShellAction(CFilesWindow* panel, CShellAction action, BOOL useSelection,
 
 #ifndef _WIN64
     CPathBuffer redirectedDir; // Heap-allocated for long path support
-    char msg[300 + MAX_PATH];
+    CPathBuffer msg;
 #endif // _WIN64
     switch (action)
     {

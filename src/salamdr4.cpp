@@ -858,7 +858,7 @@ BOOL CViewTemplates::Load(HKEY hKey)
         HKEY actKey;
         if (OpenKey(hKey, keyName, actKey))
         {
-            char name[MAX_PATH];
+            CPathBuffer name;
             DWORD flags;
             name[0] = 0;
             flags = 0;
