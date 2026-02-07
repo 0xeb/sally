@@ -72,7 +72,7 @@ BOOL SalGetIconFromPIDL(IShellFolder* psf, const char* path, LPCITEMIDLIST pidl,
     HICON hIconLarge = NULL;
 
     CPathBuffer iconFile;
-    WCHAR iconFileW[MAX_PATH];
+    CWidePathBuffer iconFileW;
     int iconIndex;
     UINT wFlags = 0; // clear because the DWGIcon.dll shell extension just ORs these bits
 
@@ -93,7 +93,7 @@ BOOL SalGetIconFromPIDL(IShellFolder* psf, const char* path, LPCITEMIDLIST pidl,
         if (SUCCEEDED(hres))
         {
             isIExtractIconW = TRUE;
-            hres = ((IExtractIconW*)pxi)->GetIconLocation(GIL_FORSHELL, iconFileW, MAX_PATH, &iconIndex, &wFlags);
+            hres = ((IExtractIconW*)pxi)->GetIconLocation(GIL_FORSHELL, iconFileW, iconFileW.Size(), &iconIndex, &wFlags);
             if (SUCCEEDED(hres))
             {
                 // Convert the UNICODE string to ANSI
@@ -328,10 +328,10 @@ LPITEMIDLIST SHILCreateFromPath(LPCSTR pszPath)
     if (SUCCEEDED(SHGetDesktopFolder(&psfDesktop)))
     {
         ULONG cchEaten;
-        WCHAR wszPath[MAX_PATH];
+        CWidePathBuffer wszPath;
 
-        MultiByteToWideChar(CP_ACP, 0, pszPath, -1, wszPath, MAX_PATH);
-        wszPath[MAX_PATH - 1] = 0;
+        MultiByteToWideChar(CP_ACP, 0, pszPath, -1, wszPath, wszPath.Size());
+        wszPath[wszPath.Size() - 1] = 0;
 
         psfDesktop->ParseDisplayName(NULL, NULL, wszPath, &cchEaten, &pidl, NULL);
 

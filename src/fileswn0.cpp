@@ -255,9 +255,9 @@ void CFilesWindow::FocusShortcutTarget(CFilesWindow* panel)
                 if (link->QueryInterface(IID_IPersistFile, (LPVOID*)&fileInt) == S_OK)
                 {
                     HRESULT res = 2;
-                    OLECHAR oleName[MAX_PATH];
-                    MultiByteToWideChar(CP_ACP, MB_PRECOMPOSED, fullName, -1, oleName, MAX_PATH);
-                    oleName[MAX_PATH - 1] = 0;
+                    CWidePathBuffer oleName;
+                    MultiByteToWideChar(CP_ACP, MB_PRECOMPOSED, fullName, -1, oleName, oleName.Size());
+                    oleName[oleName.Size() - 1] = 0;
                     if (fileInt->Load(oleName, STGM_READ) == S_OK)
                     {
                         res = link->Resolve(HWindow, SLR_ANY_MATCH | SLR_UPDATE);

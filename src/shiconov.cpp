@@ -81,7 +81,7 @@ BOOL GetGoogleDrivePath(char* gdPath, int gdPathMax, CSQLite3DynLoadBase** sqlit
     BOOL ret = FALSE;
     *pathIsFromConfig = FALSE;
 
-    WCHAR widePath[MAX_PATH]; // longer paths are not supported anyway
+    CWidePathBuffer widePath;
     CPathBuffer mbPath; // Heap-allocated for long path support
     CPathBuffer sDbPath; // Heap-allocated for long path support
     if (SHGetFolderPath(NULL, CSIDL_LOCAL_APPDATA, NULL, 0 /* SHGFP_TYPE_CURRENT */, sDbPath) == S_OK)
@@ -109,7 +109,7 @@ BOOL GetGoogleDrivePath(char* gdPath, int gdPathMax, CSQLite3DynLoadBase** sqlit
                 char utf8Select[] = "SELECT data_value FROM data WHERE entry_key = 'local_sync_root_path';"; // UTF8 string (if any extra character were to be inserted, it would need to be converted from ANSI->UTF8)
 
                 // sqlite3_open_v2 requires UTF8 path, so we will convert it from ANSI to UTF8
-                if (ConvertA2U(sDbPath, -1, widePath, _countof(widePath)) &&
+                if (ConvertA2U(sDbPath, -1, widePath, widePath.Size()) &&
                     ConvertU2A(widePath, -1, mbPath, mbPath.Size(), FALSE, CP_UTF8))
                 {
                     int iSts = sqlite3_Dyn->open_v2(mbPath, &pDb, SQLITE_OPEN_READONLY, NULL);
@@ -124,7 +124,7 @@ BOOL GetGoogleDrivePath(char* gdPath, int gdPathMax, CSQLite3DynLoadBase** sqlit
                                 const unsigned char* utf8Path = sqlite3_Dyn->column_text(pStmt, 0);
                                 int utf8PathLen = sqlite3_Dyn->column_bytes(pStmt, 0);
                                 if (utf8Path != NULL && utf8PathLen > 0 &&
-                                    ConvertA2U((const char*)utf8Path, utf8PathLen, widePath, _countof(widePath), CP_UTF8) &&
+                                    ConvertA2U((const char*)utf8Path, utf8PathLen, widePath, widePath.Size(), CP_UTF8) &&
                                     ConvertU2A(widePath, -1, mbPath, mbPath.Size()) &&
                                     (int)strlen(mbPath) < gdPathMax)
                                 {
@@ -209,10 +209,10 @@ void InitShellIconOverlaysAuxAux(CLSID* clsid, const char* name)
                          (LPVOID*)&iconOverlayIdentifier) == S_OK &&
         iconOverlayIdentifier != NULL) // probably unnecessary test, just to be safe
     {
-        OLECHAR iconFile[MAX_PATH];
+        CWidePathBuffer iconFile;
         int iconIndex;
         DWORD flags;
-        if (iconOverlayIdentifier->GetOverlayInfo(iconFile, MAX_PATH, &iconIndex, &flags) == S_OK)
+        if (iconOverlayIdentifier->GetOverlayInfo(iconFile, iconFile.Size(), &iconIndex, &flags) == S_OK)
         {
             if (flags & ISIOI_ICONFILE)
             {
@@ -671,10 +671,10 @@ void CreateIconReadersIconOverlayIdsAuxAux(CLSID* clsid, const char* name, IShel
         iconOverlayIdentifier != NULL) // probably unnecessary test, just to be safe
     {
         // just for form's sake, call the usual methods (as if we were Explorer and wanted to show those overlays)
-        OLECHAR iconFile[MAX_PATH];
+        CWidePathBuffer iconFile;
         int iconIndex;
         DWORD flags;
-        iconOverlayIdentifier->GetOverlayInfo(iconFile, MAX_PATH, &iconIndex, &flags);
+        iconOverlayIdentifier->GetOverlayInfo(iconFile, iconFile.Size(), &iconIndex, &flags);
         int priority;
         iconOverlayIdentifier->GetPriority(&priority);
 
@@ -855,10 +855,10 @@ CShellIconOverlays::GetIconOverlayIndex(WCHAR* wPath, WCHAR* wName, char* aPath,
 
 void ColorsChangedAuxAux(CShellIconOverlayItem* item)
 {
-    OLECHAR iconFile[MAX_PATH];
+    CWidePathBuffer iconFile;
     int iconIndex;
     DWORD flags;
-    if (item->Identifier->GetOverlayInfo(iconFile, MAX_PATH, &iconIndex, &flags) == S_OK)
+    if (item->Identifier->GetOverlayInfo(iconFile, iconFile.Size(), &iconIndex, &flags) == S_OK)
     {
         if (flags & ISIOI_ICONFILE)
         {

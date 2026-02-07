@@ -434,7 +434,7 @@ BOOL IsSimpleSelection(IDataObject* pDataObject, CDragDropOperData* namesList)
                         if (data != NULL)
                         {
                             int prefixLen = -1;
-                            wchar_t prefixBuf[MAX_PATH];
+                            CWidePathBuffer prefixBuf;
                             prefixBuf[0] = 0;
                             if (data->fWide)
                             {
@@ -486,8 +486,8 @@ BOOL IsSimpleSelection(IDataObject* pDataObject, CDragDropOperData* namesList)
                                             if (prefixLen == -1)
                                             {
                                                 prefixLen = (int)(lastBackslash - fileW);
-                                                if (prefixLen >= MAX_PATH)
-                                                    prefixLen = MAX_PATH - 1;
+                                                if (prefixLen >= prefixBuf.Size())
+                                                    prefixLen = prefixBuf.Size() - 1;
                                                 memmove(prefix, fileW, prefixLen * sizeof(wchar_t));
                                                 prefix[prefixLen] = 0;
                                             }
@@ -543,7 +543,7 @@ BOOL IsSimpleSelection(IDataObject* pDataObject, CDragDropOperData* namesList)
                             }
                             else
                             {
-                                char* prefix = (char*)prefixBuf;
+                                char* prefix = (char*)prefixBuf.Get();
                                 const char* fileA = ((char*)data) + data->pFiles;
                                 while (1) // double null terminated, doesn't count empty strings (at start)
                                 {
@@ -583,8 +583,8 @@ BOOL IsSimpleSelection(IDataObject* pDataObject, CDragDropOperData* namesList)
                                             if (prefixLen == -1)
                                             {
                                                 prefixLen = (int)(lastBackslash - fileA);
-                                                if (prefixLen >= MAX_PATH)
-                                                    prefixLen = MAX_PATH - 1;
+                                                if (prefixLen >= (int)(prefixBuf.Size() * sizeof(wchar_t)))
+                                                    prefixLen = (int)(prefixBuf.Size() * sizeof(wchar_t)) - 1;
                                                 memmove(prefix, fileA, prefixLen);
                                                 prefix[prefixLen] = 0;
                                             }
@@ -1468,12 +1468,12 @@ LPITEMIDLIST GetItemIdListForFileName(LPSHELLFOLDER folder, const char* fileName
             TRACE_E("GetItemIdListForFileName(): unable to find PIDL usign enumeration, trying to get it using ParseDisplayName...");
     }
 
-    OLECHAR olePath[MAX_PATH];
+    CWidePathBuffer olePath;
     if (addUNCPrefix)
         olePath[0] = olePath[1] = L'\\';
     MultiByteToWideChar(CP_ACP, MB_PRECOMPOSED, fileName, -1, olePath + (addUNCPrefix ? 2 : 0),
-                        MAX_PATH - (addUNCPrefix ? 2 : 0));
-    olePath[MAX_PATH - 1] = 0;
+                        olePath.Size() - (addUNCPrefix ? 2 : 0));
+    olePath[olePath.Size() - 1] = 0;
 
     LPITEMIDLIST pidl;
     ULONG chEaten;
@@ -2469,9 +2469,9 @@ void ResolveNetHoodPath(char* path)
                     IPersistFile* fileInt;
                     if (link->QueryInterface(IID_IPersistFile, (LPVOID*)&fileInt) == S_OK)
                     {
-                        OLECHAR oleName[MAX_PATH];
-                        MultiByteToWideChar(CP_ACP, MB_PRECOMPOSED, name, -1, oleName, MAX_PATH);
-                        oleName[MAX_PATH - 1] = 0;
+                        CWidePathBuffer oleName;
+                        MultiByteToWideChar(CP_ACP, MB_PRECOMPOSED, name, -1, oleName, oleName.Size());
+                        oleName[oleName.Size() - 1] = 0;
                         if (fileInt->Load(oleName, STGM_READ) == S_OK)
                         {
                             if (link->GetPath(name, MAX_PATH, &data, SLGP_UNCPRIORITY) == NOERROR)

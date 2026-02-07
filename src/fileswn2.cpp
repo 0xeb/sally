@@ -114,9 +114,9 @@ void CFilesWindow::Execute(int index)
                     EndStopRefresh();
                     return;
                 }
-                OLECHAR oleName[MAX_PATH];
-                MultiByteToWideChar(CP_ACP, MB_PRECOMPOSED, fullName, -1, oleName, MAX_PATH);
-                oleName[MAX_PATH - 1] = 0;
+                CWidePathBuffer oleName;
+                MultiByteToWideChar(CP_ACP, MB_PRECOMPOSED, fullName, -1, oleName, oleName.Size());
+                oleName[oleName.Size() - 1] = 0;
 
                 HCURSOR oldCur = SetCursor(LoadCursor(NULL, IDC_WAIT));
                 IShellLink* link;

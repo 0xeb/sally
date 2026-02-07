@@ -548,9 +548,9 @@ int CSharesDialog::GetFocusedIndex()
 
 void CSharesDialog::DeleteShare(const char* shareName)
 {
-    OLECHAR oleShareName[MAX_PATH];
-    MultiByteToWideChar(CP_ACP, MB_PRECOMPOSED, shareName, -1, oleShareName, MAX_PATH);
-    oleShareName[MAX_PATH - 1] = 0;
+    CWidePathBuffer oleShareName;
+    MultiByteToWideChar(CP_ACP, MB_PRECOMPOSED, shareName, -1, oleShareName, oleShareName.Size());
+    oleShareName[oleShareName.Size() - 1] = 0;
     NetShareDel(NULL, oleShareName, 0);
 }
 
