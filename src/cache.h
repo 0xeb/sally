@@ -4,6 +4,8 @@
 
 #pragma once
 
+#include "common/widepath.h"
+
 // disk cache initialization, returns success
 BOOL InitializeDiskCache();
 
@@ -154,7 +156,7 @@ public:
 class CCacheDirData // tmp-directory, contains unique tmp-names, internal use
 {
 protected:
-    char Path[MAX_PATH];             // tmp-directory representation on disk
+    CPathBuffer Path;                // tmp-directory representation on disk
     int PathLength;                  // length of the string in Path
     TDirectArray<CCacheData*> Names; // the list of records, type of item (CCacheData *)
 

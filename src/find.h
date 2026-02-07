@@ -4,6 +4,8 @@
 
 #pragma once
 
+#include "common/widepath.h"
+
 // structure for adding messages to the Find Log; sent as the message parameter
 // of WM_USER_ADDLOG; parameters will be copied into the log data (can be deallocated after returning)
 #define FLI_INFO 0x00000000   // INFORMATION item
@@ -71,7 +73,7 @@ class CMenuBar;
 
 struct CSearchForData
 {
-    char Dir[MAX_PATH];
+    CPathBuffer Dir;
     CMaskGroup MasksGroup;
     BOOL IncludeSubDirs;
 
@@ -104,7 +106,7 @@ struct CSearchForData
 class CSearchingString
 {
 protected:
-    char Buffer[MAX_PATH + 50];
+    CPathBuffer Buffer;
     int BaseLen;
     BOOL Dirty;
     CRITICAL_SECTION Section;
@@ -181,7 +183,7 @@ class CFindOptionsItem
 {
 public:
     // Internal
-    char ItemName[ITEMNAME_TEXT_LEN];
+    CPathBuffer ItemName;
 
     CFilterCriteria Criteria;
 
@@ -194,8 +196,8 @@ public:
 
     BOOL AutoLoad;
 
-    char NamedText[NAMED_TEXT_LEN];
-    char LookInText[LOOKIN_TEXT_LEN];
+    CPathBuffer NamedText;
+    CPathBuffer LookInText;
     char GrepText[GREP_TEXT_LEN];
 
 public:

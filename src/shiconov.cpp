@@ -286,7 +286,7 @@ void InitShellIconOverlaysAuxAux(CLSID* clsid, const char* name)
                             item->Priority = priority;
                             item->Identifier = iconOverlayIdentifier;
                             item->IconOverlayIdCLSID = *clsid;
-                            lstrcpyn(item->IconOverlayName, name, MAX_PATH);
+                            lstrcpyn(item->IconOverlayName, name, item->IconOverlayName.Size());
                             item->GoogleDriveOverlay = isGoogleDrive;
                             iconOverlayIdentifier = NULL;
                             for (x = 0; x < ICONSIZE_COUNT; x++)

@@ -4,6 +4,8 @@
 
 #pragma once
 
+#include "common/widepath.h"
+
 void InitShellIconOverlays();
 void ReleaseShellIconOverlays();
 
@@ -26,7 +28,7 @@ struct CSQLite3DynLoadBase
 
 struct CShellIconOverlayItem
 {
-    char IconOverlayName[MAX_PATH];          // key name under HKEY_LOCAL_MACHINE\Software\Microsoft\Windows\CurrentVersion\Explorer\ShellIconOverlayIdentifiers
+    CPathBuffer IconOverlayName;             // key name under HKEY_LOCAL_MACHINE\Software\Microsoft\Windows\CurrentVersion\Explorer\ShellIconOverlayIdentifiers
     IShellIconOverlayIdentifier* Identifier; // IShellIconOverlayIdentifier object, WARNING: usable only in the main thread
     CLSID IconOverlayIdCLSID;                // CLSID of the corresponding IShellIconOverlayIdentifier object
     int Priority;                            // priority of this icon overlay (0-100, highest priority is zero)
@@ -45,7 +47,7 @@ protected:
     TIndirectArray<CShellIconOverlayItem> Overlays; // priority-sorted list of icon overlays
     CRITICAL_SECTION GD_CS;                         // for GoogleDrive we must mutually exclude IsMemberOf calls from both icon readers (otherwise it crashes, corrupts heap)
     BOOL GetGDAlreadyCalled;                        // TRUE = Google Drive folder location already checked
-    char GoogleDrivePath[MAX_PATH];                 // Google Drive folder (we do not call their handler elsewhere, it is very slow and crashes without extra synchronization)
+    CPathBuffer GoogleDrivePath;                    // Google Drive folder (we do not call their handler elsewhere, it is very slow and crashes without extra synchronization)
     BOOL GoogleDrivePathIsFromCfg;                  // Google Drive folder read from config (FALSE = may be default only + Google Drive may not be installed)
     BOOL GoogleDrivePathExists;                     // does the Google Drive folder exist on disk?
 
@@ -103,7 +105,7 @@ public:
 
     void SetGoogleDrivePath(const char* path, BOOL pathIsFromConfig)
     {
-        strcpy_s(GoogleDrivePath, path);
+        strcpy_s(GoogleDrivePath, GoogleDrivePath.Size(), path);
         GoogleDrivePathIsFromCfg = pathIsFromConfig;
         GoogleDrivePathExists = FALSE;
     }
