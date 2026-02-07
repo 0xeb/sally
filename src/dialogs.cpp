@@ -723,8 +723,8 @@ CProgressDialog::DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
             // do not draw data immediately, only on the timer
             lstrcpyn(OperationCache, data->Operation, 100);
             lstrcpyn(PrepositionCache, data->Preposition, 100);
-            lstrcpyn(SourceCache, data->Source, 2 * MAX_PATH);
-            lstrcpyn(TargetCache, data->Target, 2 * MAX_PATH);
+            lstrcpyn(SourceCache, data->Source, SourceCache.Size());
+            lstrcpyn(TargetCache, data->Target, TargetCache.Size());
             CacheIsDirty = TRUE;
         }
 

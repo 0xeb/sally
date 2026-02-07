@@ -384,8 +384,8 @@ protected:
     BOOL CacheIsDirty;
     char OperationCache[100];
     char PrepositionCache[100];
-    char SourceCache[2 * MAX_PATH];
-    char TargetCache[2 * MAX_PATH];
+    CPathBuffer SourceCache;
+    CPathBuffer TargetCache;
 
     // values are stored and drawn only when the timer fires
     BOOL OperationProgressCacheIsDirty;
@@ -1512,8 +1512,8 @@ protected:
     CProgressBar* Progress;
     CProgressBar* TotalProgress;
 
-    char DelayedSource[2 * MAX_PATH]; // text displayed later
-    char DelayedTarget[2 * MAX_PATH]; // text displayed later
+    CPathBuffer DelayedSource; // text displayed later
+    CPathBuffer DelayedTarget; // text displayed later
     BOOL DelayedSourceDirty;
     BOOL DelayedTargetDirty;
 

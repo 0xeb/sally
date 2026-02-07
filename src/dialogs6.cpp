@@ -1727,13 +1727,13 @@ CCmpDirProgressDialog::CCmpDirProgressDialog(HWND hParent, BOOL hasProgress, CIT
 
 void CCmpDirProgressDialog::SetSource(const char* text)
 {
-    lstrcpyn(DelayedSource, text, 2 * MAX_PATH);
+    lstrcpyn(DelayedSource, text, DelayedSource.Size());
     DelayedSourceDirty = TRUE;
 }
 
 void CCmpDirProgressDialog::SetTarget(const char* text)
 {
-    lstrcpyn(DelayedTarget, text, 2 * MAX_PATH);
+    lstrcpyn(DelayedTarget, text, DelayedTarget.Size());
     DelayedTargetDirty = TRUE;
 }
 
