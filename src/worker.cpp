@@ -1428,7 +1428,7 @@ void GetDirInfo(char* buffer, const char* dir)
 
 BOOL IsDirectoryEmpty(const char* name) // directories/subdirectories contain no files
 {
-    char dir[MAX_PATH + 5];
+    CPathBuffer dir;
     int len = (int)strlen(name);
     memcpy(dir, name, len);
     if (dir[len - 1] != '\\')
@@ -2604,10 +2604,10 @@ COPY_ADS_AGAIN:
     {                                  // we have the list of ADS, let's try to copy them to the target file/directory
         wchar_t srcName[2 * MAX_PATH]; // MAX_PATH for the file name as well as the ADS name (no idea what the actual maximum lengths are)
         wchar_t tgtName[2 * MAX_PATH];
-        char longSourceName[MAX_PATH + 100];
-        char longTargetName[MAX_PATH + 100];
-        DoLongName(longSourceName, sourceName, MAX_PATH + 100);
-        DoLongName(longTargetName, targetName, MAX_PATH + 100);
+        CPathBuffer longSourceName;
+        CPathBuffer longTargetName;
+        DoLongName(longSourceName, sourceName, longSourceName.Size());
+        DoLongName(longTargetName, targetName, longTargetName.Size());
         if (!MultiByteToWideChar(CP_ACP, MB_PRECOMPOSED, longSourceName, -1, srcName, 2 * MAX_PATH))
             srcName[0] = 0;
         if (!MultiByteToWideChar(CP_ACP, MB_PRECOMPOSED, longTargetName, -1, tgtName, 2 * MAX_PATH))
@@ -3210,13 +3210,13 @@ HANDLE SalCreateFileEx(const char* fileName, DWORD desiredAccess,
                         StrICmp(tgtName, data.cFileName) != 0)            // (full name differs)
                     {
                         // rename ("tidy up") the file/directory with the conflicting DOS name to a temporary 8.3 name (no extra DOS name needed)
-                        char tmpName[MAX_PATH + 20];
-                        lstrcpyn(tmpName, fileName, MAX_PATH);
+                        CPathBuffer tmpName;
+                        lstrcpyn(tmpName, fileName, tmpName.Size());
                         CutDirectory(tmpName);
-                        SalPathAddBackslash(tmpName, MAX_PATH + 20);
+                        SalPathAddBackslash(tmpName, tmpName.Size());
                         char* tmpNamePart = tmpName + strlen(tmpName);
                         CPathBuffer origFullName; // Heap-allocated for long path support
-                        if (SalPathAppend(tmpName, data.cFileName, MAX_PATH))
+                        if (SalPathAppend(tmpName, data.cFileName, tmpName.Size()))
                         {
                             strcpy(origFullName, tmpName);
                             DWORD num = (GetTickCount() / 10) % 0xFFF;
@@ -6002,13 +6002,13 @@ BOOL DoMoveFile(COperation* op, HWND hProgressDlg, void* buffer,
                             StrICmp(tgtName, findData.cFileName) != 0)            // (the full name is different)
                         {
                             // rename ("tidy up") the file/directory with the conflicting DOS name to a temporary 8.3 name (does not need an extra DOS name)
-                            char tmpName[MAX_PATH + 20];
-                            lstrcpyn(tmpName, op->TargetName, MAX_PATH);
+                            CPathBuffer tmpName;
+                            lstrcpyn(tmpName, op->TargetName, tmpName.Size());
                             CutDirectory(tmpName);
-                            SalPathAddBackslash(tmpName, MAX_PATH + 20);
+                            SalPathAddBackslash(tmpName, tmpName.Size());
                             char* tmpNamePart = tmpName + strlen(tmpName);
                             CPathBuffer origFullName; // Heap-allocated for long path support
-                            if (SalPathAppend(tmpName, findData.cFileName, MAX_PATH))
+                            if (SalPathAppend(tmpName, findData.cFileName, tmpName.Size()))
                             {
                                 strcpy(origFullName, tmpName);
                                 DWORD num = (GetTickCount() / 10) % 0xFFF;
@@ -6448,10 +6448,10 @@ BOOL DoDeleteFile(HWND hProgressDlg, char* name, const CQuadWord& size, COperati
             }
             if (useRecycleBin)
             {
-                char nameList[MAX_PATH + 1];
+                CPathBuffer nameList;
                 int l = (int)strlen(name) + 1;
                 memmove(nameList, name, l);
-                nameList[l] = 0;
+                nameList[l] = 0; // double-null termination for SHFileOperation
                 if (!PathContainsValidComponents(nameList, FALSE))
                 {
                     err = ERROR_INVALID_NAME;
@@ -6562,13 +6562,13 @@ BOOL SalCreateDirectoryEx(const char* name, DWORD* err)
                     StrICmp(tgtName, data.cFileName) != 0)            // (the full name differs)
                 {
                     // rename ("tidy up") the file/directory whose DOS name conflicts to a temporary 8.3 name (no extra DOS name needed)
-                    char tmpName[MAX_PATH + 20];
-                    lstrcpyn(tmpName, name, MAX_PATH);
+                    CPathBuffer tmpName;
+                    lstrcpyn(tmpName, name, tmpName.Size());
                     CutDirectory(tmpName);
-                    SalPathAddBackslash(tmpName, MAX_PATH + 20);
+                    SalPathAddBackslash(tmpName, tmpName.Size());
                     char* tmpNamePart = tmpName + strlen(tmpName);
                     CPathBuffer origFullName; // Heap-allocated for long path support
-                    if (SalPathAppend(tmpName, data.cFileName, MAX_PATH))
+                    if (SalPathAppend(tmpName, data.cFileName, tmpName.Size()))
                     {
                         strcpy(origFullName, tmpName);
                         DWORD num = (GetTickCount() / 10) % 0xFFF;
@@ -7065,10 +7065,10 @@ BOOL DoDeleteDir(HWND hProgressDlg, char* name, const CQuadWord& size, COperatio
              !script->InvertRecycleBin && dlgData.UseRecycleBin == 1) &&
             IsDirectoryEmpty(name)) // subdirectory must not contain any files!!!
         {
-            char nameList[MAX_PATH + 1];
+            CPathBuffer nameList;
             int l = (int)strlen(name) + 1;
             memmove(nameList, name, l);
-            nameList[l] = 0;
+            nameList[l] = 0; // double-null termination for SHFileOperation
             if (!PathContainsValidComponents(nameList, FALSE))
             {
                 err = ERROR_INVALID_NAME;
