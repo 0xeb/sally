@@ -872,23 +872,22 @@ BOOL CPackerConfig::Save(int index, HKEY hKey)
 
 BOOL CPackerConfig::Load(HKEY hKey)
 {
-    int max = MAX_PATH + 2;
-
-    char title[MAX_PATH + 2];
+    CPathBuffer title;
     title[0] = 0;
-    char ext[MAX_PATH + 2];
+    CPathBuffer ext;
     DWORD type;
     DWORD suplong = FALSE;
     DWORD needANSI = FALSE;
-    char execcopy[MAX_PATH + 2];
+    CPathBuffer execcopy;
     execcopy[0] = 0;
-    char argscopy[MAX_PATH + 2];
+    CPathBuffer argscopy;
     argscopy[0] = 0;
     DWORD supmove = FALSE;
-    char execmove[MAX_PATH + 2];
+    CPathBuffer execmove;
     execmove[0] = 0;
-    char argsmove[MAX_PATH + 2];
+    CPathBuffer argsmove;
     argsmove[0] = 0;
+    int max = title.Size();
 
     BOOL ret = TRUE;
     if (ret)
@@ -930,8 +929,8 @@ BOOL CPackerConfig::Load(HKEY hKey)
             return FALSE;
         if (Configuration.ConfigVersion < 44) // convert extension to lowercase
         {
-            char extAux[MAX_PATH + 2];
-            lstrcpyn(extAux, ext, MAX_PATH + 2);
+            CPathBuffer extAux;
+            lstrcpyn(extAux, ext, extAux.Size());
             StrICpy(ext, extAux);
         }
         ret &= SetPacker(index, (int)type, title, ext, Configuration.ConfigVersion < 6,
@@ -1493,17 +1492,16 @@ BOOL CUnpackerConfig::Save(int index, HKEY hKey)
 
 BOOL CUnpackerConfig::Load(HKEY hKey)
 {
-    int max = MAX_PATH + 2;
-
-    char title[MAX_PATH + 2];
-    char ext[MAX_PATH + 2];
+    CPathBuffer title;
+    CPathBuffer ext;
     DWORD type;
     DWORD suplong = FALSE;
     DWORD needANSI = FALSE;
-    char execcopy[MAX_PATH + 2];
+    CPathBuffer execcopy;
     execcopy[0] = 0;
-    char argscopy[MAX_PATH + 2];
+    CPathBuffer argscopy;
     argscopy[0] = 0;
+    int max = title.Size();
 
     BOOL ret = TRUE;
     if (ret)
@@ -1536,8 +1534,8 @@ BOOL CUnpackerConfig::Load(HKEY hKey)
             return FALSE;
         if (Configuration.ConfigVersion < 44) // convert extensions to lowercase
         {
-            char extAux[MAX_PATH + 2];
-            lstrcpyn(extAux, ext, MAX_PATH + 2);
+            CPathBuffer extAux;
+            lstrcpyn(extAux, ext, extAux.Size());
             StrICpy(ext, extAux);
         }
         ret &= SetUnpacker(index, (int)type, title, ext, Configuration.ConfigVersion < 6,

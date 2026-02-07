@@ -28,7 +28,7 @@ struct SPackExpData
     const char* TgtDir;
     const char* LstName;
     const char* ExtName;
-    char Buffer[MAX_PATH];
+    CPathBuffer Buffer;
     // following variables exist because we cannot obtain the DOS name of a non-existent file
     // we handle it by returning a substitute DOS name which will later (after creating the archive) be renamed to the desired long name
     // once the archive is created
@@ -675,11 +675,10 @@ BOOL CPackerFormatConfig::Save(int index, HKEY hKey)
 
 BOOL CPackerFormatConfig::Load(HKEY hKey)
 {
-    int max = MAX_PATH + 2;
-
-    char ext[MAX_PATH + 2];
+    CPathBuffer ext;
     ext[0] = 0;
     DWORD packerIndex, unpackerIndex, usePacker;
+    int max = ext.Size();
 
     BOOL ret = TRUE;
     if (ret)
@@ -698,8 +697,8 @@ BOOL CPackerFormatConfig::Load(HKEY hKey)
             return FALSE;
         if (Configuration.ConfigVersion < 44) // convert extensions to lowercase
         {
-            char extAux[MAX_PATH + 2];
-            lstrcpyn(extAux, ext, MAX_PATH + 2);
+            CPathBuffer extAux;
+            lstrcpyn(extAux, ext, extAux.Size());
             StrICpy(ext, extAux);
         }
         ret &= SetFormat(index, ext, usePacker, packerIndex, unpackerIndex,
@@ -980,15 +979,15 @@ BOOL CArchiverConfig::Save(int index, HKEY hKey)
 
 BOOL CArchiverConfig::Load(HKEY hKey)
 {
-    int max = MAX_PATH + 2;
-    char title[MAX_PATH + 2];
+    CPathBuffer title;
     title[0] = 0;
-    char packExe[MAX_PATH + 2];
+    CPathBuffer packExe;
     packExe[0] = 0;
-    char unpackExe[MAX_PATH + 2];
+    CPathBuffer unpackExe;
     unpackExe[0] = 0;
     DWORD exesAreSame;
     DWORD uid = -1;
+    int max = title.Size();
 
     BOOL ret = TRUE;
     // loads the title
@@ -1238,7 +1237,7 @@ const char* WINAPI PackExpArcDosName(HWND msgParent, void* param)
     {
         if (data->DOSTmpFile[0] == 0) // it needs to be generated
         {
-            char path[MAX_PATH + 50];
+            CPathBuffer path;
             strcpy(path, data->ArcName);
             if (CutDirectory(path))
             {
@@ -1365,7 +1364,7 @@ const char* WINAPI PackExpTgtDosPath(HWND msgParent, void* param)
         TRACE_E("Unexpected call to PackExpTgtDosPath().");
         return NULL;
     }
-    if (!GetShortPathName(data->TgtDir, data->Buffer, MAX_PATH))
+    if (!GetShortPathName(data->TgtDir, data->Buffer, data->Buffer.Size()))
     {
         TRACE_E("Error in GetShortPathName() in PackExpTgtDosPath().");
         return NULL;
@@ -1391,7 +1390,7 @@ const char* WINAPI PackExpLstDosName(HWND msgParent, void* param)
         TRACE_E("Unexpected call to PackExpLstDosName().");
         return NULL;
     }
-    if (!GetShortPathName(data->LstName, data->Buffer, MAX_PATH))
+    if (!GetShortPathName(data->LstName, data->Buffer, data->Buffer.Size()))
     {
         TRACE_E("Error in GetShortPathName() in PackExpLstDosName().");
         return NULL;
