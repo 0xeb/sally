@@ -199,8 +199,8 @@ void DoDragDropOper(BOOL copy, BOOL toArchive, const char* archiveOrFSName, cons
         }
         if (ok)
         {
-            lstrcpyn(tmp->ArchiveOrFSName, archiveOrFSName, MAX_PATH);
-            lstrcpyn(tmp->ArchivePathOrUserPart, archivePathOrUserPart, MAX_PATH);
+            lstrcpyn(tmp->ArchiveOrFSName, archiveOrFSName, tmp->ArchiveOrFSName.Size());
+            lstrcpyn(tmp->ArchivePathOrUserPart, archivePathOrUserPart, tmp->ArchivePathOrUserPart.Size());
             tmp->Data = data;
             PostMessage(panel->HWindow, WM_USER_DROPTOARCORFS, (WPARAM)tmp, 0);
             data = NULL;

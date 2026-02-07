@@ -659,7 +659,7 @@ void CFilesWindow::DragDropToArcOrFS(CTmpDragDropOperData* data)
                     fs->IsFSNameFromSamePluginAsThisFS(data->ArchiveOrFSName, fsNameIndex)) // FS name is from the same plugin (otherwise it's not worth trying)
                 {
                     BOOL invalidPathOrCancel;
-                    _snprintf_s(targetPath.Get(), targetPath.Size(), _TRUNCATE, "%s:%s", data->ArchiveOrFSName, data->ArchivePathOrUserPart);
+                    _snprintf_s(targetPath.Get(), targetPath.Size(), _TRUNCATE, "%s:%s", data->ArchiveOrFSName.Get(), data->ArchivePathOrUserPart.Get());
                     if (fs->CopyOrMoveFromDiskToFS(data->Copy, 3, fs->GetPluginFSName(),
                                                    HWindow, data->Data->SrcPath,
                                                    PanelEnumDiskSelection, &dataEnum,
@@ -699,7 +699,7 @@ void CFilesWindow::DragDropToArcOrFS(CTmpDragDropOperData* data)
                             {
                                 Plugins.SetWorkingPluginFS(&pluginFS);
                                 BOOL invalidPathOrCancel;
-                                _snprintf_s(targetPath.Get(), targetPath.Size(), _TRUNCATE, "%s:%s", data->ArchiveOrFSName, data->ArchivePathOrUserPart);
+                                _snprintf_s(targetPath.Get(), targetPath.Size(), _TRUNCATE, "%s:%s", data->ArchiveOrFSName.Get(), data->ArchivePathOrUserPart.Get());
                                 if (!pluginFS.CopyOrMoveFromDiskToFS(data->Copy, 3, pluginFS.GetPluginFSName(),
                                                                      HWindow, data->Data->SrcPath,
                                                                      PanelEnumDiskSelection, &dataEnum,
@@ -724,7 +724,7 @@ void CFilesWindow::DragDropToArcOrFS(CTmpDragDropOperData* data)
                     }
                     else
                     {
-                        TRACE_E("Unexpected situation in CFilesWindow::DragDropToArcOrFS() - file-system " << data->ArchiveOrFSName << " was not found.");
+                        TRACE_E("Unexpected situation in CFilesWindow::DragDropToArcOrFS() - file-system " << data->ArchiveOrFSName.Get() << " was not found.");
                     }
                 }
 

@@ -67,8 +67,8 @@ struct CTmpDragDropOperData
 {
     BOOL Copy;      // copy/move
     BOOL ToArchive; // archive/FS
-    char ArchiveOrFSName[MAX_PATH];
-    char ArchivePathOrUserPart[MAX_PATH];
+    CPathBuffer ArchiveOrFSName;
+    CPathBuffer ArchivePathOrUserPart;
     CDragDropOperData* Data;
 };
 
@@ -296,7 +296,7 @@ class CFilesWindow;
 class CFileTimeStamps
 {
 protected:
-    char ZIPFile[MAX_PATH];                   // name of the archive that stores all monitored files
+    CPathBuffer ZIPFile;                      // name of the archive that stores all monitored files
     TIndirectArray<CFileTimeStampsItem> List; // list of files with data needed for their update
     CFilesWindow* Panel;                      // panel we work for
 
