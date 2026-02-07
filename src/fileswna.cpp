@@ -240,7 +240,7 @@ void CFilesWindow::PluginFSFilesAction(CPluginFSActionType type)
             {
                 if (targetPath[0] != 0) // switch focus to 'targetPath'
                 {
-                    lstrcpyn(NextFocusName, targetPath, MAX_PATH);
+                    lstrcpyn(NextFocusName, targetPath, NextFocusName.Size());
                     // RefreshDirectory may not run - the source might not have changed - just to be safe, post a message
                     PostMessage(HWindow, WM_USER_DONEXTFOCUS, 0, 0);
                 }

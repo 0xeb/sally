@@ -2033,7 +2033,7 @@ void CFilesWindow::CreateDir(CFilesWindow* target)
 
                 if (ret && !cancel) // operation completed successfully
                 {
-                    lstrcpyn(NextFocusName, newName, MAX_PATH); // ensure focus of the new name after refresh
+                    lstrcpyn(NextFocusName, newName, NextFocusName.Size()); // ensure focus of the new name after refresh
                 }
             }
 
@@ -2366,7 +2366,7 @@ void CFilesWindow::RenameFileInternalW(CFileData* f, const std::wstring& newName
     if (moveRet)
     {
         // Convert new name to ANSI for NextFocusName (best effort)
-        WideCharToMultiByte(CP_ACP, 0, newName.c_str(), -1, NextFocusName, MAX_PATH, "?", NULL);
+        WideCharToMultiByte(CP_ACP, 0, newName.c_str(), -1, NextFocusName, NextFocusName.Size(), "?", NULL);
         *tryAgain = FALSE;
     }
     else

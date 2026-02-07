@@ -770,7 +770,7 @@ public:
     BOOL SortedWithDetectNum; // used to monitor changes of the global variable Configuration.SortDetectNumbers
 
     char DropPath[2 * MAX_PATH];  // buffer for the current directory used in a drop operation
-    char NextFocusName[MAX_PATH]; // the name that will receive focus on the next refresh
+    CPathBuffer NextFocusName; // the name that will receive focus on the next refresh
     BOOL DontClearNextFocusName;  // TRUE = do not clear NextFocusName when the main Salamander window is activated
     BOOL FocusFirstNewItem;       // refresh: should the newly added item be selected? (for system New)
     CTopIndexMem TopIndexMem;     // memory of top index for Execute()
@@ -831,8 +831,8 @@ public:
 
     BOOL QuickSearchMode;           // Quick Search mode?
     short CaretHeight;              // it is set when measuring the font in CFilesWindow
-    char QuickSearch[MAX_PATH];     // name of the file that was sought via Quick Search
-    char QuickSearchMask[MAX_PATH]; // quick search mask (may contain '/' after any number of characters)
+    CPathBuffer QuickSearch;     // name of the file that was sought via Quick Search
+    CPathBuffer QuickSearchMask; // quick search mask (may contain '/' after any number of characters)
     int SearchIndex;                // position of the cursor during Quick Search
 
     int FocusedIndex;  // current caret position
@@ -1642,13 +1642,13 @@ struct CPanelTmpEnumData
     CSalamanderDirectory* EnumLastDir;
     int EnumLastIndex;
     char EnumLastPath[SAL_MAX_LONG_PATH];
-    char EnumTmpFileName[MAX_PATH]; // filename only, not full path
+    CPathBuffer EnumTmpFileName; // filename only, not full path
 
     // for disk enumeration, enumFiles > 0
     char WorkPath[SAL_MAX_LONG_PATH];        // path where Files and Dirs reside, used only when browsing disk (not archives)
     CSalamanderDirectory* DiskDirectoryTree; // replacement for Panel->ArchiveDir
-    char EnumLastDosPath[MAX_PATH];          // DOS name of EnumLastPath (8.3 format, always short)
-    char EnumTmpDosFileName[MAX_PATH];       // DOS name of EnumTmpFileName (8.3 format)
+    CPathBuffer EnumLastDosPath;          // DOS name of EnumLastPath (8.3 format, always short)
+    CPathBuffer EnumTmpDosFileName;       // DOS name of EnumTmpFileName (8.3 format)
     int FilesCountReturnedFromWP;            // number of files already returned by the enumerator directly from WorkPath (i.e. from Files)
 
     CPanelTmpEnumData();

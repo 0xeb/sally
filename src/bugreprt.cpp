@@ -1522,7 +1522,7 @@ void CCallStack::PrintBugReport(EXCEPTION_POINTERS* Exception, DWORD ThreadID, D
                     PrintLine(param, buf, TRUE);
                     sprintf(buf, "SortedWithDetectNum = %d", panel->SortedWithDetectNum);
                     PrintLine(param, buf, TRUE);
-                    sprintf(buf, "NextFocusName = %s", panel->NextFocusName);
+                    sprintf(buf, "NextFocusName = %s", panel->NextFocusName.Get());
                     PrintLine(param, buf, TRUE);
                     sprintf(buf, "FocusFirstNewItem = %d", panel->FocusFirstNewItem);
                     PrintLine(param, buf, TRUE);

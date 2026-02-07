@@ -280,7 +280,7 @@ CFilesWindow::WindowProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
                 {
                     if (targetPath[0] != 0) // change focus to 'targetPath'
                     {
-                        lstrcpyn(NextFocusName, targetPath, MAX_PATH);
+                        lstrcpyn(NextFocusName, targetPath, NextFocusName.Size());
                         // RefreshDirectory may not run - source may not have changed - to be safe we post a message
                         PostMessage(HWindow, WM_USER_DONEXTFOCUS, 0, 0);
                     }
