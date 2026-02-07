@@ -802,14 +802,14 @@ CFindManageDialog::DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
                         }
                         *item = *CurrenOptionsItem;
                         FO->Add(item);
-                        lstrcpyn(item->ItemName, dispInfo->Buffer, ITEMNAME_TEXT_LEN);
+                        lstrcpyn(item->ItemName, dispInfo->Buffer, item->ItemName.Size());
                         EditLB->SetItemData((INT_PTR)item);
                         LoadControls();
                     }
                     else
                     {
                         item = (CFindOptionsItem*)dispInfo->ItemID;
-                        lstrcpyn(item->ItemName, dispInfo->Buffer, ITEMNAME_TEXT_LEN);
+                        lstrcpyn(item->ItemName, dispInfo->Buffer, item->ItemName.Size());
                     }
                     SetWindowLongPtr(HWindow, DWLP_MSGRESULT, TRUE);
                     return TRUE;

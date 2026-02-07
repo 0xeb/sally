@@ -1378,7 +1378,7 @@ CFindDialog::CFindDialog(HWND hCenterAgainst, const char* initPath)
     {
         const char* s = initPath;
         char* d = Data.LookInText;
-        char* end = Data.LookInText + LOOKIN_TEXT_LEN - 1; // -1 leaves room for the null terminator at the end of the string
+        char* end = Data.LookInText + Data.LookInText.Size() - 1; // -1 leaves room for the null terminator at the end of the string
         while (*s != 0 && d < end)
         {
             if (*s == ';')
@@ -1684,12 +1684,12 @@ void CFindDialog::Validate(CTransferInfo& ti)
         ti.GetControl(hLookInWnd, IDC_FIND_LOOKIN))
     {
         // back up the data
-        char bufNamed[NAMED_TEXT_LEN];
-        char bufLookIn[LOOKIN_TEXT_LEN];
+        CPathBuffer bufNamed;
+        CPathBuffer bufLookIn;
         strcpy(bufNamed, Data.NamedText);
         strcpy(bufLookIn, Data.LookInText);
 
-        SendMessage(hNamesWnd, WM_GETTEXT, NAMED_TEXT_LEN, (LPARAM)Data.NamedText);
+        SendMessage(hNamesWnd, WM_GETTEXT, Data.NamedText.Size(), (LPARAM)Data.NamedText.Get());
         CMaskGroup mask(Data.NamedText);
         int errorPos;
         if (!mask.PrepareMasks(errorPos))
@@ -1702,7 +1702,7 @@ void CFindDialog::Validate(CTransferInfo& ti)
 
         if (ti.IsGood())
         {
-            SendMessage(hLookInWnd, WM_GETTEXT, LOOKIN_TEXT_LEN, (LPARAM)Data.LookInText);
+            SendMessage(hLookInWnd, WM_GETTEXT, Data.LookInText.Size(), (LPARAM)Data.LookInText.Get());
 
             BuildSerchForData();
             if (SearchForData.Count == 0)
@@ -1720,9 +1720,9 @@ void CFindDialog::Validate(CTransferInfo& ti)
 
 void CFindDialog::Transfer(CTransferInfo& ti)
 {
-    HistoryComboBox(HWindow, ti, IDC_FIND_NAMED, Data.NamedText, NAMED_TEXT_LEN,
+    HistoryComboBox(HWindow, ti, IDC_FIND_NAMED, Data.NamedText, Data.NamedText.Size(),
                     FALSE, FIND_NAMED_HISTORY_SIZE, FindNamedHistory);
-    HistoryComboBox(HWindow, ti, IDC_FIND_LOOKIN, Data.LookInText, LOOKIN_TEXT_LEN,
+    HistoryComboBox(HWindow, ti, IDC_FIND_LOOKIN, Data.LookInText, Data.LookInText.Size(),
                     FALSE, FIND_LOOKIN_HISTORY_SIZE, FindLookInHistory);
 
     ti.CheckBox(IDC_FIND_INCLUDE_SUBDIR, Data.SubDirectories);
@@ -1751,9 +1751,9 @@ void CFindDialog::LoadControls(int index)
 
     // if any edit line is empty, keep its previous value
     if (Data.NamedText[0] == 0)
-        GetDlgItemText(HWindow, IDC_FIND_NAMED, Data.NamedText, NAMED_TEXT_LEN);
+        GetDlgItemText(HWindow, IDC_FIND_NAMED, Data.NamedText, Data.NamedText.Size());
     if (Data.LookInText[0] == 0)
-        GetDlgItemText(HWindow, IDC_FIND_LOOKIN, Data.LookInText, LOOKIN_TEXT_LEN);
+        GetDlgItemText(HWindow, IDC_FIND_LOOKIN, Data.LookInText, Data.LookInText.Size());
     if (Data.GrepText[0] == 0)
         GetDlgItemText(HWindow, IDC_FIND_CONTAINING, Data.GrepText, GREP_TEXT_LEN);
 
@@ -1772,7 +1772,7 @@ void CFindDialog::LoadControls(int index)
 
 void CFindDialog::BuildSerchForData()
 {
-    char named[NAMED_TEXT_LEN + NAMED_TEXT_LEN];
+    CPathBuffer named;
     char* begin;
     char* end;
 
@@ -2979,7 +2979,7 @@ CFindDialog::DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
             if (FindOptions.At(i)->AutoLoad)
             {
                 char buff[1024];
-                sprintf(buff, LoadStr(IDS_FF_AUTOLOAD), FindOptions.At(i)->ItemName);
+                sprintf(buff, LoadStr(IDS_FF_AUTOLOAD), FindOptions.At(i)->ItemName.Get());
                 SendMessage(HStatusBar, SB_SETTEXT, 1 | SBT_NOBORDERS, (LPARAM)buff);
                 break;
             }

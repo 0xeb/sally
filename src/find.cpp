@@ -164,7 +164,7 @@ CFindOptionsItem::operator=(const CFindOptionsItem& s)
 void CFindOptionsItem::BuildItemName()
 {
     sprintf(ItemName, "\"%s\" %s \"%s\"",
-            NamedText, LoadStr(IDS_FF_IN), LookInText);
+            NamedText.Get(), LoadStr(IDS_FF_IN), LookInText.Get());
 }
 
 BOOL CFindOptionsItem::Save(HKEY hKey)
@@ -201,15 +201,15 @@ BOOL CFindOptionsItem::Save(HKEY hKey)
 
 BOOL CFindOptionsItem::Load(HKEY hKey, DWORD cfgVersion)
 {
-    GetValue(hKey, FINDOPTIONSITEM_ITEMNAME_REG, REG_SZ, ItemName, ITEMNAME_TEXT_LEN);
+    GetValue(hKey, FINDOPTIONSITEM_ITEMNAME_REG, REG_SZ, ItemName, ItemName.Size());
     GetValue(hKey, FINDOPTIONSITEM_SUBDIRS_REG, REG_DWORD, &SubDirectories, sizeof(DWORD));
     GetValue(hKey, FINDOPTIONSITEM_WHOLEWORDS_REG, REG_DWORD, &WholeWords, sizeof(DWORD));
     GetValue(hKey, FINDOPTIONSITEM_CASESENSITIVE_REG, REG_DWORD, &CaseSensitive, sizeof(DWORD));
     GetValue(hKey, FINDOPTIONSITEM_HEXMODE_REG, REG_DWORD, &HexMode, sizeof(DWORD));
     GetValue(hKey, FINDOPTIONSITEM_REGULAR_REG, REG_DWORD, &RegularExpresions, sizeof(DWORD));
     GetValue(hKey, FINDOPTIONSITEM_AUTOLOAD_REG, REG_DWORD, &AutoLoad, sizeof(DWORD));
-    GetValue(hKey, FINDOPTIONSITEM_NAMED_REG, REG_SZ, NamedText, NAMED_TEXT_LEN);
-    GetValue(hKey, FINDOPTIONSITEM_LOOKIN_REG, REG_SZ, LookInText, LOOKIN_TEXT_LEN);
+    GetValue(hKey, FINDOPTIONSITEM_NAMED_REG, REG_SZ, NamedText, NamedText.Size());
+    GetValue(hKey, FINDOPTIONSITEM_LOOKIN_REG, REG_SZ, LookInText, LookInText.Size());
     GetValue(hKey, FINDOPTIONSITEM_GREP_REG, REG_SZ, GrepText, GREP_TEXT_LEN);
 
     if (cfgVersion <= 13)
@@ -221,7 +221,8 @@ BOOL CFindOptionsItem::Load(HKEY hKey, DWORD cfgVersion)
         GetValue(hKey, OLD_FINDOPTIONSITEM_EXCLUDEMASK_REG, REG_DWORD, &excludeMask, sizeof(DWORD));
         if (excludeMask)
         {
-            memmove(NamedText + 1, NamedText, NAMED_TEXT_LEN - 1);
+            int len = (int)strlen(NamedText);
+            memmove(NamedText + 1, NamedText.Get(), len + 1);
             NamedText[0] = '|';
         }
 
@@ -2028,7 +2029,7 @@ CSearchingString::~CSearchingString()
 void CSearchingString::SetBase(const char* buf)
 {
     HANDLES(EnterCriticalSection(&Section));
-    lstrcpyn(Buffer, buf, MAX_PATH + 50);
+    lstrcpyn(Buffer, buf, Buffer.Size());
     BaseLen = (int)strlen(Buffer);
     HANDLES(LeaveCriticalSection(&Section));
 }
@@ -2036,7 +2037,7 @@ void CSearchingString::SetBase(const char* buf)
 void CSearchingString::Set(const char* buf)
 {
     HANDLES(EnterCriticalSection(&Section));
-    lstrcpyn(Buffer + BaseLen, buf, MAX_PATH + 50 - BaseLen);
+    lstrcpyn(Buffer + BaseLen, buf, Buffer.Size() - BaseLen);
     Dirty = TRUE;
     HANDLES(LeaveCriticalSection(&Section));
 }
