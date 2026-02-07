@@ -1,5 +1,6 @@
 ﻿// SPDX-FileCopyrightText: 2023 Open Salamander Authors
 // SPDX-License-Identifier: GPL-2.0-or-later
+// CommentsTranslationProject: TRANSLATED
 
 /*****************************************************************************************\
 **                                                                                       **
@@ -446,7 +447,7 @@ int LHAGetHeader(FILE* fp, LHA_HEADER* lpHeader)
         name_length += dir_length;
     }
 
-    OemToChar(lpHeader->name, lpHeader->name); // češtiňka ... :-)
+    OemToChar(lpHeader->name, lpHeader->name); // Czech characters ... :-)
 
     for (i = 0;; i++)
         if (lha_methods[i] == NULL)
