@@ -74,7 +74,7 @@ void InitAux(HWND hWindow, TIndirectArray<CCodeTablesData>& Data,
     char* name;
     char table[256];
 
-    char convertCfgFileName[MAX_PATH]; // for error messages
+    char convertCfgFileName[MAX_PATH]; // for error messages; kept as char[] due to SEH __try constraint
     strcpy(convertCfgFileName, fileName);
 
     BOOL comment;
@@ -183,7 +183,7 @@ void InitAux(HWND hWindow, TIndirectArray<CCodeTablesData>& Data,
                                 {
                                     if (*beg == '\\' || beg + 1 < txt && *(beg + 1) == ':') // full-name (UNC, normal)
                                     {
-                                        char fullName[MAX_PATH];
+                                        char fullName[MAX_PATH]; // kept as char[] due to SEH __try constraint
                                         l = (int)min(txt - beg, MAX_PATH - 1);
                                         memcpy(fullName, beg, l);
                                         fullName[l] = 0;

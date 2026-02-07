@@ -893,7 +893,7 @@ BOOL CMallocSpy::DumpLeaks()
 {
     EnterCS();
 
-    char buff[MAX_PATH + 200];
+    char buff[MAX_PATH + 200]; // kept as char[] due to SEH __try constraint
     _OutputDebugString(TRUE, "~~~~~~~~~~~~ CMallocSpy Report Begin ~~~~~~~~~~~~");
     sprintf(buff, "Memory Stats: %d allocations, %Iu bytes allocated", _iTotalAllocs, _iTotalBytes);
     _OutputDebugString(TRUE, buff);
@@ -947,7 +947,7 @@ BOOL CMallocSpy::DumpLeaks()
 
                 if (FS_IsValidID((LPITEMIDLIST)pvRequest))
                 {
-                    char szTemp[MAX_PATH];
+                    char szTemp[MAX_PATH]; // kept as char[] due to SEH __try constraint
                     SHGetPathFromIDList((LPCITEMIDLIST)pvRequest, szTemp);
                     if (szTemp[0])
                     {
@@ -965,7 +965,7 @@ BOOL CMallocSpy::DumpLeaks()
                     IShellFolder* desktopFolder;
                     if (SUCCEEDED(SHGetDesktopFolder(&desktopFolder)))
                     {
-                        char szTemp[MAX_PATH];
+                        char szTemp[MAX_PATH]; // kept as char[] due to SEH __try constraint
                         if (SHGetPathFromIDList((LPCITEMIDLIST)pvRequest, szTemp) && szTemp[0] != 0)
                         {
                             sprintf(buff, "  Pidl for '%s'", szTemp);
@@ -976,7 +976,7 @@ BOOL CMallocSpy::DumpLeaks()
                             STRRET str;
                             if (SUCCEEDED(desktopFolder->GetDisplayNameOf((LPITEMIDLIST)pvRequest, SHGDN_NORMAL, &str)))
                             {
-                                char name[MAX_PATH];
+                                char name[MAX_PATH]; // kept as char[] due to SEH __try constraint
                                 if (SUCCEEDED(_StrRetToBuf(&str, (LPITEMIDLIST)pvRequest, name, MAX_PATH)))
                                 {
                                     sprintf(buff, "  Pidl for '%s'", name);

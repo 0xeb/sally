@@ -166,7 +166,7 @@ HRESULT CreateShellLink(const char* path, const char* name, IShellLink** psl)
             // Set path, parameters, icon and description.
             ret->SetPath(pathName);
             ret->SetArguments(params);
-            char desc[MAX_PATH];
+            char desc[MAX_PATH]; // kept as char[] - SetDescription API limits to MAX_PATH+1
             lstrcpyn(desc, path, _countof(desc));
             if (strlen(path) >= _countof(desc))
                 strcpy(desc + _countof(desc) - 4, "..."); // indicates the path has been truncated

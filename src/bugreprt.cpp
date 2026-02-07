@@ -2722,8 +2722,8 @@ void AddNewlyLoadedModulesToGlobalModulesStore()
                 {
                     if ((int)module.dwSize >= ((char*)(&(module.szExePath)) - (char*)(&(module.dwSize))))
                     {
-                        char moduleName[MAX_PATH];
-                        char modulePath[MAX_PATH];
+                        char moduleName[MAX_PATH]; // kept as char[] due to SEH __try constraint
+                        char modulePath[MAX_PATH]; // kept as char[] due to SEH __try constraint
                         if (module.dwSize == sizeof(module))
                         {
                             lstrcpy(modulePath, module.szExePath);
