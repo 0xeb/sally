@@ -115,8 +115,8 @@ public:
 
 struct CShellIconOverlayItem2 // only list of icon overlay handlers (for configuration dialog, Icon Overlays page)
 {
-    char IconOverlayName[MAX_PATH];  // key name under HKEY_LOCAL_MACHINE\Software\Microsoft\Windows\CurrentVersion\Explorer\ShellIconOverlayIdentifiers
-    char IconOverlayDescr[MAX_PATH]; // description of COM object icon overlay handler
+    CPathBuffer IconOverlayName;  // key name under HKEY_LOCAL_MACHINE\Software\Microsoft\Windows\CurrentVersion\Explorer\ShellIconOverlayIdentifiers
+    CPathBuffer IconOverlayDescr; // description of COM object icon overlay handler
 };
 
 extern CShellIconOverlays ShellIconOverlays;                           // array of all available icon overlays

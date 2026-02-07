@@ -516,8 +516,8 @@ protected:
 class CCfgPageRegional : public CCommonPropSheetPage
 {
 public:
-    char SLGName[MAX_PATH];
-    char DirName[MAX_PATH];
+    CPathBuffer SLGName;
+    CPathBuffer DirName;
 
 public:
     CCfgPageRegional();

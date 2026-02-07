@@ -437,8 +437,8 @@ void InitShellIconOverlays()
                                 ListOfShellIconOverlays.Add(item2);
                                 if (ListOfShellIconOverlays.IsGood())
                                 {
-                                    lstrcpyn(item2->IconOverlayName, keyNames[s], MAX_PATH);
-                                    lstrcpyn(item2->IconOverlayDescr, descr, MAX_PATH);
+                                    lstrcpyn(item2->IconOverlayName, keyNames[s], item2->IconOverlayName.Size());
+                                    lstrcpyn(item2->IconOverlayDescr, descr, item2->IconOverlayDescr.Size());
                                 }
                                 else
                                 {
