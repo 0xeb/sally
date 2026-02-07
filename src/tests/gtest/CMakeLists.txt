@@ -134,3 +134,47 @@ add_test(NAME gtest_environment COMMAND gtest_environment)
 set_target_properties(gtest_environment PROPERTIES
     RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/tests"
 )
+
+add_executable(gtest_widepath
+    gtest_widepath.cpp
+    ../salpath_standalone.cpp
+)
+
+target_include_directories(gtest_widepath PRIVATE
+    ${CMAKE_CURRENT_SOURCE_DIR}/../..
+    ${CMAKE_CURRENT_SOURCE_DIR}/../../common
+)
+
+target_compile_definitions(gtest_widepath PRIVATE
+    WIN32 _WINDOWS _CRT_SECURE_NO_WARNINGS
+)
+
+target_link_libraries(gtest_widepath
+    GTest::gtest GTest::gtest_main kernel32
+)
+
+add_test(NAME gtest_widepath COMMAND gtest_widepath)
+
+set_target_properties(gtest_widepath PROPERTIES
+    RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/tests"
+)
+
+add_executable(gtest_pathutils
+    gtest_pathutils.cpp
+    ../pathutils_standalone.cpp
+)
+
+target_compile_definitions(gtest_pathutils PRIVATE
+    WIN32 _WINDOWS _CRT_SECURE_NO_WARNINGS
+)
+
+target_link_libraries(gtest_pathutils
+    GTest::gtest
+    GTest::gtest_main
+)
+
+add_test(NAME gtest_pathutils COMMAND gtest_pathutils)
+
+set_target_properties(gtest_pathutils PROPERTIES
+    RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/tests"
+)
