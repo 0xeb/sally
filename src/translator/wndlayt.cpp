@@ -354,7 +354,7 @@ void RemoveDialogAmpersands(HWND hDialog)
     } while (hChild = GetWindow(hChild, GW_HWNDNEXT));
 }
 
-BOOL CALLBACK
+INT_PTR CALLBACK
 CLayoutEditor::EditDialogProcW(HWND hwndDlg, UINT uMsg, WPARAM wParam, LPARAM lParam)
 {
     switch (uMsg)
@@ -844,7 +844,7 @@ BOOL CLayoutEditor::HitTest(const POINT* p, CEdgeEnum* edge)
     return FALSE;
 }
 
-BOOL CALLBACK
+INT_PTR CALLBACK
 CLayoutEditor::TestDialogProcW(HWND hwndDlg, UINT uMsg, WPARAM wParam, LPARAM lParam)
 {
     switch (uMsg)

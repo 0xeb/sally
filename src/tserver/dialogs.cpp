@@ -50,7 +50,7 @@ void CAboutDialog::Transfer(CTransferInfo& ti)
 // CCenterDialog
 //
 
-BOOL CCenterDialog::DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
+INT_PTR CCenterDialog::DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
 {
     switch (uMsg)
     {
@@ -123,7 +123,7 @@ void CPSPGeneral::EnableControls()
     EnableWindow(GetDlgItem(HWindow, IDC_PSP1_MAX_MESSAGES), use);
 }
 
-BOOL CPSPGeneral::DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
+INT_PTR CPSPGeneral::DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
 {
     switch (uMsg)
     {
@@ -213,7 +213,7 @@ void CPSPView::Transfer(CTransferInfo& ti)
     ti.CheckBox(IDC_PSP2_MESSAGE, ConfigData.ViewColumnVisible_Message);
 }
 
-BOOL CPSPView::DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
+INT_PTR CPSPView::DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
 {
     switch (uMsg)
     {
@@ -296,7 +296,7 @@ void CDetailsDialog::Transfer(CTransferInfo& ti)
     }
 }
 
-BOOL CDetailsDialog::DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
+INT_PTR CDetailsDialog::DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
 {
     switch (uMsg)
     {

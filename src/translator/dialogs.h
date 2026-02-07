@@ -31,7 +31,7 @@ public:
     }
 
 protected:
-    virtual BOOL DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam);
+    virtual INT_PTR DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam);
 };
 
 //*****************************************************************************
@@ -48,7 +48,7 @@ public:
     virtual void Transfer(CTransferInfo& ti);
 
 protected:
-    virtual BOOL DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam);
+    virtual INT_PTR DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam);
 };
 
 //*****************************************************************************
@@ -71,7 +71,7 @@ class CNewDialog: public CCommonDialog
     virtual void Transfer(CTransferInfo &ti);
 
   protected:
-    virtual BOOL DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam);
+    virtual INT_PTR DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam);
 };
 */
 //*****************************************************************************
@@ -103,7 +103,7 @@ public:
     virtual void Transfer(CTransferInfo& ti);
 
 protected:
-    virtual BOOL DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam);
+    virtual INT_PTR DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam);
 };
 
 //*****************************************************************************
@@ -120,7 +120,7 @@ public:
     virtual void Transfer(CTransferInfo& ti);
 
 protected:
-    virtual BOOL DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam);
+    virtual INT_PTR DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam);
 
     void EnableControls();
 };
@@ -155,7 +155,7 @@ public:
     virtual void Transfer(CTransferInfo& ti);
 
 protected:
-    virtual BOOL DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam);
+    virtual INT_PTR DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam);
 };
 
 //*****************************************************************************
@@ -173,7 +173,7 @@ public:
     virtual void Transfer(CTransferInfo& ti);
 
 protected:
-    virtual BOOL DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam);
+    virtual INT_PTR DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam);
 };
 
 //*****************************************************************************
@@ -195,7 +195,7 @@ public:
     BOOL HasAgreement() { return Agreement != NULL; }
 
 protected:
-    virtual BOOL DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam);
+    virtual INT_PTR DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam);
 };
 
 //*****************************************************************************
@@ -216,7 +216,7 @@ public:
     virtual void Transfer(CTransferInfo& ti);
 
 protected:
-    virtual BOOL DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam);
+    virtual INT_PTR DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam);
 
     void EnableChildWindow(int id, BOOL enabled);
     void EnableControls();
@@ -243,7 +243,7 @@ public:
     virtual void Transfer(CTransferInfo& ti);
 
 protected:
-    virtual BOOL DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam);
+    virtual INT_PTR DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam);
 
     void EnableChildWindow(int id, BOOL enabled);
     void EnableControls();

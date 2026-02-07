@@ -102,7 +102,7 @@ DefButtonSubclassProc(HWND hwnd, UINT message, WPARAM wParam, LPARAM lParam)
 }
 */
 
-BOOL CALLBACK
+INT_PTR CALLBACK
 CPreviewWindow::PreviewDialogProcW(HWND hwndDlg, UINT uMsg, WPARAM wParam, LPARAM lParam)
 {
     switch (uMsg)

@@ -664,8 +664,8 @@ CTextWindow::WindowProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
                                       NULL, //HMenu
                                       HInstance,
                                       NULL);
-        DefEditWndProc = (WNDPROC)GetWindowLongW(HTranslated, GWL_WNDPROC);
-        SetWindowLongW(HTranslated, GWL_WNDPROC, (LONG)EditWindowProcW);
+        DefEditWndProc = (WNDPROC)GetWindowLongPtrW(HTranslated, GWLP_WNDPROC);
+        SetWindowLongPtrW(HTranslated, GWLP_WNDPROC, (LONG_PTR)EditWindowProcW);
 
         SendMessage(HTranslated, EM_LIMITTEXT, 5000, 0); // Limit the buffer size
 
@@ -685,8 +685,8 @@ CTextWindow::WindowProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
                                     NULL, //HMenu
                                     HInstance,
                                     NULL);
-        DefEditWndOriginalProc = (WNDPROC)GetWindowLongW(HOriginal, GWL_WNDPROC);
-        SetWindowLongW(HOriginal, GWL_WNDPROC, (LONG)EditWindowOriginalProcW);
+        DefEditWndOriginalProc = (WNDPROC)GetWindowLongPtrW(HOriginal, GWLP_WNDPROC);
+        SetWindowLongPtrW(HOriginal, GWLP_WNDPROC, (LONG_PTR)EditWindowOriginalProcW);
 
         HFONT hFont = (HFONT)SendMessage(ListView.HWindow, WM_GETFONT, 0, 0);
         SendMessage(HOriginalLabel, WM_SETFONT, (WPARAM)hFont, TRUE);

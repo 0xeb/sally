@@ -44,6 +44,7 @@ function(sal_add_plugin_lang)
   if(MSVC)
     target_link_options(${TARGET_NAME} PRIVATE
       /NOENTRY
+      /NOIMPLIB
       $<$<CONFIG:Release>:/LTCG:OFF>  # No code to optimize in resource-only DLL
     )
   endif()
@@ -154,8 +155,8 @@ function(sal_add_plugin)
   if(MSVC)
     target_compile_options(${TARGET_NAME} PRIVATE /MP /W3 /J)
 
-    # Build linker flags: DEF file + no manifest
-    set(PLUGIN_LINK_FLAGS "/MANIFEST:NO")
+    # Build linker flags: DEF file + no manifest + suppress import library
+    set(PLUGIN_LINK_FLAGS "/MANIFEST:NO /NOIMPLIB")
     if(PLUGIN_DEF)
       set(PLUGIN_LINK_FLAGS "${PLUGIN_LINK_FLAGS} /DEF:\"${PLUGIN_DEF}\"")
     endif()

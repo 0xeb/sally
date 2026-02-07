@@ -134,9 +134,6 @@ target_link_libraries(salamander PRIVATE reglib)
 
 # Shell extension registration (C file with extern "C" linkage)
 target_sources(salamander PRIVATE "${SAL_SRC}/shexreg.c")
-set_source_files_properties("${SAL_SRC}/shexreg.c" PROPERTIES
-  COMPILE_DEFINITIONS "INSIDE_SALAMANDER"
-)
 
 # Output directories
 set_target_properties(salamander PROPERTIES
@@ -163,7 +160,7 @@ target_include_directories(sal_lang_english PRIVATE
 
 if(MSVC)
   target_link_options(sal_lang_english PRIVATE
-    /NOENTRY /MANIFEST:NO
+    /NOENTRY /MANIFEST:NO /NOIMPLIB
     $<$<CONFIG:Release>:/LTCG:OFF>  # No code to optimize in resource-only DLL
   )
 elseif(MINGW)
@@ -315,6 +312,254 @@ set_target_properties(salopen PROPERTIES
 )
 
 # ==============================================================================
+# Trace Server: tserver.exe
+# ==============================================================================
+
+add_executable(tserver WIN32
+  # tserver sources
+  "${SAL_SRC}/tserver/config.cpp"
+  "${SAL_SRC}/tserver/dialogs.cpp"
+  "${SAL_SRC}/tserver/ms_init.cpp"
+  "${SAL_SRC}/tserver/openedit.cpp"
+  "${SAL_SRC}/tserver/precomp.cpp"
+  "${SAL_SRC}/tserver/registry.cpp"
+  "${SAL_SRC}/tserver/tablist.cpp"
+  "${SAL_SRC}/tserver/tserver.cpp"
+  "${SAL_SRC}/tserver/window.cpp"
+  "${SAL_SRC}/tserver/tserver.rc"
+  # Common library sources
+  "${SAL_SRC}/common/allochan.cpp"
+  "${SAL_SRC}/common/array.cpp"
+  "${SAL_SRC}/common/dib.cpp"
+  "${SAL_SRC}/common/handles.cpp"
+  "${SAL_SRC}/common/heap.cpp"
+  "${SAL_SRC}/common/lstrfix.cpp"
+  "${SAL_SRC}/common/messages.cpp"
+  "${SAL_SRC}/common/multimon.cpp"
+  "${SAL_SRC}/common/sheets.cpp"
+  "${SAL_SRC}/common/strutils.cpp"
+  "${SAL_SRC}/common/trace.cpp"
+  "${SAL_SRC}/common/winlib.cpp"
+)
+
+target_include_directories(tserver PRIVATE
+  "${SAL_SRC}/tserver"
+  "${SAL_SRC}/common"
+  "${SAL_SRC}/common/dep"
+  "${SAL_SRC}"
+)
+
+# tserver debug defines (matches tserver.vcxproj - includes TRACE_TO_FILE, no __DEBUG_WINLIB)
+set(TSERVER_DEBUG_DEFINES
+  _DEBUG
+  SAFE_ALLOC
+  __TRACESERVER
+  TRACE_ENABLE
+  TRACE_TO_FILE
+  HANDLES_ENABLE
+  MULTITHREADED_TRACE_ENABLE
+  MULTITHREADED_MESSAGES_ENABLE
+  MULTITHREADED_HANDLES_ENABLE
+  MULTITHREADED_HEAP_ENABLE
+  MESSAGES_DEBUG
+  _CRTDBG_MAP_ALLOC
+  _ALLOW_RTCc_IN_STL
+)
+
+target_compile_definitions(tserver PRIVATE
+  UNICODE _UNICODE
+  WIN32 _WINDOWS
+  WINVER=0x0601 _WIN32_WINNT=0x0601 _WIN32_IE=0x0800
+  $<$<CONFIG:Debug>:${TSERVER_DEBUG_DEFINES}>
+  $<$<CONFIG:Release>:NDEBUG;SAFE_ALLOC;__TRACESERVER;ARRAY_NODEBUG;MULTITHREADED_HEAP_ENABLE>
+)
+
+target_link_libraries(tserver PRIVATE comctl32)
+
+if(MSVC)
+  target_precompile_headers(tserver PRIVATE "${SAL_SRC}/tserver/precomp.h")
+  target_link_options(tserver PRIVATE /SUBSYSTEM:WINDOWS /MANIFEST:NO)
+  # openedit.cpp uses #import which is incompatible with /MP (multi-process compilation)
+  set_source_files_properties("${SAL_SRC}/tserver/openedit.cpp" PROPERTIES
+    SKIP_PRECOMPILE_HEADERS ON
+    COMPILE_FLAGS "/MP1"
+  )
+elseif(MINGW)
+  target_link_options(tserver PRIVATE -Wl,--subsystem,windows)
+endif()
+
+set_source_files_properties("${SAL_SRC}/tserver/tserver.rc" PROPERTIES
+  COMPILE_DEFINITIONS "WINVER=0x0601;$<$<CONFIG:Debug>:_DEBUG>;$<$<CONFIG:Release>:NDEBUG>;$<$<EQUAL:${CMAKE_SIZEOF_VOID_P},8>:_WIN64>"
+)
+
+set_target_properties(tserver PROPERTIES
+  RUNTIME_OUTPUT_DIRECTORY "${SAL_OUTPUT_BASE}/$<CONFIG>_${SAL_PLATFORM}/utils"
+)
+
+# ==============================================================================
+# Translator: translator.exe
+# ==============================================================================
+
+add_executable(translator WIN32
+  # translator sources
+  "${SAL_SRC}/translator/bitmap.cpp"
+  "${SAL_SRC}/translator/checklst.cpp"
+  "${SAL_SRC}/translator/config.cpp"
+  "${SAL_SRC}/translator/databook.cpp"
+  "${SAL_SRC}/translator/datacnfl.cpp"
+  "${SAL_SRC}/translator/datadlg.cpp"
+  "${SAL_SRC}/translator/datafind.cpp"
+  "${SAL_SRC}/translator/datamenu.cpp"
+  "${SAL_SRC}/translator/datamui.cpp"
+  "${SAL_SRC}/translator/dataprj.cpp"
+  "${SAL_SRC}/translator/datarh.cpp"
+  "${SAL_SRC}/translator/datasel.cpp"
+  "${SAL_SRC}/translator/datastr.cpp"
+  "${SAL_SRC}/translator/dataui.cpp"
+  "${SAL_SRC}/translator/dialogs.cpp"
+  "${SAL_SRC}/translator/dlgdummy.cpp"
+  "${SAL_SRC}/translator/ignorelst.cpp"
+  "${SAL_SRC}/translator/ms_init.cpp"
+  "${SAL_SRC}/translator/precomp.cpp"
+  "${SAL_SRC}/translator/restart.cpp"
+  "${SAL_SRC}/translator/salmenu.cpp"
+  "${SAL_SRC}/translator/transfrm.cpp"
+  "${SAL_SRC}/translator/translator.cpp"
+  "${SAL_SRC}/translator/trldata.cpp"
+  "${SAL_SRC}/translator/trlipc.cpp"
+  "${SAL_SRC}/translator/versinfo.cpp"
+  "${SAL_SRC}/translator/wndframe.cpp"
+  "${SAL_SRC}/translator/wndlayt.cpp"
+  "${SAL_SRC}/translator/wndout.cpp"
+  "${SAL_SRC}/translator/wndprev.cpp"
+  "${SAL_SRC}/translator/wndrh.cpp"
+  "${SAL_SRC}/translator/wndtext.cpp"
+  "${SAL_SRC}/translator/wndtree.cpp"
+  "${SAL_SRC}/translator/translator.rc"
+  # Common library sources
+  "${SAL_SRC}/common/allochan.cpp"
+  "${SAL_SRC}/common/array.cpp"
+  "${SAL_SRC}/common/handles.cpp"
+  "${SAL_SRC}/common/heap.cpp"
+  "${SAL_SRC}/common/lstrfix.cpp"
+  "${SAL_SRC}/common/messages.cpp"
+  "${SAL_SRC}/common/str.cpp"
+  "${SAL_SRC}/common/trace.cpp"
+  "${SAL_SRC}/common/winlib.cpp"
+)
+
+target_include_directories(translator PRIVATE
+  "${SAL_SRC}/translator"
+  "${SAL_SRC}/common"
+  "${SAL_SRC}"
+  "${SAL_SHARED}"
+)
+
+# translator debug defines (matches translator.vcxproj - includes __DEBUG_WINLIB)
+set(TRANSLATOR_DEBUG_DEFINES
+  _DEBUG
+  SAFE_ALLOC
+  __DEBUG_WINLIB
+  TRACE_ENABLE
+  HANDLES_ENABLE
+  MESSAGES_DEBUG
+  MULTITHREADED_TRACE_ENABLE
+  MULTITHREADED_MESSAGES_ENABLE
+  MULTITHREADED_HANDLES_ENABLE
+  _CRTDBG_MAP_ALLOC
+  _ALLOW_RTCc_IN_STL
+)
+
+target_compile_definitions(translator PRIVATE
+  _MT WIN32 _WINDOWS
+  WINVER=0x0601 _WIN32_WINNT=0x0601 _WIN32_IE=0x0800
+  $<$<CONFIG:Debug>:${TRANSLATOR_DEBUG_DEFINES}>
+  $<$<CONFIG:Release>:NDEBUG;SAFE_ALLOC;ARRAY_NODEBUG;MESSAGES_DISABLE>
+)
+
+target_link_libraries(translator PRIVATE msimg32 comctl32)
+
+if(MSVC)
+  target_precompile_headers(translator PRIVATE "${SAL_SRC}/translator/precomp.h")
+  target_link_options(translator PRIVATE /SUBSYSTEM:WINDOWS /MANIFEST:NO)
+elseif(MINGW)
+  target_link_options(translator PRIVATE -Wl,--subsystem,windows)
+endif()
+
+set_source_files_properties("${SAL_SRC}/translator/translator.rc" PROPERTIES
+  COMPILE_DEFINITIONS "WINVER=0x0601;$<$<CONFIG:Debug>:_DEBUG>;$<$<CONFIG:Release>:NDEBUG>;$<$<EQUAL:${CMAKE_SIZEOF_VOID_P},8>:_WIN64>"
+)
+
+set_target_properties(translator PROPERTIES
+  RUNTIME_OUTPUT_DIRECTORY "${SAL_OUTPUT_BASE}/$<CONFIG>_${SAL_PLATFORM}/utils"
+)
+
+# ==============================================================================
+# Shell Extension: salext.dll (COM shell extension for Explorer integration)
+# ==============================================================================
+# Builds for the current platform (x64 or x86). For full Explorer integration,
+# both architectures are needed — build x86 variant via a separate CMake preset.
+
+add_library(salext MODULE
+  "${SAL_SRC}/common/lstrfix.c"
+  "${SAL_SRC}/common/rtc_stubs.cpp"
+  "${SAL_SRC}/shellext/copyhook.c"
+  "${SAL_SRC}/shellext/ctxmenu.c"
+  "${SAL_SRC}/shellext/shellext.c"
+  "${SAL_SRC}/shellext/shexinit.c"
+  "${SAL_SRC}/shexreg.c"
+  "${SAL_SRC}/shellext/shellext.rc"
+)
+
+target_include_directories(salext PRIVATE
+  "${SAL_SRC}/shellext"
+  "${SAL_SRC}/common"
+  "${SAL_SRC}"
+)
+
+target_compile_definitions(salext PRIVATE
+  WIN32 _WINDOWS _USRDLL INC_OLE2
+  WINVER=0x0601 _WIN32_WINNT=0x0601 _WIN32_IE=0x0800
+  LSTRFIX_WITHOUT_RTL
+  $<$<CONFIG:Debug>:_DEBUG>
+  $<$<CONFIG:Release>:NDEBUG>
+)
+
+set_source_files_properties("${SAL_SRC}/shellext/shellext.rc" PROPERTIES
+  COMPILE_DEFINITIONS "WINVER=0x0601;$<$<CONFIG:Debug>:_DEBUG>;$<$<CONFIG:Release>:NDEBUG>;$<$<EQUAL:${CMAKE_SIZEOF_VOID_P},8>:_WIN64>"
+)
+
+if(MSVC)
+  # No CRT — standalone COM DLL (like salopen/salspawn)
+  target_compile_options(salext PRIVATE /GS- /GL- /GR-)
+  set_target_properties(salext PROPERTIES
+    MSVC_RUNTIME_LIBRARY "MultiThreaded$<$<CONFIG:Debug>:Debug>"
+  )
+  target_link_options(salext PRIVATE
+    /SUBSYSTEM:WINDOWS
+    /MANIFEST:NO
+    /NODEFAULTLIB
+    /NOIMPLIB
+    /DEF:"${SAL_SRC}/shellext/shellext.def"
+    $<$<CONFIG:Release>:/LTCG:OFF>
+  )
+  # x86 uses StdCall calling convention
+  if(SAL_PLATFORM STREQUAL "x86")
+    target_compile_options(salext PRIVATE /Gz)
+  endif()
+  target_link_libraries(salext PRIVATE kernel32 user32 advapi32 ole32 shell32 uuid)
+endif()
+
+# Output name matches VS convention: salextx64.dll or salextx86.dll
+set_target_properties(salext PROPERTIES
+  OUTPUT_NAME "salext${SAL_PLATFORM}"
+  SUFFIX ".dll"
+  RUNTIME_OUTPUT_DIRECTORY "${SAL_OUTPUT_BASE}/$<CONFIG>_${SAL_PLATFORM}"
+  LIBRARY_OUTPUT_DIRECTORY "${SAL_OUTPUT_BASE}/$<CONFIG>_${SAL_PLATFORM}"
+  ARCHIVE_OUTPUT_DIRECTORY "${SAL_OUTPUT_BASE}/$<CONFIG>_${SAL_PLATFORM}"
+)
+
+# ==============================================================================
 # Plugins
 # ==============================================================================
 
@@ -334,7 +579,13 @@ include(GNUInstallDirs)
 sal_install_main(salamander)
 
 # Utils go in utils/
-install(TARGETS salmon salspawn salopen RUNTIME DESTINATION utils)
+install(TARGETS salmon salspawn salopen tserver translator RUNTIME DESTINATION utils)
+
+# Shell extension goes in root (alongside salamand.exe)
+install(TARGETS salext
+  LIBRARY DESTINATION .
+  RUNTIME DESTINATION .
+)
 
 # MSVC runtime
 sal_install_runtime()
@@ -361,7 +612,7 @@ sal_install_resources()
 sal_create_populate_target()
 
 # Ensure populate depends on main targets
-add_dependencies(populate salamander salmon salspawn salopen sal_lang_english)
+add_dependencies(populate salamander salmon salspawn salopen tserver translator salext sal_lang_english)
 
 # ==============================================================================
 # Tests

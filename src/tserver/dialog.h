@@ -30,7 +30,7 @@ public:
         : CDialog(modul, resID, parent) {};
 
 protected:
-    virtual BOOL DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam);
+    virtual INT_PTR DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam);
 };
 
 //****************************************************************************
@@ -49,7 +49,7 @@ public:
     virtual void Transfer(CTransferInfo& ti);
 
 protected:
-    virtual BOOL DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam);
+    virtual INT_PTR DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam);
 };
 
 //****************************************************************************
@@ -73,7 +73,7 @@ public:
     void EnableControls();
 
 protected:
-    virtual BOOL DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam);
+    virtual INT_PTR DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam);
 };
 
 //****************************************************************************
@@ -94,7 +94,7 @@ public:
     virtual void Transfer(CTransferInfo& ti);
 
 protected:
-    virtual BOOL DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam);
+    virtual INT_PTR DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam);
 };
 
 BOOL DoSetupDialog(HWND hWindow);

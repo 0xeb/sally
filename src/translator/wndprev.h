@@ -55,7 +55,7 @@ protected:
 
     void DisplayMenuPreview();
 
-    static BOOL CALLBACK PreviewDialogProcW(HWND hwndDlg, UINT uMsg, WPARAM wParam, LPARAM lParam);
+    static INT_PTR CALLBACK PreviewDialogProcW(HWND hwndDlg, UINT uMsg, WPARAM wParam, LPARAM lParam);
 };
 
 extern CPreviewWindow PreviewWindow;
