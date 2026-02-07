@@ -1458,7 +1458,7 @@ BOOL IsLabelCorrectlyPlaced(CDialogData* dialogData, int controlIndex, int* cont
                         ((bt = GetButtonType(control2->Style)) == btPush || bt == btCheck || bt == btRadio))
                 {
                     // Label is above the control
-#define LABEL2CONTROL_SPACING_V -2 // 2 pro space
+#define LABEL2CONTROL_SPACING_V -2 // 2 for space
                     int labelDY = LABEL2CONTROL_SPACING_V - 8 * (control1->TCY / 8);
                     BOOL control2IsCheckOrRadio = (DWORD)control2->ClassName == 0x0080ffff && (bt == btCheck || bt == btRadio);
                     if (control2IsCheckOrRadio)

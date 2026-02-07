@@ -112,7 +112,7 @@ BOOL CDriveBar::CreateDriveButtons(CDriveBar* copyDrivesListFrom)
 int CDriveBar::GetNeededHeight()
 {
     CALL_STACK_MESSAGE_NONE
-    // i v pripade, ze nedrzime zadnou ikonu budeem vracet spravnou vysku
+    // even if we hold no icon, return the correct height
     int height = CToolBar::GetNeededHeight();
     int iconSize = GetIconSizeForSystemDPI(ICONSIZE_16);
     int minH = 3 + iconSize + 3;
@@ -193,10 +193,10 @@ void CDriveBar::Execute(DWORD id)
 
             case drvtPluginCmd:
             {
-                // kod prevzaty z fileswn3.cpp, CFilesWindow::ChangeDrive()
+                // code taken from fileswn3.cpp, CFilesWindow::ChangeDrive()
                 const char* dllName = (const char*)DriveTypeParam;
                 CPluginData* data = Plugins.GetPluginData(dllName);
-                if (data != NULL) // plug-in existuje, jdeme spustit prikaz
+                if (data != NULL) // plug-in exists, execute the command
                     data->ExecuteChangeDriveMenuItem(panel == MainWindow->LeftPanel ? PANEL_LEFT : PANEL_RIGHT);
                 return;
             }
@@ -213,7 +213,7 @@ void CDriveBar::SetCheckedDrive(CFilesWindow* panel, BOOL force)
     if (isDiskOrArchive)
         lstrcpyn(CheckedDrive, panel->GetPath(), 3);
     else
-        CheckedDrive[0] = 0; // pro FS tato cache nefunguje
+        CheckedDrive[0] = 0; // this cache does not work for FS
     DWORD index;
     if (List == NULL || !List->FindPanelPathIndex(panel, &index))
         index = -1;
@@ -232,7 +232,7 @@ void CDriveBar::SetCheckedDrive(CFilesWindow* panel, BOOL force)
                 if (indexInList >= CM_DRIVEBAR2_MIN && indexInList <= CM_DRIVEBAR2_MAX)
                     indexInList -= CM_DRIVEBAR2_MIN;
                 else
-                    indexInList = -2; // nemelo by se stat
+                    indexInList = -2; // should not happen
             }
             CheckItem(i, TRUE, index == indexInList);
         }

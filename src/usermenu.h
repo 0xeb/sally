@@ -15,7 +15,7 @@
 struct CUserMenuIconData
 {
     char FileName[MAX_PATH];  // file name from which we read icon at IconIndex (via ExtractIconEx())
-    DWORD IconIndex;          // viz komentar k FileName
+    DWORD IconIndex;          // see comment for FileName
     char UMCommand[MAX_PATH]; // file name from which we read icon (via GetFileOrPathIconAux())
 
     HICON LoadedIcon; // NULL = icon not loaded, otherwise handle of loaded icon

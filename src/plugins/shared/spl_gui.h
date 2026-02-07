@@ -1255,7 +1255,7 @@ struct TLBI_ITEM_INFO2
     int ImageIndex;
     HICON HIcon;
     HICON HOverlay;
-    DWORD CustomData; // FIXME_X64 - male pro ukazatel, neni nekdy potreba?
+    DWORD CustomData; // FIXME_X64 - too small for pointer, is it ever needed?
     DWORD* Enabler;
 
     DWORD Index;

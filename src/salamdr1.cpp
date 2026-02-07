@@ -269,12 +269,12 @@ HBRUSH HMenuSelectedTextBrush = NULL;
 HBRUSH HMenuHilightBrush = NULL;
 HBRUSH HMenuGrayTextBrush = NULL;
 
-HPEN HActiveNormalPen = NULL; // pera pro ramecek kolem polozky
+HPEN HActiveNormalPen = NULL; // pens for frame around item
 HPEN HActiveSelectedPen = NULL;
 HPEN HInactiveNormalPen = NULL;
 HPEN HInactiveSelectedPen = NULL;
 
-HPEN HThumbnailNormalPen = NULL; // pera pro ramecek kolem thumbnail
+HPEN HThumbnailNormalPen = NULL; // pens for frame around thumbnail
 HPEN HThumbnailFucsedPen = NULL;
 HPEN HThumbnailSelectedPen = NULL;
 HPEN HThumbnailFocSelPen = NULL;
@@ -940,7 +940,7 @@ HICON GetDriveIcon(const char* root, UINT type, BOOL accessible, BOOL large)
     int id;
     switch (type)
     {
-    case DRIVE_REMOVABLE: // ikonky 3.5, 5.25
+    case DRIVE_REMOVABLE: // icons for 3.5", 5.25"
     {
         HICON i = GetFileOrPathIconAux(root, large, TRUE);
         if (i != NULL)
@@ -1701,7 +1701,7 @@ void UpdateDefaultColors(SALCOLOR* colors, CHighlightMasks* highlightMasks, BOOL
         if (GetFValue(colors[HOT_PANEL]) & SCF_DEFAULT)
             SetRGBPart(&colors[HOT_PANEL], hotColor);
 
-        // hilight pro active panel caption
+        // highlight for active panel caption
         if (GetFValue(colors[HOT_ACTIVE]) & SCF_DEFAULT)
         {
             COLORREF clr = GetCOLORREF(colors[ACTIVE_CAPTION_FG]);
@@ -1709,7 +1709,7 @@ void UpdateDefaultColors(SALCOLOR* colors, CHighlightMasks* highlightMasks, BOOL
                 clr = GetHilightColor(clr, GetCOLORREF(colors[ACTIVE_CAPTION_BK]));
             SetRGBPart(&colors[HOT_ACTIVE], clr);
         }
-        // hilight pro inactive panel caption
+        // highlight for inactive panel caption
         if (GetFValue(colors[HOT_INACTIVE]) & SCF_DEFAULT)
         {
             COLORREF clr = GetCOLORREF(colors[INACTIVE_CAPTION_FG]);
@@ -2906,7 +2906,7 @@ BOOL GetCmdLine(char* buf, int size, char* argv[], int& argCount, char* cmdLine)
     char term;
     while (*s != 0)
     {
-        if (*s == '"') // pocatecni '"'
+        if (*s == '"') // opening '"'
         {
             if (*++s == 0)
                 break;
@@ -4076,7 +4076,7 @@ FIND_NEW_SLG_FILE:
     for (i = 0; i < NUMBER_OF_COLORS; i++)
         UserColors[i] = SalamanderColors[i];
 
-    //--- inicializacni cast
+    //--- initialization part
     CALL_STACK_MESSAGE1("WinMainBody::inicialization");
     IfExistSetSplashScreenText(LoadStr(IDS_STARTUP_DATA));
 
@@ -4806,7 +4806,7 @@ WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR cmdLine, int cmdShow
     {
         TRACE_I("Thread Main: calling ExitProcess(1).");
         //    ExitProcess(1);
-        TerminateProcess(GetCurrentProcess(), 1); // tvrdsi exit (tenhle jeste neco vola)
+        TerminateProcess(GetCurrentProcess(), 1); // harder exit (this one still calls something)
         return 1;
     }
 #endif // CALLSTK_DISABLE

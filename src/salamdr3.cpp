@@ -240,7 +240,7 @@ void SalPathRemoveExtension(char* path)
     {
         if (*iterator == '.')
         {
-            //      if (iterator != path && *(iterator - 1) != '\\')  // ".cvspass" ve Windows je pripona ...
+            //      if (iterator != path && *(iterator - 1) != '\\')  // ".cvspass" in Windows is an extension ...
             *iterator = 0;
             break;
         }
@@ -264,9 +264,9 @@ BOOL SalPathAddExtension(char* path, const char* extension, int pathSize)
     {
         if (*iterator == '.')
         {
-            //      if (iterator != path && *(iterator - 1) != '\\')  // ".cvspass" ve Windows je pripona ...
-            return TRUE; // pripona jiz existuje
-                         //      break;  // dal hledat nema smysl
+            //      if (iterator != path && *(iterator - 1) != '\\')  // ".cvspass" in Windows is an extension ...
+            return TRUE; // extension already exists
+                         //      break;  // no point in searching further
         }
         if (*iterator == '\\')
             break;
@@ -297,10 +297,10 @@ BOOL SalPathRenameExtension(char* path, const char* extension, int pathSize)
     {
         if (*iterator == '.')
         {
-            //      if (iterator != path && *(iterator - 1) != '\\')  // ".cvspass" ve Windows je pripona ...
+            //      if (iterator != path && *(iterator - 1) != '\\')  // ".cvspass" in Windows is an extension ...
             //      {
             len = (int)(iterator - path);
-            break; // pripona jiz existuje -> prepiseme ji
+            break; // extension already exists -> overwrite it
                    //      }
                    //      break;
         }
@@ -2410,7 +2410,7 @@ CUserMenuIconBkgndReader::CUserMenuIconBkgndReader()
 
 CUserMenuIconBkgndReader::~CUserMenuIconBkgndReader()
 {
-    if (UserMenuIIU_BkgndReaderData != NULL) // tak ted uz vazne nebudou potreba, uvolnime je
+    if (UserMenuIIU_BkgndReaderData != NULL) // they really won't be needed anymore, release them
     {
         delete UserMenuIIU_BkgndReaderData;
         UserMenuIIU_BkgndReaderData = NULL;
@@ -2475,7 +2475,7 @@ unsigned BkgndReadingIconsThreadEH(void* param)
     {
         TRACE_I("Thread BkgndReadingIconsThread: calling ExitProcess(1).");
         //    ExitProcess(1);
-        TerminateProcess(GetCurrentProcess(), 1); // tvrdsi exit (tenhle jeste neco vola)
+        TerminateProcess(GetCurrentProcess(), 1); // harder exit (ExitProcess still calls something)
         return 1;
     }
 #endif // CALLSTK_DISABLE

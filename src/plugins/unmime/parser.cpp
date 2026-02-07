@@ -296,7 +296,7 @@ void CInputFile::RestorePosition()
 
 // ****************************************************************************
 //
-//  Metody CParserOutput
+//  CParserOutput methods
 //
 
 void CParserOutput::StartBlock(int iType, int iLine)
@@ -642,7 +642,7 @@ static void DestroyIllegalChars(LPSTR pszPath)
     }
 }
 
-////// JMENA DEKODOVANYCH SOUBORU //////////////////////////////////////////////
+////// DECODED FILE NAMES ///////////////////////////////////////////////////////
 
 static void SetDefaultFileName(BOOL bAppendCharset)
 {
@@ -872,7 +872,7 @@ static void EndCalcSize(CParserOutput* pOutput)
     }
 }
 
-////// FUNKCE PRO ULOZENI/OBNOVENI STAVU PARSERU ///////////////////////////////
+////// FUNCTIONS FOR SAVING/RESTORING PARSER STATE //////////////////////////////
 
 static void SaveState()
 {

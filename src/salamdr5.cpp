@@ -1461,10 +1461,10 @@ void CSystemPolicies::LoadFromRegistry()
         GetValueDontCheckTypeAux(hKey, "NoNetConnectDisconnect", /*REG_DWORD,*/ &NoNetConnectDisconnect, sizeof(DWORD));
         GetValueDontCheckTypeAux(hKey, "RestrictRun", /*REG_DWORD,*/ &RestrictRun, sizeof(DWORD));
         if (RestrictRun && !LoadList(&RestrictRunList, HKEY_CURRENT_USER, "Software\\Microsoft\\Windows\\CurrentVersion\\Policies\\Explorer\\RestrictRun"))
-            RestrictRun = 0; // malo pameti; zrusime tento option
+            RestrictRun = 0; // low memory; disable this option
         GetValueDontCheckTypeAux(hKey, "DisallowRun", /*REG_DWORD,*/ &DisallowRun, sizeof(DWORD));
         if (DisallowRun && !LoadList(&DisallowRunList, HKEY_CURRENT_USER, "Software\\Microsoft\\Windows\\CurrentVersion\\Policies\\Explorer\\DisallowRun"))
-            DisallowRun = 0; // malo pameti; zrusime tento option
+            DisallowRun = 0; // low memory; disable this option
         CloseKeyAux(hKey);
     }
 
@@ -1943,7 +1943,7 @@ BOOL GetOurPathInRoamingAPPDATA(char* buf)
 
 BOOL CreateOurPathInRoamingAPPDATA(char* buf)
 {
-    static char path[MAX_PATH]; // vola se z handleru exceptiony, stack muze byt plnej
+    static char path[MAX_PATH]; // called from exception handler, stack may be full
     if (buf != NULL)
         buf[0] = 0;
     if (SHGetFolderPath(NULL, CSIDL_APPDATA, NULL, 0 /* SHGFP_TYPE_CURRENT */, path) == S_OK)

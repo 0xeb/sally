@@ -31,15 +31,15 @@ struct huft
 
 struct CDecompressionObject
 {
-    const char* Data;    // zacatek dat
-    const char* DataPtr; // aktualni pozice v datech
-    const char* DataEnd; // konec dat
+    const char* Data;    // start of data
+    const char* DataPtr; // current position in data
+    const char* DataEnd; // end of data
 
-    DWORD Crc; // CRC32 vypakovanych dat
+    DWORD Crc; // CRC32 of unpacked data
 
-    char* OutputMem;     // buffer pro vybalena data
-    char* OutputMemPtr;  // aktualni pozice v bufferu pro vybalena data
-    DWORD OutputMemSize; // velikost bufferu pro vybalena data
+    char* OutputMem;     // buffer for unpacked data
+    char* OutputMemPtr;  // current position in buffer for unpacked data
+    DWORD OutputMemSize; // size of buffer for unpacked data
 
     //public fields, should be intialized before calling Inflate()
     uch* SlideWin;    //circular buffer

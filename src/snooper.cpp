@@ -160,7 +160,7 @@ unsigned ThreadSnooperBody(void* /*param*/) // do not call main thread functions
                         if (index < 0 || index >= WindowArray.Count)
                         {
                             TRACE_E("Unexpected value returned from WaitForMultipleObjects(): " << res);
-                            break; // pro pripad nejake jine hodnoty res
+                            break; // in case of some other value of res
                         }
 
                         // calling FindCloseChangeNotification invalidates other handles to the same path
@@ -413,7 +413,7 @@ unsigned ThreadSnooperEH(void* param)
     {
         TRACE_I("Thread Snooper: calling ExitProcess(1).");
         //    ExitProcess(1);
-        TerminateProcess(GetCurrentProcess(), 1); // tvrdsi exit (tenhle jeste neco vola)
+        TerminateProcess(GetCurrentProcess(), 1); // harder exit (this one still calls something)
         return 1;
     }
 #endif // CALLSTK_DISABLE
@@ -479,7 +479,7 @@ BOOL InitializeThread()
         return FALSE;
     }
 
-    // event "starteru" pro thread "safe handle killer"
+    // "starter" event for the "safe handle killer" thread
     SafeFindCloseStart = HANDLES(CreateEvent(NULL, FALSE, FALSE, NULL));
     if (SafeFindCloseStart == NULL)
     {
@@ -669,7 +669,7 @@ unsigned ThreadFindCloseChangeNotificationEH(void* param)
     {
         TRACE_I("Safe Handle Killer: calling ExitProcess(1).");
         //    ExitProcess(1);
-        TerminateProcess(GetCurrentProcess(), 1); // tvrdsi exit (tenhle jeste neco vola)
+        TerminateProcess(GetCurrentProcess(), 1); // harder exit (this one still calls something)
         return 1;
     }
 #endif // CALLSTK_DISABLE
@@ -726,7 +726,7 @@ void ChangeDirectory(CFilesWindow* win, const char* newPath, BOOL registerDevNot
             if ((HANDLE)ObjectArray[i] == INVALID_HANDLE_VALUE)
             {
                 win->SetAutomaticRefresh(FALSE);
-                ObjectArray.Delete(i); // vyhodime ho ze seznamu
+                ObjectArray.Delete(i); // remove it from the list
                 WindowArray.Delete(i);
                 TRACE_W("Unable to receive change notifications for directory '" << newPath << "' (auto-refresh will not work).");
             }

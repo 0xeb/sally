@@ -19,16 +19,16 @@ extern BOOL FirstInstance_3_or_later;
 
 #define MAX_TL_ITEMS 500 // maximum number of items in shared memory, cannot be changed!
 
-#define TASKLIST_TODO_HIGHLIGHT 1 // okno procesu daneho v 'PID' se ma vysvitit
-#define TASKLIST_TODO_BREAK 2     // proces dany v 'PID' se ma breaknout
-#define TASKLIST_TODO_TERMINATE 3 // proces dany v 'PID' se ma terminovat
-#define TASKLIST_TODO_ACTIVATE 4  // proces dany v 'PID' se ma aktivovat
+#define TASKLIST_TODO_HIGHLIGHT 1 // the window of the process given in 'PID' should be highlighted
+#define TASKLIST_TODO_BREAK 2     // the process given in 'PID' should be broken
+#define TASKLIST_TODO_TERMINATE 3 // the process given in 'PID' should be terminated
+#define TASKLIST_TODO_ACTIVATE 4  // the process given in 'PID' should be activated
 
 #define TASKLIST_TODO_TIMEOUT 5000 // 5 seconds for processes to process todo
 
-#define PROCESS_STATE_STARTING 1 // nas proces startuje, jeste neexistuje hlavni okno
-#define PROCESS_STATE_RUNNING 2  // nas proces bezi, mame hlavni okno
-#define PROCESS_STATE_ENDING 3   // nas proces konci, nemame uz hlavni okno
+#define PROCESS_STATE_STARTING 1 // our process is starting, main window does not exist yet
+#define PROCESS_STATE_RUNNING 2  // our process is running, we have a main window
+#define PROCESS_STATE_ENDING 3   // our process is ending, we no longer have a main window
 
 #pragma pack(push, enter_include_tasklist) // keep structures independent of configured alignment
 #pragma pack(4)
@@ -44,7 +44,7 @@ struct CProcessListItem
     BYTE SID_MD5[16];     // MD5 computed from process SID, used to distinguish processes running under different users; SID has unknown length, hence this workaround
     DWORD ProcessState;   // Salamander state, see PROCESS_STATE_xxx
     UINT64 HMainWindow;   // (x64 friendly) main window handle, if already/still exists (set on create/destroy)
-    DWORD SalmonPID;      // ProcessID salmonu, aby mu brakujici proces mohl garantovat pravo pro SetForegroundWindow
+    DWORD SalmonPID;      // ProcessID of Salmon, so the breaking process can grant it the right for SetForegroundWindow
 
     CProcessListItem()
     {

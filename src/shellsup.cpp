@@ -395,7 +395,7 @@ const char* GetCurrentDir(POINTL& pt, void* param, DWORD* effect, BOOL rButton, 
                     {
                         if (DropSourcePanel != NULL && DropSourcePanel->Is(ptPluginFS) &&
                             DropSourcePanel->GetPluginFS()->NotEmpty() && effect != NULL)
-                        { // zdrojovy FS muze ovlivnit povolene drop-effecty
+                        { // source FS can influence the allowed drop effects
                             DropSourcePanel->GetPluginFS()->GetAllowedDropEffects(1 /* drag-over-fs */, panel->DropPath,
                                                                                   effect);
                         }
@@ -893,7 +893,7 @@ void ShellActionAux7(IDataObject* dataObject, CImpIDropSource* dropSource)
     __try
     {
         if (dropSource != NULL)
-            dropSource->Release(); // ten je nas, snad nespadne ;-)
+            dropSource->Release(); // it's ours, hopefully it won't crash ;-)
         if (dataObject != NULL)
             dataObject->Release();
     }
@@ -1073,7 +1073,7 @@ BOOL ResourceGetDialogName(WCHAR* buff, int buffSize, char* name, int nameMax)
     if (style != 0xffff0001)
     {
         TRACE_E("ResourceGetDialogName(): resource is not DLGTEMPLATEEX!");
-        // cteni klasickeho DLGTEMPLATE viz altap translator, pravdepodobne ale nebude potreba implementovat
+        // reading classic DLGTEMPLATE, see altap translator, but probably won't need to be implemented
         return FALSE;
     }
 
@@ -1383,7 +1383,7 @@ void ShellAction(CFilesWindow* panel, CShellAction action, BOOL useSelection,
                                                         if (sharedMemOK)
                                                         {
                                                             SalShExtSharedMemView->DoPasteFromSalamander = TRUE;
-                                                            SalShExtSharedMemView->ClipDataObjLastGetDataTime = GetTickCount() - 60000; // inicializujeme na 1 minutu pred zalozenim data-objektu
+                                                            SalShExtSharedMemView->ClipDataObjLastGetDataTime = GetTickCount() - 60000; // initialize to 1 minute before creating the data object
                                                             *fakeName = '\\';
                                                             lstrcpyn(SalShExtSharedMemView->PasteFakeDirName, fakeRootDir, MAX_PATH);
                                                             SalShExtSharedMemView->SalamanderMainWndPID = GetCurrentProcessId();
@@ -1396,7 +1396,7 @@ void ShellAction(CFilesWindow* panel, CShellAction action, BOOL useSelection,
                                                             lstrcpyn(SalShExtSharedMemView->ArcUnableToPaste1, LoadStr(IDS_ARCUNABLETOPASTE1), 300);
                                                             lstrcpyn(SalShExtSharedMemView->ArcUnableToPaste2, LoadStr(IDS_ARCUNABLETOPASTE2), 300);
 
-                                                            delFakeDir = FALSE; // vse je OK, fake-dir se uzije
+                                                            delFakeDir = FALSE; // everything is OK, fake-dir will be used
                                                             fakeDataObject->SetCutOrCopyDone();
                                                         }
                                                         else
@@ -1527,7 +1527,7 @@ void ShellAction(CFilesWindow* panel, CShellAction action, BOOL useSelection,
                                                           panel->GetListBoxHWND(), p.x, p.y, fscmPanel,
                                                           panelID, 0, 0);
                     }
-                    else // menu pro aktualni cestu (kliknuti na change-drive buttonu)
+                    else // menu for the current path (click on the change-drive button)
                     {
                         panel->GetPluginFS()->ContextMenu(panel->GetPluginFS()->GetPluginFSName(),
                                                           panel->GetListBoxHWND(), p.x, p.y, fscmPathInPanel,

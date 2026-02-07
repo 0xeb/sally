@@ -1102,7 +1102,7 @@ CDirectorySizesHolder::Add(const char* path)
         // the array is full
         // drop the item at index zero
         delete Items[0];
-        // a pole setrepeme
+        // shift the array down
         memmove(Items, Items + 1, sizeof(void*) * (DIRECOTRY_SIZES_COUNT - 1));
         // append the item at the end
         Items[ItemsCount] = item;

@@ -148,7 +148,7 @@ BOOL GetGoogleDrivePath(char* gdPath, int gdPathMax, CSQLite3DynLoadBase** sqlit
                             sqlite3_Dyn->finalize(pStmt);
                         }
                         else
-                            TRACE_I("SQLite: cannot prepare " << sDbPath); // chodi to sem je-li GD instalovany, ale "not signed in"
+                            TRACE_I("SQLite: cannot prepare " << sDbPath); // this is hit when GD is installed but "not signed in"
                     }
                     else
                         TRACE_E("SQLite: cannot open " << sDbPath);
@@ -626,9 +626,9 @@ void CShellIconOverlayItem::Cleanup()
 
 CShellIconOverlayItem::~CShellIconOverlayItem()
 {
-    // VC2015 se nelibil __try / __except blok v destruktoru, linker si v x64 verzi stezoval:
+    // VC2015 did not like __try / __except block in the destructor, the linker complained in the x64 version:
     // error LNK2001: unresolved external symbol __C_specific_handler_noexcept
-    // prestehovani do funkce problem vyresilo
+    // moving the code into a separate function resolved the problem
     Cleanup();
 }
 

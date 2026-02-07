@@ -1129,8 +1129,8 @@ void CMainToolBar::OnGetToolTip(LPARAM lParam)
             CFilesWindow* activePanel = MainWindow != NULL ? MainWindow->GetActivePanel() : NULL;
             BOOL activePanelIsDisk = (activePanel != NULL && activePanel->Is(ptDisk));
             if (EnablerPastePath &&
-                (!activePanelIsDisk || !EnablerPasteFiles) && // PasteFiles je prioritni
-                !EnablerPasteFilesToArcOrFS)                  // PasteFilesToArcOrFS je prioritni
+                (!activePanelIsDisk || !EnablerPasteFiles) && // PasteFiles has priority
+                !EnablerPasteFilesToArcOrFS)                  // PasteFilesToArcOrFS has priority
             {
                 char tail[50];
                 tail[0] = 0;
@@ -1331,9 +1331,9 @@ CBottomToolBar::CBottomToolBar(HWND hNotifyWindow, CObjectOrigin origin)
     Padding.TextRight = 2;      // space after text
 }
 
-// fills 'Text' variable in BottomTBData array, which is read from resource
-// 'state' indicates row in BottomTBData array and 'BottomTBData' denotes string with texts
-// texts for individual keys are separated by ';' character
+// Fills the 'Text' variable in the BottomTBData array, which is read from resources.
+// 'state' indicates the row in the BottomTBData array and 'textResID' denotes the string resource with texts.
+// Texts for individual keys are separated by ',' character.
 BOOL CBottomToolBar::InitDataResRow(CBottomTBStateEnum state, int textResID)
 {
     CALL_STACK_MESSAGE2("CBottomToolBar::InitDataResRow(, %d)", textResID);
@@ -1480,7 +1480,7 @@ BOOL CBottomToolBar::SetState(CBottomTBStateEnum state)
         TLBI_ITEM_INFO2 tii;
         tii.Mask = TLBI_MASK_TEXT | TLBI_MASK_TEXTLEN | TLBI_MASK_ID | TLBI_MASK_ENABLER |
                    TLBI_MASK_STATE | TLBI_MASK_CUSTOMDATA;
-        tii.State = 0; // povolime command - bude volano UpdateItemsState(), ktere zakaze co je treba
+        tii.State = 0; // enable command - UpdateItemsState() will be called, which disables what is needed
         char emptyBuff[] = "";
         tii.Text = empty ? emptyBuff : BottomTBData[state][i].Text;
         tii.TextLen = empty ? 0 : BottomTBData[state][i].TextLen;

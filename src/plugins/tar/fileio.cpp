@@ -407,7 +407,7 @@ CZippedFile::GetBlock(unsigned short size, unsigned short* read /* = NULL*/)
 {
     if (size > BUFSIZE)
     {
-        TRACE_E("GetBlock - pozadovan prilis velky blok.");
+        TRACE_E("GetBlock - requested block is too large.");
         ErrorCode = IDS_ERR_INTERNAL;
         Ok = FALSE;
         return NULL;

@@ -245,7 +245,7 @@ void CTBCustomizeDialog::OnRemove()
                 if (tmp > data)
                     break;
             }
-            int ret = (int)SendMessage(HAvailableLB, LB_INSERTSTRING, index, 1); // 1 je dumy hodnota, obchazime chybu WinXP
+            int ret = (int)SendMessage(HAvailableLB, LB_INSERTSTRING, index, 1); // 1 is a dummy value, workaround for WinXP bug
             if (ret != LB_ERR)
                 SendMessage(HAvailableLB, LB_SETITEMDATA, ret, data);
         }
@@ -266,7 +266,7 @@ void CTBCustomizeDialog::MoveItem(int srcIndex, int tgtIndex)
     ToolBar->InsertItem2(tgtIndex - delta, TRUE, &AllItems[data]);
 
     SendMessage(HCurrentLB, LB_DELETESTRING, srcIndex, 0);
-    int ret = (int)SendMessage(HCurrentLB, LB_INSERTSTRING, tgtIndex - delta, 1); // 1 je dumy hodnota, obchazime chybu WinXP
+    int ret = (int)SendMessage(HCurrentLB, LB_INSERTSTRING, tgtIndex - delta, 1); // 1 is a dummy value, workaround for WinXP bug
     if (ret != LB_ERR)
         SendMessage(HCurrentLB, LB_SETITEMDATA, ret, data);
     SendMessage(HCurrentLB, LB_SETCURSEL, tgtIndex - delta, 0);

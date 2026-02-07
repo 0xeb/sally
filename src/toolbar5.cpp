@@ -26,9 +26,9 @@ extern "C"
 class CUMDropTarget : public IDropTarget
 {
 private:
-    long RefCount;             // zivotnost objektu
-    IDataObject* DataObject;   // IDataObject, ktery vstoupil do dragu
-    CUserMenuBar* UserMenuBar; // bar, ke kteremu jsme asociovani
+    long RefCount;             // object lifetime
+    IDataObject* DataObject;   // IDataObject that entered the drag
+    CUserMenuBar* UserMenuBar; // bar we are associated with
     IDropTarget* DropTarget;
     char DropTargetFileName[MAX_PATH];
 
@@ -118,7 +118,7 @@ public:
         if (pasteIndex != -1)
         {
             insertIndex = -1;
-            // overim, ze jde o target
+            // verify that it is a target
             TLBI_ITEM_INFO2 tii;
             tii.Mask = TLBI_MASK_ID;
             if (UserMenuBar->GetItemInfo2(pasteIndex, TRUE, &tii))
@@ -206,7 +206,7 @@ public:
 
         if (DataObject != NULL)
         {
-            // provedeme hittest
+            // perform hit test
             int insertIndex = -1;
             BOOL after;
             int pasteIndex = -1;
@@ -259,7 +259,7 @@ public:
             ImageDragMove(pt.x, pt.y);
         if (DataObject != NULL)
         {
-            // provedeme hittest
+            // perform hit test
             int insertIndex = -1;
             BOOL after;
             int pasteIndex = -1;
@@ -344,7 +344,7 @@ public:
             ImageDragLeave();
         if (DataObject != NULL)
         {
-            // provedeme hittest
+            // perform hit test
             int insertIndex = -1;
             BOOL after;
             int pasteIndex = -1;
@@ -576,7 +576,7 @@ CUserMenuBar::CUserMenuBar(HWND hNotifyWindow, CObjectOrigin origin)
 void CUserMenuBar::ToggleLabels()
 {
     CALL_STACK_MESSAGE1("CUserMenuBar::ToggleLabels()");
-    // nastvim styl
+    // set the style
     DWORD style = GetStyle();
     if (Configuration.UserMenuToolbarLabels)
         style &= ~TLB_STYLE_TEXT;
@@ -664,7 +664,7 @@ CUserMenuBar::WindowProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
             {
                 TRACE_E("RegisterDragDrop error.");
             }
-            dropTarget->Release(); // RegisterDragDrop volala AddRef()
+            dropTarget->Release(); // RegisterDragDrop called AddRef()
         }
         break;
     }

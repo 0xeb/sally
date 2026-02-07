@@ -174,9 +174,9 @@ CVersionInfo::LoadBlock(const BYTE*& ptr, CVersionBlock* parent)
         }
     }
 
-    // preskocime VERSIONINFO a retezec Key
+    // skip VERSIONINFO and Key string
     ptr += sizeof(VERSIONINFO) + sizeof(WCHAR) * wcslen(block->Key);
-    // preskocime Padding
+    // skip Padding
     ptr = ALIGN_DWORD(BYTE*, ptr);
 
     switch (block->Type)
@@ -187,7 +187,7 @@ CVersionInfo::LoadBlock(const BYTE*& ptr, CVersionBlock* parent)
     {
         int valSize = info->wValueLength;
 
-        if (block->Type == vbtVersionInfo) // udelame par kontrol konzistence dat
+        if (block->Type == vbtVersionInfo) // perform a few data consistency checks
         {
             if (valSize != sizeof(VS_FIXEDFILEINFO))
             {
@@ -211,20 +211,20 @@ CVersionInfo::LoadBlock(const BYTE*& ptr, CVersionBlock* parent)
             return NULL;
         }
 
-        // preskocime Value
+        // skip Value
         ptr += valSize;
-        // preskocime padding
+        // skip padding
         ptr = ALIGN_DWORD(BYTE*, ptr);
 
         if (block->Type == vbtString || block->Type == vbtVar)
         {
-            // String a Var nemaji childy, takze vypadneme
+            // String and Var have no children, so we exit
             return block;
         }
     }
     }
 
-    // pridame child bloky
+    // add child blocks
     while (ptr < terminatorPtr)
     {
         CVersionBlock* child = LoadBlock(ptr, block);
@@ -416,14 +416,14 @@ BOOL CVersionInfo::SaveBlock(CVersionBlock* block, BYTE*& ptr, const BYTE* maxPt
         return FALSE;
     }
 
-    BYTE* oldPtr = ptr; // ulozim si pro nasledny vypocet velikosti nas a nasich childu
+    BYTE* oldPtr = ptr; // save for subsequent size calculation of us and our children
 
     // wLength
-    WORD* wLength = (WORD*)ptr; // ulozim si pro nasledne nastaveni
+    WORD* wLength = (WORD*)ptr; // save for subsequent assignment
     ptr += 2;
 
     // wValueLength
-    WORD* wValueLength = (WORD*)ptr; // ulozim si pro nasledne nastaveni
+    WORD* wValueLength = (WORD*)ptr; // save for subsequent assignment
     *wValueLength = 0;
     ptr += 2;
 

@@ -1047,7 +1047,7 @@ STDMETHODIMP CImpDropTarget::Drop(IDataObject* pDataObject, DWORD grfKeyState,
                         if ((defEffect & DROPEFFECT_MOVE) != 0)
                             defEffect = DROPEFFECT_MOVE;
                         else
-                            defEffect = DROPEFFECT_NONE; // nemelo by nastat (resi se pres: TgtType==idtttWindows + CurDirDropTarget==NULL)
+                            defEffect = DROPEFFECT_NONE; // should not happen (handled via: TgtType==idtttWindows + CurDirDropTarget==NULL)
                     }
                 }
             }
@@ -2086,7 +2086,7 @@ BOOL HasDropTarget(const char* dir)
   if (GetShellFolder(dir, shellFolderObj, pidlFolder))
   {
     HRESULT ret;
-    attrs = SFGAO_DROPTARGET;  // ptame se jen na tento atribut
+    attrs = SFGAO_DROPTARGET;  // we only query this attribute
     if (!SUCCEEDED((ret = shellFolderObj->GetAttributesOf(1, (LPCITEMIDLIST *)&pidlFolder, &attrs))))
     {
       TRACE_E("GetAttributesOf error: " << hex << ret);

@@ -396,7 +396,7 @@ LRESULT CALLBACK ProgressControlProc(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM
                 FillRect(dc, &r, NormalBrush);
 
             char txt[10];
-            wsprintf(txt, "%d %%", (int)((progress * 1000 / ProgressTotalSize /*+ 5*/)) / 10); // nezaokrouhlujeme (100% musi byt az pri 100% a ne pri 99.5%)
+            wsprintf(txt, "%d %%", (int)((progress * 1000 / ProgressTotalSize /*+ 5*/)) / 10); // we do not round (100% must only appear at exactly 100%, not at 99.5%)
             r.left = 2;                                                                        /*
         r.right = Width - 2;
         r.top = 2;

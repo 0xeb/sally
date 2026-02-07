@@ -46,7 +46,7 @@ BOOL GetTargetDirectory(HWND parent, HWND hCenterWindow, const char* title, cons
 
 // detects whether it is a NetHood path (directory with target.lnk),
 // optionally resolves target.lnk and returns the path in 'path'; 'path' is an in/out path
-// (min. MAX_PATH znaku)
+// (min. MAX_PATH characters)
 void ResolveNetHoodPath(char* path);
 
 class CMenuNew;
@@ -511,5 +511,5 @@ public:
     }
 };
 
-// uvolni CopyMoveData
+// release CopyMoveData
 void DestroyCopyMoveData(CCopyMoveData* data);

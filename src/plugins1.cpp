@@ -2250,7 +2250,7 @@ BOOL CPluginData::InitDLL(HWND parent, BOOL quiet, BOOL waitCursor, BOOL showUns
                     Plugins.LeaveDataCS();
                     SalamanderGeneral.Init((CPluginInterfaceAbstract*)-1); // so SetFlagLoadOnSalamanderStart can be used from the entry point
 
-                    // !!! VOLANI ENTRY-POINTU plug-inu !!!
+                    // !!! CALLING THE PLUGIN ENTRY POINT !!!
                     CPluginInterfaceAbstract* resIface = entry(&salamander);
 
                     Plugins.EnterDataCS();

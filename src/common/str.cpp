@@ -66,7 +66,7 @@ BYTE UpperCase[256];
 
 void InitializeCase();
 
-class C__STR_module // automaticka inicializace modulu
+class C__STR_module // automatic module initialization
 {
 public:
     C__STR_module() { InitializeCase(); }

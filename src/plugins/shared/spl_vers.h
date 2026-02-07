@@ -134,20 +134,21 @@
 // Salamander version it is certain that Salamander contains it (it only risks
 // load into a newer Salamander version, which must also contain these methods).
 //
-// Pouziva se i opacne: aby mel interni plugin jistotu, ze mu Salamander bude
-// volat vsechny metody (vcetne nejnovejsich), vraci tuto verzi, jako verzi,
-// pro kterou byl plugin postaven (viz export pluginu SalamanderPluginGetReqVer).
+// It is also used in reverse: so that an internal plugin is certain that
+// Salamander will call all its methods (including the newest ones), it returns
+// this version as the version the plugin was built for (see plugin export
+// SalamanderPluginGetReqVer).
 //
-// Pokud nektery plugin vraci z SalamanderPluginGetReqVer nizsi verzi nez
-// LAST_VERSION_OF_SALAMANDER (pro zpetnou kompatibilitu se starsimi verzemi
-// Salamandera), mel by pridat export SalamanderPluginGetSDKVer a vracet z nej
-// LAST_VERSION_OF_SALAMANDER (verze SDK pouzita pro stavbu pluginu), aby mohl
-// Salamander (napr. aktualni nebo novejsi) pouzivat i metody pluginu, ktere
-// ve verzi vracene z SalamanderPluginGetReqVer jeste nebyly.
+// If a plugin returns a lower version from SalamanderPluginGetReqVer than
+// LAST_VERSION_OF_SALAMANDER (for backward compatibility with older versions
+// of Salamander), it should add the export SalamanderPluginGetSDKVer and return
+// LAST_VERSION_OF_SALAMANDER from it (SDK version used to build the plugin),
+// so that Salamander (e.g. current or newer) can also use plugin methods that
+// did not yet exist in the version returned from SalamanderPluginGetReqVer.
 //
-// Pri zmenach v rozhrani je potreba dodrzet postup uvedeny v doc\how_to_change.txt.
+// When making changes to the interface, follow the procedure described in doc\how_to_change.txt.
 //
-// Prehled pouzitych hodnot LAST_VERSION_OF_SALAMANDER:
+// Overview of used LAST_VERSION_OF_SALAMANDER values:
 //   1  - 1.6 beta 4 + 5
 //   2  - 1.6 beta 6
 //   3  - 1.6 beta 7
@@ -164,13 +165,13 @@
 //   14 - 2.5 beta 10
 //   15 - 2.5 beta 10a
 //   16 - 2.5 beta 11
-//   17 - 2.5 beta 12 (jen interni, pustili jsme misto ni RC1)
+//   17 - 2.5 beta 12 (internal only, we released RC1 instead)
 //   18 - 2.5 RC1
 //   19 - 2.5 RC2
 //   20 - 2.5 RC3
 //   21 - 2.5
 //   22 - 2.51
-//   23 - 2.52 beta 1 (POZOR: nekompatibilni SDK s predchozimi a dalsimi verzemi)
+//   23 - 2.52 beta 1 (WARNING: incompatible SDK with previous and subsequent versions)
 //   29 - 2.52 beta 2
 //   31 - 2.52
 //   39 - 2.53 beta 1 + 2.53 beta 1a
@@ -190,8 +191,8 @@
 //   76 - 3.06
 //   79 - 3.07
 //   81 - 3.08
-// ! DULEZITE: vsechny verze z VC2008 musi byt < 100, vsechny verze z VC2019 musi byt >= 100,
-//             nova cisla verzi je nutne zapsat do vetve "default", a pak
+// ! IMPORTANT: all versions from VC2008 must be < 100, all versions from VC2019 must be >= 100,
+//              new version numbers must be written to the "default" branch first,
 //              and only then to the side branch (complete list is only in "default" branch)
 //   101 - 4.0 beta 1 (DB177)
 //   102 - 4.0

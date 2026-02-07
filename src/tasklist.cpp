@@ -495,7 +495,7 @@ BOOL CTaskList::SetProcessState(DWORD processState, HWND hMainWindow, BOOL* time
                 if (PID == ptr[i].PID)
                 {
                     ptr[i].ProcessState = processState;
-                    ptr[i].HMainWindow = (UINT64)(DWORD_PTR)hMainWindow; // 64b pro x64/x86 kompatibilitu
+                    ptr[i].HMainWindow = (UINT64)(DWORD_PTR)hMainWindow; // 64-bit for x64/x86 compatibility
                     break;
                 }
             }
