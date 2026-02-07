@@ -2303,7 +2303,7 @@ BOOL DeleteAllADS(HANDLE file, const char* fileName)
         PFILE_STREAM_INFORMATION psi = (PFILE_STREAM_INFORMATION)buffer;
         if (ioStatus.Information > 0) // verify that we received any data at all
         {
-            WCHAR adsFullName[2 * MAX_PATH];
+            CWidePathBuffer adsFullName;
             adsFullName[0] = 0;
             WCHAR* adsPart = NULL;
             int adsPartSize = 0;
@@ -2313,10 +2313,10 @@ BOOL DeleteAllADS(HANDLE file, const char* fileName)
                 {
                     if (adsFullName[0] == 0) // convert the file name only when needed for the first time to save CPU time
                     {
-                        if (ConvertA2U(fileName, -1, adsFullName, 2 * MAX_PATH) == 0)
+                        if (ConvertA2U(fileName, -1, adsFullName, adsFullName.Size()) == 0)
                             return FALSE; // "always false"
                         adsPart = adsFullName + wcslen(adsFullName);
-                        adsPartSize = (int)((adsFullName + 2 * MAX_PATH) - adsPart);
+                        adsPartSize = (int)((adsFullName + adsFullName.Size()) - adsPart);
                         if (adsPartSize > 0)
                         {
                             *adsPart++ = L':';
