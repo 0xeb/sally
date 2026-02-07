@@ -418,7 +418,7 @@ public:
     CMenuNew* ContextMenuNew;          // handles commands from the New menu
     IContextMenu2* ContextMenuChngDrv; // handles commands from the Change Drive Menu
 
-    char SelectionMask[MAX_PATH]; // mask for select/deselect
+    CPathBuffer SelectionMask; // mask for select/deselect
 
     BOOL CanClose;                    // can the main window be closed? (has the application fully started?)
     BOOL CanCloseButInEndSuspendMode; // TRUE if CanClose was TRUE but is temporarily FALSE because a message loop is running while processing WM_USER_END_SUSPMODE

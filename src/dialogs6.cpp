@@ -2361,7 +2361,7 @@ CErrorCopyingDirTimeDlg::DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
 CDriveSelectErrDlg::CDriveSelectErrDlg(HWND parent, const char* errText, const char* drvPath) : CCommonDialog(HLanguage, IDD_DRIVESELECTERR, parent)
 {
     ErrText = errText;
-    lstrcpyn(DrvPath, drvPath, MAX_PATH);
+    lstrcpyn(DrvPath, drvPath, DrvPath.Size());
     CounterForAllowedUseOfTimer = 5 * 60; // try for at most 5 minutes, then let the user press Retry (prevents drive hammering)
 }
 
@@ -2420,7 +2420,7 @@ CDriveSelectErrDlg::DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
                 setTimer = FALSE;
                 break; // no idea what's going on, we better skip periodic tests
             }
-            lstrcpyn(DrvPath, root, MAX_PATH);
+            lstrcpyn(DrvPath, root, DrvPath.Size());
         }
         else
             setTimer = FALSE; // most likely a network connection
@@ -2440,9 +2440,9 @@ CDriveSelectErrDlg::DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
             // drive accessibility is tested using FindFirstFile because SalGetFileAttributes
             // always succeeds on junction-points (directory attributes are unrelated to content)
             BOOL ok = FALSE;
-            char fileName[MAX_PATH + 10];
-            lstrcpyn(fileName, DrvPath, MAX_PATH + 10);
-            if (SalPathAppend(fileName, "*", MAX_PATH + 10))
+            CPathBuffer fileName;
+            lstrcpyn(fileName, DrvPath, fileName.Size());
+            if (SalPathAppend(fileName, "*", fileName.Size()))
             {
                 WIN32_FIND_DATA fileData;
                 HANDLE search;

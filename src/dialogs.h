@@ -605,7 +605,7 @@ class CColorGraph;
 class CDriveInfo : public CCommonDialog
 {
 protected:
-    char VolumePath[MAX_PATH]; // which drive information should be shown (either the root or a junction point)
+    CPathBuffer VolumePath; // which drive information should be shown (either the root or a junction point)
     char OldVolumeName[1000];  // for change detection
     CColorGraph* Graph;
     HICON HDriveIcon;
@@ -649,7 +649,7 @@ private:
     BOOL SelectionContainsDirectory;
 
 public:
-    char Mask[MAX_PATH]; // which files will be converted?
+    CPathBuffer Mask; // which files will be converted?
     int Change;          // which conversion should be performed?
     BOOL SubDirs;        // include subdirectories?
     int CodeType;        // selected encoding (0 = none)
@@ -998,7 +998,7 @@ protected:
     HIMAGELIST HImageList;      // image list for the listview
     BOOL RefreshPanels;         // should the panels be refreshed after closing the dialog?
     BOOL DrivesBarChange;       // should the Drives bars be refreshed after closing the dialog?
-    char FocusPlugin[MAX_PATH]; // empty if no plugin should get focus; otherwise contains its path
+    CPathBuffer FocusPlugin; // empty if no plugin should get focus; otherwise contains its path
     CHyperLink* Url;
     char ShowInBarText[200];        // text taken from the checkbox when the dialog opens
     char ShowInChDrvText[200];      // text taken from the checkbox when the dialog opens
@@ -1589,7 +1589,7 @@ protected:
 
 protected:
     const char* ErrText;
-    char DrvPath[MAX_PATH];
+    CPathBuffer DrvPath;
     int CounterForAllowedUseOfTimer;
 };
 

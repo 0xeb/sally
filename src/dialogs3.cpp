@@ -112,12 +112,12 @@ void CConvertFilesDlg::Transfer(CTransferInfo& ti)
         if (ti.Type == ttDataToWindow)
         {
             LoadComboFromStdHistoryValues(hWnd, history, CONVERT_HISTORY_SIZE);
-            SendMessage(hWnd, CB_LIMITTEXT, MAX_PATH - 1, 0);
-            SendMessage(hWnd, WM_SETTEXT, 0, (LPARAM)Mask);
+            SendMessage(hWnd, CB_LIMITTEXT, Mask.Size() - 1, 0);
+            SendMessage(hWnd, WM_SETTEXT, 0, (LPARAM)Mask.Get());
         }
         else
         {
-            SendMessage(hWnd, WM_GETTEXT, MAX_PATH, (LPARAM)Mask);
+            SendMessage(hWnd, WM_GETTEXT, Mask.Size(), (LPARAM)Mask.Get());
             AddValueToStdHistoryValues(history, CONVERT_HISTORY_SIZE, Mask, FALSE);
         }
     }
@@ -1418,7 +1418,7 @@ CChangeDirDlg::DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
 CDriveInfo::CDriveInfo(HWND parent, const char* path, CObjectOrigin origin)
     : CCommonDialog(HLanguage, IDD_DRIVEINFO, IDD_DRIVEINFO, parent, origin)
 {
-    lstrcpyn(VolumePath, path, MAX_PATH);
+    lstrcpyn(VolumePath, path, VolumePath.Size());
     OldVolumeName[0] = 0;
     HDriveIcon = NULL;
 }
@@ -1481,7 +1481,7 @@ void CDriveInfo::Transfer(CTransferInfo& ti)
         err = (MyGetVolumeInformation(VolumePath, volumePathWithBackslash, junctionOrSymlinkTgt, &linkType,
                                       volumeName, 200, &volumeSerialNumber, &maximumComponentLength,
                                       &fileSystemFlags, fileSystemNameBuffer, 100) == 0);
-        lstrcpyn(VolumePath, volumePathWithBackslash, MAX_PATH);
+        lstrcpyn(VolumePath, volumePathWithBackslash, VolumePath.Size());
         SalPathAddBackslash(volumePathWithBackslash, volumePathWithBackslash.Size());
         //---  GetVolumeInformation - display
         if (!err)

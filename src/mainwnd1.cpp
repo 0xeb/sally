@@ -339,7 +339,7 @@ CMainWindow::CMainWindow() : ChangeNotifArray(3, 5)
     SaveCfgInEndSession = FALSE;
     WaitInEndSession = FALSE;
     DisableIdleProcessing = FALSE;
-    strcpy(SelectionMask, "*.*");
+    lstrcpyn(SelectionMask, "*.*", SelectionMask.Size());
     Created = FALSE;
     //  DrivesControlHWnd = NULL;
     HDisabledKeyboard = NULL;

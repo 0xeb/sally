@@ -889,7 +889,7 @@ CPluginsDlg::DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
                     strcat(s, p->DLLName);
                     s = buf;
                 }
-                strcpy(FocusPlugin, s);
+                lstrcpyn(FocusPlugin, s, FocusPlugin.Size());
                 PostMessage(HWindow, WM_COMMAND, IDOK, 0);
             }
             return 0;
