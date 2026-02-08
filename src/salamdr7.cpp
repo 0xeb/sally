@@ -422,9 +422,9 @@ BOOL QueryVolumeSeekPenalty(const char* volume, BOOL* seekPenalty)
 BOOL QueryVolumeATARPM(const char* volume, WORD* rpm)
 {
     BOOL ret = FALSE;
-    HANDLE hVolume = HANDLES_Q(CreateFile(volume, GENERIC_READ | GENERIC_WRITE,
+    HANDLE hVolume = SalCreateFileH(volume, GENERIC_READ | GENERIC_WRITE,
                                           FILE_SHARE_READ | FILE_SHARE_WRITE, NULL,
-                                          OPEN_EXISTING, 0, NULL));
+                                          OPEN_EXISTING, 0, NULL);
     if (hVolume != INVALID_HANDLE_VALUE)
     {
         struct ATAIdentifyDeviceQuery
