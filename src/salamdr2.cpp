@@ -1391,7 +1391,7 @@ BOOL GetReparsePointDestination(const char* repPointDir, char* repPointDstBuf, D
     CPathBuffer repPointDirCrFileCopy; // Heap-allocated for long path support
     MakeCopyWithBackslashIfNeeded(repPointDirCrFile, repPointDirCrFileCopy);
 
-    DWORD attrs = GetFileAttributes(repPointDirCrFile);
+    DWORD attrs = SalLPGetFileAttributes(repPointDirCrFile);
     if (attrs == 0xffffffff || (attrs & FILE_ATTRIBUTE_REPARSE_POINT) == 0)
     {
         //    TRACE_I("GetReparsePointDestination(): Reparse point not found: " << repPointDir);

@@ -1153,7 +1153,7 @@ void _RemoveTemporaryDir(const char* dir)
         HANDLES(FindClose(find));
     }
     *(end - 1) = 0;
-    RemoveDirectory(path);
+    SalLPRemoveDirectory(path);
 }
 
 void RemoveTemporaryDir(const char* dir)
@@ -1165,7 +1165,7 @@ void RemoveTemporaryDir(const char* dir)
     SetCurrentDirectoryToSystem(); // must leave it, otherwise it won't be deletable
 
     ClearReadOnlyAttr(dir);
-    RemoveDirectory(dir);
+    SalLPRemoveDirectory(dir);
 }
 
 // ****************************************************************************
@@ -1198,7 +1198,7 @@ void _RemoveEmptyDirs(const char* dir)
         HANDLES(FindClose(find));
     }
     *(end - 1) = 0;
-    RemoveDirectory(path);
+    SalLPRemoveDirectory(path);
 }
 
 void RemoveEmptyDirs(const char* dir)
@@ -1210,7 +1210,7 @@ void RemoveEmptyDirs(const char* dir)
     SetCurrentDirectoryToSystem(); // must leave it, otherwise it won't be deletable
 
     ClearReadOnlyAttr(dir);
-    RemoveDirectory(dir);
+    SalLPRemoveDirectory(dir);
 }
 
 // ****************************************************************************

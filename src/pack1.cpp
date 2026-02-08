@@ -1477,7 +1477,7 @@ BOOL PackUniversalUncompress(HWND parent, const char* command, TPackErrorTable* 
     FILE* listFile;
     if ((listFile = fopen(tmpListNameBuf, "w")) == NULL)
     {
-        RemoveDirectory(tmpDirNameBuf);
+        SalLPRemoveDirectory(tmpDirNameBuf);
         DeleteFileA(gFileSystem, tmpListNameBuf);
         return (*PackErrorHandlerPtr)(parent, IDS_PACKERR_FILE);
     }
@@ -1508,7 +1508,7 @@ BOOL PackUniversalUncompress(HWND parent, const char* command, TPackErrorTable* 
             {
                 fclose(listFile);
                 DeleteFileA(gFileSystem, tmpListNameBuf);
-                RemoveDirectory(tmpDirNameBuf);
+                SalLPRemoveDirectory(tmpDirNameBuf);
                 return (*PackErrorHandlerPtr)(parent, IDS_PACKERR_FILE);
             }
         }
@@ -1522,7 +1522,7 @@ BOOL PackUniversalUncompress(HWND parent, const char* command, TPackErrorTable* 
         !TestFreeSpace(parent, tmpDirNameBuf, totalSize, LoadStr(IDS_PACKERR_TITLE)))
     {
         DeleteFileA(gFileSystem, tmpListNameBuf);
-        RemoveDirectory(tmpDirNameBuf);
+        SalLPRemoveDirectory(tmpDirNameBuf);
         return FALSE;
     }
 
@@ -1535,7 +1535,7 @@ BOOL PackUniversalUncompress(HWND parent, const char* command, TPackErrorTable* 
                            command, cmdLine, PACK_CMDLINE_MAXLEN, NULL))
     {
         DeleteFileA(gFileSystem, tmpListNameBuf);
-        RemoveDirectory(tmpDirNameBuf);
+        SalLPRemoveDirectory(tmpDirNameBuf);
         return (*PackErrorHandlerPtr)(parent, IDS_PACKERR_CMDLNERR);
     }
 
@@ -1544,7 +1544,7 @@ BOOL PackUniversalUncompress(HWND parent, const char* command, TPackErrorTable* 
     {
         char buffer[1000];
         DeleteFileA(gFileSystem, tmpListNameBuf);
-        RemoveDirectory(tmpDirNameBuf);
+        SalLPRemoveDirectory(tmpDirNameBuf);
         strcpy(buffer, cmdLine);
         return (*PackErrorHandlerPtr)(parent, IDS_PACKERR_CMDLNLEN, buffer);
     }
@@ -1558,7 +1558,7 @@ BOOL PackUniversalUncompress(HWND parent, const char* command, TPackErrorTable* 
         else
         {
             DeleteFileA(gFileSystem, tmpListNameBuf);
-            RemoveDirectory(tmpDirNameBuf);
+            SalLPRemoveDirectory(tmpDirNameBuf);
             return (*PackErrorHandlerPtr)(parent, IDS_PACKERR_IDIRERR);
         }
     }
@@ -1567,7 +1567,7 @@ BOOL PackUniversalUncompress(HWND parent, const char* command, TPackErrorTable* 
         if (!PackExpandInitDir(archiveFileName, NULL, tmpDirNameBuf, initDir, currentDir, currentDir.Size()))
         {
             DeleteFileA(gFileSystem, tmpListNameBuf);
-            RemoveDirectory(tmpDirNameBuf);
+            SalLPRemoveDirectory(tmpDirNameBuf);
             return (*PackErrorHandlerPtr)(parent, IDS_PACKERR_IDIRERR);
         }
     }

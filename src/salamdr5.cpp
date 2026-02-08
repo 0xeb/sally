@@ -1279,16 +1279,16 @@ BOOL SalMoveFile(const char* srcName, const char* destName)
             DWORD attr = SalGetFileAttributes(srcName);
             if (attr != 0xFFFFFFFF && (attr & FILE_ATTRIBUTE_READONLY))
             {
-                SetFileAttributes(srcName, FILE_ATTRIBUTE_ARCHIVE);
+                SalLPSetFileAttributes(srcName, FILE_ATTRIBUTE_ARCHIVE);
                 if (MoveFileA(gFileSystem, srcName, destName).success)
                 {
-                    SetFileAttributes(destName, attr);
+                    SalLPSetFileAttributes(destName, attr);
                     return TRUE;
                 }
                 else
                 {
                     err = GetLastError();
-                    SetFileAttributes(srcName, attr);
+                    SalLPSetFileAttributes(srcName, attr);
                 }
             }
             SetLastError(err);
@@ -1564,7 +1564,7 @@ BOOL ClearReadOnlyAttr(const char* name, DWORD attr)
     else
     {
         TRACE_E("ClearReadOnlyAttr(): error getting attrs: " << name);
-        if (!SetFileAttributes(name, FILE_ATTRIBUTE_ARCHIVE)) // cannot read attributes, try at least writing (don't care if it's needed)
+        if (!SalLPSetFileAttributes(name, FILE_ATTRIBUTE_ARCHIVE)) // cannot read attributes, try at least writing (don't care if it's needed)
             TRACE_E("ClearReadOnlyAttr(): error setting attrs (FILE_ATTRIBUTE_ARCHIVE): " << name);
         return TRUE;
     }
@@ -1950,7 +1950,7 @@ BOOL CreateOurPathInRoamingAPPDATA(char* buf)
     {
         if (SalPathAppend(path, "Open Salamander", MAX_PATH))
         {
-            CreateDirectory(path, NULL); // if it fails (e.g. already exists), we don't care...
+            SalLPCreateDirectory(path, NULL); // if it fails (e.g. already exists), we don't care...
             if (buf != NULL)
                 lstrcpyn(buf, path, MAX_PATH);
             return TRUE;

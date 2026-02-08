@@ -589,7 +589,7 @@ void CFilesWindow::DragDropToArcOrFS(CTmpDragDropOperData* data)
                                 DeviceIoControl(hFile2, FSCTL_SET_COMPRESSION, &state,
                                                 sizeof(USHORT), NULL, 0, &length, FALSE);
                                 HANDLES(CloseHandle(hFile2));
-                                SetFileAttributes(data->ArchiveOrFSName, nullFileAttrs);
+                                SalLPSetFileAttributes(data->ArchiveOrFSName, nullFileAttrs);
                             }
                         }
                     }
@@ -612,7 +612,7 @@ void CFilesWindow::DragDropToArcOrFS(CTmpDragDropOperData* data)
                                 }
                                 HANDLES(CloseHandle(hFile2));
                                 if (nullFileAttrs != INVALID_FILE_ATTRIBUTES)
-                                    SetFileAttributes(data->ArchiveOrFSName, nullFileAttrs);
+                                    SalLPSetFileAttributes(data->ArchiveOrFSName, nullFileAttrs);
                             }
                         }
                     }

@@ -633,7 +633,7 @@ void CFilesWindow::FilesAction(CActionType type, CFilesWindow* target, int count
                                             DeviceIoControl(hFile2, FSCTL_SET_COMPRESSION, &state,
                                                             sizeof(USHORT), NULL, 0, &length, FALSE);
                                             HANDLES(CloseHandle(hFile2));
-                                            SetFileAttributes(path, nullFileAttrs);
+                                            SalLPSetFileAttributes(path, nullFileAttrs);
                                         }
                                     }
                                     SetSel(FALSE, -1, TRUE);                        // explicit redraw
@@ -658,7 +658,7 @@ void CFilesWindow::FilesAction(CActionType type, CFilesWindow* target, int count
                                             }
                                             HANDLES(CloseHandle(hFile2));
                                             if (nullFileAttrs != INVALID_FILE_ATTRIBUTES)
-                                                SetFileAttributes(path, nullFileAttrs);
+                                                SalLPSetFileAttributes(path, nullFileAttrs);
                                         }
                                     }
                                 }
