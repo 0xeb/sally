@@ -989,7 +989,7 @@ public:
 protected:
     virtual INT_PTR DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam);
 
-    void GetShell32(char* fileName);
+    void GetShell32(char* fileName, int fileNameSize);
 
     BOOL LoadIcons();    // enumerates icons and fills the Icons array
     void DestroyIcons(); // clears the Icons array

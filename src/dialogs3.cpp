@@ -2528,10 +2528,10 @@ CChangeIconDialog::~CChangeIconDialog()
     DestroyIcons();
 }
 
-void CChangeIconDialog::GetShell32(char* fileName)
+void CChangeIconDialog::GetShell32(char* fileName, int fileNameSize)
 {
-    EnvGetSystemDirectoryA(gEnvironment, fileName, MAX_PATH);
-    SalPathAppend(fileName, "SHELL32.DLL", MAX_PATH);
+    EnvGetSystemDirectoryA(gEnvironment, fileName, fileNameSize);
+    SalPathAppend(fileName, "SHELL32.DLL", fileNameSize);
     SetDlgItemText(HWindow, IDE_CHI_FILENAME, fileName);
 }
 
@@ -2550,7 +2550,7 @@ void CChangeIconDialog::Transfer(CTransferInfo& ti)
         if (curSel == LB_ERR || curSel >= (int)IconsCount)
         {
             CPathBuffer fileName; // Heap-allocated for long path support
-            GetShell32(fileName);
+            GetShell32(fileName, fileName.Size());
             LoadIcons();
             *IconIndex = 0;
         }
@@ -2578,7 +2578,7 @@ AGAIN:
         gPrompter->ShowError(LoadStrW(IDS_ERRORTITLE), msg.c_str());
 
         // fall back to default
-        GetShell32(fileName);
+        GetShell32(fileName, fileName.Size());
     }
 
     // enumeration of icons from *.ICO, *.EXE, *.DLL files, including 16-bit PE
@@ -2603,7 +2603,7 @@ AGAIN:
         gPrompter->ShowError(LoadStrW(IDS_ERRORTITLE), msg.c_str());
 
         // fall back to default
-        GetShell32(fileName);
+        GetShell32(fileName, fileName.Size());
         if (counter < 2) // safety check
             goto AGAIN;
     }

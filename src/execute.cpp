@@ -808,7 +808,7 @@ const char* WINAPI ExecuteExpFullPath(HWND msgParent, void* param) // full path 
 const char* WINAPI ExecuteExpWinDir(HWND msgParent, void* param) // full path to the Windows directory
 {
     CExecuteExpData* data = (CExecuteExpData*)param;
-    EnvGetWindowsDirectoryA(gEnvironment, data->Buffer, MAX_PATH);
+    EnvGetWindowsDirectoryA(gEnvironment, data->Buffer, data->Buffer.Size());
     char* s = data->Buffer + strlen(data->Buffer);
     if (s > data->Buffer && *(s - 1) != '\\')
         strcat(data->Buffer, "\\");
@@ -818,7 +818,7 @@ const char* WINAPI ExecuteExpWinDir(HWND msgParent, void* param) // full path to
 const char* WINAPI ExecuteExpSysDir(HWND msgParent, void* param) // full path to the System directory
 {
     CExecuteExpData* data = (CExecuteExpData*)param;
-    EnvGetSystemDirectoryA(gEnvironment, data->Buffer, MAX_PATH);
+    EnvGetSystemDirectoryA(gEnvironment, data->Buffer, data->Buffer.Size());
     char* s = data->Buffer + strlen(data->Buffer);
     if (s > data->Buffer && *(s - 1) != '\\')
         strcat(data->Buffer, "\\");
@@ -828,7 +828,7 @@ const char* WINAPI ExecuteExpSysDir(HWND msgParent, void* param) // full path to
 const char* WINAPI ExecuteExpSalDir(HWND msgParent, void* param) // full path to the Salamander directory
 {
     CExecuteExpData* data = (CExecuteExpData*)param;
-    GetModuleFileName(HInstance, data->Buffer, MAX_PATH);
+    GetModuleFileName(HInstance, data->Buffer, data->Buffer.Size());
     *(strrchr(data->Buffer, '\\') + 1) = 0;
     return data->Buffer;
 }
@@ -854,7 +854,7 @@ const char* WINAPI ExecuteExpDOSWinDir(HWND msgParent, void* param) // DOS full 
     CExecuteExpData* data = (CExecuteExpData*)param;
     CPathBuffer path; // Heap-allocated for long path support
     EnvGetWindowsDirectoryA(gEnvironment, path, path.Size());
-    GetShortPathName(path, data->Buffer, MAX_PATH);
+    GetShortPathName(path, data->Buffer, data->Buffer.Size());
     char* s = data->Buffer + strlen(data->Buffer);
     if (s > data->Buffer && *(s - 1) != '\\')
         strcat(data->Buffer, "\\");
@@ -866,7 +866,7 @@ const char* WINAPI ExecuteExpDOSSysDir(HWND msgParent, void* param) // DOS full 
     CExecuteExpData* data = (CExecuteExpData*)param;
     CPathBuffer path; // Heap-allocated for long path support
     EnvGetSystemDirectoryA(gEnvironment, path, path.Size());
-    GetShortPathName(path, data->Buffer, MAX_PATH);
+    GetShortPathName(path, data->Buffer, data->Buffer.Size());
     char* s = data->Buffer + strlen(data->Buffer);
     if (s > data->Buffer && *(s - 1) != '\\')
         strcat(data->Buffer, "\\");
@@ -899,7 +899,7 @@ const char* WINAPI ExecuteExpFullPath2(HWND msgParent, void* param) // full path
 const char* WINAPI ExecuteExpWinDir2(HWND msgParent, void* param) // full path to the Windows directory without trailing '\\'
 {
     CExecuteExpData* data = (CExecuteExpData*)param;
-    EnvGetWindowsDirectoryA(gEnvironment, data->Buffer, MAX_PATH);
+    EnvGetWindowsDirectoryA(gEnvironment, data->Buffer, data->Buffer.Size());
     char* s = data->Buffer + strlen(data->Buffer);
     if (s > data->Buffer && *(s - 1) == '\\')
         *(s - 1) = 0;
@@ -909,7 +909,7 @@ const char* WINAPI ExecuteExpWinDir2(HWND msgParent, void* param) // full path t
 const char* WINAPI ExecuteExpSysDir2(HWND msgParent, void* param) // full path to the System directory without trailing '\\'
 {
     CExecuteExpData* data = (CExecuteExpData*)param;
-    EnvGetSystemDirectoryA(gEnvironment, data->Buffer, MAX_PATH);
+    EnvGetSystemDirectoryA(gEnvironment, data->Buffer, data->Buffer.Size());
     char* s = data->Buffer + strlen(data->Buffer);
     if (s > data->Buffer && *(s - 1) == '\\')
         *(s - 1) = 0;
@@ -919,7 +919,7 @@ const char* WINAPI ExecuteExpSysDir2(HWND msgParent, void* param) // full path t
 const char* WINAPI ExecuteExpSalDir2(HWND msgParent, void* param) // full path to the Salamander directory without trailing '\\'
 {
     CExecuteExpData* data = (CExecuteExpData*)param;
-    GetModuleFileName(HInstance, data->Buffer, MAX_PATH);
+    GetModuleFileName(HInstance, data->Buffer, data->Buffer.Size());
     char* s = strrchr(data->Buffer, '\\');
     if (s == NULL)
     {

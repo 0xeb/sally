@@ -170,7 +170,7 @@ BOOL GetGoogleDrivePath(char* gdPath, int gdPathMax, CSQLite3DynLoadBase** sqlit
     {
         if (SHGetFolderPath(NULL, WindowsVistaAndLater ? CSIDL_PROFILE : CSIDL_MYDOCUMENTS,
                             NULL, 0 /* SHGFP_TYPE_CURRENT */, mbPath) == S_OK &&
-            SalPathAppend(mbPath, "Google Drive", MAX_PATH) &&
+            SalPathAppend(mbPath, "Google Drive", mbPath.Size()) &&
             (int)strlen(mbPath) < gdPathMax)
         {
             TRACE_I("Using default Google Drive path instead: " << mbPath);
