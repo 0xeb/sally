@@ -73,6 +73,7 @@
 #include <arraylt.h>
 #include <winliblt.h>
 #include <auxtools.h>
+#include "common/widepath.h"
 
 // Define some SAL strings for VC6.
 #ifndef __in

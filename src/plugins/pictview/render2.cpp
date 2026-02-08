@@ -458,9 +458,9 @@ void CRendererWindow::SetAsWallpaper(WORD command)
 
                 // save the image into a BMP file in the Windows directory
                 // (where it is then left on its own); a cleaner solution is unknown
-                TCHAR fileName[MAX_PATH];
-                GetWindowsDirectory(fileName, SizeOf(fileName));
-                SalamanderGeneral->SalPathAppend(fileName, PICTVIEW_WALLPAPER, MAX_PATH);
+                CPathBuffer fileName;
+                GetWindowsDirectory(fileName, fileName.Size());
+                SalamanderGeneral->SalPathAppend(fileName, PICTVIEW_WALLPAPER, fileName.Size());
                 if (SaveWallpaper(fileName))
                 {
                     CWallpaper cur;

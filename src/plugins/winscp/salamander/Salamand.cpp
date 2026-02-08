@@ -417,7 +417,7 @@ bool CPluginInterface::Init(CSalamanderPluginEntryAbstract* Salamander)
 
             Salamander->SetPluginHomePageURL(SalLoadStr(SAL_HOMEPAGE));
 
-            char FSName[MAX_PATH];
+            CPathBuffer FSName;
             SalamanderGeneral()->GetPluginFSName(FSName, 0);
             FFSNames[0] = FSName;
             assert(!FFSNames[0].IsEmpty());

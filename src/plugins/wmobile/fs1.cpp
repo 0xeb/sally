@@ -128,9 +128,10 @@ CPluginInterfaceForFS::ExecuteOnFS(int panel, CPluginFSInterfaceAbstract* plugin
     }
     else
     {
-        char cmdLine[MAX_PATH], *command = NULL, *params = NULL;
+        CPathBuffer cmdLine;
+        char *command = NULL, *params = NULL;
         strcpy(cmdLine, fs->Path);
-        if (!CRAPI::PathAppend(cmdLine, file.Name, MAX_PATH))
+        if (!CRAPI::PathAppend(cmdLine, file.Name, cmdLine.Size()))
         {
             SalamanderGeneral->ShowMessageBox(LoadStr(IDS_ERR_NAMETOOLONG),
                                               TitleWMobileError, MSGBOX_ERROR);
@@ -142,7 +143,7 @@ CPluginInterfaceForFS::ExecuteOnFS(int panel, CPluginFSInterfaceAbstract* plugin
         {
             if (SalamanderGeneral->StrICmp(cmdLine + l - 4, ".lnk") == 0)
             {
-                if (CRAPI::SHGetShortcutTarget(cmdLine, cmdLine, MAX_PATH))
+                if (CRAPI::SHGetShortcutTarget(cmdLine, cmdLine, cmdLine.Size()))
                 {
                     command = cmdLine;
                     if (*command == '"')

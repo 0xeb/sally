@@ -1008,17 +1008,17 @@ CNethoodCache::Node CNethoodCache::NewNode(
 
     if ((token.GetTokenClassification() & CUncPathParser::TokenServer) != 0)
     {
-        TCHAR szRemoteName[MAX_PATH];
+        CPathBuffer szRemoteName;
 
-        token.GetPathUpToCurrentToken(szRemoteName, COUNTOF(szRemoteName));
+        token.GetPathUpToCurrentToken(szRemoteName, szRemoteName.Size());
         nodeData.SetType(CNethoodCacheNode::TypeServer);
         nodeData.SetName(szRemoteName);
     }
     else if ((token.GetTokenClassification() & CUncPathParser::TokenShare) != 0)
     {
-        TCHAR szShareName[MAX_PATH];
+        CPathBuffer szShareName;
 
-        token.GetPathUpToCurrentToken(szShareName, COUNTOF(szShareName));
+        token.GetPathUpToCurrentToken(szShareName, szShareName.Size());
         nodeData.SetType(CNethoodCacheNode::TypeShare);
         nodeData.SetName(szShareName);
     }
@@ -2112,7 +2112,7 @@ void CNethoodCacheEnumerationThread::ProcessShareInfo(
     NETRESOURCE sNetResource = {
         0,
     };
-    TCHAR szRemoteName[MAX_PATH];
+    CPathBuffer szRemoteName;
 
     sNetResource.dwScope = RESOURCE_GLOBALNET;
     sNetResource.dwType = RESOURCETYPE_DISK;
@@ -2120,11 +2120,11 @@ void CNethoodCacheEnumerationThread::ProcessShareInfo(
     sNetResource.dwUsage = RESOURCEUSAGE_CONNECTABLE;
 
 #ifdef _UNICODE
-    StringCchPrintf(szRemoteName, COUNTOF(szRemoteName), L"%s\\%s",
+    StringCchPrintf(szRemoteName, szRemoteName.Size(), L"%s\\%s",
                     pszServerName, sShareInfo.shi1_netname);
     sNetResource.lpComment = sShareInfo.shi1_remark;
 #else
-    StringCchPrintf(szRemoteName, COUNTOF(szRemoteName), "%s\\%ls",
+    StringCchPrintf(szRemoteName, szRemoteName.Size(), "%s\\%ls",
                     pszServerName, sShareInfo.shi1_netname);
     CPathBuffer szComment; // Heap-allocated for long path support
     if (sShareInfo.shi1_remark && *sShareInfo.shi1_remark != L'\0')
@@ -2540,9 +2540,9 @@ BOOL CNethoodCacheEnumerationThread::ResolveNetShortcut(
 
 DWORD CNethoodCacheEnumerationThread::EnumNetworkShortcuts()
 {
-    TCHAR szShortcutsPath[MAX_PATH];
-    TCHAR szFindMask[MAX_PATH];
-    TCHAR szShortcut[MAX_PATH];
+    CPathBuffer szShortcutsPath;
+    CPathBuffer szFindMask;
+    CPathBuffer szShortcut;
     HANDLE hFind;
     WIN32_FIND_DATA wfd;
     BOOL res;
@@ -2552,9 +2552,9 @@ DWORD CNethoodCacheEnumerationThread::EnumNetworkShortcuts()
         return NO_ERROR;
     }
 
-    StringCchCopy(szFindMask, COUNTOF(szFindMask), szShortcutsPath);
+    StringCchCopy(szFindMask, szFindMask.Size(), szShortcutsPath);
     if (!SalamanderGeneral->SalPathAppend(szFindMask, TEXT("*"),
-                                          COUNTOF(szShortcutsPath)))
+                                          szFindMask.Size()))
     {
         return NO_ERROR;
     }
@@ -2575,10 +2575,10 @@ DWORD CNethoodCacheEnumerationThread::EnumNetworkShortcuts()
                 (wfd.cFileName[0] != TEXT('.') || wfd.cFileName[1] != 0 &&
                                                       (wfd.cFileName[1] != TEXT('.') || wfd.cFileName[2] != 0)))
             { // directories except empty names, "." and ".."
-                StringCchCopy(szShortcut, COUNTOF(szShortcut),
+                StringCchCopy(szShortcut, szShortcut.Size(),
                               szShortcutsPath);
                 if (SalamanderGeneral->SalPathAppend(szShortcut,
-                                                     wfd.cFileName, COUNTOF(szShortcut)))
+                                                     wfd.cFileName, szShortcut.Size()))
                 {
                     AddNetworkShortcut(wfd.cFileName, szShortcut);
                 }

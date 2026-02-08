@@ -69,8 +69,8 @@ BOOL CTwain::InitTwain(CViewerWindow* viewer)
     Viewer = viewer;
     HParent = Viewer->HWindow;
 
-    TCHAR buff[MAX_PATH];
-    GetWindowsDirectory(buff, SizeOf(buff));
+    CPathBuffer buff;
+    GetWindowsDirectory(buff, buff.Size());
     if (buff[(_tcslen(buff) - 1)] != '\\')
         _tcscat(buff, _T("\\"));
     _tcscat(buff, _T("TWAIN_32.DLL"));

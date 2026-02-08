@@ -1227,8 +1227,8 @@ BOOL CPluginInterfaceForMenuExt::ExecuteMenuItem(CSalamanderForOperationsAbstrac
 
     case CMD_INTERNAL_FOCUS:
     {
-        TCHAR focusPath[MAX_PATH];
-        lstrcpyn(focusPath, Focus_Path, SizeOf(focusPath));
+        CPathBuffer focusPath;
+        lstrcpyn(focusPath, Focus_Path, focusPath.Size());
         Focus_Path[0] = 0;
         if (focusPath[0] != 0) // only if we were lucky (we did not hit the start of Salamander's BUSY mode)
         {
@@ -1244,14 +1244,14 @@ BOOL CPluginInterfaceForMenuExt::ExecuteMenuItem(CSalamanderForOperationsAbstrac
 
     case CMD_INTERNAL_SAVEAS:
     {
-        TCHAR panelPath[MAX_PATH];
+        CPathBuffer panelPath;
         HWND hWindow = ghSaveAsWindow;
 
         ghSaveAsWindow = NULL;
 
-        if (!SalamanderGeneral->GetLastWindowsPanelPath(PANEL_SOURCE, panelPath, SizeOf(panelPath)))
+        if (!SalamanderGeneral->GetLastWindowsPanelPath(PANEL_SOURCE, panelPath, panelPath.Size()))
         {
-            if (!SalamanderGeneral->GetLastWindowsPanelPath(PANEL_TARGET, panelPath, SizeOf(panelPath)))
+            if (!SalamanderGeneral->GetLastWindowsPanelPath(PANEL_TARGET, panelPath, panelPath.Size()))
             {
                 // Failure -> use the stored directory
                 panelPath[0] = 0;
@@ -1359,9 +1359,9 @@ void WINAPI HTMLHelpCallback(HWND hWindow, UINT helpID)
 
 BOOL LoadPictViewDll(HWND hParentWnd)
 {
-    TCHAR path[_MAX_PATH];
+    CPathBuffer path;
 
-    if (!GetModuleFileName(DLLInstance, path, SizeOf(path)))
+    if (!GetModuleFileName(DLLInstance, path, path.Size()))
     {
         TRACE_E("GetModuleFileName failed");
         return FALSE;
@@ -1508,10 +1508,10 @@ BOOL InitEXIF(HWND hParent, BOOL bSilent)
     if (EXIFLibrary != NULL)
         return TRUE;
 
-    TCHAR path[MAX_PATH];
+    CPathBuffer path;
     EXIFINITTRANSLATIONS initTransl;
 
-    GetModuleFileName(DLLInstance, path, SizeOf(path));
+    GetModuleFileName(DLLInstance, path, path.Size());
     _tcscpy((LPTSTR)_tcsrchr(path, '\\') + 1, _T("exif.dll"));
     EXIFLibrary = LoadLibrary(path); // load EXIF.DLL
     if (EXIFLibrary == NULL)
@@ -2003,10 +2003,10 @@ BOOL CPluginInterfaceForViewer::CanViewFile(LPCTSTR name)
         memset(&oiei, 0, sizeof(oiei));
         oiei.cbSize = sizeof(oiei);
 #ifdef _UNICODE
-        char nameA[_MAX_PATH];
+        CPathBuffer nameA;
 
-        WideCharToMultiByte(CP_ACP, 0, name, -1, nameA, sizeof(nameA), NULL, NULL);
-        nameA[sizeof(nameA) - 1] = 0;
+        WideCharToMultiByte(CP_ACP, 0, name, -1, nameA, nameA.Size(), NULL, NULL);
+        nameA[nameA.Size() - 1] = 0;
         oiei.FileName = nameA;
 #else
         oiei.FileName = name;
@@ -2283,7 +2283,7 @@ void CViewerWindow::UpdateEnablers()
         IsWindowVisible(HWindow) && (Renderer.FileName == NULL || *Renderer.FileName != '<' || _tcscmp(Renderer.FileName, pDeletedTitle) == 0))
     {
         BOOL srcBusy, noMoreFiles;
-        TCHAR fileName[MAX_PATH] = _T("");
+        CPathBuffer fileName;
         LPCTSTR openedFileName = Renderer.FileName;
 
         if (Renderer.FileName != NULL && _tcscmp(Renderer.FileName, pDeletedTitle) == 0)

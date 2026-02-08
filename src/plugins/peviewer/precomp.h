@@ -34,3 +34,4 @@
 
 #include "dbg.h"
 #include "winliblt.h"
+#include "common/widepath.h"

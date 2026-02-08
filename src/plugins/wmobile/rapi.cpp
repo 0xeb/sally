@@ -478,7 +478,7 @@ BOOL CRAPI::PathAppend(char* path, const char* name, int pathSize)
 
 BOOL CRAPI::FindAllFilesInTree(const char* rootPath, const char* fileName, CFileInfoArray& array, int block, BOOL dirFirst)
 {
-    char path[MAX_PATH];
+    char path[MAX_PATH]; // NOTE: Cannot use CPathBuffer — callee expects char(&)[MAX_PATH] reference
     path[0] = 0;
 
     return FindAllFilesInTree(rootPath, path, fileName, array, block, dirFirst);
@@ -1040,7 +1040,7 @@ BOOL CRAPI::CheckAndCreateDirectory(const char* dir, HWND parent, BOOL quiet, ch
     //  if (parent == NULL) parent = MainWindow->HWindow;
     if (attrs == 0xFFFFFFFF) // probably does not exist; allow creation
     {
-        char root[MAX_PATH] = "\\";      // GetRootPath(root, dir);
+        CPathBuffer root("\\");      // GetRootPath(root, dir);
         if (strlen(dir) <= strlen(root)) // dir is the root directory
         {
             sprintf(buf, LoadStr(IDS_ERR_CREATEDIR), dir);

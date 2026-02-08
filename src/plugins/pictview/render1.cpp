@@ -225,7 +225,7 @@ BOOL CRendererWindow::OpenFile(LPCTSTR name, int showCmd, HBITMAP hBmp)
     LPPVHandle OldPVHandle = PVHandle;
     PVOpenImageExInfo oiei;
 #ifdef _UNICODE
-    char nameA[_MAX_PATH];
+    CPathBuffer nameA;
 #endif
 
     if (showCmd != -1)
@@ -253,8 +253,8 @@ BOOL CRendererWindow::OpenFile(LPCTSTR name, int showCmd, HBITMAP hBmp)
     else
     {
 #ifdef _UNICODE
-        WideCharToMultiByte(CP_ACP, 0, name, -1, nameA, sizeof(nameA), NULL, NULL);
-        nameA[sizeof(nameA) - 1] = 0;
+        WideCharToMultiByte(CP_ACP, 0, name, -1, nameA, nameA.Size(), NULL, NULL);
+        nameA[nameA.Size() - 1] = 0;
         oiei.FileName = nameA;
 #else
         oiei.FileName = name;
@@ -404,7 +404,7 @@ BOOL CRendererWindow::OpenFile(LPCTSTR name, int showCmd, HBITMAP hBmp)
 
     if ((code == PVC_OK) && (hBmp == NULL))
     {
-        TCHAR path[MAX_PATH];
+        CPathBuffer path;
 
         _tcscpy(path, name);
         // we must not pass 'name' directly to AddToHistory, because it may already come from history
@@ -2049,7 +2049,7 @@ LRESULT CRendererWindow::WindowProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
     case WM_DROPFILES:
     {
         UINT drag;
-        TCHAR path[MAX_PATH];
+        CPathBuffer path;
 
         drag = DragQueryFile((HDROP)wParam, 0xFFFFFFFF, NULL, 0); // how many files were dropped on us
         // this code opens all files - it comes from the text editor
@@ -2058,7 +2058,7 @@ LRESULT CRendererWindow::WindowProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
         // and ignore the rest
         if (drag > 0)
         {
-            DragQueryFile((HDROP)wParam, 0, path, MAX_PATH);
+            DragQueryFile((HDROP)wParam, 0, path, path.Size());
             EnumFilesSourceUID = -1;
             // If the original image is still loading we are now called from ProgressProcedure
             // and therefore cannot start a new load
@@ -2752,7 +2752,7 @@ BOOL CRendererWindow::RenameFileInternal(LPCTSTR oldPath, LPCTSTR oldName, TCHAR
         s++;
     if (newName[0] != 0 && *s == 0)
     {
-        TCHAR myOldName[MAX_PATH];
+        CPathBuffer myOldName;
         _tcscpy(myOldName, oldName);
         TCHAR finalName[2 * MAX_PATH];
         SalamanderGeneral->MaskName(finalName, 2 * MAX_PATH, myOldName, newName);
@@ -2766,14 +2766,14 @@ BOOL CRendererWindow::RenameFileInternal(LPCTSTR oldPath, LPCTSTR oldName, TCHAR
         _tcscpy(newName, finalName);
 
         int l = (int)_tcslen(oldPath);
-        TCHAR tgtPath[MAX_PATH];
+        CPathBuffer tgtPath;
         memcpy(tgtPath, oldPath, l * sizeof(TCHAR));
         if (oldPath[l - 1] != '\\')
             tgtPath[l++] = '\\';
         if (_tcslen(finalName) + l < MAX_PATH)
         {
             _tcscpy(tgtPath + l, finalName);
-            TCHAR path[MAX_PATH];
+            CPathBuffer path;
             _tcscpy(path, oldPath);
             LPTSTR end = path + l;
             if (*(end - 1) != '\\')
@@ -2802,8 +2802,8 @@ BOOL CRendererWindow::RenameFileInternal(LPCTSTR oldPath, LPCTSTR oldName, TCHAR
             }
 
             // report the change on the path (renamed file)
-            TCHAR changedPath[MAX_PATH];
-            lstrcpyn(changedPath, path, MAX_PATH);
+            CPathBuffer changedPath;
+            lstrcpyn(changedPath, path, changedPath.Size());
             SalamanderGeneral->CutDirectory(changedPath);
             SalamanderGeneral->PostChangeOnPathNotification(changedPath, FALSE);
 
@@ -2904,7 +2904,7 @@ BOOL CRendererWindow::RenameFileInternal(LPCTSTR oldPath, LPCTSTR oldName, TCHAR
 void CRendererWindow::OnCopyTo()
 {
     CALL_STACK_MESSAGE1("CRendererWindow::OnCopyTo()");
-    TCHAR dstName[MAX_PATH];
+    CPathBuffer dstName;
     CCopyToDlg dlg(HWindow, FileName, dstName);
     if (dlg.Execute() == IDOK)
     {
@@ -2939,8 +2939,8 @@ void CRendererWindow::OnCopyTo()
         fo.lpszProgressTitle = _T("");
         // perform the actual deletion - wonderfully simple, unfortunately it occasionally crashes for them ;-)
         CALL_STACK_MESSAGE1("CRendererWindow::OnCopyTo::SHFileOperation");
-        TCHAR changedPath[MAX_PATH];
-        lstrcpyn(changedPath, FileName, MAX_PATH);
+        CPathBuffer changedPath;
+        lstrcpyn(changedPath, FileName, changedPath.Size());
         if (SHFileOperation(&fo) == 0)
         {
             // report the change on the path (renamed file)
@@ -2979,8 +2979,8 @@ void CRendererWindow::OnDelete(BOOL toRecycle)
     fo.lpszProgressTitle = _T("");
     // perform the actual deletion - wonderfully simple, unfortunately it occasionally crashes for them ;-)
     CALL_STACK_MESSAGE1("CRendererWindow::OnDelete::SHFileOperation");
-    TCHAR changedPath[MAX_PATH];
-    lstrcpyn(changedPath, FileName, MAX_PATH);
+    CPathBuffer changedPath;
+    lstrcpyn(changedPath, FileName, changedPath.Size());
     if (SHFileOperation(&fo) == 0)
     {
         // from the return values we cannot tell whether the file was deleted or
@@ -3041,7 +3041,7 @@ LRESULT CRendererWindow::OnCommand(WPARAM wParam, LPARAM lParam, BOOL* closingVi
 
         if (!Loading)
         {
-            TCHAR path[MAX_PATH];
+            CPathBuffer path;
 
             *path = 0;
             if (FileName && (*FileName != '<'))
@@ -3054,7 +3054,7 @@ LRESULT CRendererWindow::OnCommand(WPARAM wParam, LPARAM lParam, BOOL* closingVi
                     {
                         s++; // root dir -> keep the backslash
                     }
-                    lstrcpyn(path, FileName, (int)min(s - FileName + 1, SizeOf(path)));
+                    lstrcpyn(path, FileName, (int)min(s - FileName + 1, path.Size()));
                 }
             }
             OnFileOpen(path);
@@ -3119,7 +3119,7 @@ LRESULT CRendererWindow::OnCommand(WPARAM wParam, LPARAM lParam, BOOL* closingVi
             BOOL ok = FALSE;
             BOOL srcBusy = FALSE;
             BOOL noMoreFiles = FALSE;
-            TCHAR fileName[MAX_PATH] = _T("");
+            CPathBuffer fileName;
             LPCTSTR reallyOpenedFileName, openedFileName = FileName;
             BOOL deletedFile = FileName != NULL && _tcscmp(FileName, LoadStr(IDS_DELETED_TITLE)) == 0;
             if (deletedFile)
@@ -3274,8 +3274,8 @@ LRESULT CRendererWindow::OnCommand(WPARAM wParam, LPARAM lParam, BOOL* closingVi
         BOOL oldCanHideCursor = CanHideCursor;
         CanHideCursor = FALSE;
 
-        TCHAR oldPath[MAX_PATH];
-        TCHAR oldName[MAX_PATH];
+        CPathBuffer oldPath;
+        CPathBuffer oldName;
         memcpy(oldPath, FileName, (s - FileName) * sizeof(TCHAR));
         oldPath[s - FileName] = 0;
         _tcscpy(oldName, s + 1);
@@ -3303,7 +3303,7 @@ LRESULT CRendererWindow::OnCommand(WPARAM wParam, LPARAM lParam, BOOL* closingVi
                         FileName = NULL;
                     }
 
-                    TCHAR newFileName[MAX_PATH];
+                    CPathBuffer newFileName;
                     int l = (int)_tcslen(oldPath);
                     memcpy(newFileName, oldPath, l * sizeof(TCHAR));
                     if (oldPath[l - 1] != '\\')

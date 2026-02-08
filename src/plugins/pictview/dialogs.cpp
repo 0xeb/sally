@@ -1626,10 +1626,10 @@ CExifDialog::DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
             else
             {
 #ifdef _UNICODE
-                char FileNameA[_MAX_PATH];
+                CPathBuffer FileNameA;
 
-                WideCharToMultiByte(CP_ACP, 0, FileName, -1, FileNameA, sizeof(FileNameA), NULL, NULL);
-                FileNameA[sizeof(FileNameA) - 1] = 0;
+                WideCharToMultiByte(CP_ACP, 0, FileName, -1, FileNameA, FileNameA.Size(), NULL, NULL);
+                FileNameA[FileNameA.Size() - 1] = 0;
                 getInfo(FileNameA, 0, ExifEnumProc, (LPARAM)this);
 #else
                 getInfo(FileName, 0, ExifEnumProc, (LPARAM)this);
@@ -1830,15 +1830,15 @@ void CCopyToDlg::Validate(CTransferInfo& ti)
     for (i = 0; i < COPYTO_LINES; i++)
         ti.RadioButton(COPYTO_RB_ID[i], i, line);
 
-    TCHAR buff[MAX_PATH];
-    ti.EditLine(COPYTO_EL_ID[line], buff, SizeOf(buff));
+    CPathBuffer buff;
+    ti.EditLine(COPYTO_EL_ID[line], buff, buff.Size());
 
-    TCHAR path[MAX_PATH];
+    CPathBuffer path;
     _tcscpy(path, buff);
 
     // put the full path of the viewed file into srcDir and trim off the name
-    TCHAR srcDir[MAX_PATH];
-    lstrcpyn(srcDir, SrcName, SizeOf(srcDir));
+    CPathBuffer srcDir;
+    lstrcpyn(srcDir, SrcName, srcDir.Size());
     LPTSTR namePart = (LPTSTR)_tcsrchr(srcDir, '\\');
     if (namePart == NULL)
     {
@@ -1852,11 +1852,11 @@ void CCopyToDlg::Validate(CTransferInfo& ti)
     int errTextID;
     if (!SalGetFullName(path, &errTextID, srcDir))
     {
-        TCHAR errBuf[MAX_PATH] = _T("");
+        CPathBuffer errBuf;
         if (errTextID == GFN_EMPTYNAMENOTALLOWED)
             _tcscpy(errBuf, LoadStr(IDS_SPECIFYPATH)); // provide a more intuitive message for an empty string
         else
-            SalamanderGeneral->GetGFNErrorText(errTextID, errBuf, MAX_PATH);
+            SalamanderGeneral->GetGFNErrorText(errTextID, errBuf, errBuf.Size());
         SalamanderGeneral->SalMessageBox(HWindow, errBuf, LoadStr(IDS_ERRORTITLE),
                                          MB_OK | MB_ICONEXCLAMATION);
         ti.ErrorOn(COPYTO_EL_ID[line]);
@@ -1865,7 +1865,7 @@ void CCopyToDlg::Validate(CTransferInfo& ti)
     // prepare the return buffer
     if (ti.IsGood())
     {
-        SalamanderGeneral->SalPathAppend(path, namePart, MAX_PATH);
+        SalamanderGeneral->SalPathAppend(path, namePart, path.Size());
         _tcscpy(DstName, path);
     }
 }
@@ -1877,15 +1877,15 @@ void CCopyToDlg::Transfer(CTransferInfo& ti)
     {
         ti.RadioButton(COPYTO_RB_ID[i], i, G.CopyToLastIndex);
 
-        TCHAR buff[MAX_PATH];
+        CPathBuffer buff;
         if (ti.Type == ttDataToWindow)
         {
             if (G.CopyToDestinations[i] != NULL)
-                lstrcpyn(buff, G.CopyToDestinations[i], SizeOf(buff));
+                lstrcpyn(buff, G.CopyToDestinations[i], buff.Size());
             else
                 buff[0] = 0;
         }
-        ti.EditLine(COPYTO_EL_ID[i], buff, SizeOf(buff));
+        ti.EditLine(COPYTO_EL_ID[i], buff, buff.Size());
         if (ti.Type == ttDataFromWindow)
         {
             if (G.CopyToDestinations[i] != NULL)
@@ -1928,8 +1928,8 @@ CCopyToDlg::DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
         {
             if (LOWORD(wParam) == COPYTO_BR_ID[i])
             {
-                TCHAR path[MAX_PATH];
-                GetDlgItemText(HWindow, COPYTO_EL_ID[i], path, MAX_PATH);
+                CPathBuffer path;
+                GetDlgItemText(HWindow, COPYTO_EL_ID[i], path, path.Size());
                 if (SalamanderGeneral->GetTargetDirectory(HWindow, HWindow, path,
                                                           LoadStr(IDS_SELECTTARGETDIR), path,
                                                           FALSE, path))

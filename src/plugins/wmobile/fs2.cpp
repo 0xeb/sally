@@ -57,20 +57,20 @@ CPluginFSInterface::GetFullFSPath(HWND parent, const char* fsName, char* path, i
     if (Path[0] == 0)
         return FALSE; // translation is not possible, let Salamander report the error itself
 
-    char root[MAX_PATH] = "\\"; //JR in Windows Mobile the root is always "\\"
+    CPathBuffer root("\\"); //JR in Windows Mobile the root is always "\\"
 
     if (*path != '\\')
         strcpy(root, Path); // paths such as "path" inherit the current FS path
 
-    success = CRAPI::PathAppend(root, path, MAX_PATH);
+    success = CRAPI::PathAppend(root, path, root.Size());
     if (success && (int)strlen(root) < 1) // shorter than the root is impossible (it would become a relative path again)
     {
-        success = SalamanderGeneral->SalPathAddBackslash(root, MAX_PATH);
+        success = SalamanderGeneral->SalPathAddBackslash(root, root.Size());
     }
     if (success)
         success = (int)(strlen(root) + strlen(fsName) + 1) < pathSize; // does it fit?
     if (success)
-        sprintf(path, "%s:%s", fsName, root);
+        sprintf(path, "%s:%s", fsName, (const char*)root);
     else
     {
         SalamanderGeneral->SalMessageBox(parent, LoadStr(IDS_ERR_PATHTOOLONG),
@@ -473,12 +473,12 @@ BOOL WINAPI
 CPluginFSInterface::ExecuteCommandLine(HWND parent, char* command, int& selFrom, int& selTo)
 {
     //JR First try the command in the current path if an absolute path is not provided
-    char commandLine[MAX_PATH]; // CRAPI::CreateProcess cannot handle paths longer than MAX_PATH
+    CPathBuffer commandLine; // CRAPI::CreateProcess cannot handle paths longer than MAX_PATH
 
     if (*command != '\\')
     {
-        lstrcpyn(commandLine, Path, MAX_PATH);
-        if (!CRAPI::PathAppend(commandLine, command, MAX_PATH))
+        lstrcpyn(commandLine, Path, commandLine.Size());
+        if (!CRAPI::PathAppend(commandLine, command, commandLine.Size()))
         {
             SalamanderGeneral->SalMessageBox(parent, LoadStr(IDS_ERR_NAMETOOLONG),
                                              TitleWMobileError, MB_OK | MB_ICONEXCLAMATION);
@@ -2167,7 +2167,7 @@ ONERROR:
 
 static BOOL FindAllFilesInTree(const char* rootPath, const char* fileName, CFileInfoArray& array, BOOL dirFirst, int block)
 {
-    char path[MAX_PATH];
+    char path[MAX_PATH]; // NOTE: Cannot use CPathBuffer — callee expects char(&)[MAX_PATH] reference
     path[0] = 0;
 
     return FindAllFilesInTree(rootPath, path, fileName, array, dirFirst, block);

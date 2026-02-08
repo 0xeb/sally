@@ -177,8 +177,8 @@ CNethoodFSInterface::ChangePath(
     int mode)
 {
     UINT uError;
-    TCHAR szPath[MAX_PATH];
-    TCHAR szCorrectedUserPart[MAX_PATH];
+    CPathBuffer szPath;
+    CPathBuffer szCorrectedUserPart;
     const TCHAR* pSrc;
     TCHAR* pDst;
 
@@ -242,7 +242,7 @@ CNethoodFSInterface::ChangePath(
             szPath[0] = TEXT('\\');
             szPath[1] = TEXT('\0');
         }
-        StringCchCat(szPath, COUNTOF(szPath), userPart);
+        StringCchCat(szPath, szPath.Size(), userPart);
     }
 
     if (m_state == FSStateDisplayError)
@@ -250,7 +250,7 @@ CNethoodFSInterface::ChangePath(
         assert(m_dwEnumerationResult != ERROR_SUCCESS);
         assert(m_szAccessiblePath[0] != TEXT('\0'));
 
-        StringCchCopy(szPath, COUNTOF(szPath), m_szAccessiblePath);
+        StringCchCopy(szPath, szPath.Size(), m_szAccessiblePath);
         m_szAccessiblePath[0] = TEXT('\0');
         DisplayError(m_dwEnumerationResult);
         m_dwEnumerationResult = ERROR_SUCCESS;
@@ -265,7 +265,7 @@ CNethoodFSInterface::ChangePath(
             // the path. Note that we cannot use FindAccessiblePath()
             // because the cache node is NULL!
 
-            StringCchCopy(szPath, COUNTOF(szPath), m_szAccessiblePath);
+            StringCchCopy(szPath, szPath.Size(), m_szAccessiblePath);
             TCHAR* pszLastSlash = _tcsrchr(szPath, TEXT('\\'));
             assert(pszLastSlash != NULL && pszLastSlash > szPath + 2);
             if (pszLastSlash != NULL)
@@ -441,7 +441,7 @@ CNethoodFSInterface::ListCurrentPath(
     bool bAddUpDir = false;
     CFileData fileData;
     CNethoodPluginDataInterface* pDataInterface;
-    TCHAR szTargetPath[MAX_PATH];
+    CPathBuffer szTargetPath;
 
     TRACE_I("Nethood: ListCurrentPath (path=" << m_szCurrentPath << ", state=" << m_state << ")");
 
@@ -515,7 +515,7 @@ CNethoodFSInterface::ListCurrentPath(
             &m_pathNode,
             uFlags,
             szTargetPath,
-            COUNTOF(szTargetPath));
+            szTargetPath.Size());
 
         if (uError == ERROR_NETHOODCACHE_FULL_UNC_PATH)
         {
@@ -1021,7 +1021,7 @@ CNethoodFSInterface::ContextMenu(
     __in int selectedFiles,
     __in int selectedDirs)
 {
-    TCHAR szPath[MAX_PATH];
+    CPathBuffer szPath;
     TCHAR szMappedRoot[4] = TEXT("\0:\\");
     bool bOk = false;
 
@@ -1045,7 +1045,7 @@ CNethoodFSInterface::ContextMenu(
         {
             g_oNethoodCache.LockCache();
             bOk = (m_pathNode != NULL) && g_oNethoodCache.GetUncPath(
-                                              m_pathNode, szPath, COUNTOF(szPath));
+                                              m_pathNode, szPath, szPath.Size());
             g_oNethoodCache.UnlockCache();
             if (bOk)
             {
@@ -1083,7 +1083,7 @@ CNethoodFSInterface::ContextMenu(
                 {
                     bOk = g_oNethoodCache.GetUncPath(
                         m_pathNode, szPath,
-                        COUNTOF(szPath));
+                        szPath.Size());
                 }
             }
             g_oNethoodCache.UnlockCache();

@@ -179,13 +179,13 @@ CNethoodPluginInterface::Connect(
     __in HWND parent,
     __in CSalamanderConnectAbstract* salamander)
 {
-    TCHAR szFileMenu[MAX_PATH];
+    CPathBuffer szFileMenu;
     int iIcon = -1;
 
     szFileMenu[0] = TEXT(',');
     szFileMenu[1] = TEXT('\t');
 
-    LoadString(GetLangInstance(), IDS_MENUITEM, &szFileMenu[2], COUNTOF(szFileMenu) - 2);
+    LoadString(GetLangInstance(), IDS_MENUITEM, &szFileMenu[2], szFileMenu.Size() - 2);
 
     g_oIcons.Load();
 

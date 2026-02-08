@@ -915,9 +915,9 @@ void __fastcall CPluginFSInterface::SynchronizeDirectories(
     int Panel;
     if (GetPanel(Panel, true))
     {
-        char Buf[MAX_PATH];
+        CPathBuffer Buf;
         int PathType;
-        if (SalamanderGeneral()->GetPanelPath(Panel, Buf, sizeof(Buf), &PathType, NULL))
+        if (SalamanderGeneral()->GetPanelPath(Panel, Buf, Buf.Size(), &PathType, NULL))
         {
             if (PathType != PATH_TYPE_WINDOWS)
             {
@@ -2392,8 +2392,8 @@ BOOL WINAPI CPluginFSInterface::CopyOrMoveFromFS(BOOL Copy, int Mode,
                 int Panel;
                 if (GetPanel(Panel, true))
                 {
-                    char Buf[MAX_PATH];
-                    if (SalamanderGeneral()->GetPanelPath(Panel, Buf, sizeof(Buf), &PathType, NULL))
+                    CPathBuffer Buf;
+                    if (SalamanderGeneral()->GetPanelPath(Panel, Buf, Buf.Size(), &PathType, NULL))
                     {
                         TargetDirectory = Buf;
                     }

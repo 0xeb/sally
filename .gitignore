@@ -18,6 +18,8 @@ Thumbs.db
 
 # Build artifacts
 build*/
+# Old MSVC vcxproj build intermediates/outputs
+**/vcxproj/**/salamander/
 .xwin-cache/
 xwin*/
 

@@ -160,8 +160,8 @@ bool TSalamandConfiguration::IteratePanelColumns(int& Column, bool& Show,
 //---------------------------------------------------------------------------
 AnsiString __fastcall TSalamandConfiguration::ModuleFileName()
 {
-    char FileName[MAX_PATH];
-    if (GetModuleFileName(FPlugin->GetDLLInstance(), FileName, sizeof(FileName)) == 0)
+    CPathBuffer FileName;
+    if (GetModuleFileName(FPlugin->GetDLLInstance(), FileName, FileName.Size()) == 0)
     {
         assert(false);
     }

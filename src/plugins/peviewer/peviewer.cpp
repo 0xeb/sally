@@ -377,7 +377,7 @@ BOOL CPluginInterfaceForViewer::ViewFile(LPCTSTR name, int left, int top, int wi
         return FALSE;
     }
 
-    TCHAR tempFileName[MAX_PATH];
+    CPathBuffer tempFileName;
     if (SalGeneral->SalGetTempFileName(NULL, _T("PEV"), tempFileName, TRUE, NULL))
     {
         TCHAR caption[2000];

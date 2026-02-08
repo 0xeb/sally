@@ -108,7 +108,7 @@ CNethoodPluginInterfaceForFS::ExecuteOnFS(
     __in CFileData& file,
     __in int isDir)
 {
-    TCHAR szNewPath[MAX_PATH];
+    CPathBuffer szNewPath;
     CNethoodFSInterface* pFSInterface;
     CNethoodCache::Node node;
 
@@ -177,7 +177,7 @@ CNethoodPluginInterfaceForFS::ExecuteOnFS(
             else
             {
                 // Combine the path...
-                if (SalamanderGeneral->SalPathAppend(szNewPath, file.Name, MAX_PATH))
+                if (SalamanderGeneral->SalPathAppend(szNewPath, file.Name, szNewPath.Size()))
                 {
                     pFSInterface = NULL; // Pointer may be invalid after ChangePanelPathToXxx
                     SalamanderGeneral->ChangePanelPathToPluginFS(
@@ -188,7 +188,7 @@ CNethoodPluginInterfaceForFS::ExecuteOnFS(
         else
         {
             // Combine the path...
-            if (SalamanderGeneral->SalPathAppend(szNewPath, file.Name, MAX_PATH))
+            if (SalamanderGeneral->SalPathAppend(szNewPath, file.Name, szNewPath.Size()))
             {
                 pFSInterface = NULL; // Pointer may be invalid after ChangePanelPathToXxx
                 SalamanderGeneral->ChangePanelPathToPluginFS(
@@ -254,19 +254,19 @@ CNethoodPluginInterfaceForFS::EnsureShareExistsOnServer(
     __in const char* server,
     __in const char* share)
 {
-    TCHAR szUncPath[MAX_PATH];
+    CPathBuffer szUncPath;
     UINT uError;
 
     assert(server != NULL);
 
     if (share != NULL)
     {
-        StringCchPrintf(szUncPath, COUNTOF(szUncPath),
+        StringCchPrintf(szUncPath, szUncPath.Size(),
                         TEXT("\\\\%s\\%s"), server, share);
     }
     else
     {
-        StringCchPrintf(szUncPath, COUNTOF(szUncPath),
+        StringCchPrintf(szUncPath, szUncPath.Size(),
                         TEXT("\\\\%s"), server);
     }
 
