@@ -44,7 +44,7 @@ extern CSalamanderGeneralAbstract* SG;
 extern CSalamanderGUIAbstract* SalGUI;
 
 // FS name assigned by Salamander after loading the plugin
-extern char AssignedFSName[MAX_PATH];
+extern CPathBuffer AssignedFSName;
 
 class CWindowQueueEx : public CWindowQueue
 {

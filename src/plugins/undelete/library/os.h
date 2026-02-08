@@ -387,8 +387,8 @@ HICON OS<CHAR>::OS_GetDriveIcon(const CHAR* root, UINT type, BOOL accessible, BO
             id = 32;
             if (type == DRIVE_FIXED && root[1] == TEXT(':'))
             {
-                char win[MAX_PATH];
-                if (GetWindowsDirectoryA(win, MAX_PATH) && win[1] == ':' && CHAR(win[0]) == root[0])
+                CPathBuffer win;
+                if (GetWindowsDirectoryA(win, win.Size()) && win[1] == ':' && CHAR(win[0]) == root[0])
                     id = 36;
             }
             break;

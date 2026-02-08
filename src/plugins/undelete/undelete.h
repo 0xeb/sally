@@ -16,7 +16,7 @@ BOOL InitFS();
 void ReleaseFS();
 
 // FS-name assigned by Salamander after plugin is loaded
-extern char AssignedFSName[MAX_PATH];
+extern CPathBuffer AssignedFSName;
 
 // image-list for simple FS icons
 extern HIMAGELIST DFSImageList;

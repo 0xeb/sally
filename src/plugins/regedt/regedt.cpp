@@ -48,7 +48,7 @@ const char* CONFIG_SIZECOLFW = "SizeColFW";
 const char* CONFIG_SIZECOLW = "SizeColW";
 
 // FS name assigned by Salamander after loading the plug-in
-char AssignedFSName[MAX_PATH] = "";
+CPathBuffer AssignedFSName;
 
 CThreadQueue ThreadQueue("RegEdt Find Dialogs, Workers, and Changes Monitor");
 CWindowQueueEx WindowQueue;

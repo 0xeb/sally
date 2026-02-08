@@ -17,7 +17,7 @@
 #include "undelete.h"
 
 // FS-name assigned by Salamanderem after plugin is loaded
-char AssignedFSName[MAX_PATH] = "";
+CPathBuffer AssignedFSName;
 
 // image-list for simple FS icons
 HIMAGELIST DFSImageList = NULL;
