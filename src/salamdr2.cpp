@@ -1149,6 +1149,19 @@ BOOL ResolveSubsts(char* resPath)
     return ret;
 }
 
+// Wide wrapper: converts to ANSI, calls ResolveSubsts, converts back.
+// GetSubstInformation/MyQueryDosDevice are ANSI internally.
+BOOL ResolveSubstsW(wchar_t* resPath, int resPathSize)
+{
+    std::string pathA = WideToAnsi(resPath);
+    CPathBuffer buf;
+    lstrcpyn(buf, pathA.c_str(), buf.Size());
+    BOOL ret = ResolveSubsts(buf);
+    std::wstring result = AnsiToWide(buf.Get());
+    lstrcpynW(resPath, result.c_str(), resPathSize);
+    return ret;
+}
+
 void ResolveLocalPathWithReparsePoints(char* resPath, const char* path, BOOL* cutResPathIsPossible,
                                        BOOL* rootOrCurReparsePointSet, char* rootOrCurReparsePoint,
                                        char* junctionOrSymlinkTgt, int* linkType, char* netPath)

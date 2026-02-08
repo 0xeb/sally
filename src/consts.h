@@ -916,6 +916,7 @@ void SetCurrentDirectoryToSystem();
 // Replaces substs in path 'resPath' with their target paths (conversion to path without SUBST drive-letters);
 // returns FALSE on error
 BOOL ResolveSubsts(char* resPath);
+BOOL ResolveSubstsW(wchar_t* resPath, int resPathSize);
 
 // Resolves subst and reparse points for path 'path', then for mount-point path
 // (if missing then for root path) tries to get GUID path. Returns FALSE on failure. On
