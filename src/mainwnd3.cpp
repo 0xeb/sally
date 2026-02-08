@@ -2291,8 +2291,8 @@ MENU_TEMPLATE_ITEM AddToSystemMenu[] =
                         (index != 0 || !subDir))
                     {
                         CFileData* file = (index < activePanel->Dirs->Count) ? &activePanel->Dirs->At(index) : &activePanel->Files->At(index - activePanel->Dirs->Count);
-                        lstrcpyn(fullName, activePanel->GetPath(), MAX_PATH);
-                        if (!SalPathAppend(fullName, file->Name, MAX_PATH) ||
+                        lstrcpyn(fullName, activePanel->GetPath(), fullName.Size());
+                        if (!SalPathAppend(fullName, file->Name, fullName.Size()) ||
                             !AddToListOfNames(&listFull, listFullEnd, fullName, (int)strlen(fullName)))
                         {
                             smallBuf = TRUE;
@@ -2817,7 +2817,7 @@ MENU_TEMPLATE_ITEM AddToSystemMenu[] =
             }
             else
             {
-                GetModuleFileName(HInstance, defDir, MAX_PATH);
+                GetModuleFileName(HInstance, defDir, defDir.Size());
                 *strrchr(defDir, '\\') = 0;
             }
             OPENFILENAME ofn;

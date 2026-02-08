@@ -1006,8 +1006,8 @@ CFoundFilesListView::WindowProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
                             f = Data[i];
                             if (f->Path != NULL && f->Name != NULL)
                             {
-                                lstrcpyn(fileName, f->Path, MAX_PATH);
-                                SalPathAppend(fileName, f->Name, MAX_PATH);
+                                lstrcpyn(fileName, f->Path, fileName.Size());
+                                SalPathAppend(fileName, f->Name, fileName.Size());
                                 if (StrICmp(fileName, FileNamesEnumData.LastFileName) == 0)
                                     break;
                             }

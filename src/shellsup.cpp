@@ -538,7 +538,7 @@ const char* GetCurrentDir(POINTL& pt, void* param, DWORD* effect, BOOL rButton, 
                         MultiByteToWideChar(CP_ACP, MB_PRECOMPOSED, fullName, -1, oleName, oleName.Size());
                         oleName[oleName.Size() - 1] = 0;
                         if (fileInt->Load(oleName, STGM_READ) == S_OK &&
-                            link->GetPath(linkTgt, MAX_PATH, NULL, SLGP_UNCPRIORITY) == NOERROR)
+                            link->GetPath(linkTgt, linkTgt.Size(), NULL, SLGP_UNCPRIORITY) == NOERROR)
                         {
                             DWORD attr = SalGetFileAttributes(linkTgt);
                             if (attr != INVALID_FILE_ATTRIBUTES && (attr & FILE_ATTRIBUTE_DIRECTORY))

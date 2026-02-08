@@ -129,7 +129,7 @@ void CFilesWindow::Execute(int index)
                     {
                         if (fileInt->Load(oleName, STGM_READ) == S_OK)
                         {
-                            if (link->GetPath(fullName, MAX_PATH, &data, SLGP_UNCPRIORITY) == NOERROR)
+                            if (link->GetPath(fullName, fullName.Size(), &data, SLGP_UNCPRIORITY) == NOERROR)
                             {                                     // the obtained path will be used for accessibility test, after Resolve it may change
                                 err = CheckPath(FALSE, fullName); // fullName is a full path (shortcuts support no other)
                                 if (err != ERROR_USER_TERMINATED) // if user didn't press ESC, ignore the error
@@ -141,7 +141,7 @@ void CFilesWindow::Execute(int index)
                             {
                                 if (link->Resolve(HWindow, SLR_ANY_MATCH | SLR_UPDATE) == NOERROR)
                                 {
-                                    if (link->GetPath(fullName, MAX_PATH, &data, SLGP_UNCPRIORITY) == NOERROR)
+                                    if (link->GetPath(fullName, fullName.Size(), &data, SLGP_UNCPRIORITY) == NOERROR)
                                     {
                                         // final form of fullName - we verify if it is OK
                                         err = CheckPath(TRUE, fullName); // fullName is a full path (links support no other)
@@ -162,7 +162,7 @@ void CFilesWindow::Execute(int index)
                                     {
                                         if (Plugins.GetFirstNethoodPluginFSName(netFSName))
                                         {
-                                            if (link->GetPath(fullName, MAX_PATH, NULL, SLGP_RAWPATH) != NOERROR)
+                                            if (link->GetPath(fullName, fullName.Size(), NULL, SLGP_RAWPATH) != NOERROR)
                                             { // path is not stored in the link as text, only as an ID list
                                                 fullName[0] = 0;
                                                 ITEMIDLIST* pidl;
@@ -171,7 +171,7 @@ void CFilesWindow::Execute(int index)
                                                     IMalloc* alloc;
                                                     if (SUCCEEDED(CoGetMalloc(1, &alloc)))
                                                     {
-                                                        if (!GetSHObjectName(pidl, SHGDN_FORPARSING | SHGDN_FORADDRESSBAR, fullName, MAX_PATH, alloc))
+                                                        if (!GetSHObjectName(pidl, SHGDN_FORPARSING | SHGDN_FORADDRESSBAR, fullName, fullName.Size(), alloc))
                                                             fullName[0] = 0;
                                                         if (alloc->DidAlloc(pidl) == 1)
                                                             alloc->Free(pidl);
@@ -1903,7 +1903,7 @@ BOOL CFilesWindow::ChangePathToDisk(HWND parent, const char* path, int suggested
                     GetCurrentLocalReparsePoint(changedPath, CheckPathRootWithRetryMsgBox);
                     if (strlen(CheckPathRootWithRetryMsgBox) > 3)
                     {
-                        lstrcpyn(drive, CheckPathRootWithRetryMsgBox, MAX_PATH);
+                        lstrcpyn(drive, CheckPathRootWithRetryMsgBox, drive.Size());
                         SalPathRemoveBackslash(drive);
                     }
                 }
@@ -2500,7 +2500,7 @@ BOOL CFilesWindow::ChangeAndListPathOnFS(const char* fsName, int fsNameIndex, co
                     changePathRet = FALSE; // fs-name change failed; simulate a fatal error on the FS
                 else                       // start using the new FS name (for the next loop pass)
                 {
-                    lstrcpyn(fsNameBuf, newFSName, MAX_PATH);
+                    lstrcpyn(fsNameBuf, newFSName, fsNameBuf.Size());
                     fsName = fsNameBuf;
                     fsNameIndex = newFSNameIndex;
                 }

@@ -570,7 +570,7 @@ BOOL CFilesWindow::BuildScriptMain2(COperations* script, BOOL copy, char* target
                 {
                     GetRootPath(root, name);
                     fsName[0] = 0;
-                    if (GetVolumeInformation(root, NULL, 0, NULL, &dummy, &flags, fsName, MAX_PATH) &&
+                    if (GetVolumeInformation(root, NULL, 0, NULL, &dummy, &flags, fsName, fsName.Size()) &&
                         StrICmp(fsName, "CDFS") == 0)
                     {
                         script->ClearReadonlyMask = ~(FILE_ATTRIBUTE_READONLY);
@@ -1191,7 +1191,7 @@ BOOL CFilesWindow::BuildScriptMain(COperations* script, CActionType type,
                 GetRootPath(root, GetPath());
                 DWORD dummy, flags;
                 fsName[0] = 0;
-                if (GetVolumeInformation(root, NULL, 0, NULL, &dummy, &flags, fsName, MAX_PATH) &&
+                if (GetVolumeInformation(root, NULL, 0, NULL, &dummy, &flags, fsName, fsName.Size()) &&
                     StrICmp(fsName, "CDFS") == 0)
                 {
                     script->ClearReadonlyMask = ~(FILE_ATTRIBUTE_READONLY);

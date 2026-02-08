@@ -208,7 +208,7 @@ CTipOfTheDayDialog::LoadTips(BOOL quiet)
   CPathBuffer fileName; // Heap-allocated for long path support
   GetModuleFileName(HInstance, fileName, fileName.Size());
   CutDirectory(fileName);
-  SalPathAppend(fileName, "help\\tips.txt", MAX_PATH);
+  SalPathAppend(fileName, "help\\tips.txt", fileName.Size());
   HANDLE hFile = SalCreateFileH(fileName, GENERIC_READ, FILE_SHARE_READ |
                                       FILE_SHARE_WRITE, NULL,
                                       OPEN_EXISTING, FILE_FLAG_SEQUENTIAL_SCAN, NULL);

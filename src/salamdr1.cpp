@@ -1256,7 +1256,7 @@ BOOL HasTheSameRootPathAndVolume(const char* p1, const char* p2)
                         strcpy(p1Volume, "fail"); // even root didn't succeed, unexpected (unfortunately happens on substed drives under W2K - debugged at Bachaalany - on failure for both paths we return MATCH, because it's more likely)
                         break;
                     }
-                    SalPathAddBackslash(ourPath, MAX_PATH);
+                    SalPathAddBackslash(ourPath, ourPath.Size());
                 }
             }
 
@@ -1279,7 +1279,7 @@ BOOL HasTheSameRootPathAndVolume(const char* p1, const char* p2)
                         strcpy(p2Volume, "fail"); // even root didn't succeed, unexpected (unfortunately happens on substed drives under W2K - debugged at Bachaalany - on failure for both paths we return MATCH, because it's more likely)
                         break;
                     }
-                    SalPathAddBackslash(ourPath, MAX_PATH);
+                    SalPathAddBackslash(ourPath, ourPath.Size());
                 }
                 if (strcmp(p1Volume, p2Volume) != 0)
                     ret = FALSE;
@@ -1398,8 +1398,8 @@ BOOL PathsAreOnTheSameVolume(const char* path1, const char* path2, BOOL* resIsOn
 
         if (resIsOnlyEstimation != NULL)
         {
-            lstrcpyn(path1NetPath, path1, MAX_PATH);
-            lstrcpyn(path2NetPath, path2, MAX_PATH);
+            lstrcpyn(path1NetPath, path1, path1NetPath.Size());
+            lstrcpyn(path2NetPath, path2, path2NetPath.Size());
             if (ResolveSubsts(path1NetPath) && ResolveSubsts(path2NetPath))
             {
                 if (IsTheSamePath(path1NetPath, path2NetPath))
@@ -3619,7 +3619,7 @@ BOOL ParseCommandLineParameters(LPSTR cmdLine, CCommandLineParams* cmdLineParams
                         *(strrchr(ConfigurationName.Get(), '\\') + 1) = 0;
                         SalPathAppend(ConfigurationName, s, ConfigurationName.Size());
                         if (!FileExists(ConfigurationName) && GetOurPathInRoamingAPPDATA(curDir) &&
-                            SalPathAppend(curDir, s, MAX_PATH) && FileExists(curDir))
+                            SalPathAppend(curDir, s, curDir.Size()) && FileExists(curDir))
                         { // if relatively specified file after -C doesn't exist next to .exe, we also look for it in APPDATA
                             lstrcpyn(ConfigurationName, curDir, ConfigurationName.Size());
                         }

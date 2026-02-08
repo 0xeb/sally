@@ -267,7 +267,7 @@ void CFilesWindow::FocusShortcutTarget(CFilesWindow* panel)
                         if (res == NOERROR)
                         {
                             WIN32_FIND_DATA dummyData;
-                            if (link->GetPath(fullName, MAX_PATH, &dummyData, SLGP_UNCPRIORITY) == NOERROR &&
+                            if (link->GetPath(fullName, fullName.Size(), &dummyData, SLGP_UNCPRIORITY) == NOERROR &&
                                 fullName[0] != 0 && CheckPath(FALSE, fullName) == ERROR_SUCCESS)
                             {
                                 panel->ChangeDir(fullName);
@@ -278,7 +278,7 @@ void CFilesWindow::FocusShortcutTarget(CFilesWindow* panel)
                                 CPathBuffer netFSName;
                                 if (Plugins.GetFirstNethoodPluginFSName(netFSName))
                                 {
-                                    if (link->GetPath(fullName, MAX_PATH, NULL, SLGP_RAWPATH) != NOERROR)
+                                    if (link->GetPath(fullName, fullName.Size(), NULL, SLGP_RAWPATH) != NOERROR)
                                     { // the path is not stored in the link as text, but only as an ID-list
                                         fullName[0] = 0;
                                         ITEMIDLIST* pidl;
@@ -287,7 +287,7 @@ void CFilesWindow::FocusShortcutTarget(CFilesWindow* panel)
                                             IMalloc* alloc;
                                             if (SUCCEEDED(CoGetMalloc(1, &alloc)))
                                             {
-                                                if (!GetSHObjectName(pidl, SHGDN_FORPARSING | SHGDN_FORADDRESSBAR, fullName, MAX_PATH, alloc))
+                                                if (!GetSHObjectName(pidl, SHGDN_FORPARSING | SHGDN_FORADDRESSBAR, fullName, fullName.Size(), alloc))
                                                     fullName[0] = 0;
                                                 if (alloc->DidAlloc(pidl) == 1)
                                                     alloc->Free(pidl);
