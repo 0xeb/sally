@@ -2653,7 +2653,7 @@ BOOL MakeFileAvailOfflineIfOneDriveOnWin81(HWND parent, const char *name)
     {
       BOOL makeOffline = FALSE;
       WIN32_FIND_DATA findData;
-      HANDLE hFind = FindFirstFile(name, &findData);
+      HANDLE hFind = SalLPFindFirstFileA(name, &findData);
       if (hFind != INVALID_HANDLE_VALUE)
       {
         makeOffline = IsFilePlaceholder(&findData);
