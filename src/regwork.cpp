@@ -15,7 +15,7 @@ BOOL ClearKeyAux(HKEY key)
 {
     CPathBuffer name;
     HKEY subKey;
-    while (RegEnumKey(key, 0, name, name.Size()) == ERROR_SUCCESS)
+    while (RegEnumKey(key, 0, name, name.Size() - 1) == ERROR_SUCCESS)
     {
         if (HANDLES_Q(RegOpenKeyEx(key, name, 0, KEY_READ | KEY_WRITE, &subKey)) == ERROR_SUCCESS)
         {

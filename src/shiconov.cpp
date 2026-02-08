@@ -356,7 +356,7 @@ void InitShellIconOverlays()
         while (1)
         { // enumerate all icon-overlay-handlers sequentially
             FILETIME dummy;
-            DWORD nameLen = name.Size();
+            DWORD nameLen = name.Size() - 1; // RegEnumKeyEx expects size excluding null terminator
             if ((errRet = RegEnumKeyEx(key, i, name, &nameLen, NULL, NULL, NULL, &dummy)) == ERROR_SUCCESS)
             {
                 int s = 0; // insert new name, there are about 15 of them, so we don't need any quick-sort
