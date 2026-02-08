@@ -523,3 +523,76 @@ TEST_F(FilesystemOpsTest, SalFindFirstFileH_LongPath)
         FindClose(hw);
     }
 }
+
+// ============================================================================
+// Long path tests for CreateFile and file attributes
+// ============================================================================
+
+TEST_F(FilesystemOpsTest, LongPath_CreateFileAndGetAttributes)
+{
+    // Build a path longer than MAX_PATH
+    std::string longDir = m_tempDir;
+    for (int i = 0; i < 15; i++)
+    {
+        longDir += "\\longsegment_test";
+        SalLPCreateDirectory(longDir.c_str(), NULL);
+    }
+    EXPECT_GT(longDir.length(), (size_t)MAX_PATH);
+
+    // Create a file via SalLPCreateFile
+    std::string longFile = longDir + "\\testcreate.dat";
+    HANDLE h = SalLPCreateFile(longFile.c_str(), GENERIC_WRITE, 0, NULL,
+                               CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL, NULL);
+    EXPECT_NE(h, INVALID_HANDLE_VALUE);
+    if (h != INVALID_HANDLE_VALUE)
+    {
+        const char* data = "longpath";
+        DWORD written;
+        WriteFile(h, data, 8, &written, NULL);
+        CloseHandle(h);
+    }
+
+    // Verify attributes
+    DWORD attrs = SalLPGetFileAttributes(longFile.c_str());
+    EXPECT_NE(attrs, (DWORD)INVALID_FILE_ATTRIBUTES);
+    EXPECT_FALSE(attrs & FILE_ATTRIBUTE_DIRECTORY);
+
+    // Set read-only and verify
+    EXPECT_TRUE(SalLPSetFileAttributes(longFile.c_str(), FILE_ATTRIBUTE_READONLY));
+    attrs = SalLPGetFileAttributes(longFile.c_str());
+    EXPECT_TRUE(attrs & FILE_ATTRIBUTE_READONLY);
+
+    // Clear read-only for cleanup
+    SalLPSetFileAttributes(longFile.c_str(), FILE_ATTRIBUTE_NORMAL);
+}
+
+TEST_F(FilesystemOpsTest, LongPath_CopyAndMoveFile)
+{
+    // Build a path longer than MAX_PATH
+    std::string longDir = m_tempDir;
+    for (int i = 0; i < 15; i++)
+    {
+        longDir += "\\copymove_segment";
+        SalLPCreateDirectory(longDir.c_str(), NULL);
+    }
+    EXPECT_GT(longDir.length(), (size_t)MAX_PATH);
+
+    // Create source file
+    std::string srcFile = longDir + "\\source.txt";
+    CreateTestFile(srcFile);
+
+    // Copy
+    std::string copyFile = longDir + "\\copied.txt";
+    EXPECT_TRUE(SalLPCopyFile(srcFile.c_str(), copyFile.c_str(), TRUE));
+    EXPECT_NE(SalLPGetFileAttributes(copyFile.c_str()), (DWORD)INVALID_FILE_ATTRIBUTES);
+
+    // Move
+    std::string movedFile = longDir + "\\moved.txt";
+    EXPECT_TRUE(SalLPMoveFile(copyFile.c_str(), movedFile.c_str()));
+    EXPECT_EQ(SalLPGetFileAttributes(copyFile.c_str()), (DWORD)INVALID_FILE_ATTRIBUTES); // source gone
+    EXPECT_NE(SalLPGetFileAttributes(movedFile.c_str()), (DWORD)INVALID_FILE_ATTRIBUTES); // target exists
+
+    // Delete
+    EXPECT_TRUE(SalLPDeleteFile(movedFile.c_str()));
+    EXPECT_EQ(SalLPGetFileAttributes(movedFile.c_str()), (DWORD)INVALID_FILE_ATTRIBUTES);
+}
