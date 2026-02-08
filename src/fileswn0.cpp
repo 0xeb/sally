@@ -41,7 +41,7 @@ BOOL CFilesWindow::QSFindNext(int currentIndex, BOOL next, BOOL skip, BOOL whole
     int len = (int)strlen(QuickSearchMask);
     if (newChar != 0)
     {
-        if (len >= MAX_PATH)
+        if (len >= QuickSearchMask.Size() - 1)
             return FALSE;
         QuickSearchMask[len] = newChar;
         len++;
@@ -303,7 +303,7 @@ void CFilesWindow::FocusShortcutTarget(CFilesWindow* panel)
                                         if (*backslash == '\\')
                                             backslash++;
                                         if (*backslash == 0 && // we only take paths "\\\\", "\\\\server", "\\\\server\\"
-                                            strlen(netFSName) + 1 + strlen(fullName) < MAX_PATH)
+                                            strlen(netFSName) + 1 + strlen(fullName) < fullName.Size())
                                         {
                                             linkIsNet = TRUE; // o.k. we'll try change-path-to-FS
                                             memmove(fullName + strlen(netFSName) + 1, fullName, strlen(fullName) + 1);

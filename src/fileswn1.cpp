@@ -723,7 +723,7 @@ unsigned IconThreadThreadFBody(void* parameter)
                                     {
                                         if (!pluginFSIconsFromPlugin) // icon on disk
                                         {
-                                            if (strlen(iconData->NameAndData) + (name - path) < MAX_PATH)
+                                            if (strlen(iconData->NameAndData) + (name - path) < (size_t)path.Size())
                                             {
                                                 strcpy(name, iconData->NameAndData);
 
@@ -801,7 +801,7 @@ unsigned IconThreadThreadFBody(void* parameter)
                                             {
                                                 *num = 0;
                                                 index = atoi(num + 1);
-                                                if (strlen(s) < MAX_PATH)
+                                                if (strlen(s) < (size_t)path.Size())
                                                 {
                                                     strcpy(path, s);
                                                     doExtractIcons = TRUE;
@@ -813,7 +813,7 @@ unsigned IconThreadThreadFBody(void* parameter)
                                             }
                                             else
                                             {
-                                                if (strlen(s) < MAX_PATH)
+                                                if (strlen(s) < (size_t)path.Size())
                                                 {
                                                     strcpy(path, s);
                                                     doLoadImage = TRUE;
@@ -881,7 +881,7 @@ unsigned IconThreadThreadFBody(void* parameter)
                                             int len = (int)strlen(s);
                                             int size = len + 4;
                                             size -= (size & 0x3); // size % 4 (alignment to four bytes)
-                                            if (strlen(s) + (name - path) < MAX_PATH)
+                                            if (strlen(s) + (name - path) < (size_t)path.Size())
                                             {
                                                 strcpy(name, s);
 

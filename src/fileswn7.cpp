@@ -1471,7 +1471,7 @@ void CFilesWindow::Pack(CFilesWindow* target, int pluginIndex, const char* plugi
         if (l > 0 && target->GetPath()[l - 1] == '\\')
             l--;
         int ll = (int)strlen(buff);
-        if (l + 2 + ll < MAX_PATH)
+        if (l + 2 + ll < SAL_MAX_LONG_PATH)
         {
             memmove(buff + l + 1, buff, ll + 1);
             buff[l] = '\\';
