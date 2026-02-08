@@ -949,7 +949,7 @@ DWORD GetDriveFormFactor(int iDrive)
      Base article Q115828 and in the "FLOPPY" SDK sample.
   */
     sprintf(tsz, "\\\\.\\%c:", '@' + iDrive);
-    h = HANDLES_Q(CreateFile(tsz, 0, FILE_SHARE_WRITE, 0, OPEN_EXISTING, 0, 0));
+    h = SalCreateFileH(tsz, 0, FILE_SHARE_WRITE, 0, OPEN_EXISTING, 0, 0);
     if (h != INVALID_HANDLE_VALUE)
     {
         DISK_GEOMETRY Geom[20];
@@ -1347,11 +1347,11 @@ void InitDropboxPath()
             if (cfgAlreadyFound ||
                 SalPathAppend(sDbPath, "Dropbox\\host.db", sDbPath.Size()) && FileExists(sDbPath))
             {
-                HANDLE hFile = HANDLES_Q(CreateFile(sDbPath, GENERIC_READ,
+                HANDLE hFile = SalCreateFileH(sDbPath, GENERIC_READ,
                                                     FILE_SHARE_READ | FILE_SHARE_WRITE, NULL,
                                                     OPEN_EXISTING,
                                                     FILE_FLAG_SEQUENTIAL_SCAN,
-                                                    NULL));
+                                                    NULL);
                 if (hFile != INVALID_HANDLE_VALUE)
                 {
                     LARGE_INTEGER size;

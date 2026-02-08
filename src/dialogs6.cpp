@@ -209,9 +209,9 @@ CTipOfTheDayDialog::LoadTips(BOOL quiet)
   GetModuleFileName(HInstance, fileName, fileName.Size());
   CutDirectory(fileName);
   SalPathAppend(fileName, "help\\tips.txt", MAX_PATH);
-  HANDLE hFile = HANDLES_Q(CreateFile(fileName, GENERIC_READ, FILE_SHARE_READ |
+  HANDLE hFile = SalCreateFileH(fileName, GENERIC_READ, FILE_SHARE_READ |
                                       FILE_SHARE_WRITE, NULL,
-                                      OPEN_EXISTING, FILE_FLAG_SEQUENTIAL_SCAN, NULL));
+                                      OPEN_EXISTING, FILE_FLAG_SEQUENTIAL_SCAN, NULL);
   if (hFile == INVALID_HANDLE_VALUE)
   {
     if (!quiet)

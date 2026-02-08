@@ -1278,8 +1278,8 @@ const char* WINAPI PackExpArcDosName(HWND msgParent, void* param)
                     randNum++;
                 }
 
-                HANDLE h = HANDLES_Q(CreateFile(path, GENERIC_WRITE, 0, NULL, CREATE_NEW,
-                                                FILE_ATTRIBUTE_NORMAL, NULL));
+                HANDLE h = SalCreateFileH(path, GENERIC_WRITE, 0, NULL, CREATE_NEW,
+                                                FILE_ATTRIBUTE_NORMAL, NULL);
                 if (h != INVALID_HANDLE_VALUE)
                 {
                     HANDLES(CloseHandle(h));

@@ -7194,12 +7194,12 @@ struct TMN_REPARSE_DATA_BUFFER
 #define MAXIMUM_REPARSE_DATA_BUFFER_SIZE      ( 16 * 1024 )
 
 
-  HANDLE srcDir = HANDLES_Q(CreateFile(name, GENERIC_READ, 0, 0, OPEN_EXISTING,
-                                       FILE_FLAG_BACKUP_SEMANTICS | FILE_FLAG_OPEN_REPARSE_POINT, NULL));
+  HANDLE srcDir = SalCreateFileH(name, GENERIC_READ, 0, 0, OPEN_EXISTING,
+                                       FILE_FLAG_BACKUP_SEMANTICS | FILE_FLAG_OPEN_REPARSE_POINT, NULL);
   if (srcDir != INVALID_HANDLE_VALUE)
   {
-    HANDLE tgtDir = HANDLES_Q(CreateFile("D:\\ZUMPA\\link", GENERIC_READ | GENERIC_WRITE, 0, 0, OPEN_EXISTING,
-                                         FILE_FLAG_BACKUP_SEMANTICS | FILE_FLAG_OPEN_REPARSE_POINT, NULL));
+    HANDLE tgtDir = SalCreateFileH("D:\\ZUMPA\\link", GENERIC_READ | GENERIC_WRITE, 0, 0, OPEN_EXISTING,
+                                         FILE_FLAG_BACKUP_SEMANTICS | FILE_FLAG_OPEN_REPARSE_POINT, NULL);
     if (tgtDir != INVALID_HANDLE_VALUE)
     {
       char szBuff[MAXIMUM_REPARSE_DATA_BUFFER_SIZE];

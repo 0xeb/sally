@@ -831,8 +831,8 @@ BOOL CDuplicateCandidates::GetMD5Digest(CGrepData* data, CFoundFilesData* file,
     data->SearchingText->Set(fullPath); // set the current file
 
     // open the file for reading with sequential access
-    HANDLE hFile = HANDLES_Q(CreateFile(fullPath, GENERIC_READ, FILE_SHARE_READ | FILE_SHARE_WRITE,
-                                        NULL, OPEN_EXISTING, FILE_FLAG_SEQUENTIAL_SCAN, NULL));
+    HANDLE hFile = SalCreateFileH(fullPath, GENERIC_READ, FILE_SHARE_READ | FILE_SHARE_WRITE,
+                                        NULL, OPEN_EXISTING, FILE_FLAG_SEQUENTIAL_SCAN, NULL);
     if (hFile != INVALID_HANDLE_VALUE)
     {
         BYTE buffer[DUPLICATES_BUFFER_SIZE];
@@ -1368,11 +1368,11 @@ BOOL TestFileContent(DWORD sizeLow, DWORD sizeHigh, const char* path, CGrepData*
     {
         DWORD err = ERROR_SUCCESS;
         data->SearchingText->Set(path); // set the current file
-        HANDLE hFile = HANDLES_Q(CreateFile(path, GENERIC_READ,
+        HANDLE hFile = SalCreateFileH(path, GENERIC_READ,
                                             FILE_SHARE_READ | FILE_SHARE_WRITE, NULL,
                                             OPEN_EXISTING,
                                             FILE_FLAG_SEQUENTIAL_SCAN,
-                                            NULL));
+                                            NULL);
         BOOL getLinkFileSizeErr = FALSE;
         if (hFile != INVALID_HANDLE_VALUE)
         {

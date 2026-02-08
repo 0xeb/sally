@@ -292,10 +292,10 @@ BOOL CompareFilesByContent(HWND hWindow, CCmpDirProgressDialog* progressDlg,
 
     //  DWORD totalTi = GetTickCount();
 
-    HANDLE hFile1 = HANDLES_Q(CreateFile(file1, GENERIC_READ, FILE_SHARE_READ | FILE_SHARE_WRITE,
-                                         NULL, OPEN_EXISTING, FILE_FLAG_SEQUENTIAL_SCAN, NULL));
-    HANDLE hFile2 = hFile1 != INVALID_HANDLE_VALUE ? HANDLES_Q(CreateFile(file2, GENERIC_READ, FILE_SHARE_READ | FILE_SHARE_WRITE,
-                                                                          NULL, OPEN_EXISTING, FILE_FLAG_SEQUENTIAL_SCAN, NULL))
+    HANDLE hFile1 = SalCreateFileH(file1, GENERIC_READ, FILE_SHARE_READ | FILE_SHARE_WRITE,
+                                         NULL, OPEN_EXISTING, FILE_FLAG_SEQUENTIAL_SCAN, NULL);
+    HANDLE hFile2 = hFile1 != INVALID_HANDLE_VALUE ? SalCreateFileH(file2, GENERIC_READ, FILE_SHARE_READ | FILE_SHARE_WRITE,
+                                                                          NULL, OPEN_EXISTING, FILE_FLAG_SEQUENTIAL_SCAN, NULL)
                                                    : INVALID_HANDLE_VALUE;
     DWORD err = GetLastError();
 

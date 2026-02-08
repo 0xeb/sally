@@ -2771,8 +2771,8 @@ void SearchForSPLs(char* buf, char* s, TIndirectArray<char>& foundFiles, WIN32_F
 BOOL SearchForAddedSPLs(char* buf, char* s, TIndirectArray<char>& foundFiles)
 { // returns TRUE if plugins from 'foundFiles' should be installed and all plugins loaded
     strcpy(s, "\\plugins.ver");
-    HANDLE file = HANDLES_Q(CreateFile(buf, GENERIC_READ, FILE_SHARE_READ, NULL, OPEN_EXISTING,
-                                       FILE_FLAG_SEQUENTIAL_SCAN, NULL));
+    HANDLE file = SalCreateFileH(buf, GENERIC_READ, FILE_SHARE_READ, NULL, OPEN_EXISTING,
+                                       FILE_FLAG_SEQUENTIAL_SCAN, NULL);
     if (file != INVALID_HANDLE_VALUE)
     {
         BOOL isPluginVerNew = FALSE;

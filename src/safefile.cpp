@@ -286,8 +286,8 @@ CSalamanderSafeFile::SafeFileCreate(const char* fileName,
                 else
                 {
                     char fibuffer[500];
-                    HANDLE file2 = HANDLES_Q(CreateFile(fileName, 0, FILE_SHARE_READ | FILE_SHARE_WRITE, NULL,
-                                                        OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, NULL));
+                    HANDLE file2 = SalCreateFileH(fileName, 0, FILE_SHARE_READ | FILE_SHARE_WRITE, NULL,
+                                                        OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, NULL);
                     if (file2 != INVALID_HANDLE_VALUE)
                     {
                         GetFileOverwriteInfo(fibuffer, _countof(fibuffer), file2, fileName);
@@ -919,8 +919,8 @@ BOOL CSalamanderSafeFile::SafeFileRead(SAFE_FILE* file, LPVOID lpBuffer,
                     HANDLES(CloseHandle(file->HFile)); // close the invalid handle because we could not read from it anyway
                 }
 
-                file->HFile = HANDLES_Q(CreateFile(file->FileName, file->dwDesiredAccess, file->dwShareMode, NULL,
-                                                   file->dwCreationDisposition, file->dwFlagsAndAttributes, NULL));
+                file->HFile = SalCreateFileH(file->FileName, file->dwDesiredAccess, file->dwShareMode, NULL,
+                                                   file->dwCreationDisposition, file->dwFlagsAndAttributes, NULL);
                 if (file->HFile != INVALID_HANDLE_VALUE) // opened; now set the offset
                 {
                 SEEK:
@@ -1003,8 +1003,8 @@ BOOL CSalamanderSafeFile::SafeFileWrite(SAFE_FILE* file, LPVOID lpBuffer,
                     HANDLES(CloseHandle(file->HFile)); // close the invalid handle because we could not read from it anyway
                 }
 
-                file->HFile = HANDLES_Q(CreateFile(file->FileName, file->dwDesiredAccess, file->dwShareMode, NULL,
-                                                   file->dwCreationDisposition, file->dwFlagsAndAttributes, NULL));
+                file->HFile = SalCreateFileH(file->FileName, file->dwDesiredAccess, file->dwShareMode, NULL,
+                                                   file->dwCreationDisposition, file->dwFlagsAndAttributes, NULL);
                 if (file->HFile != INVALID_HANDLE_VALUE) // opened; now set the offset
                 {
                     //SEEK:

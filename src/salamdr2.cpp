@@ -618,8 +618,8 @@ BOOL FileExists(const char* fileName)
   // beware of GENERIC_READ: it would return FALSE for files that have all permissions removed
   // j.r. note: without GENERIC_READ (with value 0) NT4 always returns TRUE for files on UNC paths
   // the solution would probably be to set GENERIC_READ and check what error occurred via GetLastError()
-  HANDLE hFile = HANDLES_Q(CreateFile(fileName, 0, FILE_SHARE_READ | FILE_SHARE_WRITE,
-                                      NULL, OPEN_EXISTING, 0, NULL));
+  HANDLE hFile = SalCreateFileH(fileName, 0, FILE_SHARE_READ | FILE_SHARE_WRITE,
+                                      NULL, OPEN_EXISTING, 0, NULL);
   if (hFile == INVALID_HANDLE_VALUE)
   {
     return FALSE;
@@ -1398,8 +1398,8 @@ BOOL GetReparsePointDestination(const char* repPointDir, char* repPointDstBuf, D
         return FALSE;
     }
 
-    HANDLE file = HANDLES_Q(CreateFile(repPointDirCrFile, 0 /*GENERIC_READ*/, 0, 0, OPEN_EXISTING,
-                                       FILE_FLAG_BACKUP_SEMANTICS | FILE_FLAG_OPEN_REPARSE_POINT, NULL));
+    HANDLE file = SalCreateFileH(repPointDirCrFile, 0 /*GENERIC_READ*/, 0, 0, OPEN_EXISTING,
+                                       FILE_FLAG_BACKUP_SEMANTICS | FILE_FLAG_OPEN_REPARSE_POINT, NULL);
     if (file == INVALID_HANDLE_VALUE)
     {
         DWORD err = GetLastError();
@@ -2911,8 +2911,8 @@ BOOL ImportConfiguration(HWND hParent, const char* fileName, BOOL ignoreIfNotExi
 {
     TRACE_I("ImportConfiguration(): begin");
     DWORD err = 0;
-    HANDLE file = HANDLES_Q(CreateFile(fileName, GENERIC_READ, FILE_SHARE_READ, NULL,
-                                       OPEN_EXISTING, 0, 0));
+    HANDLE file = SalCreateFileH(fileName, GENERIC_READ, FILE_SHARE_READ, NULL,
+                                       OPEN_EXISTING, 0, 0);
     if (file == INVALID_HANDLE_VALUE)
     {
         err = GetLastError();

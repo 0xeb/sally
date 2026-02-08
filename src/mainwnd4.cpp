@@ -281,11 +281,11 @@ void CMainWindow::MakeFileList()
         if (fileName[0] != 0)
         {
             BOOL append = (Configuration.FileListDestination == 2 && Configuration.FileListAppend);
-            HANDLE hFile = HANDLES_Q(CreateFile(fileName, GENERIC_WRITE | GENERIC_READ,
+            HANDLE hFile = SalCreateFileH(fileName, GENERIC_WRITE | GENERIC_READ,
                                                 FILE_SHARE_READ, NULL,
                                                 append ? OPEN_ALWAYS : CREATE_ALWAYS,
                                                 FILE_FLAG_RANDOM_ACCESS,
-                                                NULL));
+                                                NULL);
             if (hFile != INVALID_HANDLE_VALUE)
             {
                 // position the file pointer
@@ -810,8 +810,8 @@ MENU_TEMPLATE_ITEM MsgBoxButtons[] =
 
             if (buildBat)
             {
-                file = HANDLES_Q(CreateFile(batName, GENERIC_WRITE, 0, NULL, CREATE_NEW,
-                                            FILE_ATTRIBUTE_TEMPORARY, NULL));
+                file = SalCreateFileH(batName, GENERIC_WRITE, 0, NULL, CREATE_NEW,
+                                            FILE_ATTRIBUTE_TEMPORARY, NULL);
                 if (file == INVALID_HANDLE_VALUE)
                 {
                     lastErr = GetLastError();

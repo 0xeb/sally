@@ -936,8 +936,8 @@ BOOL CFilesWindow::BuildScriptMain2(COperations* script, BOOL copy, char* target
                     }
                     else
                     {
-                        h = HANDLES_Q(CreateFile(fileName, GENERIC_READ, FILE_SHARE_READ | FILE_SHARE_WRITE,
-                                                 NULL, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, NULL));
+                        h = SalCreateFileH(fileName, GENERIC_READ, FILE_SHARE_READ | FILE_SHARE_WRITE,
+                                                 NULL, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, NULL);
                     }
                     DWORD err = NO_ERROR;
                     if (h != INVALID_HANDLE_VALUE)

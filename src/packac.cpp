@@ -409,7 +409,7 @@ BOOL CPackACDialog::MyGetBinaryType(LPCSTR filename, LPDWORD lpBinaryType)
 
     BOOL ret = FALSE;
     // open the file for reading
-    HANDLE hfile = HANDLES_Q(CreateFile(filename, GENERIC_READ, FILE_SHARE_READ, NULL, OPEN_EXISTING, 0, NULL));
+    HANDLE hfile = SalCreateFileH(filename, GENERIC_READ, FILE_SHARE_READ, NULL, OPEN_EXISTING, 0, NULL);
     if (hfile != INVALID_HANDLE_VALUE)
     {
         IMAGE_DOS_HEADER mz_header;

@@ -1511,8 +1511,8 @@ BOOL SalGetFileSize(HANDLE file, CQuadWord& size, DWORD& err)
 
 BOOL SalGetFileSize2(const char* fileName, CQuadWord& size, DWORD* err)
 {
-    HANDLE hFile = HANDLES_Q(CreateFile(fileName, 0, FILE_SHARE_READ | FILE_SHARE_WRITE | FILE_SHARE_DELETE,
-                                        NULL, OPEN_EXISTING, 0, NULL));
+    HANDLE hFile = SalCreateFileH(fileName, 0, FILE_SHARE_READ | FILE_SHARE_WRITE | FILE_SHARE_DELETE,
+                                        NULL, OPEN_EXISTING, 0, NULL);
     if (hFile != INVALID_HANDLE_VALUE)
     {
         DWORD dummyErr;

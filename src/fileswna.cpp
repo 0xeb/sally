@@ -549,7 +549,7 @@ void CFilesWindow::DragDropToArcOrFS(CTmpDragDropOperData* data)
                 BOOL haveSize = FALSE;
                 CQuadWord size;
                 DWORD err;
-                HANDLE hFile = HANDLES_Q(CreateFile(data->ArchiveOrFSName, GENERIC_READ, 0, NULL, OPEN_EXISTING, 0, NULL));
+                HANDLE hFile = SalCreateFileH(data->ArchiveOrFSName, GENERIC_READ, 0, NULL, OPEN_EXISTING, 0, NULL);
                 if (hFile != INVALID_HANDLE_VALUE)
                 {
                     haveSize = SalGetFileSize(hFile, size, err);
@@ -578,9 +578,9 @@ void CFilesWindow::DragDropToArcOrFS(CTmpDragDropOperData* data)
                         if (nullFile && // zero-length file might have had a different compressed attribute, set archive accordingly
                             nullFileAttrs != INVALID_FILE_ATTRIBUTES)
                         {
-                            HANDLE hFile2 = HANDLES_Q(CreateFile(data->ArchiveOrFSName, GENERIC_READ | GENERIC_WRITE,
+                            HANDLE hFile2 = SalCreateFileH(data->ArchiveOrFSName, GENERIC_READ | GENERIC_WRITE,
                                                                  0, NULL, OPEN_EXISTING,
-                                                                 0, NULL));
+                                                                 0, NULL);
                             if (hFile2 != INVALID_HANDLE_VALUE)
                             {
                                 // restore the "compressed" flag; on FAT and FAT32 it simply won't succeed
@@ -597,9 +597,9 @@ void CFilesWindow::DragDropToArcOrFS(CTmpDragDropOperData* data)
                     {
                         if (nullFile) // operation failed, we must recreate it
                         {
-                            HANDLE hFile2 = HANDLES_Q(CreateFile(data->ArchiveOrFSName, GENERIC_READ | GENERIC_WRITE,
+                            HANDLE hFile2 = SalCreateFileH(data->ArchiveOrFSName, GENERIC_READ | GENERIC_WRITE,
                                                                  0, NULL, OPEN_ALWAYS,
-                                                                 0, NULL));
+                                                                 0, NULL);
                             if (hFile2 != INVALID_HANDLE_VALUE)
                             {
                                 if (nullFileAttrs != INVALID_FILE_ATTRIBUTES)

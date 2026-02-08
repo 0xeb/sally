@@ -2086,8 +2086,8 @@ BOOL CFilesWindow::ChangePathToArchive(const char* archive, const char* archiveP
             {
                 // retrieve file info (does it exist?, size, date & time)
                 DWORD err2 = NO_ERROR;
-                HANDLE file = HANDLES_Q(CreateFile(archive, GENERIC_READ, FILE_SHARE_READ | FILE_SHARE_WRITE,
-                                                   NULL, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, NULL));
+                HANDLE file = SalCreateFileH(archive, GENERIC_READ, FILE_SHARE_READ | FILE_SHARE_WRITE,
+                                                   NULL, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, NULL);
                 if (file != INVALID_HANDLE_VALUE)
                 {
                     GetFileTime(file, NULL, NULL, &archiveDate);
@@ -2220,8 +2220,8 @@ BOOL CFilesWindow::ChangePathToArchive(const char* archive, const char* archiveP
             DWORD err;
             if ((err = CheckPath(!isRefresh)) == ERROR_SUCCESS) // no need to restore network connections here ...
             {
-                HANDLE file = HANDLES_Q(CreateFile(archive, GENERIC_READ, FILE_SHARE_READ | FILE_SHARE_WRITE,
-                                                   NULL, OPEN_EXISTING, 0, NULL));
+                HANDLE file = SalCreateFileH(archive, GENERIC_READ, FILE_SHARE_READ | FILE_SHARE_WRITE,
+                                                   NULL, OPEN_EXISTING, 0, NULL);
                 if (file != INVALID_HANDLE_VALUE)
                 {
                     SalGetFileSize(file, archiveSize, err);

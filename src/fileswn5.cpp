@@ -829,8 +829,8 @@ void CFilesWindow::ViewFile(char* name, BOOL altView, DWORD handlerID, int enumF
                             SetCursor(oldCur);
                             SetThreadPriority(GetCurrentThread(), THREAD_PRIORITY_ABOVE_NORMAL);
                             CQuadWord size(0, 0);
-                            HANDLE file = HANDLES_Q(CreateFile(name, GENERIC_READ, FILE_SHARE_READ | FILE_SHARE_WRITE,
-                                                               NULL, OPEN_EXISTING, 0, NULL));
+                            HANDLE file = SalCreateFileH(name, GENERIC_READ, FILE_SHARE_READ | FILE_SHARE_WRITE,
+                                                               NULL, OPEN_EXISTING, 0, NULL);
                             if (file != INVALID_HANDLE_VALUE)
                             {
                                 DWORD err;
@@ -2204,12 +2204,12 @@ void CFilesWindow::RenameFileInternal(CFileData* f, const char* formatedFileName
                     if ((inAttr & FILE_ATTRIBUTE_DIRECTORY) == 0 &&
                         (outAttr & FILE_ATTRIBUTE_DIRECTORY) == 0)
                     { // only if both are files
-                        HANDLE in = HANDLES_Q(CreateFile(path, 0, FILE_SHARE_READ | FILE_SHARE_WRITE, NULL,
+                        HANDLE in = SalCreateFileH(path, 0, FILE_SHARE_READ | FILE_SHARE_WRITE, NULL,
                                                          OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL,
-                                                         NULL));
-                        HANDLE out = HANDLES_Q(CreateFile(tgtPath, 0, FILE_SHARE_READ | FILE_SHARE_WRITE, NULL,
+                                                         NULL);
+                        HANDLE out = SalCreateFileH(tgtPath, 0, FILE_SHARE_READ | FILE_SHARE_WRITE, NULL,
                                                           OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL,
-                                                          NULL));
+                                                          NULL);
                         if (in != INVALID_HANDLE_VALUE && out != INVALID_HANDLE_VALUE)
                         {
                             char iAttr[101], oAttr[101];

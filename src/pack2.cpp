@@ -762,8 +762,8 @@ BOOL PackDelFromArc(HWND parent, CFilesWindow* panel, const char* archiveFileNam
     }
 
     // if deleting removed the archive, create a zero-length file
-    HANDLE tmpHandle = HANDLES_Q(CreateFile(archiveFileName, GENERIC_READ, 0, NULL,
-                                            OPEN_ALWAYS, fileAttrs, NULL));
+    HANDLE tmpHandle = SalCreateFileH(archiveFileName, GENERIC_READ, 0, NULL,
+                                            OPEN_ALWAYS, fileAttrs, NULL);
     if (tmpHandle != INVALID_HANDLE_VALUE)
         HANDLES(CloseHandle(tmpHandle));
 

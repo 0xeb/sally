@@ -2407,11 +2407,11 @@ void ResolveNetHoodPath(char* path)
     lstrcpyn(name, path, name.Size());
     if (SalPathAppend(name, "desktop.ini", name.Size()))
     {
-        HANDLE hFile = HANDLES_Q(CreateFile(name, GENERIC_READ,
+        HANDLE hFile = SalCreateFileH(name, GENERIC_READ,
                                             FILE_SHARE_WRITE | FILE_SHARE_READ, NULL,
                                             OPEN_EXISTING,
                                             FILE_FLAG_SEQUENTIAL_SCAN,
-                                            NULL));
+                                            NULL);
         if (hFile != INVALID_HANDLE_VALUE)
         {
             if (GetFileSize(hFile, NULL) <= 1000) // so far all had 92 bytes, so 1000 bytes should be more than enough

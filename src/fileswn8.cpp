@@ -593,7 +593,7 @@ void CFilesWindow::FilesAction(CActionType type, CFilesWindow* target, int count
                             BOOL haveSize = FALSE;
                             CQuadWord size;
                             DWORD err;
-                            HANDLE hFile = HANDLES_Q(CreateFile(path, GENERIC_READ, 0, NULL, OPEN_EXISTING, 0, NULL));
+                            HANDLE hFile = SalCreateFileH(path, GENERIC_READ, 0, NULL, OPEN_EXISTING, 0, NULL);
                             if (hFile != INVALID_HANDLE_VALUE)
                             {
                                 haveSize = SalGetFileSize(hFile, size, err);
@@ -622,9 +622,9 @@ void CFilesWindow::FilesAction(CActionType type, CFilesWindow* target, int count
                                     if (nullFile && // a zero-size file might have a different compressed attribute; set the archive to the same
                                         nullFileAttrs != INVALID_FILE_ATTRIBUTES)
                                     {
-                                        HANDLE hFile2 = HANDLES_Q(CreateFile(path, GENERIC_READ | GENERIC_WRITE,
+                                        HANDLE hFile2 = SalCreateFileH(path, GENERIC_READ | GENERIC_WRITE,
                                                                              0, NULL, OPEN_EXISTING,
-                                                                             0, NULL));
+                                                                             0, NULL);
                                         if (hFile2 != INVALID_HANDLE_VALUE)
                                         {
                                             // restore the 'compressed' flag; it simply doesn't work on FAT or FAT32
@@ -643,9 +643,9 @@ void CFilesWindow::FilesAction(CActionType type, CFilesWindow* target, int count
                                 {
                                     if (nullFile) // it failed, we have to create it again
                                     {
-                                        HANDLE hFile2 = HANDLES_Q(CreateFile(path, GENERIC_READ | GENERIC_WRITE,
+                                        HANDLE hFile2 = SalCreateFileH(path, GENERIC_READ | GENERIC_WRITE,
                                                                              0, NULL, OPEN_ALWAYS,
-                                                                             0, NULL));
+                                                                             0, NULL);
                                         if (hFile2 != INVALID_HANDLE_VALUE)
                                         {
                                             if (nullFileAttrs != INVALID_FILE_ATTRIBUTES)
