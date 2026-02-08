@@ -1416,7 +1416,7 @@ BOOL CSystemPolicies::GetMyCanRun(const char* fileName)
     // skip spaces from left
     while (*p != 0 && *p == ' ')
         p++;
-    if (strlen(p) >= MAX_PATH)
+    if (strlen(p) >= SAL_MAX_LONG_PATH)
         return RestrictRun == 0; // deny execution if only selected commands are allowed (this one couldn't be separated from command line)
     CPathBuffer name;
     lstrcpyn(name, p, name.Size());
