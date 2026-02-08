@@ -1770,7 +1770,7 @@ BOOL DoCopySecurity(const char* sourceName, const char* targetName, DWORD* err, 
         else
         {
             BOOL inheritedDACL = /*(srcSDControl & SE_DACL_AUTO_INHERITED) != 0 &&*/ (srcSDControl & SE_DACL_PROTECTED) == 0; // SE_DACL_AUTO_INHERITED unfortunately is not always set (for example Total Commander clears it after moving a file, so we ignore it)
-            DWORD attr = GetFileAttributes(targetNameSec);
+            DWORD attr = SalLPGetFileAttributes(targetNameSec);
             *err = SetNamedSecurityInfo((char*)targetNameSec, SE_FILE_OBJECT,
                                         DACL_SECURITY_INFORMATION | GROUP_SECURITY_INFORMATION | OWNER_SECURITY_INFORMATION |
                                             (inheritedDACL ? UNPROTECTED_DACL_SECURITY_INFORMATION : PROTECTED_DACL_SECURITY_INFORMATION),
@@ -1881,7 +1881,7 @@ BOOL DoCopySecurity(const char* sourceName, const char* targetName, DWORD* err, 
                     LocalFree(tgtSD);
             }
             if (attr != INVALID_FILE_ATTRIBUTES)
-                SetFileAttributes(targetNameSec, attr);
+                SalLPSetFileAttributes(targetNameSec, attr);
         }
     }
     if (srcSD != NULL)
@@ -1905,7 +1905,7 @@ DWORD CompressFile(char* fileName, DWORD attrs)
     if (attrs & FILE_ATTRIBUTE_READONLY)
     {
         attrsChange = TRUE;
-        SetFileAttributes(fileNameCrFile, attrs & ~FILE_ATTRIBUTE_READONLY);
+        SalLPSetFileAttributes(fileNameCrFile, attrs & ~FILE_ATTRIBUTE_READONLY);
     }
     HANDLE file = SalCreateFileH(fileNameCrFile, FILE_READ_DATA | FILE_WRITE_DATA,
                                  FILE_SHARE_READ | FILE_SHARE_WRITE, NULL,
@@ -1922,7 +1922,7 @@ DWORD CompressFile(char* fileName, DWORD attrs)
         HANDLES(CloseHandle(file));
     }
     if (attrsChange)
-        SetFileAttributes(fileNameCrFile, attrs); // revert to the original attributes (on error the attributes would remain nonsensically changed)
+        SalLPSetFileAttributes(fileNameCrFile, attrs); // revert to the original attributes (on error the attributes would remain nonsensically changed)
     return ret;
 }
 
@@ -1942,7 +1942,7 @@ DWORD UncompressFile(char* fileName, DWORD attrs)
     if (attrs & FILE_ATTRIBUTE_READONLY)
     {
         attrsChange = TRUE;
-        SetFileAttributes(fileNameCrFile, attrs & ~FILE_ATTRIBUTE_READONLY);
+        SalLPSetFileAttributes(fileNameCrFile, attrs & ~FILE_ATTRIBUTE_READONLY);
     }
 
     HANDLE file = SalCreateFileH(fileNameCrFile, FILE_READ_DATA | FILE_WRITE_DATA,
@@ -1960,7 +1960,7 @@ DWORD UncompressFile(char* fileName, DWORD attrs)
         HANDLES(CloseHandle(file));
     }
     if (attrsChange)
-        SetFileAttributes(fileNameCrFile, attrs); // revert to the original attributes (on error the attributes would remain nonsensically changed)
+        SalLPSetFileAttributes(fileNameCrFile, attrs); // revert to the original attributes (on error the attributes would remain nonsensically changed)
     return ret;
 }
 
@@ -2022,7 +2022,7 @@ DWORD MyEncryptFile(HWND hProgressDlg, char* fileName, DWORD attrs, DWORD finalA
     if (attrs & (FILE_ATTRIBUTE_SYSTEM | FILE_ATTRIBUTE_READONLY))
     {
         attrsChange = TRUE;
-        SetFileAttributes(fileNameCrFile, attrs & ~(FILE_ATTRIBUTE_SYSTEM | FILE_ATTRIBUTE_READONLY));
+        SalLPSetFileAttributes(fileNameCrFile, attrs & ~(FILE_ATTRIBUTE_SYSTEM | FILE_ATTRIBUTE_READONLY));
     }
     if (preserveDate)
     {
@@ -2059,7 +2059,7 @@ DWORD MyEncryptFile(HWND hProgressDlg, char* fileName, DWORD attrs, DWORD finalA
             retEnc = GetLastError();
     }
     if (attrsChange)
-        SetFileAttributes(fileNameCrFile, attrs); // revert to the original attributes (on error the attributes would remain nonsensically changed)
+        SalLPSetFileAttributes(fileNameCrFile, attrs); // revert to the original attributes (on error the attributes would remain nonsensically changed)
     return retEnc;
 }
 
@@ -2079,7 +2079,7 @@ DWORD MyDecryptFile(char* fileName, DWORD attrs, BOOL preserveDate)
     if (attrs & FILE_ATTRIBUTE_READONLY)
     {
         attrsChange = TRUE;
-        SetFileAttributes(fileNameCrFile, attrs & ~FILE_ATTRIBUTE_READONLY);
+        SalLPSetFileAttributes(fileNameCrFile, attrs & ~FILE_ATTRIBUTE_READONLY);
     }
     if (preserveDate)
     {
@@ -2116,7 +2116,7 @@ DWORD MyDecryptFile(char* fileName, DWORD attrs, BOOL preserveDate)
             ret = GetLastError();
     }
     if (attrsChange)
-        SetFileAttributes(fileNameCrFile, attrs); // revert to the original attributes (on error the attributes would remain nonsensically changed)
+        SalLPSetFileAttributes(fileNameCrFile, attrs); // revert to the original attributes (on error the attributes would remain nonsensically changed)
     return ret;
 }
 
@@ -3267,7 +3267,7 @@ HANDLE SalCreateFileEx(const char* fileName, DWORD desiredAccess,
                                 else
                                 {
                                     if ((origFullNameAttr & FILE_ATTRIBUTE_ARCHIVE) == 0)
-                                        SetFileAttributes(origFullName, origFullNameAttr); // leave without extra handling or retry; not critical (normally toggles unpredictably)
+                                        SalLPSetFileAttributes(origFullName, origFullNameAttr); // leave without extra handling or retry; not critical (normally toggles unpredictably)
                                 }
                             }
                         }
@@ -5859,7 +5859,7 @@ BOOL DoMoveFile(COperation* op, HWND hProgressDlg, void* buffer,
             if (!invalidName && !*novellRenamePatch && MoveFileA(gFileSystem, sourceNameMvDir, targetNameMvDir).success)
             {
                 if (script->CopyAttrs && (op->Attr & FILE_ATTRIBUTE_ARCHIVE) == 0) // Archive attribute was not set, MoveFile turned it on, clear it again
-                    SetFileAttributes(targetNameMvDir, op->Attr);                  // leave without handling or retry, not important (it normally toggles chaotically)
+                    SalLPSetFileAttributes(targetNameMvDir, op->Attr);                  // leave without handling or retry, not important (it normally toggles chaotically)
 
             OPERATION_DONE:
 
@@ -5978,13 +5978,13 @@ BOOL DoMoveFile(COperation* op, HWND hProgressDlg, void* buffer,
                         if (!*novellRenamePatch)
                             *novellRenamePatch = TRUE; // the next operations will go straight through here
                         if (setAttr || script->CopyAttrs && (attr & FILE_ATTRIBUTE_ARCHIVE) == 0)
-                            SetFileAttributes(targetNameMvDir, attr);
+                            SalLPSetFileAttributes(targetNameMvDir, attr);
 
                         goto OPERATION_DONE;
                     }
                     err = GetLastError();
                     if (setAttr)
-                        SetFileAttributes(sourceNameMvDir, attr);
+                        SalLPSetFileAttributes(sourceNameMvDir, attr);
                 }
 
                 if (StrICmp(op->SourceName, op->TargetName) != 0 && // provided this is not just a change of case
@@ -6044,7 +6044,7 @@ BOOL DoMoveFile(COperation* op, HWND hProgressDlg, void* buffer,
                                     else
                                     {
                                         if ((origFullNameAttr & FILE_ATTRIBUTE_ARCHIVE) == 0)
-                                            SetFileAttributes(origFullName, origFullNameAttr); // leave without handling or retry, not important (it normally toggles chaotically)
+                                            SalLPSetFileAttributes(origFullName, origFullNameAttr); // leave without handling or retry, not important (it normally toggles chaotically)
                                     }
 
                                     if (moveDone)
@@ -6602,7 +6602,7 @@ BOOL SalCreateDirectoryEx(const char* name, DWORD* err)
                             else
                             {
                                 if ((origFullNameAttr & FILE_ATTRIBUTE_ARCHIVE) == 0)
-                                    SetFileAttributes(origFullName, origFullNameAttr); // leave it without extra handling or retries; not important (normally toggles unpredictably)
+                                    SalLPSetFileAttributes(origFullName, origFullNameAttr); // leave it without extra handling or retries; not important (normally toggles unpredictably)
                             }
 
                             if (createDirDone)
@@ -6646,11 +6646,11 @@ BOOL DoCopyDirTime(HWND hProgressDlg, const char* targetName, FILETIME* modified
 
     BOOL showError = !quiet;
     DWORD error = NO_ERROR;
-    DWORD attr = GetFileAttributes(targetNameCrFile);
+    DWORD attr = SalLPGetFileAttributes(targetNameCrFile);
     BOOL setAttr = FALSE;
     if (attr != INVALID_FILE_ATTRIBUTES && (attr & FILE_ATTRIBUTE_READONLY))
     {
-        SetFileAttributes(targetNameCrFile, attr & ~FILE_ATTRIBUTE_READONLY);
+        SalLPSetFileAttributes(targetNameCrFile, attr & ~FILE_ATTRIBUTE_READONLY);
         setAttr = TRUE;
     }
     HANDLE file;
@@ -6669,7 +6669,7 @@ BOOL DoCopyDirTime(HWND hProgressDlg, const char* targetName, FILETIME* modified
     else
         error = GetLastError();
     if (setAttr)
-        SetFileAttributes(targetNameCrFile, attr);
+        SalLPSetFileAttributes(targetNameCrFile, attr);
 
     if (showError)
     {
@@ -6746,7 +6746,7 @@ BOOL DoCreateDir(HWND hProgressDlg, char* name, DWORD attr,
                                operDone, operTotal, dlgData, script, &adsSkip, buffer) ||
                     adsSkip) // user cancelled or skipped at least one ADS
                 {
-                    if (RemoveDirectory(nameCrDir) == 0)
+                    if (SalLPRemoveDirectory(nameCrDir) == 0)
                     {
                         DWORD err2 = GetLastError();
                         TRACE_E("Unable to remove newly created directory: " << name << ", error: " << GetErrorText(err2));
@@ -6816,7 +6816,7 @@ BOOL DoCreateDir(HWND hProgressDlg, char* name, DWORD attr,
                                     case IDB_SKIP:
                                     {
                                         ClearReadOnlyAttr(nameCrDir); // remove read-only attribute so the file can be deleted
-                                        RemoveDirectory(nameCrDir);
+                                        SalLPRemoveDirectory(nameCrDir);
                                         script->SetTFS(lastTransferredFileSize); // add TFS only after the directory is fully outside; ProgressSize will be synced outside (no point in adjusting it here)
                                         skip = TRUE;
                                         return TRUE;
@@ -6844,7 +6844,7 @@ BOOL DoCreateDir(HWND hProgressDlg, char* name, DWORD attr,
                         TRACE_I("DoCreateDir(): Unable to set Encrypted or Compressed attributes for " << name << "! error=" << GetErrorText(changeAttrErr));
                     }
                 }
-                SetFileAttributes(nameCrDir, newAttr);
+                SalLPSetFileAttributes(nameCrDir, newAttr);
 
                 if (script->CopyAttrs) // verify whether the source file attributes were preserved
                 {
@@ -6881,7 +6881,7 @@ BOOL DoCreateDir(HWND hProgressDlg, char* name, DWORD attr,
                         CANCEL_CRDIR:
 
                             ClearReadOnlyAttr(nameCrDir); // remove read-only so the file can be deleted
-                            RemoveDirectory(nameCrDir);
+                            SalLPRemoveDirectory(nameCrDir);
                             return FALSE;
                         }
                         }
@@ -7090,7 +7090,7 @@ BOOL DoDeleteDir(HWND hProgressDlg, char* name, const CQuadWord& size, COperatio
         }
         else
         {
-            if (RemoveDirectory(nameRmDir) == 0)
+            if (SalLPRemoveDirectory(nameRmDir) == 0)
                 err = GetLastError();
         }
 
@@ -7230,7 +7230,7 @@ BOOL DoDeleteDirLinkAux(const char* nameDelLink, DWORD* err)
     if (err != NULL)
         *err = ERROR_SUCCESS;
     BOOL ok = FALSE;
-    DWORD attr = GetFileAttributes(nameDelLink);
+    DWORD attr = SalLPGetFileAttributes(nameDelLink);
     if (attr != INVALID_FILE_ATTRIBUTES && (attr & FILE_ATTRIBUTE_REPARSE_POINT))
     {
         HANDLE dir = SalCreateFileH(nameDelLink, GENERIC_WRITE /* | GENERIC_READ */, 0, 0, OPEN_EXISTING,
@@ -7286,7 +7286,7 @@ BOOL DoDeleteDirLinkAux(const char* nameDelLink, DWORD* err)
     // remove the empty directory (that remained after deleting the reparse point)
     if (ok)
         ClearReadOnlyAttr(nameDelLink, attr); // ensure it can be deleted even with the read-only attribute
-    if (ok && !RemoveDirectory(nameDelLink))
+    if (ok && !SalLPRemoveDirectory(nameDelLink))
     {
         ok = FALSE;
         if (err != NULL)
@@ -7669,7 +7669,7 @@ CONVERT_AGAIN:
                         totalDone += size;
                         // restore attributes (write operations have trouble with read-only)
                         if (changeAttrs)
-                            SetFileAttributes(tmpFileName, srcAttrs);
+                            SalLPSetFileAttributes(tmpFileName, srcAttrs);
                         // overwrite the original file with the temp file
                         while (1)
                         {
@@ -7953,7 +7953,7 @@ BOOL DoChangeAttrs(HWND hProgressDlg, char* name, const CQuadWord& size, DWORD a
             SendMessage(hProgressDlg, WM_USER_DIALOG, 5, (LPARAM)data);
             error = ERROR_SUCCESS;
         }
-        if (error == ERROR_SUCCESS && SetFileAttributes(nameSetAttrs, attrs))
+        if (error == ERROR_SUCCESS && SalLPSetFileAttributes(nameSetAttrs, attrs))
         {
             BOOL isDir = ((attrs & FILE_ATTRIBUTE_DIRECTORY) != 0);
             // if any of the timestamps need to be set
@@ -7961,7 +7961,7 @@ BOOL DoChangeAttrs(HWND hProgressDlg, char* name, const CQuadWord& size, DWORD a
             {
                 HANDLE file;
                 if (attrs & FILE_ATTRIBUTE_READONLY)
-                    SetFileAttributes(nameSetAttrs, attrs & (~FILE_ATTRIBUTE_READONLY));
+                    SalLPSetFileAttributes(nameSetAttrs, attrs & (~FILE_ATTRIBUTE_READONLY));
                 file = SalCreateFileH(nameSetAttrs, GENERIC_READ | GENERIC_WRITE,
                                       FILE_SHARE_READ | FILE_SHARE_WRITE,
                                       NULL, OPEN_EXISTING, isDir ? FILE_FLAG_BACKUP_SEMANTICS : 0, NULL);
@@ -7978,12 +7978,12 @@ BOOL DoChangeAttrs(HWND hProgressDlg, char* name, const CQuadWord& size, DWORD a
                     SetFileTime(file, &ftCreated, &ftAccessed, &ftModified);
                     HANDLES(CloseHandle(file));
                     if (attrs & FILE_ATTRIBUTE_READONLY)
-                        SetFileAttributes(nameSetAttrs, attrs);
+                        SalLPSetFileAttributes(nameSetAttrs, attrs);
                 }
                 else
                 {
                     if (attrs & FILE_ATTRIBUTE_READONLY)
-                        SetFileAttributes(nameSetAttrs, attrs);
+                        SalLPSetFileAttributes(nameSetAttrs, attrs);
                     goto SHOW_ERROR;
                 }
             }
