@@ -1496,7 +1496,7 @@ void CFilesWindow::Pack(CFilesWindow* target, int pluginIndex, const char* plugi
 
 _PACK_AGAIN:
 
-    CPackDialog dlg(HWindow, fileBuf, fileBufAlt, &str, &PackerConfig);
+    CPackDialog dlg(HWindow, fileBuf, fileBuf.Size(), fileBufAlt, &str, &PackerConfig);
     dlg.SetUnicodePath(AnsiToWide(fileBuf));
 
     // Since Windows Vista Microsoft introduced an odd behavior: quick rename selects only the name without the dot and extension
@@ -1772,7 +1772,7 @@ void CFilesWindow::Unpack(CFilesWindow* target, int pluginIndex, const char* plu
         BOOL delArchiveWhenDone = FALSE;
     DO_AGAIN:
 
-        CUnpackDialog unpackDlg(HWindow, path, pathAlt, mask, &str, &UnpackerConfig, &delArchiveWhenDone);
+        CUnpackDialog unpackDlg(HWindow, path, path.Size(), pathAlt, mask, &str, &UnpackerConfig, &delArchiveWhenDone);
         unpackDlg.SetUnicodePath(AnsiToWide(path));
         if (unpackDlg.Execute() == IDOK)
         {

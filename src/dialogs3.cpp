@@ -2066,12 +2066,13 @@ CEnterPasswdDialog::DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
 // CPackDialog
 //
 
-CPackDialog::CPackDialog(HWND parent, char* path, const char* pathAlt,
+CPackDialog::CPackDialog(HWND parent, char* path, int pathBufSize, const char* pathAlt,
                          CTruncatedString* subject, CPackerConfig* config)
     : CCommonDialog(HLanguage, IDD_PACK, IDD_PACK, parent)
 {
     Subject = subject;
     Path = path;
+    PathBufSize = pathBufSize;
     PathAlt = pathAlt;
     PackerConfig = config;
     SelectionEnd = -1;
@@ -2149,11 +2150,11 @@ void CPackDialog::Transfer(CTransferInfo& ti)
                 GetWindowTextW(HUnicodeEdit, buffer.data(), len + 1);
                 ResultW = buffer.data();
             }
-            WideCharToMultiByte(CP_ACP, 0, ResultW.c_str(), -1, Path, MAX_PATH, "?", NULL);
+            WideCharToMultiByte(CP_ACP, 0, ResultW.c_str(), -1, Path, PathBufSize, "?", NULL);
         }
         else
         {
-            ti.EditLine(IDE_PATH, Path, MAX_PATH);
+            ti.EditLine(IDE_PATH, Path, PathBufSize);
         }
     }
 
@@ -2168,7 +2169,7 @@ void CPackDialog::Transfer(CTransferInfo& ti)
             if ((s == NULL || s2 != NULL && s2 > s) && // '.cvspass' in Windows is considered an extension ...
                 (s2 == NULL || (s2 - Path + 1) < nameLen) &&
                 nameLen > 0 &&
-                nameLen + 1 + 1 + strlen(ext) < MAX_PATH)
+                nameLen + 1 + 1 + strlen(ext) < (size_t)PathBufSize)
             {
                 strcpy(Path + nameLen, ".");
                 strcpy(Path + nameLen + 1, ext);
@@ -2204,7 +2205,7 @@ BOOL CPackDialog::ChangeExtension(char* name, const char* ext)
     if (s != NULL && // '.cvspass' in Windows is considered an extension ...
                      //if (s != NULL && s > name &&
         (s2 == NULL || s > s2) &&
-        strlen(ext) + 1 + ((s + 1) - name) < MAX_PATH)
+        strlen(ext) + 1 + ((s + 1) - name) < (size_t)PathBufSize)
     {
         strcpy(s + 1, ext);
         return TRUE;
@@ -2215,7 +2216,7 @@ BOOL CPackDialog::ChangeExtension(char* name, const char* ext)
         if ((s == NULL || s2 != NULL && s2 > s) &&
             (s2 == NULL || (s2 - name + 1) < nameLen) &&
             nameLen > 0 &&
-            nameLen + 1 + 1 + strlen(ext) < MAX_PATH)
+            nameLen + 1 + 1 + strlen(ext) < (size_t)PathBufSize)
         {
             strcpy(name + nameLen, ".");
             strcpy(name + nameLen + 1, ext);
@@ -2343,13 +2344,14 @@ CPackDialog::DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
 // CUnpackDialog
 //
 
-CUnpackDialog::CUnpackDialog(HWND parent, char* path, const char* pathAlt, char* mask,
+CUnpackDialog::CUnpackDialog(HWND parent, char* path, int pathBufSize, const char* pathAlt, char* mask,
                              CTruncatedString* subject, CUnpackerConfig* config,
                              BOOL* delArchiveWhenDone)
     : CCommonDialog(HLanguage, IDD_UNPACK, IDD_UNPACK, parent)
 {
     Subject = subject;
     Path = path;
+    PathBufSize = pathBufSize;
     PathAlt = pathAlt;
     Mask = mask;
     UnpackerConfig = config;
@@ -2419,11 +2421,11 @@ void CUnpackDialog::Transfer(CTransferInfo& ti)
                 GetWindowTextW(HUnicodeEdit, buffer.data(), len + 1);
                 ResultW = buffer.data();
             }
-            WideCharToMultiByte(CP_ACP, 0, ResultW.c_str(), -1, Path, MAX_PATH, "?", NULL);
+            WideCharToMultiByte(CP_ACP, 0, ResultW.c_str(), -1, Path, PathBufSize, "?", NULL);
         }
         else
         {
-            ti.EditLine(IDE_PATH, Path, MAX_PATH);
+            ti.EditLine(IDE_PATH, Path, PathBufSize);
         }
         if (IsWindowEnabled(GetDlgItem(HWindow, IDC_DELETEARCHIVEFILES)))
             ti.CheckBox(IDC_DELETEARCHIVEFILES, *DelArchiveWhenDone);
@@ -2431,7 +2433,7 @@ void CUnpackDialog::Transfer(CTransferInfo& ti)
             *DelArchiveWhenDone = FALSE;
     }
 
-    ti.EditLine(IDE_MASK, Mask, MAX_PATH);
+    ti.EditLine(IDE_MASK, Mask, MAX_PATH); // Mask is always MAX_PATH (file masks are short)
 }
 
 INT_PTR

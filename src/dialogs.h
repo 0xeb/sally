@@ -774,7 +774,7 @@ class CPackerConfig;
 class CPackDialog : public CCommonDialog
 {
 public:
-    CPackDialog(HWND parent, char* path, const char* pathAlt,
+    CPackDialog(HWND parent, char* path, int pathBufSize, const char* pathAlt,
                 CTruncatedString* subject, CPackerConfig* config);
 
     virtual void Transfer(CTransferInfo& ti);
@@ -791,6 +791,7 @@ protected:
     BOOL ChangeExtension(char* name, const char* ext);
 
     char* Path;
+    int PathBufSize;
     std::wstring PathW;         // Unicode input path
     std::wstring ResultW;       // Unicode result
     HWND HUnicodeEdit;          // Overlay Unicode edit control
@@ -808,7 +809,7 @@ class CUnpackerConfig;
 class CUnpackDialog : public CCommonDialog
 {
 public:
-    CUnpackDialog(HWND parent, char* path, const char* pathAlt, char* mask,
+    CUnpackDialog(HWND parent, char* path, int pathBufSize, const char* pathAlt, char* mask,
                   CTruncatedString* subject, CUnpackerConfig* config,
                   BOOL* delArchiveWhenDone);
 
@@ -825,6 +826,7 @@ protected:
 
     char *Mask,
         *Path;
+    int PathBufSize;
     std::wstring PathW;         // Unicode input path
     std::wstring ResultW;       // Unicode result
     HWND HUnicodeEdit;          // Overlay Unicode edit control
