@@ -1187,7 +1187,7 @@ void CAssociations::ReadAssociations(BOOL showWaitWnd)
     FILETIME ft;
     while (1)
     { // sequentially enumerate all extensions
-        DWORD extS = ext.Size();
+        DWORD extS = ext.Size() - 1; // RegEnumKeyEx expects size excluding null terminator
         if ((enumRet = RegEnumKeyEx(HKEY_CLASSES_ROOT, i, ext, &extS, NULL, NULL, NULL, &ft)) == ERROR_SUCCESS)
         { // open extension key
             if (ext[0] == '.' && HANDLES_Q(RegOpenKey(HKEY_CLASSES_ROOT, ext, &extKey)) == ERROR_SUCCESS)
@@ -1264,7 +1264,7 @@ void CAssociations::ReadAssociations(BOOL showWaitWnd)
         i = 0;
         while (1)
         { // sequentially enumerate all extensions
-            DWORD extS = ext.Size();
+            DWORD extS = ext.Size() - 1; // RegEnumKeyEx expects size excluding null terminator
             if ((enumRet = RegEnumKeyEx(systemFileAssoc, i, ext, &extS, NULL, NULL, NULL, &ft)) == ERROR_SUCCESS)
             { // open extension key
                 if (ext[0] == '.')
@@ -1308,7 +1308,7 @@ void CAssociations::ReadAssociations(BOOL showWaitWnd)
         i = 0;
         while (1)
         { // sequentially enumerate all extensions
-            DWORD extS = ext.Size();
+            DWORD extS = ext.Size() - 1; // RegEnumKeyEx expects size excluding null terminator
             if (RegEnumKeyEx(explorerFileExts, i, ext, &extS, NULL, NULL, NULL, &ft) == ERROR_SUCCESS)
             { // open extension key
                 if (ext[0] == '.' && HANDLES_Q(RegOpenKey(explorerFileExts, ext, &extKey)) == ERROR_SUCCESS)
