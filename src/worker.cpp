@@ -2602,21 +2602,21 @@ COPY_ADS_AGAIN:
                           &lowMemory, &adsWinError, 0, NULL, NULL) &&
         !lowMemory && streamNames != NULL)
     {                                  // we have the list of ADS, let's try to copy them to the target file/directory
-        wchar_t srcName[2 * MAX_PATH]; // MAX_PATH for the file name as well as the ADS name (no idea what the actual maximum lengths are)
-        wchar_t tgtName[2 * MAX_PATH];
+        CWidePathBuffer srcName;       // Heap-allocated for long path + ADS name support
+        CWidePathBuffer tgtName;
         CPathBuffer longSourceName;
         CPathBuffer longTargetName;
         DoLongName(longSourceName, sourceName, longSourceName.Size());
         DoLongName(longTargetName, targetName, longTargetName.Size());
-        if (!MultiByteToWideChar(CP_ACP, MB_PRECOMPOSED, longSourceName, -1, srcName, 2 * MAX_PATH))
+        if (!MultiByteToWideChar(CP_ACP, MB_PRECOMPOSED, longSourceName, -1, srcName, srcName.Size()))
             srcName[0] = 0;
-        if (!MultiByteToWideChar(CP_ACP, MB_PRECOMPOSED, longTargetName, -1, tgtName, 2 * MAX_PATH))
+        if (!MultiByteToWideChar(CP_ACP, MB_PRECOMPOSED, longTargetName, -1, tgtName, tgtName.Size()))
             tgtName[0] = 0;
-        wchar_t* srcEnd = srcName + lstrlenW(srcName);
-        if (srcEnd > srcName && *(srcEnd - 1) == L'\\')
+        wchar_t* srcEnd = (wchar_t*)srcName + lstrlenW(srcName);
+        if (srcEnd > (wchar_t*)srcName && *(srcEnd - 1) == L'\\')
             *--srcEnd = 0;
-        wchar_t* tgtEnd = tgtName + lstrlenW(tgtName);
-        if (tgtEnd > tgtName && *(tgtEnd - 1) == L'\\')
+        wchar_t* tgtEnd = (wchar_t*)tgtName + lstrlenW(tgtName);
+        if (tgtEnd > (wchar_t*)tgtName && *(tgtEnd - 1) == L'\\')
             *--tgtEnd = 0;
 
         int bufferSize = script->RemovableSrcDisk || script->RemovableTgtDisk ? REMOVABLE_DISK_COPY_BUFFER : OPERATION_BUFFER;
@@ -2627,8 +2627,8 @@ COPY_ADS_AGAIN:
         int i;
         for (i = 0; i < streamNamesCount; i++)
         {
-            MyStrCpyNW(srcEnd, streamNames[i], (int)(2 * MAX_PATH - (srcEnd - srcName)));
-            MyStrCpyNW(tgtEnd, streamNames[i], (int)(2 * MAX_PATH - (tgtEnd - tgtName)));
+            MyStrCpyNW(srcEnd, streamNames[i], (int)(srcName.Size() - (srcEnd - (wchar_t*)srcName)));
+            MyStrCpyNW(tgtEnd, streamNames[i], (int)(tgtName.Size() - (tgtEnd - (wchar_t*)tgtName)));
 
         COPY_AGAIN_ADS:
 
