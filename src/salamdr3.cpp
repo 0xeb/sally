@@ -598,7 +598,7 @@ BOOL SalGetFullName(char* name, int* errTextID, const char* curDir, char* nextFo
                     s++; // prejeti servername
                 if (*s == '\\')
                     s++;
-                if (s - name > MAX_PATH - 1)
+                if (s - name > nameBufSize - 1)
                     err = IDS_SERVERNAMEMISSING; // found text is too long to be a server
                 else
                 {
@@ -612,7 +612,7 @@ BOOL SalGetFullName(char* name, int* errTextID, const char* curDir, char* nextFo
                     {
                         while (*s != 0 && *s != '\\')
                             s++; // prejeti sharename
-                        if ((s - name) + 1 > MAX_PATH - 1)
+                        if ((s - name) + 1 > nameBufSize - 1)
                             err = IDS_SHARENAMEMISSING; // found text is too long to be a share (+1 for trailing backslash)
                         if (*s == '\\')
                             s++;

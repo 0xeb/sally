@@ -607,7 +607,7 @@ BOOL CPackACDialog::DirectorySearch(char* path)
             if ((findData.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY) == 0)
             {
                 // it is a file; now check if it is an exe
-                if (nameLen > 4 && pathLen + nameLen < MAX_PATH &&
+                if (nameLen > 4 && pathLen + nameLen < SAL_MAX_LONG_PATH &&
                     (findData.cFileName[nameLen - 1] == 'e' || findData.cFileName[nameLen - 1] == 'E') &&
                     (findData.cFileName[nameLen - 2] == 'x' || findData.cFileName[nameLen - 2] == 'X') &&
                     (findData.cFileName[nameLen - 3] == 'e' || findData.cFileName[nameLen - 3] == 'E') &&
@@ -639,7 +639,7 @@ BOOL CPackACDialog::DirectorySearch(char* path)
                     (findData.cFileName[0] != '.' ||
                      (findData.cFileName[1] != '\0' &&
                       (findData.cFileName[1] != '.' || findData.cFileName[2] != '\0'))) &&
-                    pathLen + 1 + nameLen < MAX_PATH)
+                    pathLen + 1 + nameLen < SAL_MAX_LONG_PATH)
                 {
                     // create the directory name to search
                     char* newPath = (char*)HANDLES(GlobalAlloc(GMEM_FIXED, pathLen + 1 + nameLen + 1));

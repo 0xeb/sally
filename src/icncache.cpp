@@ -759,7 +759,7 @@ BOOL GetIconFromAssocAux(BOOL initFlagAndIndexes, HKEY root, const char* keyName
         }
     }
 
-    if (size - 1 + 7 <= MAX_PATH) // test na moznost otevirani pres asociace
+    if (size - 1 + 7 <= keyNameBuf.Size()) // test na moznost otevirani pres asociace
     {
         memmove(keyNameBuf + size - 1, "\\Shell", 7);
         if (HANDLES_Q(RegOpenKey(root, keyNameBuf, &openKey)) == ERROR_SUCCESS)
@@ -775,7 +775,7 @@ BOOL GetIconFromAssocAux(BOOL initFlagAndIndexes, HKEY root, const char* keyName
         }
     }
 
-    if (size - 1 + 21 <= MAX_PATH)
+    if (size - 1 + 21 <= keyNameBuf.Size())
     {
         memmove(keyNameBuf + size - 1, "\\ShellEx\\IconHandler", 21);
         // if contains "\\ShellEx\\IconHandler", must be extracted from file
