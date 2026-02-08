@@ -922,7 +922,7 @@ void DoDragFromArchiveOrFS(CFilesWindow* panel, BOOL& dropDone, char* targetPath
             // zbavit DROPFAKE metody
             if (SalPathAppend(fakeRootDir, "DROPFAKE", fakeRootDir.Size()))
             {
-                if (CreateDirectory(fakeRootDir, NULL))
+                if (SalLPCreateDirectory(fakeRootDir, NULL))
                 {
                     // vytvorime objekty pro drag&drop
                     *fakeName = 0;
@@ -1331,7 +1331,7 @@ void ShellAction(CFilesWindow* panel, CShellAction action, BOOL useSelection,
                         fakeName = fakeRootDir + strlen(fakeRootDir);
                         if (SalPathAppend(fakeRootDir, "CLIPFAKE", fakeRootDir.Size()))
                         {
-                            if (CreateDirectory(fakeRootDir, NULL))
+                            if (SalLPCreateDirectory(fakeRootDir, NULL))
                             {
                                 DWORD prefferedDropEffect = DROPEFFECT_COPY; // DROPEFFECT_MOVE (we used for debugging purposes)
 

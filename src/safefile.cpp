@@ -560,7 +560,7 @@ CSalamanderSafeFile::SafeFileCreate(const char* fileName,
             namecpy2[len += (int)(slash - src)] = '\0';
             if (namecpy2[len - 1] <= ' ' || namecpy2[len - 1] == '.')
                 invalidPath = TRUE; // spaces and dots at the end of the directory name being created are undesirable
-            while (invalidPath || !CreateDirectory(namecpy2, NULL))
+            while (invalidPath || !SalLPCreateDirectory(namecpy2, NULL))
             {
                 // failed to create the directory, display an error
                 int ret;
