@@ -30,6 +30,8 @@
 
 #include "array2.h"
 
+#include "common/widepath.h"
+
 #include "unrar.h"
 #include "dialogs.h"
 

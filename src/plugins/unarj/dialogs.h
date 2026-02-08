@@ -24,14 +24,14 @@ class CNextVolumeDialog : public CDlgRoot
 {
     char* VolumeName;
     char* PrevName;
-    char CurrentPath[MAX_PATH];
+    CPathBuffer CurrentPath;
 
 public:
     CNextVolumeDialog(HWND parent, char* volumeName, char* prevName) : CDlgRoot(parent)
     {
         VolumeName = volumeName;
         PrevName = prevName;
-        lstrcpyn(CurrentPath, VolumeName, MAX_PATH);
+        lstrcpyn(CurrentPath, VolumeName, CurrentPath.Size());
         SalamanderGeneral->CutDirectory(CurrentPath);
     }
     INT_PTR Proceed();

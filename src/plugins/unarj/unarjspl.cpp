@@ -500,8 +500,8 @@ BOOL CPluginInterfaceForArchiver::UnpackOneFile(CSalamanderForOperationsAbstract
                 }
                 char buf[100];
                 GetInfo(buf, &header.Time, header.Size);
-                lstrcpy(TargetName, targetDir);
-                SalamanderGeneral->SalPathAppend(TargetName, justName, MAX_PATH);
+                lstrcpyn(TargetName, targetDir, TargetName.Size());
+                SalamanderGeneral->SalPathAppend(TargetName, justName, TargetName.Size());
                 BOOL skip;
                 CQuadWord q = CQuadWord(header.Size, 0);
                 bool allocate = CQuadWord(2, 0) < q && q < CQuadWord(0, 0x80000000);
@@ -869,7 +869,7 @@ BOOL CPluginInterfaceForArchiver::ErrorProc(int error, BOOL flags)
 void CPluginInterfaceForArchiver::SwitchToFirstVol(const char* arcName)
 {
     CALL_STACK_MESSAGE2("CPluginInterfaceForArchiver::SwitchToFirstVol(%s)", arcName);
-    lstrcpy(ArcFileName, arcName);
+    lstrcpyn(ArcFileName, arcName, ArcFileName.Size());
     char* ext = PathFindExtension(ArcFileName);
     if (lstrlen(ext) > 3 &&
         isdigit(ext[2]) && isdigit(ext[3]))
@@ -991,8 +991,8 @@ BOOL CPluginInterfaceForArchiver::DoThisFile(CARJHeaderData* hdr, const char* ar
             return FALSE;
         }
     }
-    lstrcpy(TargetName, targetDir);
-    SalamanderGeneral->SalPathAppend(TargetName, hdr->FileName + RootLen, MAX_PATH);
+    lstrcpyn(TargetName, targetDir, TargetName.Size());
+    SalamanderGeneral->SalPathAppend(TargetName, hdr->FileName + RootLen, TargetName.Size());
     char nameInArc[MAX_PATH + ARJ_MAX_PATH];
     lstrcpy(nameInArc, arcName);
     SalamanderGeneral->SalPathAppend(nameInArc, hdr->FileName, MAX_PATH + ARJ_MAX_PATH);

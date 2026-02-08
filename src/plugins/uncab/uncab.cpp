@@ -1028,8 +1028,8 @@ CPluginInterfaceForArchiver::UnpackFile(char* fileName, DWORD size, WORD date, W
         Abort = TRUE;
         return -1;
     }
-    strncpy_s(ret->FileName, TargetDir, _TRUNCATE);
-    if (!SalamanderGeneral->SalPathAppend(ret->FileName, fileName + RootLen, MAX_PATH))
+    strncpy_s((char*)ret->FileName, ret->FileName.Size(), TargetDir, _TRUNCATE);
+    if (!SalamanderGeneral->SalPathAppend(ret->FileName, fileName + RootLen, ret->FileName.Size()))
     {
         delete ret;
         ret = NULL;
@@ -1185,7 +1185,7 @@ CPluginInterfaceForArchiver::Open(char* pszFile, int oflag, int pmode)
         ret->Handle = CreateFile((LPTSTR)pszFile, fileaccess, FILE_SHARE_READ, NULL, filecreate, fileattrib, NULL);
         if (ret->Handle != INVALID_HANDLE_VALUE)
         {
-            lstrcpyn(ret->FileName, pszFile, MAX_PATH);
+            lstrcpyn(ret->FileName, pszFile, ret->FileName.Size());
             ret->Flags = 0;
             IOError = FALSE;
             ret->cabOffset = 0;

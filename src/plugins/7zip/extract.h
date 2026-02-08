@@ -63,7 +63,7 @@ private:
     ItemsToExtractMap& ItemsToExtract;
 
     const char* TargetDir;
-    char TargetFileName[MAX_PATH];
+    CPathBuffer TargetFileName;
 
     bool ExtractMode;
     struct CProcessedFileInfo

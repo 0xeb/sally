@@ -25,14 +25,14 @@ class CPluginInterfaceForArchiver : public CPluginInterfaceForArchiverAbstract
 {
 protected:
     CSalamanderForOperationsAbstract* Salamander;
-    char ArcFileName[MAX_PATH];
+    CPathBuffer ArcFileName;
     BOOL List;
     DWORD Silent;
     BOOL Abort;
     CQuadWord ProgressTotal;
     const char* ArcRoot;
     DWORD RootLen;
-    char TargetName[MAX_PATH];
+    CPathBuffer TargetName;
     HANDLE TargetFile;
     BOOL UnPackWholeArchive;
     BOOL NotWholeArchListed;

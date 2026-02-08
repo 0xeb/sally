@@ -29,3 +29,4 @@
 #include "spl_vers.h"
 #include "spl_file.h"
 #include "dbg.h"
+#include "common/widepath.h"

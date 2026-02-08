@@ -185,9 +185,9 @@ STDMETHODIMP CExtractCallbackImp::GetStream(UINT32 index, ISequentialOutStream**
             // TODO: check for free space
 
             _tcscpy(TargetFileName, TargetDir);
-            if (SalamanderGeneral->SalPathAppend(TargetFileName, aii->NameInArchive, MAX_PATH))
+            if (SalamanderGeneral->SalPathAppend(TargetFileName, aii->NameInArchive, TargetFileName.Size()))
             {
-                ProcessedFileInfo.FileName = GetUnicodeString(TargetFileName);
+                ProcessedFileInfo.FileName = GetUnicodeString((const char*)TargetFileName);
 
                 // Show file name in the progress dialog
                 SendMessage(hProgWnd, WM_7ZIP, WM_7ZIP_ADDTEXT, (LPARAM)GetName());
@@ -254,7 +254,7 @@ STDMETHODIMP CExtractCallbackImp::GetStream(UINT32 index, ISequentialOutStream**
                 *outStream = NULL;
 
                 char errText[1000];
-                _snprintf_s(errText, _TRUNCATE, LoadStr(IDS_NAMEISTOOLONG), (const char*)(aii->NameInArchive), TargetFileName);
+                _snprintf_s(errText, _TRUNCATE, LoadStr(IDS_NAMEISTOOLONG), (const char*)(aii->NameInArchive), (const char*)TargetFileName);
                 SalamanderGeneral->ShowMessageBox(errText, LoadStr(IDS_PLUGINNAME), MSGBOX_ERROR);
             }
         }

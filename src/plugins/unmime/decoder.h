@@ -30,7 +30,7 @@ protected:
     BOOL bCalcSize;
     char* PBuffer;
     int iBufPos;
-    char FileName[MAX_PATH];
+    CPathBuffer FileName;
 
     virtual BOOL BufferedWrite(const void* pData, int nBytes);
 };

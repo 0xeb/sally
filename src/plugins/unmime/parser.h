@@ -47,7 +47,7 @@ public:
     char bEmpty;              // flag indicating the block is empty (just whitespace)
     char bSelected;           // flag showing selection for decoding
     char bAttachment;         // 1 if this file is an attachment
-    char cFileName[MAX_PATH]; // file name the block will be decoded into
+    CPathBuffer cFileName; // file name the block will be decoded into
     char cCharset[20];        // name of the character set
     int iSize;                // size of the decoded file
     int iBadBlock;            // 0 or BADBLOCK_XXX

@@ -433,7 +433,7 @@ BOOL CPluginInterfaceForArchiver::UnpackArchive(CSalamanderForOperationsAbstract
         (attr = SalamanderGeneral->SalGetFileAttributes(fv)) != -1 &&
         (attr & FILE_ATTRIBUTE_DIRECTORY) == 0)
     {
-        _tcscpy(ArcFileName, fv);
+        lstrcpyn(ArcFileName, fv, ArcFileName.Size());
     }
     else
     {
@@ -600,7 +600,7 @@ BOOL CPluginInterfaceForArchiver::UnpackOneFile(CSalamanderForOperationsAbstract
         (attr = SalamanderGeneral->SalGetFileAttributes(fv)) != -1 &&
         (attr & FILE_ATTRIBUTE_DIRECTORY) == 0)
     {
-        _tcscpy(ArcFileName, fv);
+        lstrcpyn(ArcFileName, fv, ArcFileName.Size());
     }
     else
     {
@@ -653,9 +653,9 @@ BOOL CPluginInterfaceForArchiver::UnpackOneFile(CSalamanderForOperationsAbstract
                     ContinuedFileDialog(SalamanderGeneral->GetMsgBoxParent(), header.FileName);
                     goto UOF_NEXT;
                 }
-                strncpy_s(TargetName, targetDir, _TRUNCATE);
+                strncpy_s((char*)TargetName, TargetName.Size(), targetDir, _TRUNCATE);
                 DestroyIllegalChars(justName);
-                if (!SalamanderGeneral->SalPathAppend(TargetName, justName, MAX_PATH))
+                if (!SalamanderGeneral->SalPathAppend(TargetName, justName, TargetName.Size()))
                 {
                     TargetName[0] = 0;
                     Error(IDS_TOOLONGNAME);
@@ -1363,7 +1363,7 @@ int CPluginInterfaceForArchiver::NeedPassword(char* password, int size)
 BOOL CPluginInterfaceForArchiver::SwitchToFirstVol(LPCTSTR arcName, BOOL* saveFirstVolume)
 {
     CALL_STACK_MESSAGE2("CPluginInterfaceForArchiver::SwitchToFirstVol(%s)", arcName);
-    lstrcpy(ArcFileName, arcName);
+    lstrcpyn(ArcFileName, arcName, ArcFileName.Size());
     LPTSTR ext = PathFindExtension(ArcFileName);
     if (!ext)
         return TRUE;
@@ -1387,7 +1387,7 @@ BOOL CPluginInterfaceForArchiver::SwitchToFirstVol(LPCTSTR arcName, BOOL* saveFi
             _tcscpy(path, ArcFileName);
             if (NextVolumeDialog(SalamanderGeneral->GetMsgBoxParent(), path, LoadStr(IDS_SELECTFIRST)) == IDOK)
             {
-                _tcscpy(ArcFileName, path);
+                lstrcpyn(ArcFileName, path, ArcFileName.Size());
                 if (saveFirstVolume)
                     *saveFirstVolume = TRUE;
                 return TRUE;
@@ -1425,14 +1425,14 @@ BOOL CPluginInterfaceForArchiver::SwitchToFirstVol(LPCTSTR arcName, BOOL* saveFi
             DWORD attr = SalamanderGeneral->SalGetFileAttributes(path);
             if (!(attr & FILE_ATTRIBUTE_DIRECTORY))
             {
-                strcpy(ArcFileName, path);
+                lstrcpyn(ArcFileName, path, ArcFileName.Size());
                 if (saveFirstVolume)
                     *saveFirstVolume = TRUE;
                 return TRUE;
             }
             if (NextVolumeDialog(SalamanderGeneral->GetMsgBoxParent(), path, LoadStr(IDS_SELECTFIRST)) == IDOK)
             {
-                _tcscpy(ArcFileName, path);
+                lstrcpyn(ArcFileName, path, ArcFileName.Size());
                 if (saveFirstVolume)
                     *saveFirstVolume = TRUE;
             }
@@ -1560,8 +1560,8 @@ BOOL CPluginInterfaceForArchiver::DoThisFile(CFileHeader* header, const char* ar
         }
         RARSetPassword(ArcHandle, PluginData->Password);
     }
-    strncpy_s(TargetName, targetDir, _TRUNCATE);
-    if (!SalamanderGeneral->SalPathAppend(TargetName, header->FileName + RootLen, MAX_PATH))
+    strncpy_s((char*)TargetName, TargetName.Size(), targetDir, _TRUNCATE);
+    if (!SalamanderGeneral->SalPathAppend(TargetName, header->FileName + RootLen, TargetName.Size()))
     {
         TargetName[0] = 0;
         if (PluginData->Silent & SF_LONGNAMES)

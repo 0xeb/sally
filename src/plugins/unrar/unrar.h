@@ -132,7 +132,7 @@ class CPluginInterfaceForArchiver : public CPluginInterfaceForArchiverAbstract
 {
 protected:
     CSalamanderForOperationsAbstract* Salamander;
-    char ArcFileName[MAX_PATH];
+    CPathBuffer ArcFileName;
     HANDLE ArcHandle;
     unsigned ArcFlags;
     BOOL List;
@@ -141,7 +141,7 @@ protected:
     CQuadWord ProgressTotal;
     const char* ArcRoot;
     DWORD RootLen;
-    char TargetName[MAX_PATH];
+    CPathBuffer TargetName;
     HANDLE TargetFile;
     BOOL Success;
     //char Password[MAX_PASSWORD];

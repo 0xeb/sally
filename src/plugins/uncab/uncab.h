@@ -26,7 +26,7 @@
 struct CFile
 {
     HANDLE Handle;
-    char FileName[MAX_PATH];
+    CPathBuffer FileName;
     DWORD Flags;
     DWORD cabOffset; // for sfx archives
 };

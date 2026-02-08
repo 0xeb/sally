@@ -53,3 +53,4 @@
 #include "arraylt.h"
 #include "winliblt.h"
 #include "auxtools.h"
+#include "common/widepath.h"
