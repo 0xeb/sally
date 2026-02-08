@@ -25,7 +25,7 @@ CPluginInterfaceForThumbLoader InterfaceForThumbLoader;
 const char* PluginNameEN = "DemoPlug";    // untranslated plugin name, used before the language module loads and for debugging
 const char* PluginNameShort = "DEMOPLUG"; // plugin name (short form, without spaces)
 
-char Str[MAX_PATH] = "default";
+CPathBuffer Str("default");
 int Number = 0;
 int Selection = 1; // "second" in configuration dialog
 BOOL CheckBox = FALSE;
@@ -459,13 +459,11 @@ CPluginInterfaceAbstract* WINAPI SalamanderPluginEntry(CSalamanderPluginEntryAbs
     AssignedFSNameLen = (int)strlen(AssignedFSName);
 
     // test adding multiple filesystem names
-    char demoFSAssignedFSName[MAX_PATH]; // should live in a global variable (so it can be used throughout the plugin)
-    demoFSAssignedFSName[0] = 0;
+    CPathBuffer demoFSAssignedFSName; // should live in a global variable (so it can be used throughout the plugin)
     int demoFSFSNameIndex; // should live in a global variable (so it can be used throughout the plugin)
     if (salamander->AddFSName("demofs", &demoFSFSNameIndex))
         SalamanderGeneral->GetPluginFSName(demoFSAssignedFSName, demoFSFSNameIndex);
-    char demoAssignedFSName[MAX_PATH]; // should live in a global variable (so it can be used throughout the plugin)
-    demoAssignedFSName[0] = 0;
+    CPathBuffer demoAssignedFSName; // should live in a global variable (so it can be used throughout the plugin)
     int demoFSNameIndex; // should live in a global variable (so it can be used throughout the plugin)
     if (salamander->AddFSName("demo", &demoFSNameIndex))
         SalamanderGeneral->GetPluginFSName(demoAssignedFSName, demoFSNameIndex);
@@ -567,7 +565,7 @@ CPluginInterface::Release(HWND parent, BOOL force)
             ReleaseFS();
 
             // remove all filesystem file copies from the disk cache (theoretically redundant, each FS should clean its copies)
-            char uniqueFileName[MAX_PATH];
+            CPathBuffer uniqueFileName;
             strcpy(uniqueFileName, AssignedFSName);
             strcat(uniqueFileName, ":");
             // disk names are case-insensitive while the disk cache is case-sensitive, converting

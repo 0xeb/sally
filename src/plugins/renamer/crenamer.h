@@ -46,9 +46,9 @@ enum CRenameSpec
 
 struct CRenamerOptions
 {
-    char NewName[2 * MAX_PATH];
-    char SearchFor[2 * MAX_PATH];
-    char ReplaceWith[MAX_PATH];
+    CPathBuffer NewName;     // Heap-allocated for long path support
+    CPathBuffer SearchFor;   // Heap-allocated for long path support
+    CPathBuffer ReplaceWith; // Heap-allocated for long path support
     BOOL CaseSensitive;
     BOOL WholeWords;
     BOOL Global;
@@ -60,6 +60,25 @@ struct CRenamerOptions
     CRenameSpec Spec;
 
     CRenamerOptions() { Reset(FALSE); }
+    CRenamerOptions& operator=(const CRenamerOptions& other)
+    {
+        if (this != &other)
+        {
+            lstrcpyn(NewName.Get(), other.NewName.Get(), NewName.Size());
+            lstrcpyn(SearchFor.Get(), other.SearchFor.Get(), SearchFor.Size());
+            lstrcpyn(ReplaceWith.Get(), other.ReplaceWith.Get(), ReplaceWith.Size());
+            CaseSensitive = other.CaseSensitive;
+            WholeWords = other.WholeWords;
+            Global = other.Global;
+            RegExp = other.RegExp;
+            ExcludeExt = other.ExcludeExt;
+            FileCase = other.FileCase;
+            ExtCase = other.ExtCase;
+            IncludePath = other.IncludePath;
+            Spec = other.Spec;
+        }
+        return *this;
+    }
     void Reset(BOOL soft);
     BOOL Load(HKEY regKey, CSalamanderRegistryAbstract* registry);
     BOOL Save(HKEY regKey, CSalamanderRegistryAbstract* registry);
@@ -105,7 +124,7 @@ enum CRenamerErrorType
 class CRenamer
 {
 protected:
-    char (&Root)[MAX_PATH];
+    CPathBuffer& Root;
     int& RootLen;
 
     // information about the last error
@@ -121,7 +140,7 @@ protected:
     BOOL Substitute;
     CSalamanderBMSearchData* BMSearch;
     CRegExpAbstract* RegExp;
-    char ReplaceWith[MAX_PATH];
+    CPathBuffer ReplaceWith; // Heap-allocated for long path support
     int ReplaceWithLen;
     BOOL UseRegExp;
     BOOL WholeWords;
@@ -129,7 +148,7 @@ protected:
     BOOL ExcludeExt;
 
 public:
-    CRenamer(char (&root)[MAX_PATH], int& rootLen);
+    CRenamer(CPathBuffer& root, int& rootLen);
     ~CRenamer();
 
     BOOL IsGood() { return Error == 0; }

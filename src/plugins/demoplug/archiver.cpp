@@ -272,7 +272,7 @@ CPluginInterfaceForArchiver::UnpackArchive(CSalamanderForOperationsAbstract* sal
     //   moves the files to the correct location on disk (handles overwriting files, etc.):
 
     BOOL ret = FALSE;
-    char tmpExtractDir[MAX_PATH];
+    CPathBuffer tmpExtractDir;
     DWORD err;
     if (!SalamanderGeneral->SalGetTempFileName(targetDir, "Sal", tmpExtractDir, FALSE, &err))
     {
@@ -402,14 +402,14 @@ CPluginInterfaceForArchiver::UnpackOneFile(CSalamanderForOperationsAbstract* sal
     // unpacking without a progress dialog
 
     // instead of unpacking we only create a test file
-    char name[MAX_PATH];
+    CPathBuffer name;
     strcpy(name, targetDir);
     const char* lastComp = strrchr(nameInArchive, '\\');
     if (lastComp != NULL)
         lastComp++;
     else
         lastComp = nameInArchive;
-    if (SalamanderGeneral->SalPathAppend(name, lastComp, MAX_PATH))
+    if (SalamanderGeneral->SalPathAppend(name, lastComp, name.Size()))
     {
         HANDLE file = HANDLES_Q(CreateFile(name, GENERIC_WRITE,
                                            FILE_SHARE_READ, NULL,
@@ -475,7 +475,7 @@ CPluginInterfaceForArchiver::PackToArchive(CSalamanderForOperationsAbstract* sal
         }
     }
 
-    char archivePath[MAX_PATH];
+    CPathBuffer archivePath;
     char* s = (char*)strrchr(fileName, '\\');
     if (s != NULL)
     {
@@ -707,15 +707,15 @@ CPluginInterfaceForArchiver::GetCacheInfo(char* tempPath, BOOL* ownDelete, BOOL*
 
 void ClearTEMPIfNeeded(HWND parent)
 {
-    char tmpDir[2 * MAX_PATH];
+    CPathBuffer tmpDir;
     GetMyDocumentsPath(tmpDir);
     if (tmpDir[0] != 0 &&
-        SalamanderGeneral->SalPathAppend(tmpDir, "DemoPlug Temporary Copies", 2 * MAX_PATH))
+        SalamanderGeneral->SalPathAppend(tmpDir, "DemoPlug Temporary Copies", tmpDir.Size()))
     {
-        SalamanderGeneral->SalPathAddBackslash(tmpDir, 2 * MAX_PATH);
+        SalamanderGeneral->SalPathAddBackslash(tmpDir, tmpDir.Size());
         char* tmpDirEnd = tmpDir + strlen(tmpDir);
         // add the mask (if it does not fit, there is no point in searching)
-        if (SalamanderGeneral->SalPathAppend(tmpDir, "SAL*.tmp", 2 * MAX_PATH))
+        if (SalamanderGeneral->SalPathAppend(tmpDir, "SAL*.tmp", tmpDir.Size()))
         {
             TIndirectArray<char> tmpDirs(10, 50);
 

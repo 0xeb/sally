@@ -631,11 +631,11 @@ BOOL CPluginFSInterface::Delete(const char* fsName, int mode, HWND parent, int p
     }
 
     // prepare the text describing what we are working with ("file "test.txt"", etc.)
-    char subjectSrc[MAX_PATH + 100];
-    SalamanderGeneral->GetCommonFSOperSourceDescr(subjectSrc, MAX_PATH + 100, panel,
+    CPathBuffer subjectSrc;
+    SalamanderGeneral->GetCommonFSOperSourceDescr(subjectSrc, subjectSrc.Size(), panel,
                                                   selectedFiles, selectedDirs, NULL, FALSE, FALSE);
-    char dlgSubjectSrc[MAX_PATH + 100];
-    SalamanderGeneral->GetCommonFSOperSourceDescr(dlgSubjectSrc, MAX_PATH + 100, panel,
+    CPathBuffer dlgSubjectSrc;
+    SalamanderGeneral->GetCommonFSOperSourceDescr(dlgSubjectSrc, dlgSubjectSrc.Size(), panel,
                                                   selectedFiles, selectedDirs, NULL, FALSE, TRUE);
     cancelOrError = FALSE;
     if (mode == 1)
@@ -646,8 +646,8 @@ BOOL CPluginFSInterface::Delete(const char* fsName, int mode, HWND parent, int p
         if (CnfrmFileDirDel)
         {
             // build the delete prompt
-            char subject[MAX_PATH + 200];
-            sprintf(subject, LoadStr(IDS_DELETEFROMFTP), subjectSrc);
+            CPathBuffer subject;
+            sprintf(subject, LoadStr(IDS_DELETEFROMFTP), subjectSrc.Get());
 
             // open a message box asking about the delete
             const char* Shell32DLLName = "shell32.dll";
@@ -694,10 +694,10 @@ BOOL CPluginFSInterface::Delete(const char* fsName, int mode, HWND parent, int p
         if (ControlConnection->InitOperation(oper)) // initialize the server connection according to the "control connection"
         {
             oper->SetBasicData(dlgSubjectSrc, (AutodetectSrvType ? NULL : LastServerType));
-            char path[2 * MAX_PATH];
+            CPathBuffer path;
             sprintf(path, "%s:", fsName);
             int pathLen = (int)strlen(path);
-            MakeUserPart(path + pathLen, 2 * MAX_PATH - pathLen);
+            MakeUserPart(path + pathLen, path.Size() - pathLen);
             CFTPServerPathType pathType = ControlConnection->GetFTPServerPathType(Path);
             oper->SetOperationDelete(path, FTPGetPathDelimiter(pathType), TRUE, selectedDirs > 0,
                                      Config.OperationsNonemptyDirDel, Config.OperationsHiddenFileDel,
@@ -919,14 +919,14 @@ BOOL CPluginFSInterface::CopyOrMoveFromFS(BOOL copy, int mode, const char* fsNam
     }
 
     // compose the edit line title with the copy/move destination
-    char subjectSrc[MAX_PATH + 100];
-    SalamanderGeneral->GetCommonFSOperSourceDescr(subjectSrc, MAX_PATH + 100, panel,
+    CPathBuffer subjectSrc;
+    SalamanderGeneral->GetCommonFSOperSourceDescr(subjectSrc, subjectSrc.Size(), panel,
                                                   selectedFiles, selectedDirs, NULL, FALSE, FALSE);
-    char dlgSubjectSrc[MAX_PATH + 100];
-    SalamanderGeneral->GetCommonFSOperSourceDescr(dlgSubjectSrc, MAX_PATH + 100, panel,
+    CPathBuffer dlgSubjectSrc;
+    SalamanderGeneral->GetCommonFSOperSourceDescr(dlgSubjectSrc, dlgSubjectSrc.Size(), panel,
                                                   selectedFiles, selectedDirs, NULL, FALSE, TRUE);
-    char subject[MAX_PATH + 200];
-    sprintf(subject, LoadStr(copy ? IDS_COPYFROMFTP : IDS_MOVEFROMFTP), subjectSrc);
+    CPathBuffer subject;
+    sprintf(subject, LoadStr(copy ? IDS_COPYFROMFTP : IDS_MOVEFROMFTP), subjectSrc.Get());
 
     if (mode == 1 && targetPath[0] != 0) // only when opening the dialog for the first time and the target path is selected
     {
@@ -972,7 +972,7 @@ BOOL CPluginFSInterface::CopyOrMoveFromFS(BOOL copy, int mode, const char* fsNam
             {                                                   // add a trailing backslash so it is a path in every case ('mode'==5 always provides a path)
                 SalamanderGeneral->SalPathAddBackslash(targetPath, MAX_PATH);
             }
-            lstrcpyn(subject, LoadStr(IDS_FTPERRORTITLE), MAX_PATH + 200);
+            lstrcpyn(subject, LoadStr(IDS_FTPERRORTITLE), subject.Size());
             if (SalamanderGeneral->SalParsePath(parent, targetPath, type, isDir, secondPart,
                                                 subject, NULL, FALSE,
                                                 NULL, NULL, NULL, 2 * MAX_PATH))
@@ -1038,10 +1038,10 @@ BOOL CPluginFSInterface::CopyOrMoveFromFS(BOOL copy, int mode, const char* fsNam
             if (ControlConnection->InitOperation(oper)) // initialize the server connection according to the "control connection"
             {
                 oper->SetBasicData(dlgSubjectSrc, (AutodetectSrvType ? NULL : LastServerType));
-                char path[2 * MAX_PATH];
+                CPathBuffer path;
                 sprintf(path, "%s:", fsName);
                 int pathLen = (int)strlen(path);
-                MakeUserPart(path + pathLen, 2 * MAX_PATH - pathLen);
+                MakeUserPart(path + pathLen, path.Size() - pathLen);
                 char asciiFileMasks[MAX_GROUPMASK];
                 Config.ASCIIFileMasks->GetMasksString(asciiFileMasks);
                 CFTPServerPathType pathType = ControlConnection->GetFTPServerPathType(Path);
@@ -1093,22 +1093,22 @@ BOOL CPluginFSInterface::CopyOrMoveFromFS(BOOL copy, int mode, const char* fsNam
                                 if (f != NULL)
                                 {
                                     // create the target name according to the operation mask
-                                    char targetName[2 * MAX_PATH];
+                                    CPathBuffer targetName;
                                     if (!is_AS_400_QSYS_LIB_Path)
                                     {
                                         if (donotUseOpMask)
-                                            lstrcpyn(targetName, f->Name, 2 * MAX_PATH); // masks trim '.' from name ends, which is not always OK (e.g. directories "a.b" and "a.b." would merge) - probably rare, so for now we solve it only provisionally like this
+                                            lstrcpyn(targetName, f->Name, targetName.Size()); // masks trim '.' from name ends, which is not always OK (e.g. directories "a.b" and "a.b." would merge) - probably rare, so for now we solve it only provisionally like this
                                         else
-                                            SalamanderGeneral->MaskName(targetName, 2 * MAX_PATH, f->Name, opMask);
+                                            SalamanderGeneral->MaskName(targetName, targetName.Size(), f->Name, opMask);
                                     }
                                     else
                                     {
                                         CPathBuffer mbrName; // Heap-allocated for long path support
                                         FTPAS400CutFileNamePart(mbrName, f->Name);
                                         if (donotUseOpMask)
-                                            lstrcpyn(targetName, mbrName, 2 * MAX_PATH); // masks trim '.' from name ends, which is not always OK (e.g. directories "a.b" and "a.b." would merge) - probably rare, so for now we solve it only provisionally like this
+                                            lstrcpyn(targetName, mbrName, targetName.Size()); // masks trim '.' from name ends, which is not always OK (e.g. directories "a.b" and "a.b." would merge) - probably rare, so for now we solve it only provisionally like this
                                         else
-                                            SalamanderGeneral->MaskName(targetName, 2 * MAX_PATH, mbrName, opMask);
+                                            SalamanderGeneral->MaskName(targetName, targetName.Size(), mbrName, opMask);
                                     }
 
                                     CFTPQueueItemType type;

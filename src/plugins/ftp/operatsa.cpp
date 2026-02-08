@@ -118,14 +118,14 @@ void CFTPWorker::HandleEventInWorkingState4(CFTPWorkerEvent event, BOOL& sendQui
 
         case fwssWorkUploadResolveLink: // upload copy/move file: determine what the link is (file/directory) whose name collides with the target directory on the server
         {
-            lstrcpyn(ftpPath, curItem->TgtPath, FTP_MAX_PATH);
+            lstrcpyn(ftpPath, curItem->TgtPath, ftpPath.Size());
             CFTPServerPathType type = Oper->GetFTPServerPathType(ftpPath);
-            if (FTPPathAppend(type, ftpPath, FTP_MAX_PATH, curItem->TgtName, TRUE))
+            if (FTPPathAppend(type, ftpPath, ftpPath.Size(), curItem->TgtName, TRUE))
             { // we have the path, send CWD to the examined directory on the server
-                _snprintf_s(errText, 200 + FTP_MAX_PATH, _TRUNCATE, LoadStr(IDS_LOGMSGRESOLVINGLINK), ftpPath);
+                _snprintf_s(errText, errText.Size(), _TRUNCATE, LoadStr(IDS_LOGMSGRESOLVINGLINK), ftpPath);
                 Logs.LogMessage(LogUID, errText, -1, TRUE);
 
-                PrepareFTPCommand(buf, 200 + FTP_MAX_PATH, errBuf, 50 + FTP_MAX_PATH,
+                PrepareFTPCommand(buf, buf.Size(), errBuf, errBuf.Size(),
                                   ftpcmdChangeWorkingPath, &cmdLen, ftpPath); // cannot report an error
                 sendCmd = TRUE;
                 SubState = fwssWorkUploadResLnkWaitForCWDRes;
@@ -164,7 +164,7 @@ void CFTPWorker::HandleEventInWorkingState4(CFTPWorkerEvent event, BOOL& sendQui
                 }
                 else // an error occurred; show it to the user and move on to the next queue item
                 {
-                    CopyStr(errText, 200 + FTP_MAX_PATH, reply, replySize);
+                    CopyStr(errText, errText.Size(), reply, replySize);
                     Queue->UpdateItemState(CurItem, sqisFailed, ITEMPR_UNABLETORESOLVELNK, NO_ERROR,
                                            SalamanderGeneral->DupStr(errText) /* low memory = the error will be without details */,
                                            Oper);
@@ -184,7 +184,7 @@ void CFTPWorker::HandleEventInWorkingState4(CFTPWorkerEvent event, BOOL& sendQui
 
         case fwssWorkUploadCreateDir: // upload copy/move file: create the target directory on the server - start by setting the target path
         {
-            PrepareFTPCommand(buf, 200 + FTP_MAX_PATH, errBuf, 50 + FTP_MAX_PATH,
+            PrepareFTPCommand(buf, buf.Size(), errBuf, errBuf.Size(),
                               ftpcmdChangeWorkingPath, &cmdLen, curItem->TgtPath); // cannot report an error
             sendCmd = TRUE;
             SubState = fwssWorkUploadCrDirWaitForCWDRes;
@@ -206,10 +206,10 @@ void CFTPWorker::HandleEventInWorkingState4(CFTPWorkerEvent event, BOOL& sendQui
                         handleShouldStop = TRUE; // check whether the worker should stop
                     else
                     {
-                        _snprintf_s(errText, 200 + FTP_MAX_PATH, _TRUNCATE, LoadStr(IDS_LOGMSGCREATEDIR), curItem->TgtName);
+                        _snprintf_s(errText, errText.Size(), _TRUNCATE, LoadStr(IDS_LOGMSGCREATEDIR), curItem->TgtName);
                         Logs.LogMessage(LogUID, errText, -1, TRUE);
 
-                        PrepareFTPCommand(buf, 200 + FTP_MAX_PATH, errBuf, 50 + FTP_MAX_PATH,
+                        PrepareFTPCommand(buf, buf.Size(), errBuf, errBuf.Size(),
                                           ftpcmdCreateDir, &cmdLen, curItem->TgtName); // cannot report an error
                         sendCmd = TRUE;
                         SubState = fwssWorkUploadCrDirWaitForMKDRes;
@@ -217,7 +217,7 @@ void CFTPWorker::HandleEventInWorkingState4(CFTPWorkerEvent event, BOOL& sendQui
                 }
                 else // an error occurred; show it to the user and move on to the next queue item
                 {
-                    CopyStr(errText, 200 + FTP_MAX_PATH, reply, replySize);
+                    CopyStr(errText, errText.Size(), reply, replySize);
                     Queue->UpdateItemState(CurItem, sqisFailed, ITEMPR_UNABLETOCWDONLYPATH, NO_ERROR,
                                            SalamanderGeneral->DupStr(errText) /* low memory = the error will be without details */,
                                            Oper);
@@ -273,7 +273,7 @@ void CFTPWorker::HandleEventInWorkingState4(CFTPWorkerEvent event, BOOL& sendQui
                     }
                     else
                     {
-                        CopyStr(errText, 200 + FTP_MAX_PATH, reply, replySize);
+                        CopyStr(errText, errText.Size(), reply, replySize);
                         if (CurItem->ForceAction == fqiaUseAutorename) // forced autorename
                         {
                             if (ShouldStop)
@@ -439,7 +439,7 @@ void CFTPWorker::HandleEventInWorkingState4(CFTPWorkerEvent event, BOOL& sendQui
 
         case fwssWorkUploadAutorenameDir: // upload copy/move file: handle the target directory creation error - autorename - start by setting the target path
         {
-            PrepareFTPCommand(buf, 200 + FTP_MAX_PATH, errBuf, 50 + FTP_MAX_PATH,
+            PrepareFTPCommand(buf, buf.Size(), errBuf, errBuf.Size(),
                               ftpcmdChangeWorkingPath, &cmdLen, curItem->TgtPath); // cannot report an error
             sendCmd = TRUE;
             SubState = fwssWorkUploadAutorenDirWaitForCWDRes;
@@ -469,7 +469,7 @@ void CFTPWorker::HandleEventInWorkingState4(CFTPWorkerEvent event, BOOL& sendQui
                 }
                 else // an error occurred; show it to the user and move on to the next queue item
                 {
-                    CopyStr(errText, 200 + FTP_MAX_PATH, reply, replySize);
+                    CopyStr(errText, errText.Size(), reply, replySize);
                     Queue->UpdateItemState(CurItem, sqisFailed, ITEMPR_UNABLETOCWDONLYPATH, NO_ERROR,
                                            SalamanderGeneral->DupStr(errText) /* low memory = the error will be without details */,
                                            Oper);
@@ -531,10 +531,10 @@ void CFTPWorker::HandleEventInWorkingState4(CFTPWorkerEvent event, BOOL& sendQui
                         {
                             if (!nameExists) // no collision -> try to create the target directory
                             {
-                                _snprintf_s(errText, 200 + FTP_MAX_PATH, _TRUNCATE, LoadStr(IDS_LOGMSGCREATEDIR), UploadAutorenameNewName);
+                                _snprintf_s(errText, errText.Size(), _TRUNCATE, LoadStr(IDS_LOGMSGCREATEDIR), UploadAutorenameNewName);
                                 Logs.LogMessage(LogUID, errText, -1, TRUE);
 
-                                PrepareFTPCommand(buf, 200 + FTP_MAX_PATH, errBuf, 50 + FTP_MAX_PATH,
+                                PrepareFTPCommand(buf, buf.Size(), errBuf, errBuf.Size(),
                                                   ftpcmdCreateDir, &cmdLen, UploadAutorenameNewName); // cannot report an error
                                 sendCmd = TRUE;
                                 SubState = fwssWorkUploadAutorenDirWaitForMKDRes;
@@ -609,7 +609,7 @@ void CFTPWorker::HandleEventInWorkingState4(CFTPWorkerEvent event, BOOL& sendQui
                     }
                     else // no other name can be generated, so report an error
                     {
-                        CopyStr(errText, 200 + FTP_MAX_PATH, reply, replySize);
+                        CopyStr(errText, errText.Size(), reply, replySize);
                         Queue->UpdateItemState(CurItem, sqisFailed, ITEMPR_UPLOADCRDIRAUTORENFAILED, NO_ERROR,
                                                SalamanderGeneral->DupStr(errText) /* low memory = the error will be without details */,
                                                Oper);
@@ -635,11 +635,11 @@ void CFTPWorker::HandleEventInWorkingState4(CFTPWorkerEvent event, BOOL& sendQui
 
         case fwssWorkUploadGetTgtPath: // upload copy/move file: determine the path to the target directory on the server - start by changing into it
         {
-            lstrcpyn(ftpPath, curItem->TgtPath, FTP_MAX_PATH);
+            lstrcpyn(ftpPath, curItem->TgtPath, ftpPath.Size());
             CFTPServerPathType type = Oper->GetFTPServerPathType(ftpPath);
-            if (FTPPathAppend(type, ftpPath, FTP_MAX_PATH, curItem->TgtName, TRUE))
+            if (FTPPathAppend(type, ftpPath, ftpPath.Size(), curItem->TgtName, TRUE))
             { // we have the path, send CWD to the examined directory on the server
-                PrepareFTPCommand(buf, 200 + FTP_MAX_PATH, errBuf, 50 + FTP_MAX_PATH,
+                PrepareFTPCommand(buf, buf.Size(), errBuf, errBuf.Size(),
                                   ftpcmdChangeWorkingPath, &cmdLen, ftpPath); // cannot report an error
                 sendCmd = TRUE;
                 SubState = fwssWorkUploadGetTgtPathWaitForCWDRes;
@@ -684,7 +684,7 @@ void CFTPWorker::HandleEventInWorkingState4(CFTPWorkerEvent event, BOOL& sendQui
                     }
                     else
                     {
-                        CopyStr(errText, 200 + FTP_MAX_PATH, reply, replySize);
+                        CopyStr(errText, errText.Size(), reply, replySize);
                         Queue->UpdateItemState(CurItem, sqisFailed, ITEMPR_UNABLETOCWD, NO_ERROR,
                                                SalamanderGeneral->DupStr(errText) /* low memory = the error will be without details */,
                                                Oper);
@@ -705,7 +705,7 @@ void CFTPWorker::HandleEventInWorkingState4(CFTPWorkerEvent event, BOOL& sendQui
 
         case fwssWorkUploadGetTgtPathSendPWD: // upload copy/move file: send "PWD" (determine the path to the target directory)
         {
-            PrepareFTPCommand(buf, 200 + FTP_MAX_PATH, errBuf, 50 + FTP_MAX_PATH,
+            PrepareFTPCommand(buf, buf.Size(), errBuf, errBuf.Size(),
                               ftpcmdPrintWorkingPath, &cmdLen); // cannot report an error
             sendCmd = TRUE;
             SubState = fwssWorkUploadGetTgtPathWaitForPWDRes;
@@ -720,9 +720,9 @@ void CFTPWorker::HandleEventInWorkingState4(CFTPWorkerEvent event, BOOL& sendQui
             case fweCmdReplyReceived:
             {
                 if (FTP_DIGIT_1(replyCode) == FTP_D1_SUCCESS &&
-                    FTPGetDirectoryFromReply(reply, replySize, ftpPath, FTP_MAX_PATH))
+                    FTPGetDirectoryFromReply(reply, replySize, ftpPath, ftpPath.Size()))
                 { // success, we have the working path
-                    lstrcpyn(WorkingPath, ftpPath, FTP_MAX_PATH);
+                    lstrcpyn(WorkingPath, ftpPath, WorkingPath.Size());
                     HaveWorkingPath = TRUE;
 
                     if (ShouldStop)
@@ -735,7 +735,7 @@ void CFTPWorker::HandleEventInWorkingState4(CFTPWorkerEvent event, BOOL& sendQui
                 }
                 else // an error occurred; show it to the user and move on to the next queue item
                 {
-                    CopyStr(errText, 200 + FTP_MAX_PATH, reply, replySize);
+                    CopyStr(errText, errText.Size(), reply, replySize);
                     Queue->UpdateItemState(CurItem, sqisFailed, ITEMPR_UNABLETOPWD, NO_ERROR,
                                            SalamanderGeneral->DupStr(errText) /* low memory = the error will be without details */,
                                            Oper);
@@ -821,11 +821,11 @@ void CFTPWorker::HandleEventInWorkingState4(CFTPWorkerEvent event, BOOL& sendQui
                             {
                                 CDiskListingItem* lstItem = DiskWork.DiskListing->At(i);
 
-                                char mbrName[2 * MAX_PATH];
+                                CPathBuffer mbrName;
                                 char* tgtName = lstItem->Name;
                                 if (is_AS_400_QSYS_LIB_Path)
                                 {
-                                    lstrcpyn(mbrName, tgtName, MAX_PATH);
+                                    lstrcpyn(mbrName, tgtName, mbrName.Size());
                                     FTPAS400AddFileNamePart(mbrName);
                                     tgtName = mbrName;
                                 }

@@ -30,7 +30,7 @@ const char* EXP_DOSSYSDIR = "DOSSysDir";
 
 struct CExpData
 {
-    char Buffer[MAX_PATH];
+    CPathBuffer Buffer; // Heap-allocated for long path support
     const char* LongName;
     const char* DosName;
 };
@@ -192,11 +192,11 @@ ExecuteWinDir(HWND msgParent, void* param)
 {
     CALL_STACK_MESSAGE1("ExecuteWinDir(, )");
     CExpData* data = (CExpData*)param;
-    UINT l = GetWindowsDirectory(data->Buffer, MAX_PATH);
-    if (l < 0 || l >= MAX_PATH)
+    UINT l = GetWindowsDirectory(data->Buffer, data->Buffer.Size());
+    if (l < 0 || l >= data->Buffer.Size())
         *data->Buffer = 0;
     else
-        SG->SalPathAddBackslash(data->Buffer, MAX_PATH);
+        SG->SalPathAddBackslash(data->Buffer, data->Buffer.Size());
     return data->Buffer;
 }
 
@@ -205,13 +205,13 @@ ExecuteDOSWinDir(HWND msgParent, void* param)
 {
     CALL_STACK_MESSAGE1("ExecuteDOSWinDir(, )");
     CExpData* data = (CExpData*)param;
-    UINT l = GetWindowsDirectory(data->Buffer, MAX_PATH);
-    if (l < 0 || l >= MAX_PATH)
+    UINT l = GetWindowsDirectory(data->Buffer, data->Buffer.Size());
+    if (l < 0 || l >= data->Buffer.Size())
         *data->Buffer = 0;
     else
     {
-        if (GetShortPathName(data->Buffer, data->Buffer, MAX_PATH))
-            SG->SalPathAddBackslash(data->Buffer, MAX_PATH);
+        if (GetShortPathName(data->Buffer, data->Buffer, data->Buffer.Size()))
+            SG->SalPathAddBackslash(data->Buffer, data->Buffer.Size());
         else
             *data->Buffer = 0;
     }
@@ -223,11 +223,11 @@ ExecuteSysDir(HWND msgParent, void* param)
 {
     CALL_STACK_MESSAGE1("ExecuteSysDir(, )");
     CExpData* data = (CExpData*)param;
-    UINT l = GetSystemDirectory(data->Buffer, MAX_PATH);
-    if (l < 0 || l >= MAX_PATH)
+    UINT l = GetSystemDirectory(data->Buffer, data->Buffer.Size());
+    if (l < 0 || l >= data->Buffer.Size())
         *data->Buffer = 0;
     else
-        SG->SalPathAddBackslash(data->Buffer, MAX_PATH);
+        SG->SalPathAddBackslash(data->Buffer, data->Buffer.Size());
     return data->Buffer;
 }
 
@@ -236,13 +236,13 @@ ExecuteDOSSysDir(HWND msgParent, void* param)
 {
     CALL_STACK_MESSAGE1("ExecuteDOSSysDir(, )");
     CExpData* data = (CExpData*)param;
-    UINT l = GetSystemDirectory(data->Buffer, MAX_PATH);
-    if (l < 0 || l >= MAX_PATH)
+    UINT l = GetSystemDirectory(data->Buffer, data->Buffer.Size());
+    if (l < 0 || l >= data->Buffer.Size())
         *data->Buffer = 0;
     else
     {
-        if (GetShortPathName(data->Buffer, data->Buffer, MAX_PATH))
-            SG->SalPathAddBackslash(data->Buffer, MAX_PATH);
+        if (GetShortPathName(data->Buffer, data->Buffer, data->Buffer.Size()))
+            SG->SalPathAddBackslash(data->Buffer, data->Buffer.Size());
         else
             *data->Buffer = 0;
     }
@@ -276,8 +276,8 @@ ExecuteWinDir2(HWND msgParent, void* param)
 {
     CALL_STACK_MESSAGE1("ExecuteWinDir2(, )");
     CExpData* data = (CExpData*)param;
-    UINT l = GetWindowsDirectory(data->Buffer, MAX_PATH);
-    if (l < 0 || l >= MAX_PATH)
+    UINT l = GetWindowsDirectory(data->Buffer, data->Buffer.Size());
+    if (l < 0 || l >= data->Buffer.Size())
         *data->Buffer = 0;
     else
         SG->SalPathRemoveBackslash(data->Buffer);
@@ -289,8 +289,8 @@ ExecuteSysDir2(HWND msgParent, void* param)
 {
     CALL_STACK_MESSAGE1("ExecuteSysDir2(, )");
     CExpData* data = (CExpData*)param;
-    UINT l = GetSystemDirectory(data->Buffer, MAX_PATH);
-    if (l < 0 || l >= MAX_PATH)
+    UINT l = GetSystemDirectory(data->Buffer, data->Buffer.Size());
+    if (l < 0 || l >= data->Buffer.Size())
         *data->Buffer = 0;
     else
         SG->SalPathRemoveBackslash(data->Buffer);
@@ -302,7 +302,7 @@ ExecuteSalDir(HWND msgParent, void* param)
 {
     CALL_STACK_MESSAGE1("ExecuteSalDir(, )");
     CExpData* data = (CExpData*)param;
-    GetModuleFileName(NULL, data->Buffer, MAX_PATH); // hInstance==NULL: we want the path to the EXE, not to the DLL
+    GetModuleFileName(NULL, data->Buffer, data->Buffer.Size()); // hInstance==NULL: we want the path to the EXE, not to the DLL
     *(strrchr(data->Buffer, '\\') + 1) = 0;
     return data->Buffer;
 }

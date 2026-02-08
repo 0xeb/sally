@@ -968,7 +968,7 @@ void CConfigDialog::Validate(CTransferInfo& ti)
         return;
     }
 
-    ti.EditLine(IDE_INITDIR, buffer, MAX_PATH);
+    ti.EditLine(IDE_INITDIR, buffer, buffer.Size());
     if (!SG->ValidateVarString(HWindow, buffer, e1, e2, ExpInitDirVariables))
     {
         ti.ErrorOn(IDE_INITDIR);
@@ -1049,7 +1049,7 @@ CConfigDialog::DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
                     CPathBuffer path; // Heap-allocated for long path support
                     path[0] = 0;
                     GetDlgItemText(HWindow, IDE_COMMAND, path, path.Size());
-                    if (GetOpenFileName(HWindow, NULL, LoadStr(IDS_EXEFILES), path))
+                    if (GetOpenFileName(HWindow, NULL, LoadStr(IDS_EXEFILES), path, path.Size()))
                         SetDlgItemText(HWindow, IDE_COMMAND, path);
                 }
                 else if (cmd == 30)

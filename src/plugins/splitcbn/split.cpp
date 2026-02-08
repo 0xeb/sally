@@ -135,7 +135,7 @@ static BOOL SplitFile(LPTSTR fileName, LPTSTR targetDir, CQuadWord& qwPartSize,
         StripExtension(name);
 
     // determine the type of the target media
-    char text[MAX_PATH + 50]; // must be longer than MAX_PATH because of "too long name" (see below)
+    CPathBuffer text; // Heap-allocated for long path support
     SalamanderGeneral->GetRootPath(text, targetDir);
     UINT driveType = GetDriveType(text);
 
@@ -217,13 +217,13 @@ static BOOL SplitFile(LPTSTR fileName, LPTSTR targetDir, CQuadWord& qwPartSize,
 
         // create the name of the target file
         sprintf(name2.Get(), "%s.%#03ld", name.Get(), partNum++);
-        strncpy_s(text, MAX_PATH, targetDir, _TRUNCATE);
-        if (!SalamanderGeneral->SalPathAppend(text, name2, MAX_PATH))
+        strncpy_s(text.Get(), text.Size(), targetDir, _TRUNCATE);
+        if (!SalamanderGeneral->SalPathAppend(text, name2, text.Size()))
         { // too long name - reported in SalamanderSafeFile->SafeFileCreate
             char* end = text + strlen(text);
             if (end > text && *(end - 1) != '\\')
                 *end++ = '\\';
-            strncpy_s(end, _countof(text) - (end - text), name2, _TRUNCATE);
+            strncpy_s(end, text.Size() - (end - text), name2, _TRUNCATE);
         }
 
         // create the file
@@ -243,7 +243,7 @@ static BOOL SplitFile(LPTSTR fileName, LPTSTR targetDir, CQuadWord& qwPartSize,
         fileProgress = CQuadWord(0, 0);
         if (!bSkip)
         {
-            char text2[MAX_PATH + 50];
+            CPathBuffer text2; // Heap-allocated for long path support
             sprintf(text2, "%s %s...", LoadStr(IDS_WRITING), name2.Get());
             salamander->ProgressDialogAddText(text2, delayed);
 
@@ -405,13 +405,13 @@ static BOOL SplitFile(LPTSTR fileName, LPTSTR targetDir, CQuadWord& qwPartSize,
                 {
                     strcpy(name2, name);
                     strcat(name2, ".bat");
-                    strncpy_s(text, MAX_PATH, targetDir, _TRUNCATE);
-                    if (!SalamanderGeneral->SalPathAppend(text, name2, MAX_PATH))
+                    strncpy_s(text.Get(), text.Size(), targetDir, _TRUNCATE);
+                    if (!SalamanderGeneral->SalPathAppend(text, name2, text.Size()))
                     { // too long name - reported in SalamanderSafeFile->SafeFileCreate
                         char* end = text + strlen(text);
                         if (end > text && *(end - 1) != '\\')
                             *end++ = '\\';
-                        strncpy_s(end, _countof(text) - (end - text), name2, _TRUNCATE);
+                        strncpy_s(end, text.Size() - (end - text), name2, _TRUNCATE);
                     }
 
                     GetInfo(buf, batSize);

@@ -5,11 +5,11 @@
 #include "precomp.h"
 
 // FS-name assigned by Salamander after loading the plug-in
-char AssignedFSName[MAX_PATH] = "";
+CPathBuffer AssignedFSName;
 int AssignedFSNameLen = 0;
 
 // FS-name for FTP over SSL (FTPS) assigned by Salamander after loading the plugin
-char AssignedFSNameFTPS[MAX_PATH] = "";
+CPathBuffer AssignedFSNameFTPS;
 int AssignedFSNameIndexFTPS = -1;
 int AssignedFSNameLenFTPS = 0;
 
@@ -662,13 +662,13 @@ void CPluginInterfaceForFS::ExecuteOnFS(int panel, CPluginFSInterfaceAbstract* p
     if (isDir || file.IsLink) // subdirectory or up-dir or link (it can target a file or directory - we currently prefer this test to see if it is a directory)
     {
         char newUserPart[FTP_USERPART_SIZE];
-        char newPath[FTP_MAX_PATH];
-        char cutDir[FTP_MAX_PATH];
-        lstrcpyn(newPath, fs->Path, FTP_MAX_PATH);
+        CPathBuffer newPath;
+        CPathBuffer cutDir;
+        lstrcpyn(newPath, fs->Path, newPath.Size());
         CFTPServerPathType type = fs->GetFTPServerPathType(newPath);
         if (isDir == 2) // up-dir
         {
-            if (FTPCutDirectory(type, newPath, FTP_MAX_PATH, cutDir, FTP_MAX_PATH, NULL)) // shorten the path by the last component
+            if (FTPCutDirectory(type, newPath, newPath.Size(), cutDir, cutDir.Size(), NULL)) // shorten the path by the last component
             {
                 int topIndex; // next top-index, -1 -> invalid
                 if (!fs->TopIndexMem.FindAndPop(type, newPath, topIndex))
@@ -682,10 +682,10 @@ void CPluginInterfaceForFS::ExecuteOnFS(int panel, CPluginFSInterfaceAbstract* p
         else // subdirectory
         {
             // backup of data for TopIndexMem (backupPath + topIndex)
-            char backupPath[FTP_MAX_PATH];
+            CPathBuffer backupPath;
             strcpy(backupPath, newPath);
             int topIndex = SalamanderGeneral->GetPanelTopIndex(panel);
-            if (FTPPathAppend(type, newPath, FTP_MAX_PATH, file.Name, TRUE)) // set the path
+            if (FTPPathAppend(type, newPath, newPath.Size(), file.Name, TRUE)) // set the path
             {
                 // change the path in the panel
                 fs->MakeUserPart(newUserPart, FTP_USERPART_SIZE, newPath);
@@ -748,10 +748,10 @@ void CPluginInterfaceForFS::ConvertPathToExternal(const char* fsName, int fsName
 void CTopIndexMem::Push(CFTPServerPathType type, const char* path, int topIndex)
 {
     // determine whether path follows Path (path == Path+"/name")
-    char testPath[FTP_MAX_PATH];
-    lstrcpyn(testPath, path, FTP_MAX_PATH);
+    CPathBuffer testPath;
+    lstrcpyn(testPath, path, testPath.Size());
     BOOL ok = FALSE;
-    if (FTPCutDirectory(type, testPath, FTP_MAX_PATH, NULL, 0, NULL))
+    if (FTPCutDirectory(type, testPath, testPath.Size(), NULL, 0, NULL))
     {
         ok = FTPIsTheSameServerPath(type, testPath, Path);
     }
@@ -783,7 +783,7 @@ BOOL CTopIndexMem::FindAndPop(CFTPServerPathType type, const char* path, int& to
     {
         if (TopIndexesCount > 0)
         {
-            if (!FTPCutDirectory(type, Path, FTP_MAX_PATH, NULL, 0, NULL))
+            if (!FTPCutDirectory(type, Path, Path.Size(), NULL, 0, NULL))
                 Path[0] = 0;
             topIndex = TopIndexes[--TopIndexesCount];
             return TRUE;

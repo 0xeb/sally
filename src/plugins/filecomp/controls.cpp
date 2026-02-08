@@ -86,8 +86,8 @@ CFileHeaderWindow::WindowProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
 
         // DT_PATH_ELLIPSIS does not work on some strings, which prints clipped text
         // PathCompactPath() needs a copy in a local buffer, but it does not clip the text
-        char buff[2 * MAX_PATH];
-        strncpy_s(buff, _countof(buff), Text, _TRUNCATE);
+        CPathBuffer buff; // Heap-allocated for long path support
+        strncpy_s(buff, buff.Size(), Text, _TRUNCATE);
         PathCompactPath(dc, buff, r.right - r.left);
 
         DrawText(dc, buff, -1, &r, /*DT_PATH_ELLIPSIS | */ DT_SINGLELINE | DT_NOPREFIX);

@@ -35,7 +35,7 @@ BOOL CombineFiles(TIndirectArray<char>& files, LPTSTR targetName,
 
     // sum sizes of all partial files (while simultaneously checking their accessibility)
     CQuadWord totalSize = CQuadWord(0, 0);
-    char text[MAX_PATH + 50];
+    CPathBuffer text; // Heap-allocated for long path support
     int i;
     for (i = 0; i < files.Count; i++)
     {

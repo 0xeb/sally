@@ -172,7 +172,7 @@ static bool LoadSymbols(LPCTSTR libName, LPCTSTR altLibName, HINSTANCE& hLib, PS
     }
     if (hLib)
         SalamanderDebug->AddModuleWithPossibleMemoryLeaks(libName);
-    char buf[MAX_PATH + 400];
+    CPathBuffer buf;
     if (!hLib)
     {
         sprintf(buf, "Err %u: Unable to load %s\r\n", GetLastError(), libName);

@@ -796,8 +796,8 @@ struct CFTPDiskWork
 
     CFTPDiskWorkType Type; // type of disk work
 
-    char Path[MAX_PATH]; // target path (e.g. fdwtCheckOrWriteFile and fdwtCreateAndWriteFile do not use it = "")
-    char Name[MAX_PATH]; // IN/OUT target name (the name may change during autorename) (e.g. fdwtCheckOrWriteFile does not use it = "") (for fdwtCreateAndWriteFile this holds the tgt-full-file-name)
+    CPathBuffer Path; // target path (e.g. fdwtCheckOrWriteFile and fdwtCreateAndWriteFile do not use it = "")
+    CPathBuffer Name; // IN/OUT target name (the name may change during autorename) (e.g. fdwtCheckOrWriteFile does not use it = "") (for fdwtCreateAndWriteFile this holds the tgt-full-file-name)
 
     CFTPQueueItemAction ForceAction; // action forced by the user (for example an autorename entered from the Solve Error dialog)
 
@@ -846,7 +846,7 @@ struct CFTPDiskWork
 
 struct CFTPFileToClose
 {
-    char FileName[MAX_PATH]; // file name
+    CPathBuffer FileName; // file name
     HANDLE File;             // file handle we should close
     BOOL DeleteIfEmpty;      // TRUE = if the file being closed is empty, delete it
     BOOL SetDateAndTime;     // TRUE = set 'Date'+'Time' before closing the file
@@ -1252,7 +1252,7 @@ protected:
     int ControlConnectionUID; // if the worker has a connection from the panel, this stores the UID of the panel socket object (otherwise -1)
 
     BOOL HaveWorkingPath;                     // TRUE if WorkingPath is valid
-    char WorkingPath[FTP_MAX_PATH];           // current working path on the FTP server (it may be only the last string sent via CWD with a "success" return value - for performance reasons we do not run PWD after every CWD)
+    CPathBuffer WorkingPath;           // current working path on the FTP server (it may be only the last string sent via CWD with a "success" return value - for performance reasons we do not run PWD after every CWD)
     CCurrentTransferMode CurrentTransferMode; // current transfer mode on the FTP server (only stores the last FTP command "TYPE")
 
     BOOL EventConnectSent; // TRUE only if the fwseConnect event has already been generated (handles FD_READ arriving before FD_CONNECT)
@@ -1348,7 +1348,7 @@ protected:
     BOOL UploadDirGetTgtPathListing; // only when processing upload-dir-explore or upload-file items: TRUE = the target path listing should be fetched
 
     int UploadAutorenamePhase;              // upload: current phase of generating names for the target directory/file (see FTPGenerateNewName()); 0 = beginning of the autorename process; -1 = it was the last generation phase, we simply cannot generate another name of that type
-    char UploadAutorenameNewName[MAX_PATH]; // upload: buffer for the last generated name for the target directory/file
+    CPathBuffer UploadAutorenameNewName; // upload: buffer for the last generated name for the target directory/file
 
     CUploadType UploadType; // type of upload (according to the state of the target file): new, resume, resume or overwrite, overwrite, autorename
 
@@ -3399,7 +3399,7 @@ protected:
     unsigned short Port;         // port on which the FTP server runs
     char Path[FTP_MAX_PATH];     // path to the opened file (local on the server)
     CFTPServerPathType PathType; // type of the cached path
-    char Name[MAX_PATH];         // name of the opened file
+    CPathBuffer Name;         // name of the opened file
 
 public:
     CFTPOpenedFile(int myUID, const char* user, const char* host, unsigned short port,

@@ -27,7 +27,8 @@ protected:
     CGUIProgressBarAbstract *ProgressBar1, *ProgressBar2;
     CGUIStaticTextAbstract *Label1, *Label2;
     BOOL WantCancel;
-    char SrcName[MAX_PATH], DestName[MAX_PATH];
+    CPathBuffer SrcName; // Heap-allocated for long path support
+    CPathBuffer DestName; // Heap-allocated for long path support
     DWORD LastTick, FileProgress, TotalProgress;
     BOOL Changed[4];
 
@@ -48,7 +49,7 @@ class CConnectDialog : public CDialog
 {
 public:
     CConnectDialog(HWND parent, int panel);
-    char Volume[MAX_PATH];
+    CPathBuffer Volume; // Heap-allocated for long path support
     int Panel;
 
 protected:
@@ -95,7 +96,7 @@ class CRestoreDialog : public CDialog
 public:
     CRestoreDialog(HWND parent);
 
-    char TargetPath[MAX_PATH];
+    CPathBuffer TargetPath; // Heap-allocated for long path support
 
 protected:
     virtual INT_PTR DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam);

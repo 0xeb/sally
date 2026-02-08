@@ -214,8 +214,8 @@ LRESULT CCompareFilesDialog::DragDropEditProc(HWND hWnd, UINT uMsg, WPARAM wPara
     if (WM_DROPFILES == uMsg)
     {
         HDROP hDrop = (HDROP)wParam;
-        TCHAR buffer[MAX_PATH];
-        int nFilesDropped = DragQueryFile(hDrop, 0, buffer, MAX_PATH);
+        CPathBuffer buffer; // Heap-allocated for long path support
+        int nFilesDropped = DragQueryFile(hDrop, 0, buffer, buffer.Size());
 
         if (nFilesDropped)
         {
@@ -314,8 +314,8 @@ CCompareFilesDialog::DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
             }
 
             OPENFILENAME ofn;
-            TCHAR path[MAX_PATH];
-            TCHAR dir[MAX_PATH];
+            CPathBuffer path; // Heap-allocated for long path support
+            CPathBuffer dir;  // Heap-allocated for long path support
             TCHAR buf[128];
 
             memset(&ofn, 0, sizeof(OPENFILENAME));
@@ -323,14 +323,14 @@ CCompareFilesDialog::DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
             ofn.hwndOwner = HWindow;
             _stprintf(buf, _T("%s%c*.*%c"), LoadStr(IDS_ALLFILES), 0, 0);
             ofn.lpstrFilter = buf;
-            if (!GetDlgItemText(HWindow, idCB, path, SizeOf(path)))
+            if (!GetDlgItemText(HWindow, idCB, path, path.Size()))
             {
-                SendDlgItemMessage(HWindow, idCB, CB_GETLBTEXT, 0, LPARAM(dir));
+                SendDlgItemMessage(HWindow, idCB, CB_GETLBTEXT, 0, (LPARAM)dir.Get());
                 SG->CutDirectory(dir);
                 ofn.lpstrInitialDir = dir;
             }
             ofn.lpstrFile = path;
-            ofn.nMaxFile = SizeOf(path);
+            ofn.nMaxFile = path.Size();
             ofn.lpstrTitle = LoadStr(idTitle);
             //ofn.lpfnHook = OFNHookProc;
             ofn.Flags = OFN_EXPLORER | OFN_FILEMUSTEXIST | OFN_HIDEREADONLY | OFN_NOCHANGEDIR /*| OFN_ENABLEHOOK*/;
@@ -346,15 +346,15 @@ CCompareFilesDialog::DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
 
     case WM_USER_CLEARHISTORY:
     {
-        TCHAR buffer[MAX_PATH];
+        CPathBuffer buffer; // Heap-allocated for long path support
         HWND cb = GetDlgItem(HWindow, IDE_PATH1);
-        SendMessage(cb, WM_GETTEXT, SizeOf(buffer), (LPARAM)buffer);
+        SendMessage(cb, WM_GETTEXT, buffer.Size(), (LPARAM)buffer.Get());
         SendMessage(cb, CB_RESETCONTENT, 0, 0);
-        SendMessage(cb, WM_SETTEXT, 0, (LPARAM)buffer);
+        SendMessage(cb, WM_SETTEXT, 0, (LPARAM)buffer.Get());
         cb = GetDlgItem(HWindow, IDE_PATH2);
-        SendMessage(cb, WM_GETTEXT, SizeOf(buffer), (LPARAM)buffer);
+        SendMessage(cb, WM_GETTEXT, buffer.Size(), (LPARAM)buffer.Get());
         SendMessage(cb, CB_RESETCONTENT, 0, 0);
-        SendMessage(cb, WM_SETTEXT, 0, (LPARAM)buffer);
+        SendMessage(cb, WM_SETTEXT, 0, (LPARAM)buffer.Get());
         break;
     }
 

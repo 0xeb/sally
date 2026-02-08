@@ -13,7 +13,7 @@
 #include "precomp.h"
 
 // FS name assigned by Salamander after the plugin loads
-char AssignedFSName[MAX_PATH] = "";
+CPathBuffer AssignedFSName;
 extern int AssignedFSNameLen = 0;
 
 // image list for simple FS icons
@@ -94,7 +94,7 @@ CPluginInterfaceForFS::CloseFS(CPluginFSInterfaceAbstract* fs)
         delete dfsFS;
 }
 
-char ConnectPath[MAX_PATH] = "";
+CPathBuffer ConnectPath;
 char** History = NULL;
 int HistoryCount = 0;
 
@@ -115,8 +115,8 @@ INT_PTR CALLBACK ConnectDlgProc(HWND HWindow, UINT uMsg, WPARAM wParam, LPARAM l
         // populate the dialog with data
         SalamanderGeneral->LoadComboFromStdHistoryValues(GetDlgItem(HWindow, IDC_PATH),
                                                          History, HistoryCount);
-        SendDlgItemMessage(HWindow, IDC_PATH, CB_LIMITTEXT, MAX_PATH - 1, 0);
-        SendDlgItemMessage(HWindow, IDC_PATH, WM_SETTEXT, 0, (LPARAM)ConnectPath);
+        SendDlgItemMessage(HWindow, IDC_PATH, CB_LIMITTEXT, ConnectPath.Size() - 1, 0);
+        SendDlgItemMessage(HWindow, IDC_PATH, WM_SETTEXT, 0, (LPARAM)(const char*)ConnectPath);
 
         SalamanderGeneral->InstallWordBreakProc(GetDlgItem(HWindow, IDC_PATH)); // install WordBreakProc into the combo box
 
@@ -130,7 +130,7 @@ INT_PTR CALLBACK ConnectDlgProc(HWND HWindow, UINT uMsg, WPARAM wParam, LPARAM l
         case IDOK:
         {
             // read data from the dialog
-            SendDlgItemMessage(HWindow, IDC_PATH, WM_GETTEXT, MAX_PATH, (LPARAM)ConnectPath);
+            SendDlgItemMessage(HWindow, IDC_PATH, WM_GETTEXT, ConnectPath.Size(), (LPARAM)(char*)ConnectPath);
             SalamanderGeneral->AddValueToStdHistoryValues(History, HistoryCount, ConnectPath, FALSE);
         }
         case IDCANCEL:
@@ -402,7 +402,7 @@ CPluginInterfaceForFS::ExecuteOnFS(int panel, CPluginFSInterfaceAbstract* plugin
     CPluginFSInterface* fs = (CPluginFSInterface*)pluginFS;
     if (isDir) // subdirectory or up-dir
     {
-        char newPath[MAX_PATH];
+        CPathBuffer newPath;
         strcpy(newPath, fs->Path);
         if (isDir == 2) // parent directory
         {
@@ -421,11 +421,11 @@ CPluginInterfaceForFS::ExecuteOnFS(int panel, CPluginFSInterfaceAbstract* plugin
         else // subdirectory
         {
             // backup data for TopIndexMem (backupPath + topIndex)
-            char backupPath[MAX_PATH];
+            CPathBuffer backupPath;
             strcpy(backupPath, newPath);
             int topIndex = SalamanderGeneral->GetPanelTopIndex(panel);
 
-            if (SalamanderGeneral->SalPathAppend(newPath, file.Name, MAX_PATH)) // set the path
+            if (SalamanderGeneral->SalPathAppend(newPath, file.Name, newPath.Size())) // set the path
             {
                 // change the path in the panel
                 fs = NULL; // after ChangePanelPathToXXX the pointer may no longer be valid

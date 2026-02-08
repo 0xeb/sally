@@ -1,4 +1,4 @@
-// SPDX-FileCopyrightText: 2023 Open Salamander Authors
+﻿// SPDX-FileCopyrightText: 2023 Open Salamander Authors
 // SPDX-License-Identifier: GPL-2.0-or-later
 // CommentsTranslationProject: TRANSLATED
 
@@ -894,7 +894,7 @@ void CSrvTypeTestParserDlg::LoadTextFromFile()
     ofn.lpstrInitialDir = initDir;
     ofn.Flags = OFN_PATHMUSTEXIST | OFN_FILEMUSTEXIST | OFN_HIDEREADONLY;
 
-    char buf[300 + MAX_PATH];
+    CPathBuffer buf;
     if (SalamanderGeneral->SafeGetOpenFileName(&ofn))
     {
         HCURSOR oldCur = SetCursor(LoadCursor(NULL, IDC_WAIT));

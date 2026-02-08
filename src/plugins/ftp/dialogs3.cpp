@@ -179,7 +179,7 @@ void CConfigPageServers::OnExportServer(CServerType* serverType)
     ofn.Flags = OFN_PATHMUSTEXIST | OFN_LONGNAMES | OFN_NOCHANGEDIR | OFN_OVERWRITEPROMPT |
                 OFN_NOTESTFILECREATE | OFN_HIDEREADONLY;
 
-    char buf[200 + MAX_PATH];
+    CPathBuffer buf;
     if (SalamanderGeneral->SafeGetSaveFileName(&ofn))
     {
         HCURSOR oldCur = SetCursor(LoadCursor(NULL, IDC_WAIT));
@@ -253,7 +253,7 @@ void CConfigPageServers::OnImportServer()
         ofn.lpstrInitialDir = ImpExpInitDir;
         ofn.Flags = OFN_PATHMUSTEXIST | OFN_FILEMUSTEXIST | OFN_HIDEREADONLY;
 
-        char buf[300 + MAX_PATH];
+        CPathBuffer buf;
         char typeBuf[SERVERTYPE_MAX_SIZE + 101];
         if (SalamanderGeneral->SafeGetOpenFileName(&ofn))
         {

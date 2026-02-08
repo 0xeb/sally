@@ -695,7 +695,7 @@ void CDataConnectionSocket::DirectFlushData()
                     DiskWork.SocketUID = UID;
                     DiskWork.MsgID = DATACON_DISKWORKWRITEFINISHED;
                     DiskWork.Type = fdwtCreateAndWriteFile;
-                    lstrcpyn(DiskWork.Name, TgtDiskFileName, MAX_PATH);
+                    lstrcpyn(DiskWork.Name, TgtDiskFileName, DiskWork.Name.Size());
                     DiskWork.WinError = NO_ERROR;
                     DiskWork.State = sqisNone;
                     if (DiskWork.OpenedFile != NULL)
@@ -1354,7 +1354,7 @@ void CDataConnectionSocket::SetDirectFlushParams(const char* tgtFileName, CCurre
     CALL_STACK_MESSAGE1("CDataConnectionSocket::SetDirectFlushParams()");
 
     HANDLES(EnterCriticalSection(&SocketCritSect));
-    lstrcpyn(TgtDiskFileName, tgtFileName, MAX_PATH);
+    lstrcpyn(TgtDiskFileName, tgtFileName, TgtDiskFileName.Size());
     CurrentTransferMode = currentTransferMode;
     HANDLES(LeaveCriticalSection(&SocketCritSect));
 }

@@ -261,7 +261,7 @@ BOOL CRenamerDialog::BuildScript(CRenameScriptEntry*& script, int& count,
     {
         tmpScript[i].Source = SourceFiles[i];
         // create a new name
-        int l = ManualMode ? GetManualModeNewName(SourceFiles[i], i, newName, newPart) : renamer.Rename(SourceFiles[i], i, newName, &newPart);
+        int l = ManualMode ? GetManualModeNewName(SourceFiles[i], i, newName, newName.Size(), newPart) : renamer.Rename(SourceFiles[i], i, newName, &newPart);
         if (l < 0)
         {
             FileError(HWindow, SourceFiles[i]->FullName, IDS_EXP_SMALLBUFFER,
@@ -486,7 +486,7 @@ LBUILD_SCRIPT_ERROR:
     return ret;
 }
 
-int CRenamerDialog::GetManualModeNewName(CSourceFile* file, int index, char* newName, char*& newPart)
+int CRenamerDialog::GetManualModeNewName(CSourceFile* file, int index, char* newName, int newNameSize, char*& newPart)
 {
     CALL_STACK_MESSAGE_NONE
     int pathLen = 0;
@@ -521,13 +521,13 @@ int CRenamerDialog::GetManualModeNewName(CSourceFile* file, int index, char* new
     else
     {
         int l = (int)SendMessage(ManualEdit->HWindow, EM_LINELENGTH, charIndex, 0);
-        if (l >= MAX_PATH - pathLen)
+        if (l >= newNameSize - pathLen)
         {
             return -1;
         }
         else
         {
-            *LPWORD(newName) = MAX_PATH - pathLen;
+            *LPWORD(newName) = (WORD)(newNameSize - pathLen);
             int l2 = (int)SendMessage(ManualEdit->HWindow, EM_GETLINE, index, (LPARAM)newName);
             newName[l2] = 0; // just to be sure
         }

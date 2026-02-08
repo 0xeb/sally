@@ -329,7 +329,7 @@ protected:
 
     DWORD m_dwCookie; //connection point identifier for m_pConnectionPoint
 
-    char MarkdownFilename[MAX_PATH];
+    CPathBuffer MarkdownFilename; // Heap-allocated for long path support
 
     //Object interfaces
     IUnknown* m_pIUnknown;

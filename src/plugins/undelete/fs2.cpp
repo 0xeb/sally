@@ -244,7 +244,7 @@ CPluginFSInterface::ChangePath(int currentFSNameIndex, char* fsName, int fsNameI
     }
 
     // determine the device to open
-    if (!RootPathFromFull(userPart, Root, MAX_PATH))
+    if (!RootPathFromFull(userPart, Root, Root.Size()))
         return String<char>::Error(IDS_UNDELETE, IDS_PATHDISK);
     strcpy(Path, Root);
     CurrentDir = NULL;
@@ -344,7 +344,7 @@ CPluginFSInterface::ChangePath(int currentFSNameIndex, char* fsName, int fsNameI
             {
                 if (di->Record->IsDir) // yes, it is direcotry
                 {
-                    SalamanderGeneral->SalPathAppend(Path, component, MAX_PATH);
+                    SalamanderGeneral->SalPathAppend(Path, component, Path.Size());
                     CurrentDir = di->Record;
                 }
                 else // it is file
@@ -728,16 +728,16 @@ BOOL CPluginFSInterface::CopyFile(FILE_RECORD_I<char>* record, char* filename, c
     CALL_STACK_MESSAGE2("CPluginFSInterface::CopyFile(, , %d)", view);
 
     BOOL ret;
-    char path[MAX_PATH + MAX_PATH]; // + for stream name
+    CPathBuffer path; // Heap-allocated for long path support
     int oldlen;
 
     if (!view)
     {
         // print source path to dialog box
         oldlen = (int)strlen(SourcePath);
-        SalamanderGeneral->SalPathAddBackslash(SourcePath, MAX_PATH);
+        SalamanderGeneral->SalPathAddBackslash(SourcePath, SourcePath.Size());
         char* namepos = SourcePath + strlen(SourcePath);
-        SalamanderGeneral->SalPathAppend(SourcePath, filename, MAX_PATH);
+        SalamanderGeneral->SalPathAppend(SourcePath, filename, SourcePath.Size());
         Replace0xE5(namepos);
         Progress->SetSourceFileName(SourcePath);
 
@@ -745,7 +745,7 @@ BOOL CPluginFSInterface::CopyFile(FILE_RECORD_I<char>* record, char* filename, c
         char* name = FixDamagedName(filename);
         if (name == NULL)
             return FALSE;
-        lstrcpyn(namepos, name, MAX_PATH - (int)(namepos - SourcePath));
+        lstrcpyn(namepos, name, SourcePath.Size() - (int)(namepos - (char*)SourcePath));
 
         // make target path
         if (!AppendPath(path, targetPath, name, &ret))
@@ -757,8 +757,8 @@ BOOL CPluginFSInterface::CopyFile(FILE_RECORD_I<char>* record, char* filename, c
     else
     {
         // for view it is simple
-        lstrcpyn(path, targetPath, MAX_PATH);
-        lstrcpyn(SourcePath, filename, MAX_PATH);
+        lstrcpyn(path, targetPath, path.Size());
+        lstrcpyn(SourcePath, filename, SourcePath.Size());
         oldlen = 0;
     }
 
@@ -1008,9 +1008,9 @@ BOOL CPluginFSInterface::CopyDir(FILE_RECORD_I<char>* record, char* filename, ch
 
     // print source path to the dialog box
     int oldlen = (int)strlen(SourcePath);
-    SalamanderGeneral->SalPathAddBackslash(SourcePath, MAX_PATH);
+    SalamanderGeneral->SalPathAddBackslash(SourcePath, SourcePath.Size());
     char* namepos = SourcePath + strlen(SourcePath);
-    SalamanderGeneral->SalPathAppend(SourcePath, filename, MAX_PATH);
+    SalamanderGeneral->SalPathAppend(SourcePath, filename, SourcePath.Size());
     Replace0xE5(namepos);
     Progress->SetSourceFileName(SourcePath);
 
@@ -1415,13 +1415,13 @@ CPluginFSInterface::ViewFile(const char* fsName, HWND parent,
         return;
 
     // prepare unique file name for disk-cache (standard Salamander path format)
-    char uniqueFileName[2 * MAX_PATH];
+    CPathBuffer uniqueFileName; // Heap-allocated for long path support
     sprintf(uniqueFileName, "%IX", file.PluginData); // we don't need to test snapshot state, during CPluginFSInterface::CopyOrMoveFromFS() it is valid
     strcat(uniqueFileName, ":");
     strcat(uniqueFileName, fsName);
     strcat(uniqueFileName, ":");
     strcat(uniqueFileName, Path);
-    SalamanderGeneral->SalPathAppend(uniqueFileName + strlen(fsName) + 1, file.Name, MAX_PATH);
+    SalamanderGeneral->SalPathAppend(uniqueFileName + strlen(fsName) + 1, file.Name, uniqueFileName.Size());
     // name on disk are case-insensitive, disk-cache is case-sensitive, we will convert
     // to lowercase so disk-cache will behave as case-insensitive
     SalamanderGeneral->ToLowerCase(uniqueFileName);
@@ -1573,13 +1573,13 @@ void CPluginFSInterface::ContextMenu(const char* fsName, HWND parent, int menuX,
         DumpDebugInformation(parent, di, cmd);
     if (cmd == CMD_FRAGMENTFILE || cmd == CMD_SETVALIDDATAFILE || cmd == CMD_SETSPARSEFILE)
     {
-        char fullPath[2 * MAX_PATH];
+        CPathBuffer fullPath; // Heap-allocated for long path support
         char* archiveOrFS = NULL;
         int type;
-        if (SalamanderGeneral->GetPanelPath(panel, fullPath, sizeof(fullPath), &type, &archiveOrFS, NULL) && archiveOrFS != NULL)
+        if (SalamanderGeneral->GetPanelPath(panel, fullPath, fullPath.Size(), &type, &archiveOrFS, NULL) && archiveOrFS != NULL)
         {
             archiveOrFS++;
-            SalamanderGeneral->SalPathAppend(archiveOrFS, di->FileName->FNName, MAX_PATH);
+            SalamanderGeneral->SalPathAppend(archiveOrFS, di->FileName->FNName, fullPath.Size());
             if (cmd == CMD_FRAGMENTFILE)
                 FragmentFile(parent, di, archiveOrFS);
             if (cmd == CMD_SETVALIDDATAFILE || cmd == CMD_SETSPARSEFILE)
@@ -1903,7 +1903,7 @@ void CPluginFSInterface::DumpDebugInformation(HWND parent, const DIR_ITEM_I<char
         return;
 
     DWORD error;
-    char fileNameBuf[MAX_PATH + MAX_PATH]; // + for stream name
+    CPathBuffer fileNameBuf; // Heap-allocated for long path support
     if (SalamanderGeneral->SalGetTempFileName(tempdir, "view", fileNameBuf, TRUE, &error))
     {
         FILE* file = fopen(fileNameBuf, "w");

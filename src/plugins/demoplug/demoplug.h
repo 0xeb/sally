@@ -39,7 +39,7 @@ BOOL InitFS();
 void ReleaseFS();
 
 // FS name assigned by Salamander after the plugin loads
-extern char AssignedFSName[MAX_PATH];
+extern CPathBuffer AssignedFSName;
 extern int AssignedFSNameLen;
 
 // invoked for the first instance of DEMOPLUG: optional cleanup of its own temp directory
@@ -61,7 +61,7 @@ extern CPluginDataInterfaceAbstract** TransferPluginDataIface;
 extern DWORD* TransferActCustomData;
 
 // global data
-extern char Str[MAX_PATH];
+extern CPathBuffer Str;
 extern int Number;
 extern int Selection; // "second" option in the configuration dialog
 extern BOOL CheckBox;
@@ -324,7 +324,7 @@ class CViewerWindow : public CWindow
 {
 public:
     HANDLE Lock;                      // 'lock' object or NULL (set to the signaled state after the file is closed)
-    char Name[MAX_PATH];              // file name or ""
+    CPathBuffer Name;                 // file name or ""
     CRendererWindow Renderer;         // inner viewer window
     HIMAGELIST HGrayToolBarImageList; // toolbar and menu in the gray variant (computed from the colored one)
     HIMAGELIST HHotToolBarImageList;  // toolbar and menu in the colored variant
@@ -383,12 +383,11 @@ extern CThreadQueue ThreadQueue;       // list of all window threads
 struct CConnectData
 {
     BOOL UseConnectData;
-    char UserPart[MAX_PATH];
+    CPathBuffer UserPart;
 
     CConnectData()
     {
         UseConnectData = FALSE;
-        UserPart[0] = 0;
     }
 };
 
@@ -411,7 +410,7 @@ protected:
     // the caller must invoke us anyway to pump the message queue
     DWORD LastTickCount; // to detect when changed data needs to be repainted
 
-    char TextCache[MAX_PATH];
+    CPathBuffer TextCache;
     BOOL TextCacheIsDirty;
     DWORD ProgressCache;
     BOOL ProgressCacheIsDirty;
@@ -456,7 +455,7 @@ struct CFSData
 class CPluginFSDataInterface : public CPluginDataInterfaceAbstract
 {
 protected:
-    char Path[MAX_PATH]; // buffer for the full file/directory name used when loading icons
+    CPathBuffer Path;    // buffer for the full file/directory name used when loading icons
     char* Name;          // pointer within Path after the last backslash (to the name)
 
 public:
@@ -511,7 +510,7 @@ class CTopIndexMem
 {
 protected:
     // path for the last remembered top index
-    char Path[MAX_PATH];
+    CPathBuffer Path;
     int TopIndexes[TOP_INDEX_MEM_SIZE]; // stored top indexes
     int TopIndexesCount;                // number of stored top indexes
 
@@ -535,7 +534,7 @@ public:
 class CPluginFSInterface : public CPluginFSInterfaceAbstract
 {
 public:
-    char Path[MAX_PATH];             // current path
+    CPathBuffer Path;                // current path
     BOOL PathError;                  // TRUE if ListCurrentPath failed (path error); ChangePath will be called
     BOOL FatalError;                 // TRUE if ListCurrentPath failed (fatal error); ChangePath will be called
     CTopIndexMem TopIndexMem;        // top-index cache used by ExecuteOnFS()

@@ -1,4 +1,4 @@
-// SPDX-FileCopyrightText: 2023 Open Salamander Authors
+﻿// SPDX-FileCopyrightText: 2023 Open Salamander Authors
 // SPDX-License-Identifier: GPL-2.0-or-later
 // CommentsTranslationProject: TRANSLATED
 
@@ -1057,11 +1057,11 @@ void CPluginInterface::AcceptChangeOnPathNotification(const char* path, BOOL inc
 
         SalamanderGeneral->RemoveFilesFromCache(path);
 
-        char path2[2 * MAX_PATH]; // build the name for the second FS-name (remove the same name from cache on the other FS-name as a precaution)
+        CPathBuffer path2; // build the name for the second FS-name (remove the same name from cache on the other FS-name as a precaution)
         strcpy(path2, isFTPS ? AssignedFSName : AssignedFSNameFTPS);
         lstrcpyn(path2 + (isFTPS ? AssignedFSNameLen : AssignedFSNameLenFTPS),
                  path + (isFTP ? AssignedFSNameLen : AssignedFSNameLenFTPS),
-                 2 * MAX_PATH - (isFTPS ? AssignedFSNameLen : AssignedFSNameLenFTPS));
+                 path2.Size() - (isFTPS ? AssignedFSNameLen : AssignedFSNameLenFTPS));
         SalamanderGeneral->RemoveFilesFromCache(path2);
     }
 }
@@ -1484,7 +1484,7 @@ BOOL CFTPServer::Load(HWND parent, HKEY regKey, CSalamanderRegistryAbstract* reg
 {
     char itemName[BOOKMARKNAME_MAX_SIZE];
     char address[HOST_MAX_SIZE];
-    char initialPath[FTP_MAX_PATH];
+    CPathBuffer initialPath;
     int anonymousConnection;
     char userName[USER_MAX_SIZE];
     BYTE* encryptedPassword;
@@ -1505,7 +1505,7 @@ BOOL CFTPServer::Load(HWND parent, HKEY regKey, CSalamanderRegistryAbstract* reg
     int useServerSpeedLimit;
     double serverSpeedLimit;
     int useListingsCache;
-    char initFTPCommands[FTP_MAX_PATH];
+    CPathBuffer initFTPCommands;
     char listCommand[FTPCOMMAND_MAX_SIZE];
     int encryptControlConnection, encryptDataConnection;
     int compressData;
@@ -1543,7 +1543,7 @@ BOOL CFTPServer::Load(HWND parent, HKEY regKey, CSalamanderRegistryAbstract* reg
     if (!registry->GetValue(regKey, CONFIG_FTPSRVNAME, REG_SZ, itemName, BOOKMARKNAME_MAX_SIZE))
         return FALSE; // the name is mandatory
     registry->GetValue(regKey, CONFIG_FTPSRVADDRESS, REG_SZ, address, HOST_MAX_SIZE);
-    registry->GetValue(regKey, CONFIG_FTPSRVPATH, REG_SZ, initialPath, FTP_MAX_PATH);
+    registry->GetValue(regKey, CONFIG_FTPSRVPATH, REG_SZ, initialPath, initialPath.Size());
     registry->GetValue(regKey, CONFIG_FTPSRVANONYM, REG_DWORD, &anonymousConnection, sizeof(DWORD));
     registry->GetValue(regKey, CONFIG_FTPSRVUSER, REG_SZ, userName, USER_MAX_SIZE);
 
@@ -1582,7 +1582,7 @@ BOOL CFTPServer::Load(HWND parent, HKEY regKey, CSalamanderRegistryAbstract* reg
             serverSpeedLimit = ServerSpeedLimit; // do not leave -1 there -> use the default value
     }
     registry->GetValue(regKey, CONFIG_FTPSRVUSELISTINGSCACHE, REG_DWORD, &useListingsCache, sizeof(DWORD));
-    registry->GetValue(regKey, CONFIG_FTPSRVINITFTPCMDS, REG_SZ, initFTPCommands, FTP_MAX_PATH);
+    registry->GetValue(regKey, CONFIG_FTPSRVINITFTPCMDS, REG_SZ, initFTPCommands, initFTPCommands.Size());
     registry->GetValue(regKey, CONFIG_FTPSRVLISTCMD, REG_SZ, listCommand, FTPCOMMAND_MAX_SIZE);
     if (strcmp(listCommand, LIST_CMD_TEXT) == 0)
         listCommand[0] = 0;

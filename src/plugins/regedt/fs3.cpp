@@ -191,14 +191,14 @@ void CPluginFSInterface::AcceptChangeOnPathNotification(const char* fsName, cons
         // compare paths or at least their prefixes (only paths on our FS have a chance;
         // disk paths and paths on other FS types in 'path' are filtered out automatically
         // because they can never match 'fsName'+':' at the beginning of 'path2' below)
-        char path1[MAX_PATH * 2];
-        char path2[MAX_FULL_KEYNAME + MAX_PATH];
+        CPathBuffer path1; // Heap-allocated for long path support
+        CPathBuffer path2; // Heap-allocated for long path support
         char root[MAX_PREDEF_KEYNAME];
         char key[MAX_KEYNAME];
-        lstrcpyn(path1, path, MAX_PATH * 2);
+        lstrcpyn(path1, path, path1.Size());
         WStrToStr(root, MAX_PREDEF_KEYNAME, PredefinedHKeys[CurrentKeyRoot].KeyName);
         WStrToStr(key, MAX_KEYNAME, CurrentKeyName);
-        SalPrintf(path2, MAX_FULL_KEYNAME + MAX_PATH, "%s:\\%s\\%s", fsName, root, key);
+        SalPrintf(path2.Get(), path2.Size(), "%s:\\%s\\%s", fsName, root, key);
         RemoveTrailingSlashes(path1);
         RemoveTrailingSlashes(path2);
         int len1 = (int)strlen(path1);
@@ -381,10 +381,10 @@ void CPluginFSInterface::ViewFile(const char* fsName, HWND parent,
         return;
 
     // build a unique file name for the disk cache (standard Salamander path format)
-    char uniqueFileName[MAX_FULL_KEYNAME + MAX_PATH];
-    SalPrintf(uniqueFileName, MAX_FULL_KEYNAME + MAX_PATH, "%s:\\%ls\\%ls", fsName,
+    CPathBuffer uniqueFileName; // Heap-allocated for long path support
+    SalPrintf(uniqueFileName.Get(), uniqueFileName.Size(), "%s:\\%ls\\%ls", fsName,
               PredefinedHKeys[CurrentKeyRoot].KeyName, CurrentKeyName);
-    SG->SalPathAppend(uniqueFileName, file.Name, MAX_FULL_KEYNAME + MAX_PATH);
+    SG->SalPathAppend(uniqueFileName, file.Name, uniqueFileName.Size());
 
     // disk names are case-insensitive, the disk cache is case-sensitive; converting
     // to lowercase makes the cache behave case-insensitively as well

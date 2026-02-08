@@ -190,9 +190,9 @@ char* CPreviewWindow::GetItemText(int index, int subItem)
                 //   }
                 //   else
                 //   {
-                *LPWORD(NewNameCache) = MAX_PATH;
+                *LPWORD(NewNameCache.Get()) = (WORD)NewNameCache.Size();
                 int l = (int)SendMessage(RenamerDialog->ManualEdit->HWindow, EM_GETLINE,
-                                         index, (LPARAM)NewNameCache);
+                                         index, (LPARAM)(char*)NewNameCache);
                 NewNameCache[l] = 0; // just to be sure
 
                 NewNameValid = ValidateFileName(NewNameCache, l, RenamerOptions.Spec, NULL, NULL);
@@ -210,7 +210,7 @@ char* CPreviewWindow::GetItemText(int index, int subItem)
                         int l = Renamer.Rename(item, index, NewNameCache, FALSE);
                         if (l < 0)
                         {
-                            SalPrintf(NewNameCache, MAX_PATH, LoadStr(IDS_GENERICERR), LoadStr(IDS_EXP_SMALLBUFFER));
+                            SalPrintf(NewNameCache, NewNameCache.Size(), LoadStr(IDS_GENERICERR), LoadStr(IDS_EXP_SMALLBUFFER));
                         }
                         else
                         {
@@ -241,7 +241,7 @@ char* CPreviewWindow::GetItemText(int index, int subItem)
                             et = IDS_GENERICERR;
                             break;
                         }
-                        SalPrintf(NewNameCache, MAX_PATH, LoadStr(et), LoadStr(error));
+                        SalPrintf(NewNameCache, NewNameCache.Size(), LoadStr(et), LoadStr(error));
                     }
                 }
             }
@@ -255,9 +255,9 @@ char* CPreviewWindow::GetItemText(int index, int subItem)
         {
         case rsFileName:
         {
-            lstrcpyn(TextBuffer, item->FullName, _countof(TextBuffer));
-            if (item->NameLen < _countof(TextBuffer) ||
-                strchr(item->FullName + _countof(TextBuffer) - 1, '\\') == NULL)
+            lstrcpyn(TextBuffer, item->FullName, TextBuffer.Size());
+            if ((int)item->NameLen < TextBuffer.Size() ||
+                strchr(item->FullName + TextBuffer.Size() - 1, '\\') == NULL)
             {
                 SG->CutDirectory(TextBuffer);
             }

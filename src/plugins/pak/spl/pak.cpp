@@ -426,7 +426,7 @@ BOOL CPluginInterfaceForArchiver::UnpackFiles(TIndirectArray2<CFileInfo>& files,
                 Salamander->ProgressDialogAddText(message, TRUE);
                 // Declare path buffers before goto block to avoid skipping initialization
                 CPathBuffer targetName; // Heap-allocated for long path support
-                char arcName[MAX_PATH + PAK_MAXPATH];
+                CPathBuffer arcName; // Heap-allocated for long path support
                 if (lstrlen(targetDir) + lstrlen(file) - rootLen >= MAX_PATH)
                 {
                     if (Silent & SF_LONGNAMES)
@@ -446,7 +446,7 @@ BOOL CPluginInterfaceForArchiver::UnpackFiles(TIndirectArray2<CFileInfo>& files,
                 SalamanderGeneral->SalPathAppend(targetName, file + rootLen, targetName.Size());
                 IOFileName = targetName;
                 lstrcpy(arcName, arcFile);
-                SalamanderGeneral->SalPathAppend(arcName, file, MAX_PATH + PAK_MAXPATH);
+                SalamanderGeneral->SalPathAppend(arcName, file, arcName.Size());
                 FILETIME ft;
                 PakIFace->GetPakTime(&ft);
                 char buf[100];

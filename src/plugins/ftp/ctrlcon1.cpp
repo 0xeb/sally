@@ -2055,9 +2055,9 @@ MENU_TEMPLATE_ITEM MsgBoxButtons[] =
 
         // send the initial FTP commands
         HANDLES(EnterCriticalSection(&SocketCritSect));
-        char cmdBuf[FTP_MAX_PATH];
+        CPathBuffer cmdBuf;
         if (InitFTPCommands != NULL && *InitFTPCommands != 0)
-            lstrcpyn(cmdBuf, InitFTPCommands, FTP_MAX_PATH);
+            lstrcpyn(cmdBuf, InitFTPCommands, cmdBuf.Size());
         else
             cmdBuf[0] = 0;
         HANDLES(LeaveCriticalSection(&SocketCritSect));

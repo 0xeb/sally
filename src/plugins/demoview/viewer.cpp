@@ -116,7 +116,7 @@ void ReleaseViewer()
 class CViewerThread : public CThread
 {
 protected:
-    char Name[MAX_PATH];
+    CPathBuffer Name; // Heap-allocated for long path support
     int Left, Top, Width, Height;
     UINT ShowCmd;
     BOOL AlwaysOnTop;
@@ -137,7 +137,7 @@ public:
                   BOOL* success, int enumFilesSourceUID,
                   int enumFilesCurrentIndex) : CThread("DMV Viewer")
     {
-        lstrcpyn(Name, name, MAX_PATH);
+        lstrcpyn(Name, name, Name.Size());
         Left = left;
         Top = top;
         Width = width;
@@ -509,7 +509,7 @@ void FillMenuFilter(CGUIMenuPopupAbstract* popup, int cmdFirst, int filterCount)
     mi.Type = MENU_TYPE_STRING;
     mi.State = 0;
 
-    char buff[MAX_PATH + 3];
+    CPathBuffer buff; // Heap-allocated for long path support
     mi.String = buff;
     int index = 0;
     while (index < filterCount)
@@ -624,12 +624,12 @@ CViewerWindow::WindowProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
     case WM_DROPFILES: // allow opening files via drag and drop
     {
         UINT drag;
-        char path[MAX_PATH];
+        CPathBuffer path; // Heap-allocated for long path support
 
         drag = DragQueryFile((HDROP)wParam, 0xFFFFFFFF, NULL, 0); // determine how many files were dropped onto the window
         if (drag > 0)
         {
-            DragQueryFile((HDROP)wParam, 0, path, MAX_PATH);
+            DragQueryFile((HDROP)wParam, 0, path, path.Size());
             OpenFile(path);
         }
         DragFinish((HDROP)wParam);
@@ -728,8 +728,7 @@ CViewerWindow::WindowProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
                 BOOL ok = FALSE;
                 BOOL srcBusy = FALSE;
                 BOOL noMoreFiles = FALSE;
-                char fileName[MAX_PATH];
-                fileName[0] = 0;
+                CPathBuffer fileName; // Heap-allocated for long path support
                 if (shiftPressed) // legacy hot-key: use Backspace (keys + commands in the menu see PictView, menu File/Other Files)
                 {
                     ok = SalamanderGeneral->GetPreviousFileNameForViewer(EnumFilesSourceUID,
@@ -853,8 +852,7 @@ CViewerWindow::WindowProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
         {
         case CM_VIEWER_OPEN:
         {
-            char file[MAX_PATH];
-            file[0] = 0;
+            CPathBuffer file; // Heap-allocated for long path support
             OPENFILENAME ofn;
             memset(&ofn, 0, sizeof(OPENFILENAME));
             ofn.lStructSize = sizeof(OPENFILENAME);
@@ -870,10 +868,10 @@ CViewerWindow::WindowProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
                 s++;
             }
             ofn.lpstrFile = file;
-            ofn.nMaxFile = MAX_PATH;
+            ofn.nMaxFile = file.Size();
             ofn.nFilterIndex = 1;
-            char curDir[MAX_PATH];
-            lstrcpyn(curDir, Name, MAX_PATH);
+            CPathBuffer curDir; // Heap-allocated for long path support
+            lstrcpyn(curDir, Name, curDir.Size());
             SalamanderGeneral->CutDirectory(curDir);
             ofn.lpstrInitialDir = curDir[0] != 0 ? curDir : NULL;
             ofn.Flags = OFN_PATHMUSTEXIST | OFN_FILEMUSTEXIST | OFN_HIDEREADONLY;
@@ -958,7 +956,7 @@ void CViewerWindow::OpenFile(const char* name, BOOL setLock)
         SetEvent(Lock);
         Lock = NULL; // from now on it's up to the disk cache
     }
-    lstrcpyn(Name, name, MAX_PATH);
+    lstrcpyn(Name, name, Name.Size());
     InvalidateRect(HWindow, NULL, TRUE);
     InvalidateRect(Renderer.HWindow, NULL, TRUE);
 }

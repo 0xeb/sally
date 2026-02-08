@@ -206,7 +206,7 @@ char* String<char>::AddNumberSuffix(char* filename, int n)
     if (ext != NULL && (ext - filename) != ((int)strlen(filename) - 4))
         ext = NULL;
 
-    char temp[MAX_PATH + 50];
+    CPathBuffer temp; // Heap-allocated for long path support
     if (ext == NULL)
     {
         sprintf(temp, "%s (%d)", filename, n++);

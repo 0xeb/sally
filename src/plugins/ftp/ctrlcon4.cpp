@@ -330,10 +330,10 @@ BOOL CControlConnectionSocket::ListWorkingPath(HWND parent, const char* path, ch
     *pathListingIsBroken = FALSE;
     BOOL ok = TRUE;
     BOOL ret = TRUE;
-    char cmdBuf[50 + FTP_MAX_PATH];
-    char logBuf[50 + FTP_MAX_PATH];
+    CPathBuffer cmdBuf;
+    CPathBuffer logBuf;
     char replyBuf[700];
-    char errBuf[900 + FTP_MAX_PATH];
+    CPathBuffer errBuf;
     char listCmd[FTPCOMMAND_MAX_SIZE + 2];
 
     HANDLES(EnterCriticalSection(&SocketCritSect));
@@ -382,7 +382,7 @@ BOOL CControlConnectionSocket::ListWorkingPath(HWND parent, const char* path, ch
             ReuseSSLSessionFailed = FALSE;
             if (ok && usePassiveModeAux) // passive mode (PASV)
             {
-                PrepareFTPCommand(cmdBuf, 50 + FTP_MAX_PATH, logBuf, 50 + FTP_MAX_PATH,
+                PrepareFTPCommand(cmdBuf, cmdBuf.Size(), logBuf, logBuf.Size(),
                                   ftpcmdPassive, NULL); // cannot fail
                 int ftpReplyCode;
                 if (SendFTPCommand(parent, cmdBuf, logBuf, NULL, GetWaitTime(WAITWND_COMOPER), NULL,
@@ -427,9 +427,9 @@ BOOL CControlConnectionSocket::ListWorkingPath(HWND parent, const char* path, ch
                 dataConnection->SetActive(logUID);
                 if (OpenForListeningAndWaitForRes(parent, dataConnection, &localIP, &localPort, &canRetry,
                                                   retryMsgBuf, 300, GetWaitTime(WAITWND_COMOPER),
-                                                  errBuf, 900 + FTP_MAX_PATH))
+                                                  errBuf, errBuf.Size()))
                 {
-                    PrepareFTPCommand(cmdBuf, 50 + FTP_MAX_PATH, logBuf, 50 + FTP_MAX_PATH,
+                    PrepareFTPCommand(cmdBuf, cmdBuf.Size(), logBuf, logBuf.Size(),
                                       ftpcmdSetPort, NULL, localIP, localPort); // cannot fail
                     int ftpReplyCode;
                     if (!SendFTPCommand(parent, cmdBuf, logBuf, NULL, GetWaitTime(WAITWND_COMOPER), NULL,
@@ -553,7 +553,7 @@ BOOL CControlConnectionSocket::ListWorkingPath(HWND parent, const char* path, ch
                                 else
                                 {
                                     // display the "list can be incomplete" message; the user has not been warned yet
-                                    lstrcpyn(errBuf, LoadStr(IDS_UNABLETOREADLIST), 900 + FTP_MAX_PATH);
+                                    lstrcpyn(errBuf, LoadStr(IDS_UNABLETOREADLIST), errBuf.Size());
                                     int len = (int)strlen(errBuf);
                                     BOOL systErr = FALSE;
                                     BOOL trModeHint = FTP_DIGIT_1(ftpReplyCode) == FTP_D1_TRANSIENTERROR &&
@@ -592,7 +592,7 @@ BOOL CControlConnectionSocket::ListWorkingPath(HWND parent, const char* path, ch
                                             }
                                         }
                                     }
-                                    _snprintf_s(errBuf + len, 900 + FTP_MAX_PATH - len, _TRUNCATE,
+                                    _snprintf_s(errBuf + len, errBuf.Size() - len, _TRUNCATE,
                                                 LoadStr(systErr ? (trModeHint ? IDS_UNABLETOREADLISTSUFFIX3 : IDS_UNABLETOREADLISTSUFFIX) : (trModeHint ? IDS_UNABLETOREADLISTSUFFIX4 : IDS_UNABLETOREADLISTSUFFIX2)),
                                                 replyBuf);
                                     SalamanderGeneral->SalMessageBox(parent, errBuf,
@@ -651,7 +651,7 @@ BOOL CControlConnectionSocket::ListWorkingPath(HWND parent, const char* path, ch
                         dataConnection->SetCertificate(pCertificate);
 
                     // change the path to 'path' (the path we are listing)
-                    PrepareFTPCommand(cmdBuf, 50 + FTP_MAX_PATH, logBuf, 50 + FTP_MAX_PATH,
+                    PrepareFTPCommand(cmdBuf, cmdBuf.Size(), logBuf, logBuf.Size(),
                                       ftpcmdChangeWorkingPath, NULL, path);
                     int ftpReplyCode;
                     if (SendFTPCommand(parent, cmdBuf, logBuf, NULL, GetWaitTime(WAITWND_COMOPER), NULL,
@@ -661,7 +661,7 @@ BOOL CControlConnectionSocket::ListWorkingPath(HWND parent, const char* path, ch
                         BOOL pathError = TRUE;
                         if (FTP_DIGIT_1(ftpReplyCode) == FTP_D1_SUCCESS) // there is hope for success; better verify the path
                         {
-                            if (GetCurrentWorkingPath(parent, cmdBuf, FTP_MAX_PATH, TRUE, &canRetry,
+                            if (GetCurrentWorkingPath(parent, cmdBuf, cmdBuf.Size(), TRUE, &canRetry,
                                                       retryMsgBuf, 300))
                             {
                                 if (strcmp(cmdBuf, path) == 0) // we have the desired working directory on the server
@@ -737,9 +737,9 @@ BOOL CControlConnectionSocket::ListWorkingPath(HWND parent, const char* path, ch
             ok = FALSE;
 
             // display the "list can be incomplete" message; the user has not been warned yet
-            lstrcpyn(errBuf, LoadStr(IDS_UNABLETOREADLIST), 900 + FTP_MAX_PATH);
+            lstrcpyn(errBuf, LoadStr(IDS_UNABLETOREADLIST), errBuf.Size());
             int len = (int)strlen(errBuf);
-            _snprintf_s(errBuf + len, 900 + FTP_MAX_PATH - len, _TRUNCATE, LoadStr(IDS_UNABLETOREADLISTSUFFIX),
+            _snprintf_s(errBuf + len, errBuf.Size() - len, _TRUNCATE, LoadStr(IDS_UNABLETOREADLISTSUFFIX),
                         LoadStr(IDS_ERRDATACONDECOMPRERROR));
             SalamanderGeneral->SalMessageBox(parent, errBuf, LoadStr(IDS_FTPERRORTITLE),
                                              MB_OK | MB_ICONEXCLAMATION);

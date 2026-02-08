@@ -16,7 +16,7 @@ extern HBRUSH HDitheredBrush;
 class CFileHeaderWindow : public CWindow
 {
 protected:
-    char Text[MAX_PATH];
+    CPathBuffer Text; // Heap-allocated for long path support
     int TextLen;
     COLORREF BkColor;
     HBRUSH BkgndBrush;

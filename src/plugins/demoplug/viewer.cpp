@@ -276,7 +276,7 @@ CPluginInterfaceForViewer::ViewFile(const char *name, int left, int top, int wid
 class CViewerThread : public CThread
 {
 protected:
-    char Name[MAX_PATH];
+    CPathBuffer Name;
     int Left, Top, Width, Height;
     UINT ShowCmd;
     BOOL AlwaysOnTop;
@@ -297,7 +297,7 @@ public:
                   BOOL* success, int enumFilesSourceUID,
                   int enumFilesCurrentIndex) : CThread("DOP Viewer")
     {
-        lstrcpyn(Name, name, MAX_PATH);
+        lstrcpyn(Name, name, Name.Size());
         Left = left;
         Top = top;
         Width = width;
@@ -727,7 +727,7 @@ void FillMenuFilter(CGUIMenuPopupAbstract* popup, int cmdFirst, int filterCount)
     mi.Type = MENU_TYPE_STRING;
     mi.State = 0;
 
-    char buff[MAX_PATH + 3];
+    CPathBuffer buff;
     mi.String = buff;
     int index = 0;
     while (index < filterCount)
@@ -842,12 +842,12 @@ CViewerWindow::WindowProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
     case WM_DROPFILES: // drag&drop open file
     {
         UINT drag;
-        char path[MAX_PATH];
+        CPathBuffer path;
 
         drag = DragQueryFile((HDROP)wParam, 0xFFFFFFFF, NULL, 0); // how many files were dropped
         if (drag > 0)
         {
-            DragQueryFile((HDROP)wParam, 0, path, MAX_PATH);
+            DragQueryFile((HDROP)wParam, 0, path, path.Size());
             OpenFile(path);
         }
         DragFinish((HDROP)wParam);
@@ -955,7 +955,7 @@ CViewerWindow::WindowProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
                 BOOL ok = FALSE;
                 BOOL srcBusy = FALSE;
                 BOOL noMoreFiles = FALSE;
-                char fileName[MAX_PATH];
+                CPathBuffer fileName;
                 fileName[0] = 0;
                 if (shiftPressed) // obsolete hotkey: use Backspace instead (see PictView, File/Other Files for the key bindings)
                 {
@@ -1083,7 +1083,7 @@ CViewerWindow::WindowProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
         {
         case CM_VIEWER_OPEN:
         {
-            char file[MAX_PATH];
+            CPathBuffer file;
             file[0] = 0;
             OPENFILENAME ofn;
             memset(&ofn, 0, sizeof(OPENFILENAME));
@@ -1100,12 +1100,12 @@ CViewerWindow::WindowProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
                 s++;
             }
             ofn.lpstrFile = file;
-            ofn.nMaxFile = MAX_PATH;
+            ofn.nMaxFile = file.Size();
             ofn.nFilterIndex = 1;
-            char curDir[MAX_PATH];
-            lstrcpyn(curDir, Name, MAX_PATH);
+            CPathBuffer curDir;
+            lstrcpyn(curDir, Name, curDir.Size());
             SalamanderGeneral->CutDirectory(curDir);
-            ofn.lpstrInitialDir = curDir[0] != 0 ? curDir : NULL;
+            ofn.lpstrInitialDir = curDir[0] != 0 ? (const char*)curDir : NULL;
             ofn.Flags = OFN_PATHMUSTEXIST | OFN_FILEMUSTEXIST | OFN_HIDEREADONLY;
 
             if (SalamanderGeneral->SafeGetOpenFileName(&ofn))

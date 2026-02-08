@@ -196,7 +196,7 @@ namespace split
     static INT_PTR CALLBACK SplitDlgProc(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
     {
         CALL_STACK_MESSAGE4("SplitDlgProc( , 0x%X, 0x%IX, 0x%IX)", uMsg, wParam, lParam);
-        char text[MAX_PATH + 100];
+        CPathBuffer text; // Heap-allocated for long path support
 
         switch (uMsg)
         {
@@ -300,7 +300,7 @@ namespace split
             case IDC_BUTTON_BROWSE:
             {
                 HWND parent = SalamanderGeneral->GetMsgBoxParent();
-                GetDlgItemText(hWnd, IDC_EDIT_DIR, text, MAX_PATH);
+                GetDlgItemText(hWnd, IDC_EDIT_DIR, text, text.Size());
                 if (SalamanderGeneral->GetTargetDirectory(hWnd, parent, LoadStr(IDS_SPLIT),
                                                           LoadStr(IDS_SELECTDIR), text, FALSE, text))
                     SetDlgItemText(hWnd, IDC_EDIT_DIR, text);
@@ -364,7 +364,7 @@ namespace combine
     {
         int index;
         //HICON hIcon;
-        char text[MAX_PATH];
+        CPathBuffer text; // Heap-allocated for long path support
     };
 
     static BOOL AddFile(LPTSTR fullName, BOOL bUpdateArray = TRUE)

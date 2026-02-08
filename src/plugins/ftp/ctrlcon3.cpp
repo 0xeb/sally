@@ -794,7 +794,7 @@ BOOL CControlConnectionSocket::GetCurrentWorkingPath(HWND parent, char* path, in
         {
             HANDLES(EnterCriticalSection(&SocketCritSect));
             if (FTP_DIGIT_1(ftpReplyCode) == FTP_D1_SUCCESS && // success is returned (should be 257)
-                    FTPGetDirectoryFromReply(replyBuf, (int)strlen(replyBuf), WorkingPath, FTP_MAX_PATH) ||
+                    FTPGetDirectoryFromReply(replyBuf, (int)strlen(replyBuf), WorkingPath, WorkingPath.Size()) ||
                 FTP_DIGIT_1(ftpReplyCode) != FTP_D1_SUCCESS) // failure returned (e.g. "not defined; use CWD to set the working directory") -> temporarily use an empty path
             {
                 if (FTP_DIGIT_1(ftpReplyCode) != FTP_D1_SUCCESS)
@@ -864,10 +864,10 @@ BOOL CControlConnectionSocket::SendChangeWorkingPath(BOOL notInPanel, BOOL leftP
 
     BOOL ret = FALSE;
     *success = FALSE;
-    char cmdBuf[50 + FTP_MAX_PATH];
-    char logBuf[50 + FTP_MAX_PATH];
+    CPathBuffer cmdBuf;
+    CPathBuffer logBuf;
     char replyBuf[700];
-    char newPath[FTP_MAX_PATH];
+    CPathBuffer newPath;
     BOOL reconnected = FALSE;
     int attemptNum = 1;
     if (totalAttemptNum != NULL)
@@ -899,7 +899,7 @@ BOOL CControlConnectionSocket::SendChangeWorkingPath(BOOL notInPanel, BOOL leftP
             if (i == 0 && !reconnected && startPath != NULL)                 // we have been connected for a while, check
             {                                                                // whether the working directory matches 'startPath'
                 // use the cache; under normal circumstances the path should be there
-                if (GetCurrentWorkingPath(parent, newPath, FTP_MAX_PATH, FALSE, &canRetry, retryMsgBuf, 300))
+                if (GetCurrentWorkingPath(parent, newPath, newPath.Size(), FALSE, &canRetry, retryMsgBuf, 300))
                 {
                     if (strcmp(newPath, startPath) != 0) // the working directory on the server differs - change required
                         needChangeDir = TRUE;            // (assumption: the server always returns the same working path string)
@@ -924,7 +924,7 @@ BOOL CControlConnectionSocket::SendChangeWorkingPath(BOOL notInPanel, BOOL leftP
                 p = path;
                 i = 1; // end of the loop
             }
-            if (PrepareFTPCommand(cmdBuf, 50 + FTP_MAX_PATH, logBuf, 50 + FTP_MAX_PATH,
+            if (PrepareFTPCommand(cmdBuf, cmdBuf.Size(), logBuf, logBuf.Size(),
                                   ftpcmdChangeWorkingPath, NULL, p))
             {
                 int ftpReplyCode;
@@ -1033,8 +1033,8 @@ BOOL CControlConnectionSocket::ChangeWorkingPath(BOOL notInPanel, BOOL leftPanel
     }
     CFTPServerPathType pathType = ftpsptEmpty;
     BOOL donotTestPath = FALSE;
-    char newPath[FTP_MAX_PATH];
-    char prevUsedPath[FTP_MAX_PATH];
+    CPathBuffer newPath;
+    CPathBuffer prevUsedPath;
     BOOL fileNameAlreadyCut = FALSE;
     if (ret)
     {
@@ -1095,13 +1095,13 @@ BOOL CControlConnectionSocket::ChangeWorkingPath(BOOL notInPanel, BOOL leftPanel
                         if (pathType == ftpsptOpenVMS && mode == 3 && !fileNameAlreadyCut &&
                             cutFileName != NULL && !cutDirectory)
                         { // try whether it is a file name (with VMS it is distinguished by syntax)
-                            lstrcpyn(prevUsedPath, path, FTP_MAX_PATH);
+                            lstrcpyn(prevUsedPath, path, prevUsedPath.Size());
                             BOOL fileNameCouldBeCut;
-                            if (FTPCutDirectory(pathType, prevUsedPath, FTP_MAX_PATH, newPath,
-                                                FTP_MAX_PATH, &fileNameCouldBeCut) &&
+                            if (FTPCutDirectory(pathType, prevUsedPath, prevUsedPath.Size(), newPath,
+                                                newPath.Size(), &fileNameCouldBeCut) &&
                                 fileNameCouldBeCut) // with VMS, 'fileNameCouldBeCut' == TRUE means it is definitely a file
                             {
-                                lstrcpyn(cutFileName, newPath, MAX_PATH);
+                                lstrcpyn(cutFileName, newPath, cutFileNameBufSize);
                                 lstrcpyn(path, prevUsedPath, pathBufSize);
                                 fileNameAlreadyCut = TRUE;
                                 if (pathWasCut != NULL)
@@ -1119,7 +1119,7 @@ BOOL CControlConnectionSocket::ChangeWorkingPath(BOOL notInPanel, BOOL leftPanel
     }
 
     char replyBuf[700];
-    char errBuf[900 + FTP_MAX_PATH];
+    CPathBuffer errBuf;
     if (ret && showChangeInLog && // if it should be shown in the log
         !cutDirectory)            // only on the first pass (do not report shortening due to a faulty listing)
     {
@@ -1132,7 +1132,7 @@ BOOL CControlConnectionSocket::ChangeWorkingPath(BOOL notInPanel, BOOL leftPanel
     {
         if (donotTestPath)
             donotTestPath = FALSE;                  // path change - we must test the modified one
-        lstrcpyn(prevUsedPath, path, FTP_MAX_PATH); // remember the previous path on the server (returned by the server)
+        lstrcpyn(prevUsedPath, path, prevUsedPath.Size()); // remember the previous path on the server (returned by the server)
         if (!FTPCutDirectory(pathType, path, pathBufSize, NULL, 0, NULL))
         {
             if (rescuePath[0] != 0) // try the rescue path as well
@@ -1203,9 +1203,9 @@ BOOL CControlConnectionSocket::ChangeWorkingPath(BOOL notInPanel, BOOL leftPanel
                                                            cachedListing, cachedListingLen,
                                                            cachedListingDate,
                                                            cachedListingStartTime);
-                char pathSearchedInCache[FTP_MAX_PATH];
+                CPathBuffer pathSearchedInCache;
                 if (useListingsCacheAux && !forceRefresh)
-                    lstrcpyn(pathSearchedInCache, path, FTP_MAX_PATH);
+                    lstrcpyn(pathSearchedInCache, path, pathSearchedInCache.Size());
                 else
                     pathSearchedInCache[0] = 0;
 
@@ -1234,7 +1234,7 @@ BOOL CControlConnectionSocket::ChangeWorkingPath(BOOL notInPanel, BOOL leftPanel
                         retryMsgAux = NULL;
                         if (success) // the server reports success - retrieve the new path
                         {
-                            if (GetCurrentWorkingPath(parent, newPath, FTP_MAX_PATH, forceRefresh,
+                            if (GetCurrentWorkingPath(parent, newPath, newPath.Size(), forceRefresh,
                                                       &canRetry, retryMsgBuf, 300))
                             {
                                 if (cutDirectory && strcmp(newPath, prevUsedPath) == 0)
@@ -1286,7 +1286,7 @@ BOOL CControlConnectionSocket::ChangeWorkingPath(BOOL notInPanel, BOOL leftPanel
 
                         // try to shorten the path (a successful path change would not reach this point)
                         BOOL fileNameCouldBeCut;
-                        if (!FTPCutDirectory(pathType, path, pathBufSize, newPath, FTP_MAX_PATH, &fileNameCouldBeCut))
+                        if (!FTPCutDirectory(pathType, path, pathBufSize, newPath, newPath.Size(), &fileNameCouldBeCut))
                         {
                             if (rescuePath[0] != 0) // try the rescue path as well
                             {
@@ -1298,7 +1298,7 @@ BOOL CControlConnectionSocket::ChangeWorkingPath(BOOL notInPanel, BOOL leftPanel
                             else
                             {
                                 // even if we did not find any accessible path, we do not want a disconnect, therefore do the following:
-                                if (GetCurrentWorkingPath(parent, newPath, FTP_MAX_PATH, TRUE,
+                                if (GetCurrentWorkingPath(parent, newPath, newPath.Size(), TRUE,
                                                           &canRetry, retryMsgBuf, 300))
                                 {
                                     if (newPath[0] == 0) // we care only about the case when there is no current path on the server (otherwise we should not get here - rescuePath would be used)
@@ -1332,7 +1332,7 @@ BOOL CControlConnectionSocket::ChangeWorkingPath(BOOL notInPanel, BOOL leftPanel
                         {
                             errBuf[0] = 0; // in 'mode' 3 this is not reported as an error (we are trying to focus on the file)
                             if (cutFileName != NULL)
-                                lstrcpyn(cutFileName, newPath, MAX_PATH);
+                                lstrcpyn(cutFileName, newPath, cutFileNameBufSize);
                         }
                         else
                         {
@@ -1475,7 +1475,7 @@ void CControlConnectionSocket::GiveConnectionToWorker(CFTPWorker* newWorker, HWN
                 if (HaveWorkingPath)
                 {
                     newWorker->HaveWorkingPath = TRUE;
-                    lstrcpyn(newWorker->WorkingPath, WorkingPath, FTP_MAX_PATH);
+                    lstrcpyn(newWorker->WorkingPath, WorkingPath, newWorker->WorkingPath.Size());
                 }
                 newWorker->CurrentTransferMode = CurrentTransferMode;
                 newWorker->ResetBuffersAndEvents();
@@ -1542,7 +1542,7 @@ void CControlConnectionSocket::GetConnectionFromWorker(CFTPWorker* workerWithCon
             if (workerWithCon->HaveWorkingPath)
             {
                 HaveWorkingPath = TRUE;
-                lstrcpyn(WorkingPath, workerWithCon->WorkingPath, FTP_MAX_PATH);
+                lstrcpyn(WorkingPath, workerWithCon->WorkingPath, WorkingPath.Size());
             }
             CurrentTransferMode = workerWithCon->CurrentTransferMode;
             ResetBuffersAndEvents();

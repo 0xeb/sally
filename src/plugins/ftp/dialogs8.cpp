@@ -590,8 +590,8 @@ void CConnectAdvancedDlg::Transfer(CTransferInfo& ti)
         ti.EditLine(IDE_INITFTPCOMMANDS, HandleNULLStr(Server->InitFTPCommands), FTP_MAX_PATH);
     else
     {
-        char initFTPCommands[FTP_MAX_PATH];
-        ti.EditLine(IDE_INITFTPCOMMANDS, initFTPCommands, FTP_MAX_PATH);
+        CPathBuffer initFTPCommands;
+        ti.EditLine(IDE_INITFTPCOMMANDS, initFTPCommands, initFTPCommands.Size());
         UpdateStr(Server->InitFTPCommands, initFTPCommands);
     }
 

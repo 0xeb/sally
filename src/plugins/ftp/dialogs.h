@@ -1016,7 +1016,7 @@ protected:
     // critical section for accessing object data
     CRITICAL_SECTION GetFreeSpaceCritSect;
 
-    char Path[MAX_PATH]; // path where we check free space
+    CPathBuffer Path; // path where we check free space
     CQuadWord FreeSpace; // detected free space; -1 = free space unknown
     HWND Dialog;         // handle of the operation dialog that should receive it
 

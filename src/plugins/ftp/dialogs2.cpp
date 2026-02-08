@@ -1,4 +1,4 @@
-// SPDX-FileCopyrightText: 2023 Open Salamander Authors
+﻿// SPDX-FileCopyrightText: 2023 Open Salamander Authors
 // SPDX-License-Identifier: GPL-2.0-or-later
 // CommentsTranslationProject: TRANSLATED
 
@@ -283,7 +283,7 @@ void CWelcomeMsgDlg::OnSaveTextAs()
     ofn.Flags = OFN_PATHMUSTEXIST | OFN_LONGNAMES | OFN_NOCHANGEDIR | OFN_OVERWRITEPROMPT |
                 OFN_NOTESTFILECREATE | OFN_HIDEREADONLY;
 
-    char buf[200 + MAX_PATH];
+    CPathBuffer buf;
     if (SalamanderGeneral->SafeGetSaveFileName(&ofn))
     {
         HCURSOR oldCur = SetCursor(LoadCursor(NULL, IDC_WAIT));

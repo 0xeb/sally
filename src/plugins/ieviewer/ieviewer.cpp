@@ -1138,7 +1138,7 @@ STDMETHODIMP_(void) CImpIAdviseSink::OnViewChange(DWORD dwAspect, LONG lindex)
     else
       lstrcpy(location, locationName);
 
-    char title[MAX_PATH + 200];
+    CPathBuffer title; // Heap-allocated for long path support
     title[0] = 0;
     if (location[0] != 0)
       sprintf(title, "%s - ", location);

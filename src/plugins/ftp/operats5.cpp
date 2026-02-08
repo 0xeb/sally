@@ -792,8 +792,8 @@ CFTPFileToClose::CFTPFileToClose(const char* path, const char* name, HANDLE file
 {
     File = file;
     DeleteIfEmpty = deleteIfEmpty;
-    lstrcpyn(FileName, path, MAX_PATH);
-    if (!SalamanderGeneral->SalPathAppend(FileName, name, MAX_PATH))
+    lstrcpyn(FileName, path, FileName.Size());
+    if (!SalamanderGeneral->SalPathAppend(FileName, name, FileName.Size()))
         TRACE_E("Unexpected situation in CFTPFileToClose::CFTPFileToClose(): too long file name!");
     SetDateAndTime = setDateAndTime;
     if (SetDateAndTime && date != NULL)
@@ -839,8 +839,8 @@ void CFTPDiskWork::CopyFrom(CFTPDiskWork* work)
 
     Type = work->Type;
 
-    lstrcpyn(Path, work->Path, MAX_PATH);
-    lstrcpyn(Name, work->Name, MAX_PATH);
+    lstrcpyn(Path, work->Path, Path.Size());
+    lstrcpyn(Name, work->Name, Name.Size());
 
     ForceAction = work->ForceAction;
     AlreadyRenamedName = work->AlreadyRenamedName;
@@ -1297,7 +1297,7 @@ void DoCreateFile(CFTPDiskWork& localWork, char* fullName, BOOL& workDone, BOOL&
     if (isValid)
     {
         strcpy(fullName, localWork.Path);
-        if (!SalamanderGeneral->SalPathAppend(fullName, localWork.Name, MAX_PATH))
+        if (!SalamanderGeneral->SalPathAppend(fullName, localWork.Name, localWork.Name.Size()))
         {
             winErr = ERROR_FILENAME_EXCED_RANGE; // "file name is too long"
             tooLongName = TRUE;
@@ -1532,7 +1532,7 @@ void DoCreateFile(CFTPDiskWork& localWork, char* fullName, BOOL& workDone, BOOL&
             char* pathEnd = fullName + strlen(fullName);
             if (pathEnd > fullName && *(pathEnd - 1) != '\\')
                 *pathEnd++ = '\\';
-            int rest = MAX_PATH - (int)(pathEnd - fullName);
+            int rest = localWork.Name.Size() - (int)(pathEnd - fullName);
             if (rest < 0)
                 rest = 0; // theoretically should never happen, but Windows extensions can do it (see paths starting with "\\?\")
             int suffixCounter = 1;
@@ -2019,14 +2019,14 @@ void DoCreateAndWriteFile(CFTPDiskWork& localWork, BOOL& needCopyBack, BOOL& wor
 
 void DoListDirectory(CFTPDiskWork& localWork, BOOL& needCopyBack)
 {
-    char srcPath[MAX_PATH + 10];
-    lstrcpyn(srcPath, localWork.Path, MAX_PATH);
-    if (SalamanderGeneral->SalPathAppend(srcPath, localWork.Name, MAX_PATH))
+    CPathBuffer srcPath;
+    lstrcpyn(srcPath, localWork.Path, srcPath.Size());
+    if (SalamanderGeneral->SalPathAppend(srcPath, localWork.Name, srcPath.Size()))
     {
         localWork.DiskListing = new TIndirectArray<CDiskListingItem>(100, 500);
         if (localWork.DiskListing != NULL && localWork.DiskListing->IsGood())
         {
-            SalamanderGeneral->SalPathAppend(srcPath, "*.*", MAX_PATH + 10); // cannot fail
+            SalamanderGeneral->SalPathAppend(srcPath, "*.*", srcPath.Size()); // cannot fail
             char* srcPathEnd = strrchr(srcPath, '\\');                       // cannot fail either
             WIN32_FIND_DATA fileData;
             HANDLE search = HANDLES_Q(FindFirstFile(srcPath, &fileData));
@@ -2051,7 +2051,7 @@ void DoListDirectory(CFTPDiskWork& localWork, BOOL& needCopyBack)
                     BOOL isDir = (fileData.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY) != 0;
                     CQuadWord size(fileData.nFileSizeLow, fileData.nFileSizeHigh);
                     if (!isDir && (fileData.dwFileAttributes & FILE_ATTRIBUTE_REPARSE_POINT) != 0 &&
-                        srcPathEnd != NULL && (srcPathEnd + 1) - srcPath + strlen(fileData.cFileName) < MAX_PATH)
+                        srcPathEnd != NULL && (srcPathEnd + 1) - srcPath + strlen(fileData.cFileName) < srcPath.Size())
                     { // it's a link and the full link name is not too long
                         strcpy(srcPathEnd + 1, fileData.cFileName);
                         DWORD err; // obtain the target file size
@@ -2117,9 +2117,9 @@ void DoListDirectory(CFTPDiskWork& localWork, BOOL& needCopyBack)
 
 void DoDeleteDir(CFTPDiskWork& localWork, BOOL& needCopyBack)
 {
-    char delPath[MAX_PATH + 10];
-    lstrcpyn(delPath, localWork.Path, MAX_PATH);
-    if (SalamanderGeneral->SalPathAppend(delPath, localWork.Name, MAX_PATH))
+    CPathBuffer delPath;
+    lstrcpyn(delPath, localWork.Path, delPath.Size());
+    if (SalamanderGeneral->SalPathAppend(delPath, localWork.Name, delPath.Size()))
     {
         DWORD attr = SalamanderGeneral->SalGetFileAttributes(delPath);
         BOOL chAttrs = SalamanderGeneral->ClearReadOnlyAttr(delPath, attr); // so it can be deleted ...
@@ -2147,9 +2147,9 @@ void DoDeleteDir(CFTPDiskWork& localWork, BOOL& needCopyBack)
 
 void DoDeleteFile(CFTPDiskWork& localWork, BOOL& needCopyBack)
 {
-    char delPath[MAX_PATH + 10];
-    lstrcpyn(delPath, localWork.Path, MAX_PATH);
-    if (SalamanderGeneral->SalPathAppend(delPath, localWork.Name, MAX_PATH))
+    CPathBuffer delPath;
+    lstrcpyn(delPath, localWork.Path, delPath.Size());
+    if (SalamanderGeneral->SalPathAppend(delPath, localWork.Name, delPath.Size()))
     {
         DWORD attr = SalamanderGeneral->SalGetFileAttributes(delPath);
         BOOL chAttrs = SalamanderGeneral->ClearReadOnlyAttr(delPath, attr); // so it can be deleted ...

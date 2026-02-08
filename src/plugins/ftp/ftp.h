@@ -106,11 +106,11 @@ extern CSalamanderZLIBAbstract* SalZLIB;
 extern CSalamanderGUIAbstract* SalamanderGUI;
 
 // FS name assigned by Salamander after the plug-in is loaded
-extern char AssignedFSName[MAX_PATH];
+extern CPathBuffer AssignedFSName;
 extern int AssignedFSNameLen; // length of AssignedFSName
 
 // FS name for FTP over SSL (FTPS) assigned by Salamander after the plug-in loads
-extern char AssignedFSNameFTPS[MAX_PATH];
+extern CPathBuffer AssignedFSNameFTPS;
 extern int AssignedFSNameIndexFTPS; // index of AssignedFSNameFTPS
 extern int AssignedFSNameLenFTPS;   // length of AssignedFSNameFTPS
 
@@ -1253,7 +1253,7 @@ class CTopIndexMem
 {
 protected:
     // path for the last remembered top index (note it is case-sensitive)
-    char Path[FTP_MAX_PATH];
+    CPathBuffer Path;
     int TopIndexes[TOP_INDEX_MEM_SIZE]; // remembered top indices
     int TopIndexesCount;                // number of remembered top indices
 
@@ -1498,15 +1498,15 @@ protected:
     char Host[HOST_MAX_SIZE]; // host (FTP server)
     int Port;                 // port on which the FTP server runs
     char User[USER_MAX_SIZE]; // user
-    char Path[FTP_MAX_PATH];  // current path on FTP (remote path; note that it is case-sensitive)
+    CPathBuffer Path;  // current path on FTP (remote path; note that it is case-sensitive)
 
     CFTPErrorState ErrorState;
     BOOL IsDetached;          // is this FS detached? (FALSE = it is in a panel)
     CTopIndexMem TopIndexMem; // top-index memory for ExecuteOnFS()
 
     CControlConnectionSocket* ControlConnection; // "control connection" socket to the FTP server (NULL == never connected)
-    char RescuePath[FTP_MAX_PATH];               // rescue path on FTP - try when ChangePath() can no longer shorten the path
-    char HomeDir[FTP_MAX_PATH];                  // default path on FTP - set after logging into the server
+    CPathBuffer RescuePath;               // rescue path on FTP - try when ChangePath() can no longer shorten the path
+    CPathBuffer HomeDir;                  // default path on FTP - set after logging into the server
     BOOL OverwritePathListing;                   // if TRUE, PathListing should be overwritten with a new listing (once/if we obtain it) - handles the situation when ChangePath is called and ListCurrentPath is no longer invoked because the path did not change
     char* PathListing;                           // if not NULL, contains at least part (can also be "") of the listing of the current path
     int PathListingLen;                          // length of the string in PathListing

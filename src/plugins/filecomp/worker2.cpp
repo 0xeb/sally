@@ -84,18 +84,18 @@ void CFilecompWorker::CompareBinaryFiles()
                 InvalidateRect(comboHWnd, NULL, TRUE);
                 UpdateWindow(comboHWnd);
 
-                TCHAR buf[MAX_PATH * 2 + 200];
+                CPathBuffer buf; // Heap-allocated for long path support
                 if (changes.size() < MaxBinChanges)
                 {
                     TCHAR fmt[128];
                     CQuadWord qSize((DWORD)changes.size(), 0);
                     SG->ExpandPluralString(fmt, SizeOf(fmt), LoadStr(IDS_MAINWNDHEADER), 1, &qSize);
-                    _stprintf(buf, fmt, SG->SalPathFindFileName(Files[0].Name.c_str()), "",
+                    _stprintf(buf.Get(), fmt, SG->SalPathFindFileName(Files[0].Name.c_str()), "",
                               SG->SalPathFindFileName(Files[1].Name.c_str()), "", changes.size());
                 }
                 else
                 {
-                    _stprintf(buf, LoadStr(IDS_MAINWNDHEADERTOOMANY),
+                    _stprintf(buf.Get(), LoadStr(IDS_MAINWNDHEADERTOOMANY),
                               SG->SalPathFindFileName(Files[0].Name.c_str()), SG->SalPathFindFileName(Files[1].Name.c_str()));
                 }
                 SetWindowText(MainWindow, buf);

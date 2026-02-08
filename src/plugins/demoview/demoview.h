@@ -142,7 +142,7 @@ class CViewerWindow : public CWindow
 {
 public:
     HANDLE Lock;                      // 'lock' object or NULL (set to the signaled state once we close the file)
-    char Name[MAX_PATH];              // file name or ""
+    CPathBuffer Name; // Heap-allocated for long path support (file name or "")
     CRendererWindow Renderer;         // viewer inner window
     HIMAGELIST HGrayToolBarImageList; // toolbar and menu in the gray variant (computed from the colored one)
     HIMAGELIST HHotToolBarImageList;  // toolbar and menu in the colored variant

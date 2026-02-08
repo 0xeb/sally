@@ -30,7 +30,7 @@ const char* EXP_DOSSYSDIR = "DOSSysDir";
 
 struct CExpData
 {
-    char Buffer[MAX_PATH];
+    CPathBuffer Buffer; // Heap-allocated for long path support
     const char* LongName;
     const char* DosName;
 };
@@ -192,11 +192,11 @@ ExecuteWinDir(HWND msgParent, void* param)
 {
     CALL_STACK_MESSAGE1("ExecuteWinDir(, )");
     CExpData* data = (CExpData*)param;
-    UINT l = GetWindowsDirectory(data->Buffer, MAX_PATH);
-    if (l < 0 || l >= MAX_PATH)
+    UINT l = GetWindowsDirectory(data->Buffer, data->Buffer.Size());
+    if (l < 0 || l >= (UINT)data->Buffer.Size())
         *data->Buffer = 0;
     else
-        SG->SalPathAddBackslash(data->Buffer, MAX_PATH);
+        SG->SalPathAddBackslash(data->Buffer, data->Buffer.Size());
     return data->Buffer;
 }
 
@@ -205,13 +205,13 @@ ExecuteDOSWinDir(HWND msgParent, void* param)
 {
     CALL_STACK_MESSAGE1("ExecuteDOSWinDir(, )");
     CExpData* data = (CExpData*)param;
-    UINT l = GetWindowsDirectory(data->Buffer, MAX_PATH);
-    if (l < 0 || l >= MAX_PATH)
+    UINT l = GetWindowsDirectory(data->Buffer, data->Buffer.Size());
+    if (l < 0 || l >= (UINT)data->Buffer.Size())
         *data->Buffer = 0;
     else
     {
-        if (GetShortPathName(data->Buffer, data->Buffer, MAX_PATH))
-            SG->SalPathAddBackslash(data->Buffer, MAX_PATH);
+        if (GetShortPathName(data->Buffer, data->Buffer, data->Buffer.Size()))
+            SG->SalPathAddBackslash(data->Buffer, data->Buffer.Size());
         else
             *data->Buffer = 0;
     }
@@ -223,11 +223,11 @@ ExecuteSysDir(HWND msgParent, void* param)
 {
     CALL_STACK_MESSAGE1("ExecuteSysDir(, )");
     CExpData* data = (CExpData*)param;
-    UINT l = GetSystemDirectory(data->Buffer, MAX_PATH);
-    if (l < 0 || l >= MAX_PATH)
+    UINT l = GetSystemDirectory(data->Buffer, data->Buffer.Size());
+    if (l < 0 || l >= (UINT)data->Buffer.Size())
         *data->Buffer = 0;
     else
-        SG->SalPathAddBackslash(data->Buffer, MAX_PATH);
+        SG->SalPathAddBackslash(data->Buffer, data->Buffer.Size());
     return data->Buffer;
 }
 
@@ -236,13 +236,13 @@ ExecuteDOSSysDir(HWND msgParent, void* param)
 {
     CALL_STACK_MESSAGE1("ExecuteDOSSysDir(, )");
     CExpData* data = (CExpData*)param;
-    UINT l = GetSystemDirectory(data->Buffer, MAX_PATH);
-    if (l < 0 || l >= MAX_PATH)
+    UINT l = GetSystemDirectory(data->Buffer, data->Buffer.Size());
+    if (l < 0 || l >= (UINT)data->Buffer.Size())
         *data->Buffer = 0;
     else
     {
-        if (GetShortPathName(data->Buffer, data->Buffer, MAX_PATH))
-            SG->SalPathAddBackslash(data->Buffer, MAX_PATH);
+        if (GetShortPathName(data->Buffer, data->Buffer, data->Buffer.Size()))
+            SG->SalPathAddBackslash(data->Buffer, data->Buffer.Size());
         else
             *data->Buffer = 0;
     }
@@ -276,8 +276,8 @@ ExecuteWinDir2(HWND msgParent, void* param)
 {
     CALL_STACK_MESSAGE1("ExecuteWinDir2(, )");
     CExpData* data = (CExpData*)param;
-    UINT l = GetWindowsDirectory(data->Buffer, MAX_PATH);
-    if (l < 0 || l >= MAX_PATH)
+    UINT l = GetWindowsDirectory(data->Buffer, data->Buffer.Size());
+    if (l < 0 || l >= (UINT)data->Buffer.Size())
         *data->Buffer = 0;
     else
         SG->SalPathRemoveBackslash(data->Buffer);
@@ -289,8 +289,8 @@ ExecuteSysDir2(HWND msgParent, void* param)
 {
     CALL_STACK_MESSAGE1("ExecuteSysDir2(, )");
     CExpData* data = (CExpData*)param;
-    UINT l = GetSystemDirectory(data->Buffer, MAX_PATH);
-    if (l < 0 || l >= MAX_PATH)
+    UINT l = GetSystemDirectory(data->Buffer, data->Buffer.Size());
+    if (l < 0 || l >= (UINT)data->Buffer.Size())
         *data->Buffer = 0;
     else
         SG->SalPathRemoveBackslash(data->Buffer);
@@ -302,8 +302,8 @@ ExecuteSalDir(HWND msgParent, void* param)
 {
     CALL_STACK_MESSAGE1("ExecuteSalDir(, )");
     CExpData* data = (CExpData*)param;
-    GetModuleFileName(NULL, data->Buffer, MAX_PATH); // hInstance==NULL: we want the path to the EXE, not the DLL
-    *(strrchr(data->Buffer, '\\') + 1) = 0;
+    GetModuleFileName(NULL, data->Buffer.Get(), data->Buffer.Size()); // hInstance==NULL: we want the path to the EXE, not the DLL
+    *(strrchr(data->Buffer.Get(), '\\') + 1) = 0;
     return data->Buffer;
 }
 
@@ -387,17 +387,17 @@ BOOL ExpandCommand(const char* varText, char* buffer, int bufferLen, BOOL ignore
         return FALSE;
 }
 
-BOOL ExpandInitDir(const char* varText, char* directory,
+BOOL ExpandInitDir(const char* varText, char* directory, int directorySize,
                    const char* longName, const char* dosName)
 {
     CALL_STACK_MESSAGE4("ExpandInitDir(%s, , %s, %s)", varText, longName, dosName);
     CExpData data;
     data.LongName = longName;
     data.DosName = dosName;
-    return SG->ExpandVarString(GetParent(), varText, directory, MAX_PATH, ExpInitDirVariables, &data);
+    return SG->ExpandVarString(GetParent(), varText, directory, directorySize, ExpInitDirVariables, &data);
 }
 
-BOOL ExpandArguments(const char* varText, char* arguments,
+BOOL ExpandArguments(const char* varText, char* arguments, int argumentsSize,
                      const char* longName, const char* dosName)
 {
     CALL_STACK_MESSAGE4("ExpandArguments(%s, , %s, %s)", varText, longName,
@@ -405,7 +405,7 @@ BOOL ExpandArguments(const char* varText, char* arguments,
     CExpData data;
     data.LongName = longName;
     data.DosName = dosName;
-    return SG->ExpandVarString(GetParent(), varText, arguments, MAX_PATH, ExpArgumentsVariables, &data);
+    return SG->ExpandVarString(GetParent(), varText, arguments, argumentsSize, ExpArgumentsVariables, &data);
 }
 
 BOOL ExecuteEditor(const char* tempFile)
@@ -427,7 +427,7 @@ BOOL ExecuteEditor(const char* tempFile)
         return FALSE;
 
     if (!SG->ValidateVarString(GetParent(), InitDir, e1, e2, ExpInitDirVariables) ||
-        !ExpandInitDir(InitDir, directory, longName, dosName))
+        !ExpandInitDir(InitDir, directory, directory.Size(), longName, dosName))
         return FALSE;
 
     // expand arguments
@@ -435,7 +435,7 @@ BOOL ExecuteEditor(const char* tempFile)
         dosName[0] = 0;
 
     if (!SG->ValidateVarString(GetParent(), Arguments, e1, e2, ExpArgumentsVariables) ||
-        !ExpandArguments(Arguments, arguments, tempFile, dosName))
+        !ExpandArguments(Arguments, arguments, arguments.Size(), tempFile, dosName))
         return FALSE;
 
     // run the command

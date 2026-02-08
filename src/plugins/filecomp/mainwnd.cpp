@@ -742,7 +742,7 @@ void CMainWindow::ResetComboBox(BOOL* cancel)
             size_t line1 = TextChanges[i].InsertPos;   // Line number of 1st inserted line.
             const char* path0 = SG->SalPathFindFileName(Path1);
             const char* path1 = SG->SalPathFindFileName(Path2);
-            char buf[MAX_PATH * 3];
+            CPathBuffer buf; // Heap-allocated for long path support
 
             ++i;
 
@@ -751,35 +751,35 @@ void CMainWindow::ResetComboBox(BOOL* cancel)
                 if (inserted)
                 {
                     // change
-                    char buf2[MAX_PATH * 2];
+                    CPathBuffer buf2; // Heap-allocated for long path support
                     if (deleted > 1)
-                        sprintf(buf2, LoadStr(IDS_CHANGEFROM2), i, line0 + 1, line0 + deleted, path0);
+                        sprintf((char*)buf2, LoadStr(IDS_CHANGEFROM2), i, line0 + 1, line0 + deleted, path0);
                     else
-                        sprintf(buf2, LoadStr(IDS_CHANGEFROM1), i, line0 + 1, path0);
+                        sprintf((char*)buf2, LoadStr(IDS_CHANGEFROM1), i, line0 + 1, path0);
                     if (inserted > 1)
-                        sprintf(buf, LoadStr(IDS_CHANGETO2), buf2, line1 + 1, line1 + inserted, path1);
+                        sprintf((char*)buf, LoadStr(IDS_CHANGETO2), buf2.Get(), line1 + 1, line1 + inserted, path1);
                     else
-                        sprintf(buf, LoadStr(IDS_CHANGETO1), buf2, line1 + 1, path1);
+                        sprintf((char*)buf, LoadStr(IDS_CHANGETO1), buf2.Get(), line1 + 1, path1);
                 }
                 else
                 {
                     // delete
                     if (deleted > 1)
-                        sprintf(buf, LoadStr(IDS_DELETE2), i, line0 + 1, line0 + deleted, path0);
+                        sprintf((char*)buf, LoadStr(IDS_DELETE2), i, line0 + 1, line0 + deleted, path0);
                     else
-                        sprintf(buf, LoadStr(IDS_DELETE1), i, line0 + 1, path0);
+                        sprintf((char*)buf, LoadStr(IDS_DELETE1), i, line0 + 1, path0);
                 }
             }
             else
             {
                 // insert
                 if (inserted > 1)
-                    sprintf(buf, LoadStr(IDS_ADD2), i, line1 + 1, line1 + inserted, path0, line0, path1);
+                    sprintf((char*)buf, LoadStr(IDS_ADD2), i, line1 + 1, line1 + inserted, path0, line0, path1);
                 else
-                    sprintf(buf, LoadStr(IDS_ADD1), i, line1 + 1, path0, line0, path1);
+                    sprintf((char*)buf, LoadStr(IDS_ADD1), i, line1 + 1, path0, line0, path1);
             }
 
-            LRESULT ret = SendMessage(ComboBox->HWindow, CB_ADDSTRING, 0, (LPARAM)buf);
+            LRESULT ret = SendMessage(ComboBox->HWindow, CB_ADDSTRING, 0, (LPARAM)buf.Get());
             if (ret == CB_ERR || ret == CB_ERRSPACE)
             {
                 TRACE_E("CB_ADDSTRING has failed, i = " << DWORD(i));
@@ -895,8 +895,8 @@ void CMainWindow::SpawnWorker(const char* path1, const char* path2,
         else
         {
             EnableInput(FALSE);
-            char buf[MAX_PATH * 2 + 200];
-            sprintf(buf, LoadStr(IDS_MAINWNDHEADERCOMPUTING), SG->SalPathFindFileName(path1),
+            CPathBuffer buf; // Heap-allocated for long path support
+            sprintf((char*)buf, LoadStr(IDS_MAINWNDHEADERCOMPUTING), SG->SalPathFindFileName(path1),
                     SG->SalPathFindFileName(path2));
             SetWindowText(HWindow, buf);
             SetWait(TRUE);
@@ -2030,7 +2030,8 @@ CMainWindow::WindowProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
 
         case WN_SET_PROGRESS:
         {
-            TCHAR buf[MAX_PATH * 2 + 400], fmt[128];
+            CPathBuffer buf; // Heap-allocated for long path support
+            TCHAR fmt[128];
             if (HIWORD(lParam))
             {
                 CQuadWord qLPARAM(LOWORD(lParam), 0);
@@ -2040,7 +2041,7 @@ CMainWindow::WindowProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
             {
                 _tcscpy(fmt, LoadStr(IDS_MAINWNDHEADERCOMPUTING_PROGRESS));
             }
-            _stprintf(buf, fmt, SG->SalPathFindFileName(Path1), SG->SalPathFindFileName(Path2),
+            _stprintf(buf.Get(), fmt, SG->SalPathFindFileName(Path1), SG->SalPathFindFileName(Path2),
                       LOWORD(lParam), HIWORD(lParam));
             SetWindowText(HWindow, buf);
             return 0;
@@ -2107,7 +2108,7 @@ CMainWindow::WindowProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
                 PostMessage(HWindow, WM_COMMAND, CM_EXIT, 0);
         }
 
-        TCHAR buf[MAX_PATH * 2 + 400];
+        CPathBuffer buf; // Heap-allocated for long path support
         if (DataValid)
         {
             //        if (DifferencesCount || (WN_NO_DIFFERENCE == wParam))
@@ -2120,7 +2121,7 @@ CMainWindow::WindowProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
             }
             else
                 _tcscpy(fmt, LoadStr((WN_NO_DIFFERENCE == wParam) ? IDS_MAINWNDHEADER_NODIF : IDS_MAINWNDHEADERCOMPUTING2));
-            _stprintf(buf, fmt, SG->SalPathFindFileName(Path1), encoding[0], SG->SalPathFindFileName(Path2), encoding[1], DifferencesCount);
+            _stprintf(buf.Get(), fmt, SG->SalPathFindFileName(Path1), encoding[0], SG->SalPathFindFileName(Path2), encoding[1], DifferencesCount);
             //        }
             //        else
             //        {

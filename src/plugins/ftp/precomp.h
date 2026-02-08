@@ -33,6 +33,8 @@
 #include "spl_vers.h"
 #include "spl_zlib.h"
 
+#include "common/widepath.h"
+
 #include "dbg.h"
 #include "mhandles.h"
 #include "arraylt.h"

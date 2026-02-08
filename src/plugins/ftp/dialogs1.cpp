@@ -925,13 +925,13 @@ void CConnectDlg::Transfer(CTransferInfo& ti)
     // restore the non-expanded variant of the Address string (history stores what the user typed, not the split result)
     if (ti.IsGood() && ti.Type == ttDataFromWindow && Config.LastBookmark == 0)
         SetWindowText(GetDlgItem(HWindow, IDE_HOSTADDRESS), LastRawHostAddress);
-    char buf[HOST_MAX_SIZE < FTP_MAX_PATH ? FTP_MAX_PATH : HOST_MAX_SIZE];
+    CPathBuffer buf;
     buf[0] = 0;
     HistoryComboBox(HWindow, ti, IDE_HOSTADDRESS, buf, HOST_MAX_SIZE,
                     HOSTADDRESS_HISTORY_SIZE, Config.HostAddressHistory,
                     Config.LastBookmark != 0 /* store in history only during Quick Connect*/);
     buf[0] = 0;
-    HistoryComboBox(HWindow, ti, IDE_INITIALPATH, buf, FTP_MAX_PATH,
+    HistoryComboBox(HWindow, ti, IDE_INITIALPATH, buf, buf.Size(),
                     INITIALPATH_HISTORY_SIZE, Config.InitPathHistory,
                     Config.LastBookmark != 0 /* store in history only during Quick Connect*/);
 }
@@ -1780,18 +1780,18 @@ CConnectDlg::DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
                     }
                     if (path != NULL) // we have a remote path, use it
                     {
-                        char pathBuf[FTP_MAX_PATH];
+                        CPathBuffer pathBuf;
                         CFTPServerPathType type;
                         type = GetFTPServerPathType(NULL, NULL, path);
                         if (type == ftpsptOpenVMS || type == ftpsptMVS || type == ftpsptIBMz_VM ||
                             type == ftpsptOS2) // VMS + MVS + IBM_z/VM + OS/2 (poorly recognizes the Unix path "/C:/path", but it probably will not bother anyone; it is a very unlikely Unix path)
                         {                      // they do not have '/' or '\\' at the start of the path
-                            lstrcpyn(pathBuf, path, FTP_MAX_PATH);
+                            lstrcpyn(pathBuf, path, pathBuf.Size());
                         }
                         else
                         {
                             pathBuf[0] = firstCharOfPath;
-                            lstrcpyn(pathBuf + 1, path, FTP_MAX_PATH - 1);
+                            lstrcpyn(pathBuf + 1, path, pathBuf.Size() - 1);
                         }
                         UpdateStr(s->InitialPath, pathBuf);
                     }
@@ -1807,8 +1807,8 @@ CConnectDlg::DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
             {
                 if (HIWORD(wParam) == CBN_KILLFOCUS)
                 {
-                    char buf[FTP_MAX_PATH];
-                    ti.EditLine(IDE_INITIALPATH, buf, FTP_MAX_PATH);
+                    CPathBuffer buf;
+                    ti.EditLine(IDE_INITIALPATH, buf, buf.Size());
                     unsigned len = (unsigned)strlen(buf);
                     UpdateStr(s->InitialPath, buf);
                     if (len != strlen(buf))

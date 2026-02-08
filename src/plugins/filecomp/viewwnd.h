@@ -255,7 +255,7 @@ protected:
     int BytesPerLine;
     QWORD ViewOffset;
     QWORD SiblinkSize;
-    char Path[MAX_PATH];
+    CPathBuffer Path; // Heap-allocated for long path support
     BOOL PaintEnabled;
     int HScrollOffs;
     QWORD FocusedDiffOffset;

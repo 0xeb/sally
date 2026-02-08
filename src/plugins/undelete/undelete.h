@@ -143,7 +143,7 @@ class CTopIndexMem
 {
 protected:
     // path for last stored top-index
-    char Path[MAX_PATH];
+    CPathBuffer Path; // Heap-allocated for long path support
     int TopIndexes[TOP_INDEX_MEM_SIZE]; // stored top-index list
     int TopIndexesCount;                // count of stored top-index
 
@@ -241,8 +241,8 @@ protected:
                                                           const char* pluginFSName, int pluginFSNameIndex,
                                                           CFileData& file, int isDir);
 
-    char Path[MAX_PATH]; // current path
-    char Root[MAX_PATH]; // root of volume
+    CPathBuffer Path; // Heap-allocated for long path support; current path
+    CPathBuffer Root; // Heap-allocated for long path support; root of volume
     FILE_RECORD_I<char>* CurrentDir;
 
     BOOL FatalError;          // TRUE when ListCurrentPath failed (fatal error), ChangePath will be called
@@ -259,7 +259,7 @@ protected:
     DWORD SilentMask;
     QWORD FileProgress, TotalProgress, FileTotal, GrandTotal;
     CCopyProgressDlg* Progress;
-    char SourcePath[MAX_PATH];
+    CPathBuffer SourcePath; // Heap-allocated for long path support
     char AllSubstChar;
     BOOL BackupEncryptedFiles;
 

@@ -488,7 +488,7 @@ BOOL CConnectDialog::OnDialogOK()
     if (BST_CHECKED == SendMessage(GetDlgItem(HWindow, IDC_CHECK_IMAGE), BM_GETCHECK, 0, 0))
     {
         // disk image
-        GetDlgItemText(HWindow, IDC_EDIT_IMAGE, Volume, MAX_PATH);
+        GetDlgItemText(HWindow, IDC_EDIT_IMAGE, Volume, Volume.Size());
 
         // reset the volume if the image file does not exist
         DWORD attr = SalamanderGeneral->SalGetFileAttributes(Volume);
@@ -510,7 +510,7 @@ BOOL CConnectDialog::OnDialogOK()
         item.iSubItem = 0;
         item.mask = LVIF_TEXT;
         item.pszText = Volume;
-        item.cchTextMax = MAX_PATH;
+        item.cchTextMax = Volume.Size();
         SendMessage(hList2, LVM_GETITEM, 0, (LPARAM)&item);
         if (Volume[0] == 0)
         {
@@ -538,7 +538,7 @@ BOOL CConnectDialog::OnDialogOK()
 
 void CConnectDialog::OnImageBrowse()
 {
-    GetDlgItemText(HWindow, IDC_EDIT_IMAGE, Volume, MAX_PATH);
+    GetDlgItemText(HWindow, IDC_EDIT_IMAGE, Volume, Volume.Size());
 
     OPENFILENAME openInfo;
     memset(&openInfo, 0, sizeof(OPENFILENAME));
@@ -731,7 +731,7 @@ CRestoreDialog::CRestoreDialog(HWND parent)
 INT_PTR CRestoreDialog::DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
 {
     CALL_STACK_MESSAGE4("CRestoreDialog::DialogProc(0x%X, 0x%IX, 0x%IX)", uMsg, wParam, lParam);
-    char path[MAX_PATH + 300];
+    CPathBuffer path; // Heap-allocated for long path support
     switch (uMsg)
     {
     case WM_INITDIALOG:
@@ -739,13 +739,14 @@ INT_PTR CRestoreDialog::DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
         if (Parent != NULL)
             SalamanderGeneral->MultiMonCenterWindow(HWindow, Parent, TRUE);
 
-        SalamanderGeneral->GetPanelPath(PANEL_TARGET, path, MAX_PATH, NULL, NULL);
+        SalamanderGeneral->GetPanelPath(PANEL_TARGET, path, path.Size(), NULL, NULL);
         SetDlgItemText(HWindow, IDC_EDIT_TARGET, path);
 
         int files, dirs;
-        char text1[200], text2[MAX_PATH + 100];
+        char text1[200];
+        CPathBuffer text2; // Heap-allocated for long path support
         SalamanderGeneral->GetPanelSelection(PANEL_SOURCE, &files, &dirs);
-        SalamanderGeneral->GetCommonFSOperSourceDescr(text2, MAX_PATH + 100, PANEL_SOURCE, files, dirs, NULL, FALSE, FALSE);
+        SalamanderGeneral->GetCommonFSOperSourceDescr(text2, text2.Size(), PANEL_SOURCE, files, dirs, NULL, FALSE, FALSE);
         GetDlgItemText(HWindow, IDC_LABEL_SOURCE, text1, 200);
         BOOL labelSet = FALSE;
         // if it is "file \"name.txt\"" or "directory \"name\"" we find the name and the remaining text
@@ -760,7 +761,7 @@ INT_PTR CRestoreDialog::DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
                 lstrcpyn(fileName, beg + 1, (int)(end - (beg + 1) + 1));
                 memmove(beg + 1 + 2, end, strlen(end) + 1);
                 memcpy(beg + 1, "%s", 2);
-                _snprintf_s(path, _TRUNCATE, text1, text2);
+                _snprintf_s((char*)path, path.Size(), _TRUNCATE, text1, text2.Get());
 
                 BOOL isDir = dirs == 1;
                 if (files + dirs == 0)
@@ -772,7 +773,7 @@ INT_PTR CRestoreDialog::DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
         }
         if (!labelSet)
         {
-            _snprintf_s(path, _TRUNCATE, text1, text2);
+            _snprintf_s((char*)path, path.Size(), _TRUNCATE, text1, text2.Get());
             SetDlgItemText(HWindow, IDC_LABEL_SOURCE, path);
         }
         break;
@@ -785,7 +786,7 @@ INT_PTR CRestoreDialog::DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
         case IDC_BUTTON_BROWSE:
         {
             char title[100];
-            GetDlgItemText(HWindow, IDC_EDIT_TARGET, path, MAX_PATH);
+            GetDlgItemText(HWindow, IDC_EDIT_TARGET, path, path.Size());
             GetWindowText(HWindow, title, 100);
             SalamanderGeneral->GetTargetDirectory(HWindow, HWindow, title, String<char>::LoadStr(IDS_CHOOSETARGET),
                                                   path, FALSE, path);
@@ -795,7 +796,7 @@ INT_PTR CRestoreDialog::DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
 
         case IDOK:
         {
-            GetDlgItemText(HWindow, IDC_EDIT_TARGET, TargetPath, MAX_PATH);
+            GetDlgItemText(HWindow, IDC_EDIT_TARGET, TargetPath, TargetPath.Size());
             break;
         }
         }

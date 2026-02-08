@@ -624,7 +624,7 @@ protected:
     char* ServerSystem;                       // server system (reply to SYST command) - may also be NULL
     char* ServerFirstReply;                   // first server reply (often contains the FTP server version) - may also be NULL
     BOOL HaveWorkingPath;                     // TRUE if WorkingPath is valid
-    char WorkingPath[FTP_MAX_PATH];           // current working directory on the FTP server
+    CPathBuffer WorkingPath;           // current working directory on the FTP server
     CCurrentTransferMode CurrentTransferMode; // current transfer mode on the FTP server (memory of the last FTP "TYPE" command)
 
     BOOL EventConnectSent; // TRUE only if the ccsevConnected event was already sent (handles FD_READ arriving before FD_CONNECT)

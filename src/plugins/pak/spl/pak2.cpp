@@ -75,13 +75,13 @@ BOOL CPluginInterfaceForArchiver::MakeFileList3(TIndirectArray2<CFileInfo>& file
         {
             if (!(Silent & SF_OVEWRITEALL))
             {
-                char name1[MAX_PATH + PAK_MAXPATH + 1];
+                CPathBuffer name1; // Heap-allocated for long path support
                 char data1[100];
                 char data2[100];
                 FILETIME ft;
 
                 lstrcpy(name1, PakFileName);
-                SalamanderGeneral->SalPathAppend(name1, pakName, MAX_PATH + PAK_MAXPATH + 1);
+                SalamanderGeneral->SalPathAppend(name1, pakName, name1.Size());
                 PakIFace->GetPakTime(&ft);
                 GetInfo(data1, &ft, pakSize);
                 HANDLE file;
@@ -204,7 +204,7 @@ BOOL CPluginInterfaceForArchiver::AddFiles(TIndirectArray2<CFileInfo>& files, un
                         sourPath, archiveRoot);
     Abort = TRUE;
     CFileInfo* f;
-    char message[MAX_PATH + 32];
+    CPathBuffer message; // Heap-allocated for long path support
     BOOL skip;
     CQuadWord currentProgress = CQuadWord(deleted, 0);
     int i;

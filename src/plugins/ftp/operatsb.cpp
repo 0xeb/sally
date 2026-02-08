@@ -210,7 +210,7 @@ void CFTPWorker::HandleEventInWorkingState5(CFTPWorkerEvent event, BOOL& sendQui
             {
             case fwssWorkStartWork: // determine the state of the target directory
             {
-                _snprintf_s(errText, 200 + FTP_MAX_PATH, _TRUNCATE, LoadStr(IDS_LOGMSGUPLOADFILE), curItem->Name);
+                _snprintf_s(errText, errText.Size(), _TRUNCATE, LoadStr(IDS_LOGMSGUPLOADFILE), curItem->Name);
                 Logs.LogMessage(LogUID, errText, -1, TRUE);
 
                 if (ShouldStop)
@@ -319,14 +319,14 @@ void CFTPWorker::HandleEventInWorkingState5(CFTPWorkerEvent event, BOOL& sendQui
 
             case fwssWorkUploadResolveLink: // upload copy/move file: determine what the link is (file/directory) whose name collides with the target file name on the server
             {
-                lstrcpyn(ftpPath, curItem->TgtPath, FTP_MAX_PATH);
+                lstrcpyn(ftpPath, curItem->TgtPath, ftpPath.Size());
                 CFTPServerPathType type = Oper->GetFTPServerPathType(ftpPath);
-                if (FTPPathAppend(type, ftpPath, FTP_MAX_PATH, curItem->TgtName, TRUE))
+                if (FTPPathAppend(type, ftpPath, ftpPath.Size(), curItem->TgtName, TRUE))
                 { // we have the path; send CWD to the server into the directory being examined
-                    _snprintf_s(errText, 200 + FTP_MAX_PATH, _TRUNCATE, LoadStr(IDS_LOGMSGRESOLVINGLINK), ftpPath);
+                    _snprintf_s(errText, errText.Size(), _TRUNCATE, LoadStr(IDS_LOGMSGRESOLVINGLINK), ftpPath);
                     Logs.LogMessage(LogUID, errText, -1, TRUE);
 
-                    PrepareFTPCommand(buf, 200 + FTP_MAX_PATH, errBuf, 50 + FTP_MAX_PATH,
+                    PrepareFTPCommand(buf, buf.Size(), errBuf, errBuf.Size(),
                                       ftpcmdChangeWorkingPath, &cmdLen, ftpPath); // cannot report an error
                     sendCmd = TRUE;
                     SubState = fwssWorkUploadResLnkWaitForCWDRes;
@@ -365,7 +365,7 @@ void CFTPWorker::HandleEventInWorkingState5(CFTPWorkerEvent event, BOOL& sendQui
                     }
                     else // an error occurred; report it to the user and move on to the next queue item
                     {
-                        CopyStr(errText, 200 + FTP_MAX_PATH, reply, replySize);
+                        CopyStr(errText, errText.Size(), reply, replySize);
                         Queue->UpdateItemState(CurItem, sqisFailed, ITEMPR_UNABLETORESOLVELNK, NO_ERROR,
                                                SalamanderGeneral->DupStr(errText) /* low memory = the error will have no details */,
                                                Oper);
@@ -669,7 +669,7 @@ void CFTPWorker::HandleEventInWorkingState5(CFTPWorkerEvent event, BOOL& sendQui
                 { // the working path must be changed (assumption: the server returns the same path string - it
                     // got into the item during explore-dir or from the panel; in both cases it was the path returned
                     // by the server in response to PWD)
-                    PrepareFTPCommand(buf, 200 + FTP_MAX_PATH, errBuf, 50 + FTP_MAX_PATH,
+                    PrepareFTPCommand(buf, buf.Size(), errBuf, errBuf.Size(),
                                       ftpcmdChangeWorkingPath, &cmdLen, curItem->TgtPath); // cannot report an error
                     sendCmd = TRUE;
                     SubState = fwssWorkUploadFileSetTgtPathWaitForCWDRes;
@@ -696,7 +696,7 @@ void CFTPWorker::HandleEventInWorkingState5(CFTPWorkerEvent event, BOOL& sendQui
                         // by the server in response to PWD, we assume PWD would return it again now, and therefore
                         // we will not send it (an optimization hopefully with very low risk)
                         HaveWorkingPath = TRUE;
-                        lstrcpyn(WorkingPath, curItem->TgtPath, FTP_MAX_PATH);
+                        lstrcpyn(WorkingPath, curItem->TgtPath, WorkingPath.Size());
 
                         if (ShouldStop)
                             handleShouldStop = TRUE; // check whether the worker should stop
@@ -708,7 +708,7 @@ void CFTPWorker::HandleEventInWorkingState5(CFTPWorkerEvent event, BOOL& sendQui
                     }
                     else // an error occurred; report it to the user and move on to the next queue item
                     {
-                        CopyStr(errText, 200 + FTP_MAX_PATH, reply, replySize);
+                        CopyStr(errText, errText.Size(), reply, replySize);
                         Queue->UpdateItemState(CurItem, sqisFailed, ITEMPR_UNABLETOCWDONLYPATH, NO_ERROR,
                                                SalamanderGeneral->DupStr(errText) /* low memory = the error will have no details */,
                                                Oper);
@@ -734,7 +734,7 @@ void CFTPWorker::HandleEventInWorkingState5(CFTPWorkerEvent event, BOOL& sendQui
                 {
                     if (CurrentTransferMode != (curItem->AsciiTransferMode ? ctrmASCII : ctrmBinary)) // if it is not already set, configure the desired mode
                     {
-                        PrepareFTPCommand(buf, 200 + FTP_MAX_PATH, errBuf, 50 + FTP_MAX_PATH,
+                        PrepareFTPCommand(buf, buf.Size(), errBuf, errBuf.Size(),
                                           ftpcmdSetTransferMode, &cmdLen, curItem->AsciiTransferMode); // cannot report an error
                         sendCmd = TRUE;
                         SubState = fwssWorkUploadWaitForTYPERes;
@@ -813,7 +813,7 @@ void CFTPWorker::HandleEventInWorkingState5(CFTPWorkerEvent event, BOOL& sendQui
             {
                 if (Oper->GetSizeCmdIsSupported())
                 {
-                    PrepareFTPCommand(buf, 200 + FTP_MAX_PATH, errBuf, 50 + FTP_MAX_PATH,
+                    PrepareFTPCommand(buf, buf.Size(), errBuf, errBuf.Size(),
                                       ftpcmdGetSize, &cmdLen, curItem->TgtName); // cannot report an error
                     sendCmd = TRUE;
                     SubState = fwssWorkUploadWaitForSIZERes;
@@ -1138,7 +1138,7 @@ void CFTPWorker::HandleEventInWorkingState5(CFTPWorkerEvent event, BOOL& sendQui
             {
                 char num[100];
                 SalamanderGeneral->PrintDiskSize(num, OpenedInFileSize, 2);
-                _snprintf_s(errText, 200 + FTP_MAX_PATH, _TRUNCATE,
+                _snprintf_s(errText, errText.Size(), _TRUNCATE,
                             LoadStr(SubState == fwssWorkUploadTestFileSizeOK ? (curItem->AsciiTransferMode ? IDS_LOGMSGUPLOADISCOMPL2 : IDS_LOGMSGUPLOADISCOMPL) : (curItem->AsciiTransferMode ? IDS_LOGMSGUPLOADISNOTCOMPL2 : IDS_LOGMSGUPLOADISNOTCOMPL)),
                             curItem->TgtName, num);
                 Logs.LogMessage(LogUID, errText, -1, TRUE);
@@ -1268,7 +1268,7 @@ void CFTPWorker::HandleEventInWorkingState5(CFTPWorkerEvent event, BOOL& sendQui
             {
                 if (UseDeleteForOverwrite && UploadType == utOverwriteFile)
                 { // the file is already locked for writing; deletion is just an intermediate step, no need to call FTPOpenedFiles.OpenFile()
-                    PrepareFTPCommand(buf, 200 + FTP_MAX_PATH, errBuf, 50 + FTP_MAX_PATH,
+                    PrepareFTPCommand(buf, buf.Size(), errBuf, errBuf.Size(),
                                       ftpcmdDeleteFile, &cmdLen, curItem->TgtName); // cannot report an error
                     sendCmd = TRUE;
                     SubState = fwssWorkUploadDelForOverWaitForDELERes;
@@ -1372,7 +1372,7 @@ void CFTPWorker::HandleEventInWorkingState5(CFTPWorkerEvent event, BOOL& sendQui
 
                     if (Oper->GetUsePassiveMode()) // passive mode (PASV)
                     {
-                        PrepareFTPCommand(buf, 200 + FTP_MAX_PATH, errBuf, 50 + FTP_MAX_PATH,
+                        PrepareFTPCommand(buf, buf.Size(), errBuf, errBuf.Size(),
                                           ftpcmdPassive, &cmdLen); // cannot report an error
                         sendCmd = TRUE;
                         SubState = fwssWorkUploadWaitForPASVRes;
@@ -1554,7 +1554,7 @@ void CFTPWorker::HandleEventInWorkingState5(CFTPWorkerEvent event, BOOL& sendQui
                     {
                         if (error != NO_ERROR)
                         {
-                            FTPGetErrorText(error, errBuf, 50 + FTP_MAX_PATH);
+                            FTPGetErrorText(error, errBuf, errBuf.Size());
                             char* s = errBuf + strlen(errBuf);
                             while (s > errBuf && (*(s - 1) == '\n' || *(s - 1) == '\r'))
                                 s--;
@@ -1563,7 +1563,7 @@ void CFTPWorker::HandleEventInWorkingState5(CFTPWorkerEvent event, BOOL& sendQui
                         }
                         else
                             _snprintf_s(ErrorDescr, _TRUNCATE, LoadStr(IDS_PROXYERRUNABLETOCON));
-                        _snprintf_s(errBuf, 50 + FTP_MAX_PATH, _TRUNCATE, LoadStr(IDS_LOGMSGDATCONERROR), ErrorDescr);
+                        _snprintf_s(errBuf, errBuf.Size(), _TRUNCATE, LoadStr(IDS_LOGMSGDATCONERROR), ErrorDescr);
                         lstrcpyn(ErrorDescr, errBuf, FTPWORKER_ERRDESCR_BUFSIZE); // we want the error text to contain "data con. err.:"
                         CorrectErrorDescr();
 
@@ -1626,14 +1626,14 @@ void CFTPWorker::HandleEventInWorkingState5(CFTPWorkerEvent event, BOOL& sendQui
                             BOOL ok = WorkerUploadDataCon->GetListenIPAndPort(&listenOnIP, &listenOnPort);
                             if (!ok)
                             {
-                                if (!WorkerUploadDataCon->GetProxyError(errBuf, 50 + FTP_MAX_PATH, NULL, 0, TRUE))
+                                if (!WorkerUploadDataCon->GetProxyError(errBuf, errBuf.Size(), NULL, 0, TRUE))
                                     errBuf[0] = 0;
                             }
                             HANDLES(EnterCriticalSection(&WorkerCritSect));
 
                             if (ok)
                             {
-                                PrepareFTPCommand(buf, 200 + FTP_MAX_PATH, errBuf, 50 + FTP_MAX_PATH,
+                                PrepareFTPCommand(buf, buf.Size(), errBuf, errBuf.Size(),
                                                   ftpcmdSetPort, &cmdLen, listenOnIP, listenOnPort); // cannot report an error
                                 sendCmd = TRUE;
                                 SubState = fwssWorkUploadWaitForPORTRes;
@@ -1674,7 +1674,7 @@ void CFTPWorker::HandleEventInWorkingState5(CFTPWorkerEvent event, BOOL& sendQui
                         if (WorkerUploadDataCon != NULL)
                         {
                             HANDLES(LeaveCriticalSection(&WorkerCritSect));
-                            if (!WorkerUploadDataCon->GetProxyTimeoutDescr(errBuf, 50 + FTP_MAX_PATH))
+                            if (!WorkerUploadDataCon->GetProxyTimeoutDescr(errBuf, errBuf.Size()))
                                 errBuf[0] = 0;
                             // because we are already in CSocketsThread::CritSect, this call is also
                             // possible from CSocket::SocketCritSect (no deadlock risk)
@@ -1699,7 +1699,7 @@ void CFTPWorker::HandleEventInWorkingState5(CFTPWorkerEvent event, BOOL& sendQui
                         CorrectErrorDescr();
 
                         // log the timeout
-                        _snprintf_s(errBuf, 50 + FTP_MAX_PATH, _TRUNCATE, "%s\r\n", ErrorDescr);
+                        _snprintf_s(errBuf, errBuf.Size(), _TRUNCATE, "%s\r\n", ErrorDescr);
                         Logs.LogMessage(LogUID, errBuf, -1, TRUE);
 
                         // "manually" close the control connection
@@ -1784,12 +1784,12 @@ void CFTPWorker::HandleEventInWorkingState5(CFTPWorkerEvent event, BOOL& sendQui
 
                     if (UploadType == utAutorename)
                     {
-                        _snprintf_s(errText, 200 + FTP_MAX_PATH, _TRUNCATE, LoadStr(IDS_LOGMSGUPLOADRENFILE), curItem->RenamedName);
+                        _snprintf_s(errText, errText.Size(), _TRUNCATE, LoadStr(IDS_LOGMSGUPLOADRENFILE), curItem->RenamedName);
                         Logs.LogMessage(LogUID, errText, -1, TRUE);
                     }
 
                     CommandTransfersData = TRUE;
-                    PrepareFTPCommand(buf, 200 + FTP_MAX_PATH, errBuf, 50 + FTP_MAX_PATH,
+                    PrepareFTPCommand(buf, buf.Size(), errBuf, errBuf.Size(),
                                       ResumingFileOnServer ? ftpcmdAppendFile : ftpcmdStoreFile, &cmdLen,
                                       UploadType == utAutorename ? curItem->RenamedName : curItem->TgtName); // cannot report an error
                     sendCmd = TRUE;
@@ -1881,7 +1881,7 @@ void CFTPWorker::HandleEventInWorkingState5(CFTPWorkerEvent event, BOOL& sendQui
                     {
                         HANDLES(LeaveCriticalSection(&WorkerCritSect));
                         WorkerUploadDataCon->GetError(&dataConError, &dataConNoDataTransTimeout, &dataSSLErrorOccured);
-                        if (!WorkerUploadDataCon->GetProxyError(errBuf, 50 + FTP_MAX_PATH, NULL, 0, TRUE))
+                        if (!WorkerUploadDataCon->GetProxyError(errBuf, errBuf.Size(), NULL, 0, TRUE))
                             errBuf[0] = 0;
                         // because we are already in CSocketsThread::CritSect, this call is also
                         // possible from CSocket::SocketCritSect (no deadlock risk)
@@ -1900,7 +1900,7 @@ void CFTPWorker::HandleEventInWorkingState5(CFTPWorkerEvent event, BOOL& sendQui
                     if (!ShouldStop && PrepareDataError == pderASCIIForBinaryFile)
                     { // when a binary file is detected in ASCII mode, ensure the target file is deleted
                         // the file is already locked for writing, deletion is only an intermediate step, no need to call FTPOpenedFiles.OpenFile()
-                        PrepareFTPCommand(buf, 200 + FTP_MAX_PATH, errBuf, 50 + FTP_MAX_PATH,
+                        PrepareFTPCommand(buf, buf.Size(), errBuf, errBuf.Size(),
                                           ftpcmdDeleteFile, &cmdLen,
                                           UploadType == utAutorename ? curItem->RenamedName : curItem->TgtName); // cannot report an error
                         sendCmd = TRUE;
@@ -1995,7 +1995,7 @@ void CFTPWorker::HandleEventInWorkingState5(CFTPWorkerEvent event, BOOL& sendQui
                                                         }
                                                         else // we no longer know what other name could be created, so report an error
                                                         {
-                                                            CopyStr(errText, 200 + FTP_MAX_PATH, reply, replySize);
+                                                            CopyStr(errText, errText.Size(), reply, replySize);
                                                             Queue->UpdateItemState(CurItem, sqisFailed, ITEMPR_UPLOADFILEAUTORENFAILED, NO_ERROR,
                                                                                    SalamanderGeneral->DupStr(errText) /* low memory = the error will have no details */,
                                                                                    Oper);
@@ -2003,7 +2003,7 @@ void CFTPWorker::HandleEventInWorkingState5(CFTPWorkerEvent event, BOOL& sendQui
                                                     }
                                                     else
                                                     {
-                                                        CopyStr(errText, 200 + FTP_MAX_PATH, reply, replySize);
+                                                        CopyStr(errText, errText.Size(), reply, replySize);
                                                         if (CurItem->ForceAction == fqiaUseAutorename) // forced autorename
                                                         {
                                                             canClearForceAction = FALSE;
@@ -2075,17 +2075,17 @@ void CFTPWorker::HandleEventInWorkingState5(CFTPWorkerEvent event, BOOL& sendQui
                                                     else
                                                     {
                                                         if (dataSSLErrorOccured != SSLCONERR_NOERROR)
-                                                            lstrcpyn(errText, LoadStr(IDS_ERRDATACONSSLCONNECTERROR), 200 + FTP_MAX_PATH);
+                                                            lstrcpyn(errText, LoadStr(IDS_ERRDATACONSSLCONNECTERROR), errText.Size());
                                                         else
                                                         {
                                                             errText[0] = 0;
                                                             if (FTP_DIGIT_1(replyCode) != FTP_D1_SUCCESS)
                                                             { // if we have no description of the network error from the server, fall back to the system description
-                                                                CopyStr(errText, 200 + FTP_MAX_PATH, reply, replySize);
+                                                                CopyStr(errText, errText.Size(), reply, replySize);
                                                             }
 
                                                             if (errText[0] == 0 && errBuf[0] != 0) // try to use the error text from the proxy server
-                                                                lstrcpyn(errText, errBuf, 200 + FTP_MAX_PATH);
+                                                                lstrcpyn(errText, errBuf, errText.Size());
                                                         }
 
                                                         // an error occurred on the item, record this state in it

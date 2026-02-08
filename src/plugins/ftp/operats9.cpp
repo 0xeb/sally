@@ -478,9 +478,9 @@ CUploadListingsOnServer::AddEmptyListing(const char* path, const char* dirName, 
                                          CUploadListingState listingState, BOOL doNotCheckIfPathIsKnown)
 {
     CUploadPathListing* ret = NULL;
-    char dir[FTP_MAX_PATH];
-    lstrcpyn(dir, path, FTP_MAX_PATH);
-    if (dirName == NULL || FTPPathAppend(pathType, dir, FTP_MAX_PATH, dirName, TRUE))
+    CPathBuffer dir;
+    lstrcpyn(dir, path, dir.Size());
+    if (dirName == NULL || FTPPathAppend(pathType, dir, dir.Size(), dirName, TRUE))
     {
         int index;
         if (doNotCheckIfPathIsKnown || !FindPath(dir, pathType, index)) // the path is not in the cache yet
@@ -557,19 +557,19 @@ BOOL CUploadListingsOnServer::FindPath(const char* path, CFTPServerPathType path
 void CUploadListingsOnServer::ReportCreateDirs(const char* workPath, CFTPServerPathType pathType,
                                                const char* newDirs, BOOL unknownResult)
 {
-    char cutDir[FTP_MAX_PATH];
-    char path[FTP_MAX_PATH];
+    CPathBuffer cutDir;
+    CPathBuffer path;
     if (FTPIsPathRelative(pathType, newDirs))
     { // call ReportCreateDir sequentially for all directories being created
-        char relPath[FTP_MAX_PATH];
-        lstrcpyn(relPath, newDirs, FTP_MAX_PATH);
-        lstrcpyn(path, workPath, FTP_MAX_PATH);
-        while (FTPCutFirstDirFromRelativePath(pathType, relPath, cutDir, FTP_MAX_PATH))
+        CPathBuffer relPath;
+        lstrcpyn(relPath, newDirs, relPath.Size());
+        lstrcpyn(path, workPath, path.Size());
+        while (FTPCutFirstDirFromRelativePath(pathType, relPath, cutDir, cutDir.Size()))
         {
             if (strcmp(cutDir, ".") != 0) // assumption: "." is the current directory or is meaningless
             {
                 if (strcmp(cutDir, "..") == 0)
-                    FTPCutDirectory(pathType, path, FTP_MAX_PATH, NULL, 0, NULL); // assumption: ".." is the parent directory or is meaningless
+                    FTPCutDirectory(pathType, path, path.Size(), NULL, 0, NULL); // assumption: ".." is the parent directory or is meaningless
                 else
                 {
                     int index;
@@ -587,7 +587,7 @@ void CUploadListingsOnServer::ReportCreateDirs(const char* workPath, CFTPServerP
                                 AddEmptyListing(path, cutDir, pathType, ulsReady, FALSE); // add an empty listing to the listing cache for the newly created directory
                         }
                     }
-                    if (!FTPPathAppend(pathType, path, FTP_MAX_PATH, cutDir, TRUE))
+                    if (!FTPPathAppend(pathType, path, path.Size(), cutDir, TRUE))
                         break; // ignore paths that are too long
                 }
             }
@@ -595,10 +595,10 @@ void CUploadListingsOnServer::ReportCreateDirs(const char* workPath, CFTPServerP
     }
     else // newDirs is an absolute path, so trim it up to the root and call ReportCreateDir for all subdirectories (we do not know how many subdirectories were created)
     {
-        lstrcpyn(path, newDirs, FTP_MAX_PATH);
-        FTPCompleteAbsolutePath(pathType, path, FTP_MAX_PATH, workPath); // convert the path to a full absolute path if necessary
+        lstrcpyn(path, newDirs, path.Size());
+        FTPCompleteAbsolutePath(pathType, path, path.Size(), workPath); // convert the path to a full absolute path if necessary
         FTPRemovePointsFromPath(path, pathType);                         // assumption: "." is the current directory or is meaningless, ".." is the parent directory or is meaningless
-        while (FTPCutDirectory(pathType, path, FTP_MAX_PATH, cutDir, FTP_MAX_PATH, NULL))
+        while (FTPCutDirectory(pathType, path, path.Size(), cutDir, cutDir.Size(), NULL))
         {
             int index;
             if (FindPath(path, pathType, index)) // find the path in the cache
@@ -655,9 +655,9 @@ void CUploadListingsOnServer::ReportDelete(const char* workPath, CFTPServerPathT
     {
         // just in case 'name' is a directory or a link to a directory, invalidate
         // the listing of the path to that directory
-        char path[FTP_MAX_PATH];
-        lstrcpyn(path, workPath, FTP_MAX_PATH);
-        if (FTPPathAppend(pathType, path, FTP_MAX_PATH, name, TRUE))
+        CPathBuffer path;
+        lstrcpyn(path, workPath, path.Size());
+        if (FTPPathAppend(pathType, path, path.Size(), name, TRUE))
         {
             if (FindPath(path, pathType, index)) // find the path in the cache (if it was a file, the path cannot be found)
                 InvalidateListing(index);
@@ -1844,9 +1844,9 @@ void CFTPOpenedFile::Set(int myUID, const char* user, const char* host, unsigned
     lstrcpyn(User, user, USER_MAX_SIZE);
     lstrcpyn(Host, host, HOST_MAX_SIZE);
     Port = port;
-    lstrcpyn(Path, path, FTP_MAX_PATH);
+    lstrcpyn(Path, path, Path.Size());
     PathType = pathType;
-    lstrcpyn(Name, name, MAX_PATH);
+    lstrcpyn(Name, name, Name.Size());
 }
 
 BOOL CFTPOpenedFile::IsSameFile(const char* user, const char* host, unsigned short port,

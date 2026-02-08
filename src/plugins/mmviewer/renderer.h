@@ -18,7 +18,7 @@ class CRendererWindow : public CWindow
 public:
     COutput Output; // interface for working with the open database
     CViewerWindow* Viewer;
-    char FileName[MAX_PATH]; // name of the currently opened file; 0 if none is open
+    CPathBuffer FileName; // Heap-allocated for long path support; name of the currently opened file; 0 if none is open
 
     BOOL Creating; // the window is being created -- do not erase the background yet
 

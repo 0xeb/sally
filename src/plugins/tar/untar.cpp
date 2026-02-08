@@ -239,7 +239,7 @@ BOOL CArchive::ListArchive(const char* prefix, CSalamanderDirectoryAbstract* dir
         // ignore entries we cannot interpret
         if (!header.Ignored)
         {
-            char path[2 * MAX_PATH];
+            CPathBuffer path; // Heap-allocated for long path support
 
             if (prefix)
             {

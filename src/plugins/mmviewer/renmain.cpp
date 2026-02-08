@@ -90,7 +90,7 @@ BOOL CRendererWindow::OpenFile(const char* name)
     }
     else
     {
-        char buff[2 * MAX_PATH];
+        CPathBuffer buff; // Heap-allocated for long path support
         sprintf(buff, LoadStr(IDS_ERROR_OPENING), name);
         SalGeneral->SalMessageBox(HWindow, buff, LoadStr(IDS_PLUGIN_NAME), MB_ICONEXCLAMATION);
 
@@ -150,9 +150,9 @@ void CRendererWindow::SetupScrollBars()
 
 void CRendererWindow::SetViewerTitle()
 {
-    char title[MAX_PATH + 300];
+    CPathBuffer title; // Heap-allocated for long path support
     if (FileName[0] != 0)
-        sprintf(title, "%s - %s", FileName, LoadStr(IDS_PLUGIN_NAME));
+        sprintf(title, "%s - %s", FileName.Get(), LoadStr(IDS_PLUGIN_NAME));
     else
         sprintf(title, "%s", LoadStr(IDS_PLUGIN_NAME));
 

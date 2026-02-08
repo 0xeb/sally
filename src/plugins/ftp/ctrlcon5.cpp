@@ -28,7 +28,7 @@ void CControlConnectionSocket::DownloadOneFile(HWND parent, const char* fileName
     HANDLES(EnterCriticalSection(&SocketCritSect));
     BOOL usePassiveModeAux = UsePassiveMode;
     int logUID = LogUID; // log UID of this connection
-    char errBuf[900 + FTP_MAX_PATH];
+    CPathBuffer errBuf;
     char hostBuf[HOST_MAX_SIZE];
     char userBuffer[USER_MAX_SIZE];
     lstrcpyn(hostBuf, Host, HOST_MAX_SIZE);
@@ -61,8 +61,8 @@ void CControlConnectionSocket::DownloadOneFile(HWND parent, const char* fileName
         }
         else
         {
-            char cmdBuf[50 + FTP_MAX_PATH];
-            char logBuf[50 + FTP_MAX_PATH];
+            CPathBuffer cmdBuf;
+            CPathBuffer logBuf;
             const char* retryMsgAux = NULL;
             BOOL canRetry = FALSE;
             char retryMsgBuf[300];
@@ -85,12 +85,12 @@ void CControlConnectionSocket::DownloadOneFile(HWND parent, const char* fileName
                 setStartTimeIfConnected = TRUE;
                 BOOL run = FALSE;
                 BOOL ok = TRUE;
-                char newPath[FTP_MAX_PATH];
+                CPathBuffer newPath;
                 BOOL needChangeDir = reconnected; // after a reconnect we try to set the working directory again
                 if (!reconnected)                 // we have been connected for a while, check whether the working directory matches 'workPath'
                 {
                     // use the cache; in normal cases the path should be there
-                    ok = GetCurrentWorkingPath(parent, newPath, FTP_MAX_PATH, FALSE, &canRetry, retryMsgBuf, 300);
+                    ok = GetCurrentWorkingPath(parent, newPath, newPath.Size(), FALSE, &canRetry, retryMsgBuf, 300);
                     if (!ok && canRetry) // "retry" is allowed
                     {
                         run = TRUE;
@@ -121,7 +121,7 @@ void CControlConnectionSocket::DownloadOneFile(HWND parent, const char* fileName
                 ReuseSSLSessionFailed = FALSE;
                 if (ok && usePassiveModeAux) // passive mode (PASV)
                 {
-                    PrepareFTPCommand(cmdBuf, 50 + FTP_MAX_PATH, logBuf, 50 + FTP_MAX_PATH,
+                    PrepareFTPCommand(cmdBuf, cmdBuf.Size(), logBuf, logBuf.Size(),
                                       ftpcmdPassive, NULL); // cannot fail
                     int ftpReplyCode;
                     if (SendFTPCommand(parent, cmdBuf, logBuf, NULL, GetWaitTime(WAITWND_COMOPER), NULL,
@@ -164,9 +164,9 @@ void CControlConnectionSocket::DownloadOneFile(HWND parent, const char* fileName
                     dataConnection->SetActive(logUID);
                     if (OpenForListeningAndWaitForRes(parent, dataConnection, &localIP, &localPort, &canRetry,
                                                       retryMsgBuf, 300, GetWaitTime(WAITWND_COMOPER),
-                                                      errBuf, 900 + FTP_MAX_PATH))
+                                                      errBuf, errBuf.Size()))
                     {
-                        PrepareFTPCommand(cmdBuf, 50 + FTP_MAX_PATH, logBuf, 50 + FTP_MAX_PATH,
+                        PrepareFTPCommand(cmdBuf, cmdBuf.Size(), logBuf, logBuf.Size(),
                                           ftpcmdSetPort, NULL, localIP, localPort); // cannot fail
                         int ftpReplyCode;
                         if (!SendFTPCommand(parent, cmdBuf, logBuf, NULL, GetWaitTime(WAITWND_COMOPER), NULL,
@@ -223,7 +223,7 @@ void CControlConnectionSocket::DownloadOneFile(HWND parent, const char* fileName
                     CFTPServerPathType pathType = ::GetFTPServerPathType(ServerFirstReply, ServerSystem, workPath);
                     HANDLES(LeaveCriticalSection(&SocketCritSect));
 
-                    PrepareFTPCommand(cmdBuf, 50 + FTP_MAX_PATH, logBuf, 50 + FTP_MAX_PATH,
+                    PrepareFTPCommand(cmdBuf, cmdBuf.Size(), logBuf, logBuf.Size(),
                                       ftpcmdRetrieveFile, NULL, fileName); // cannot report an error
                     BOOL fileIncomplete = TRUE;
                     BOOL tgtFileError = FALSE;
@@ -364,7 +364,7 @@ void CControlConnectionSocket::DownloadOneFile(HWND parent, const char* fileName
                                                 }
                                             }
                                         }
-                                        _snprintf_s(errBuf + len, 900 + FTP_MAX_PATH - len, _TRUNCATE, LoadStr(useSuffixResID), replyBuf);
+                                        _snprintf_s(errBuf + len, errBuf.Size() - len, _TRUNCATE, LoadStr(useSuffixResID), replyBuf);
                                         SalamanderGeneral->SalMessageBox(parent, errBuf,
                                                                          LoadStr(IDS_FTPERRORTITLE),
                                                                          MB_OK | MB_ICONEXCLAMATION);
@@ -443,7 +443,7 @@ void CControlConnectionSocket::DownloadOneFile(HWND parent, const char* fileName
                                         FTPGetErrorText(err, replyBuf, 700);
                                     else
                                         lstrcpyn(replyBuf, LoadStr(IDS_UNKNOWNERROR), 700);
-                                    _snprintf_s(errBuf + len, 900 + FTP_MAX_PATH - len, _TRUNCATE, LoadStr(IDS_DOWNLOADFILEERRORSUFIX3), replyBuf);
+                                    _snprintf_s(errBuf + len, errBuf.Size() - len, _TRUNCATE, LoadStr(IDS_DOWNLOADFILEERRORSUFIX3), replyBuf);
                                     SalamanderGeneral->SalMessageBox(parent, errBuf,
                                                                      LoadStr(IDS_FTPERRORTITLE),
                                                                      MB_OK | MB_ICONEXCLAMATION);
@@ -470,7 +470,7 @@ void CControlConnectionSocket::DownloadOneFile(HWND parent, const char* fileName
         // display the message "Unable to download file from server - file is locked by another operation"
         _snprintf_s(errBuf, _TRUNCATE, LoadStr(IDS_DOWNLOADFILEERROR), fileName, workPath);
         int len = (int)strlen(errBuf);
-        _snprintf_s(errBuf + len, 900 + FTP_MAX_PATH - len, _TRUNCATE, LoadStr(IDS_DOWNLOADFILEERRORSUFIX4));
+        _snprintf_s(errBuf + len, errBuf.Size() - len, _TRUNCATE, LoadStr(IDS_DOWNLOADFILEERRORSUFIX4));
         SalamanderGeneral->SalMessageBox(parent, errBuf,
                                          LoadStr(IDS_FTPERRORTITLE),
                                          MB_OK | MB_ICONEXCLAMATION);
@@ -493,9 +493,9 @@ BOOL CControlConnectionSocket::CreateDir(char* changedPath, HWND parent, char* n
     const char* retryMsgAux = NULL;
     char retryMsgBuf[300];
     char replyBuf[700];
-    char errBuf[900 + FTP_MAX_PATH];
-    char cmdBuf[50 + 2 * MAX_PATH];
-    char logBuf[50 + 2 * MAX_PATH];
+    CPathBuffer errBuf;
+    CPathBuffer cmdBuf;
+    CPathBuffer logBuf;
     char hostBuf[HOST_MAX_SIZE];
     char userBuffer[USER_MAX_SIZE];
     while (ReconnectIfNeeded(notInPanel, panel == PANEL_LEFT, parent,
@@ -506,12 +506,12 @@ BOOL CControlConnectionSocket::CreateDir(char* changedPath, HWND parent, char* n
         setStartTimeIfConnected = TRUE;
         BOOL run = FALSE;
         BOOL ok = TRUE;
-        char newPath[FTP_MAX_PATH];
+        CPathBuffer newPath;
         BOOL needChangeDir = reconnected; // after a reconnect we try to set the working directory again
         if (!reconnected)                 // we have been connected for a while, check whether the working directory matches 'workPath'
         {
             // use the cache; in normal cases the path should be there
-            ok = GetCurrentWorkingPath(parent, newPath, FTP_MAX_PATH, FALSE, &canRetry, retryMsgBuf, 300);
+            ok = GetCurrentWorkingPath(parent, newPath, newPath.Size(), FALSE, &canRetry, retryMsgBuf, 300);
             if (!ok && canRetry) // "retry" is allowed
             {
                 run = TRUE;
@@ -542,7 +542,7 @@ BOOL CControlConnectionSocket::CreateDir(char* changedPath, HWND parent, char* n
         if (ok)
         {
             // create the requested directory
-            PrepareFTPCommand(cmdBuf, 50 + 2 * MAX_PATH, logBuf, 50 + 2 * MAX_PATH,
+            PrepareFTPCommand(cmdBuf, cmdBuf.Size(), logBuf, logBuf.Size(),
                               ftpcmdCreateDir, NULL, newName); // cannot fail
             BOOL refreshWorkingPath = TRUE;
             int ftpReplyCode;
@@ -562,17 +562,17 @@ BOOL CControlConnectionSocket::CreateDir(char* changedPath, HWND parent, char* n
                                                         GetFTPServerPathType(workPath), newName, FALSE);
                 }
                 if (FTP_DIGIT_1(ftpReplyCode) == FTP_D1_SUCCESS && // success is returned (should be 257)
-                    FTPGetDirectoryFromReply(replyBuf, (int)strlen(replyBuf), newPath, FTP_MAX_PATH))
+                    FTPGetDirectoryFromReply(replyBuf, (int)strlen(replyBuf), newPath, newPath.Size()))
                 {                   // directory 'newPath' has just been created
                     newName[0] = 0; // no focus after refresh yet
                     CFTPServerPathType pathType = GetFTPServerPathType(newPath);
-                    char cutDir[FTP_MAX_PATH];
+                    CPathBuffer cutDir;
                     if (pathType != ftpsptUnknown &&
-                        FTPCutDirectory(pathType, newPath, FTP_MAX_PATH, cutDir, FTP_MAX_PATH, NULL))
+                        FTPCutDirectory(pathType, newPath, newPath.Size(), cutDir, cutDir.Size(), NULL))
                     {
                         if (!FTPIsPrefixOfServerPath(pathType, workPath, newPath))
                         {
-                            lstrcpyn(changedPath, newPath, FTP_MAX_PATH);
+                            lstrcpyn(changedPath, newPath, changedPath.Size());
                             refreshWorkingPath = FALSE;
                         }
                         if (FTPIsTheSameServerPath(pathType, newPath, workPath))
@@ -612,7 +612,7 @@ BOOL CControlConnectionSocket::CreateDir(char* changedPath, HWND parent, char* n
                 }
             }
             if (refreshWorkingPath)
-                lstrcpyn(changedPath, workPath, FTP_MAX_PATH);
+                lstrcpyn(changedPath, workPath, changedPath.Size());
         }
 
         if (!run)
@@ -637,11 +637,11 @@ BOOL CControlConnectionSocket::QuickRename(char* changedPath, HWND parent, const
         return TRUE; // nothing to do; the name does not change
     }
 
-    char fromNameBuf[MAX_PATH + 10];
+    CPathBuffer fromNameBuf;
     const char* fromNameForSrv = fromName;
     if (isVMS && isDir)
     {
-        FTPMakeVMSDirName(fromNameBuf, MAX_PATH + 10, fromName);
+        FTPMakeVMSDirName(fromNameBuf, fromNameBuf.Size(), fromName);
         fromNameForSrv = fromNameBuf;
     }
 
@@ -656,7 +656,7 @@ BOOL CControlConnectionSocket::QuickRename(char* changedPath, HWND parent, const
     BOOL retSuccess = FALSE;
     BOOL srcLocked = FALSE;
     BOOL tgtLocked = FALSE;
-    char errBuf[900 + FTP_MAX_PATH];
+    CPathBuffer errBuf;
     CFTPServerPathType pathType = GetFTPServerPathType(workPath);
     int lockedFromFileUID; // UID of the locked file (in FTPOpenedFiles) - we lock the file for renaming
     if (isDir || FTPOpenedFiles.OpenFile(userBuffer, hostBuf, portBuf, workPath, pathType,
@@ -672,8 +672,8 @@ BOOL CControlConnectionSocket::QuickRename(char* changedPath, HWND parent, const
             const char* retryMsgAux = NULL;
             char retryMsgBuf[300];
             char replyBuf[700];
-            char cmdBuf[50 + 2 * MAX_PATH];
-            char logBuf[50 + 2 * MAX_PATH];
+            CPathBuffer cmdBuf;
+            CPathBuffer logBuf;
             while (ReconnectIfNeeded(notInPanel, panel == PANEL_LEFT, parent,
                                      userBuf, userBufSize, &reconnected,
                                      setStartTimeIfConnected, totalAttemptNum,
@@ -682,12 +682,12 @@ BOOL CControlConnectionSocket::QuickRename(char* changedPath, HWND parent, const
                 setStartTimeIfConnected = TRUE;
                 BOOL run = FALSE;
                 BOOL ok = TRUE;
-                char newPath[FTP_MAX_PATH];
+                CPathBuffer newPath;
                 BOOL needChangeDir = reconnected; // after a reconnect we try to set the working directory again
                 if (!reconnected)                 // we have been connected for a while, check whether the working directory matches 'workPath'
                 {
                     // use the cache; in normal cases the path should be there
-                    ok = GetCurrentWorkingPath(parent, newPath, FTP_MAX_PATH, FALSE, &canRetry, retryMsgBuf, 300);
+                    ok = GetCurrentWorkingPath(parent, newPath, newPath.Size(), FALSE, &canRetry, retryMsgBuf, 300);
                     if (!ok && canRetry) // "retry" is allowed
                     {
                         run = TRUE;
@@ -718,7 +718,7 @@ BOOL CControlConnectionSocket::QuickRename(char* changedPath, HWND parent, const
                 if (ok)
                 {
                     // send the "rename from" command first (later send the follow-up "rename to")
-                    PrepareFTPCommand(cmdBuf, 50 + 2 * MAX_PATH, logBuf, 50 + 2 * MAX_PATH,
+                    PrepareFTPCommand(cmdBuf, cmdBuf.Size(), logBuf, logBuf.Size(),
                                       ftpcmdRenameFrom, NULL, fromNameForSrv); // cannot fail
                     int ftpReplyCode;
                     if (SendFTPCommand(parent, cmdBuf, logBuf, NULL, GetWaitTime(WAITWND_COMOPER), NULL,
@@ -727,7 +727,7 @@ BOOL CControlConnectionSocket::QuickRename(char* changedPath, HWND parent, const
                     {
                         if (FTP_DIGIT_1(ftpReplyCode) == FTP_D1_PARTIALSUCCESS) // 350 Requested file action pending further information
                         {                                                       // we need to send "rename to"
-                            PrepareFTPCommand(cmdBuf, 50 + 2 * MAX_PATH, logBuf, 50 + 2 * MAX_PATH,
+                            PrepareFTPCommand(cmdBuf, cmdBuf.Size(), logBuf, logBuf.Size(),
                                               ftpcmdRenameTo, NULL, newName); // cannot fail
                             if (SendFTPCommand(parent, cmdBuf, logBuf, NULL, GetWaitTime(WAITWND_COMOPER), NULL,
                                                &ftpReplyCode, replyBuf, 700, FALSE, FALSE, FALSE, &canRetry,
@@ -772,7 +772,7 @@ BOOL CControlConnectionSocket::QuickRename(char* changedPath, HWND parent, const
                                     retryMsgAux = retryMsgBuf;
                                 }
                             }
-                            lstrcpyn(changedPath, workPath, FTP_MAX_PATH);
+                            lstrcpyn(changedPath, workPath, changedPath.Size());
                         }
                         else // error (including an unexpected reply)
                         {
@@ -809,7 +809,7 @@ BOOL CControlConnectionSocket::QuickRename(char* changedPath, HWND parent, const
         // display the message "Unable to rename file on server - src or tgt file is locked by another operation"
         _snprintf_s(errBuf, _TRUNCATE, LoadStr(IDS_QUICKRENAMEFILEERR), fromNameForSrv, newName);
         int len = (int)strlen(errBuf);
-        _snprintf_s(errBuf + len, 900 + FTP_MAX_PATH - len, _TRUNCATE,
+        _snprintf_s(errBuf + len, errBuf.Size() - len, _TRUNCATE,
                     LoadStr(srcLocked ? IDS_QUICKRENAMEFILEERRSUF1 : IDS_QUICKRENAMEFILEERRSUF2));
         SalamanderGeneral->SalMessageBox(parent, errBuf, LoadStr(IDS_FTPERRORTITLE),
                                          MB_OK | MB_ICONEXCLAMATION);

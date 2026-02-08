@@ -1551,9 +1551,9 @@ int CFTPQueue::SolveErrorOnItem(HWND parent, int UID, CFTPOperation* oper)
     CALL_STACK_MESSAGE1("CFTPQueue::SolveErrorOnItem()");
 
     int openDlgWithID = 0;
-    char ftpPath[FTP_MAX_PATH];
+    CPathBuffer ftpPath;
     ftpPath[0] = 0;
-    char ftpName[FTP_MAX_PATH];
+    CPathBuffer ftpName;
     ftpName[0] = 0;
     CPathBuffer diskPath, diskName; // Heap-allocated for long path support
     diskPath[0] = 0;
@@ -1581,21 +1581,21 @@ int CFTPQueue::SolveErrorOnItem(HWND parent, int UID, CFTPOperation* oper)
             if (found->Type == fqitUploadCopyExploreDir || found->Type == fqitUploadMoveExploreDir)
             {
                 isUploadItem = TRUE;
-                lstrcpyn(ftpPath, ((CFTPQueueItemCopyMoveUploadExplore*)found)->TgtPath, FTP_MAX_PATH);
-                lstrcpyn(ftpName, ((CFTPQueueItemCopyMoveUploadExplore*)found)->TgtName, FTP_MAX_PATH);
+                lstrcpyn(ftpPath, ((CFTPQueueItemCopyMoveUploadExplore*)found)->TgtPath, ftpPath.Size());
+                lstrcpyn(ftpName, ((CFTPQueueItemCopyMoveUploadExplore*)found)->TgtName, ftpName.Size());
             }
             else
             {
                 if (found->Type == fqitUploadCopyFile || found->Type == fqitUploadMoveFile)
                 {
                     isUploadItem = TRUE;
-                    lstrcpyn(ftpPath, ((CFTPQueueItemCopyOrMoveUpload*)found)->TgtPath, FTP_MAX_PATH);
-                    lstrcpyn(ftpName, ((CFTPQueueItemCopyOrMoveUpload*)found)->TgtName, FTP_MAX_PATH);
+                    lstrcpyn(ftpPath, ((CFTPQueueItemCopyOrMoveUpload*)found)->TgtPath, ftpPath.Size());
+                    lstrcpyn(ftpName, ((CFTPQueueItemCopyOrMoveUpload*)found)->TgtName, ftpName.Size());
                 }
                 else
                 {
-                    lstrcpyn(ftpPath, found->Path, FTP_MAX_PATH);
-                    lstrcpyn(ftpName, found->Name, FTP_MAX_PATH);
+                    lstrcpyn(ftpPath, found->Path, ftpPath.Size());
+                    lstrcpyn(ftpName, found->Name, ftpName.Size());
                 }
             }
             switch (found->ProblemID)

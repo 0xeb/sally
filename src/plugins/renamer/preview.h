@@ -30,16 +30,16 @@ protected:
     CRenamer Renamer;
 
     // data for rename operation
-    char (&Root)[MAX_PATH];
+    CPathBuffer& Root;
     int& RootLen;
     TIndirectArray<CSourceFile>& SourceFiles;
     BOOL& SourceFilesValid;
 
     BOOL TransferError;
     BOOL Dirty;
-    char TextBuffer[MAX_PATH];
+    CPathBuffer TextBuffer; // Heap-allocated for long path support
     int CachedItem;
-    char NewNameCache[MAX_PATH];
+    CPathBuffer NewNameCache; // Heap-allocated for long path support
     BOOL NewNameValid;
 
     HWND Static;

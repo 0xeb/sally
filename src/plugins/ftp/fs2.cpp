@@ -1,4 +1,4 @@
-// SPDX-FileCopyrightText: 2023 Open Salamander Authors
+﻿// SPDX-FileCopyrightText: 2023 Open Salamander Authors
 // SPDX-License-Identifier: GPL-2.0-or-later
 // CommentsTranslationProject: TRANSLATED
 
@@ -199,7 +199,7 @@ BOOL CPluginFSInterface::GetFullFSPath(HWND parent, const char* fsName, char* pa
     if (ControlConnection == NULL)
         return FALSE; // translation is not possible (the FS has not been connected yet); let Salamander report the error
 
-    char errBuf[900 + FTP_MAX_PATH];
+    CPathBuffer errBuf;
     _snprintf_s(errBuf, _TRUNCATE, LoadStr(IDS_LOGMSGCHANGINGPATH), path);
     ControlConnection->LogMessage(errBuf, -1, TRUE);
 
@@ -253,10 +253,10 @@ BOOL CPluginFSInterface::GetFullFSPath(HWND parent, const char* fsName, char* pa
         success = FALSE;
     if (success)
     {
-        char root[2 * MAX_PATH];
+        CPathBuffer root;
         sprintf(root, "%s:", fsName);
         int len = (int)strlen(root);
-        if (MakeUserPart(root + len, 2 * MAX_PATH - len, path) &&
+        if (MakeUserPart(root + len, root.Size() - len, path) &&
             (int)strlen(root) < pathSize)
         {
             strcpy(path, root);
@@ -278,9 +278,9 @@ BOOL CPluginFSInterface::GetFullName(CFileData& file, int isDir, char* buf, int 
     CFTPServerPathType type = GetFTPServerPathType(Path);
     if (isDir == 2) // up-dir
     {
-        char tmpPath[FTP_MAX_PATH];
-        lstrcpyn(tmpPath, Path, FTP_MAX_PATH);
-        if (FTPCutDirectory(type, tmpPath, FTP_MAX_PATH, NULL, 0, NULL))
+        CPathBuffer tmpPath;
+        lstrcpyn(tmpPath, Path, tmpPath.Size());
+        if (FTPCutDirectory(type, tmpPath, tmpPath.Size(), NULL, 0, NULL))
             return MakeUserPart(buf, bufSize, tmpPath);
         else
             return FALSE;
@@ -463,7 +463,7 @@ BOOL CPluginFSInterface::ChangePath(int currentFSNameIndex, char* fsName, int fs
             {
                 lstrcpyn(User, HandleNULLStr(server->UserName), USER_MAX_SIZE);
             }
-            lstrcpyn(Path, HandleNULLStr(server->InitialPath), FTP_MAX_PATH);
+            lstrcpyn(Path, HandleNULLStr(server->InitialPath), Path.Size());
             parsedPath = FALSE; // path entered by the user (never trim '/' or '\\' at the beginning)
 
             if (server->TargetPanelPath != NULL)
@@ -607,7 +607,7 @@ BOOL CPluginFSInterface::ChangePath(int currentFSNameIndex, char* fsName, int fs
             if (path != NULL)
             {
                 Path[0] = firstCharOfPath;
-                lstrcpyn(Path + 1, path, FTP_MAX_PATH - 1);
+                lstrcpyn(Path + 1, path, Path.Size() - 1);
             }
             else
                 Path[0] = 0;
@@ -631,7 +631,7 @@ BOOL CPluginFSInterface::ChangePath(int currentFSNameIndex, char* fsName, int fs
         ControlConnection->SetStartTime();
         if (!ControlConnection->StartControlConnection(SalamanderGeneral->GetMsgBoxParent(),
                                                        User, USER_MAX_SIZE, FALSE, RescuePath,
-                                                       FTP_MAX_PATH, &TotalConnectAttemptNum,
+                                                       RescuePath.Size(), &TotalConnectAttemptNum,
                                                        NULL, TRUE, -1, FALSE))
         {                                            // failed to connect, release the socket object (signals the "never connected" state)
             ControlConnection->ActivateWelcomeMsg(); // if any message box deactivated the welcome-msg window, activate it again
@@ -641,14 +641,14 @@ BOOL CPluginFSInterface::ChangePath(int currentFSNameIndex, char* fsName, int fs
             *TargetPanelPath = 0; // the connection failed, no path change in the target panel
             return FALSE;
         }
-        lstrcpyn(HomeDir, RescuePath, FTP_MAX_PATH); // save the current path after logging into the server (home dir)
+        lstrcpyn(HomeDir, RescuePath, HomeDir.Size()); // save the current path after logging into the server (home dir)
         char* pathListing = NULL;
         int pathListingLen = 0;
         CFTPDate pathListingDate;
         memset(&pathListingDate, 0, sizeof(pathListingDate));
         DWORD pathListingStartTime = 0;
         BOOL ret = ControlConnection->ChangeWorkingPath(TRUE, FALSE, SalamanderGeneral->GetMsgBoxParent(),
-                                                        Path, FTP_MAX_PATH, User, USER_MAX_SIZE,
+                                                        Path, Path.Size(), User, USER_MAX_SIZE,
                                                         parsedPath, forceRefresh, mode, FALSE,
                                                         cutFileName, pathWasCut, RescuePath, TRUE,
                                                         &pathListing, &pathListingLen, &pathListingDate,
@@ -708,7 +708,7 @@ BOOL CPluginFSInterface::ChangePath(int currentFSNameIndex, char* fsName, int fs
             if (path != NULL)
             {
                 Path[0] = firstCharOfPath;
-                lstrcpyn(Path + 1, path, FTP_MAX_PATH - 1);
+                lstrcpyn(Path + 1, path, Path.Size() - 1);
             }
             else
                 Path[0] = 0;
@@ -746,7 +746,7 @@ BOOL CPluginFSInterface::ChangePath(int currentFSNameIndex, char* fsName, int fs
             DWORD pathListingStartTime = 0;
             ret = ControlConnection->ChangeWorkingPath(notInPanel, panel == PANEL_LEFT,
                                                        SalamanderGeneral->GetMsgBoxParent(), Path,
-                                                       FTP_MAX_PATH, User, USER_MAX_SIZE, TRUE,
+                                                       Path.Size(), User, USER_MAX_SIZE, TRUE,
                                                        forceRefresh, mode,
                                                        lastErrorState == fesInaccessiblePath, /* if it cannot be listed, shorten it */
                                                        lastErrorState == fesInaccessiblePath ? NULL : cutFileName,
@@ -1061,7 +1061,7 @@ BOOL CPluginFSInterface::ListCurrentPath(CSalamanderDirectoryAbstract* dir,
         PathListingStartTime = 0;
     }
 
-    char logBuf[200 + FTP_MAX_PATH];
+    CPathBuffer logBuf;
     _snprintf_s(logBuf, _TRUNCATE, LoadStr(PathListing != NULL ? IDS_LOGMSGLISTINGCACHEDPATH : IDS_LOGMSGLISTINGPATH), Path);
     ControlConnection->LogMessage(logBuf, -1, TRUE);
 
@@ -1235,7 +1235,7 @@ BOOL CPluginFSInterface::ListCurrentPath(CSalamanderDirectoryAbstract* dir,
                 if (needSimpleListing) // unknown listing; show a message about sending the information to ALTAP
                 {                      // and log "Unknown Server Type"
                     lstrcpyn(logBuf, LoadStr(AutodetectSrvType ? IDS_LOGMSGUNKNOWNSRVTYPE : IDS_LOGMSGUNKNOWNSRVTYPE2),
-                             200 + FTP_MAX_PATH);
+                             logBuf.Size());
                     ControlConnection->LogMessage(logBuf, -1, TRUE);
                     if (InformAboutUnknownSrvType)
                     {

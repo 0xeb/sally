@@ -76,9 +76,9 @@ BOOL SafeQueryInfoKey(HKEY hKey, int root, LPWSTR key, LPWSTR className,
             {
                 char keyNameA[MAX_KEYNAME];
                 WStrToStr(keyNameA, MAX_KEYNAME, key);
-                char classNameA[MAX_PATH];
+                CPathBuffer classNameA; // Heap-allocated for long path support
                 if (className)
-                    WStrToStr(classNameA, MAX_PATH, className);
+                    WStrToStr(classNameA, classNameA.Size(), className);
                 else
                     classNameA[0] = 0;
                 TRACE_I("registry key " << keyNameA << " has the class name set to: " << classNameA);
@@ -893,7 +893,7 @@ BOOL CPluginFSInterface::CopyOrMoveFromFS(BOOL copy, int mode, const char* fsNam
         BOOL skipAllLongNames = FALSE;
         BOOL skipAllClassNames = FALSE;
         BOOL overwriteAll = !ConfirmOnOverwrite;
-        char nextFocus[2 * MAX_PATH];
+        CPathBuffer nextFocus; // Heap-allocated for long path support
         nextFocus[0] = 0;
         BOOL sourceEqualsTarget = FALSE;
 
@@ -922,7 +922,7 @@ BOOL CPluginFSInterface::CopyOrMoveFromFS(BOOL copy, int mode, const char* fsNam
 
             // this is a rename
             if (!copy)
-                WStrToStr(nextFocus, 2 * MAX_PATH, targetName);
+                WStrToStr(nextFocus, nextFocus.Size(), targetName);
             sourceEqualsTarget = TRUE;
         }
 

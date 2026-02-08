@@ -10,7 +10,7 @@ BOOL CRenamerDialog::ExportToTempFile()
 
     // create the name of the tmp file
     if (!SG->SalGetTempFileName(NULL, "SAL", TempFile, FALSE, NULL) ||
-        !SG->SalPathAppend(TempFile, "list.txt", MAX_PATH))
+        !SG->SalPathAppend(TempFile, "list.txt", TempFile.Size()))
         return Error(IDS_CREATETEMP);
 
     // create/open the tmp file
@@ -225,7 +225,7 @@ BOOL CRenamerDialog::ExecuteCommand(const char* command)
 
     if (!CreateProcess(NULL, cmdLine, NULL, NULL, TRUE,
                        CREATE_DEFAULT_ERROR_MODE | NORMAL_PRIORITY_CLASS,
-                       NULL, *Root ? Root : NULL, &si, &pi))
+                       NULL, *Root ? (char*)Root : NULL, &si, &pi))
     {
         ret = Error(IDS_PROCESS);
         goto LERROR;

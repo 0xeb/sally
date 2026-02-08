@@ -472,7 +472,7 @@ void CCalculateDialog::RefreshUI()
     }
 }
 
-BOOL CCalculateDialog::AddDir(char (&path)[MAX_PATH + 50], size_t root, BOOL* ignoreAll)
+BOOL CCalculateDialog::AddDir(CPathBuffer& path, size_t root, BOOL* ignoreAll)
 {
     if (StopReadingDirectories)
         return FALSE;
@@ -496,7 +496,7 @@ BOOL CCalculateDialog::AddDir(char (&path)[MAX_PATH + 50], size_t root, BOOL* ig
             {
                 if (fd.cFileName[0] != 0 && strcmp(fd.cFileName, ".") && strcmp(fd.cFileName, ".."))
                 {
-                    if (plen + 1 + strlen(fd.cFileName) < MAX_PATH)
+                    if (plen + 1 + strlen(fd.cFileName) < (size_t)path.Size())
                     {
                         strcpy(path + plen + 1, fd.cFileName);
                         if (fd.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY)
@@ -568,7 +568,7 @@ BOOL CCalculateDialog::GetFileList()
     totalSize = CQuadWord(0, 0);
 
     BOOL ret = TRUE;
-    char path[MAX_PATH + 50];
+    CPathBuffer path; // Heap-allocated for long path support
     size_t root = strlen(SourcePath);
     if (root > 0 && SourcePath[root - 1] == '\\')
         root--;
@@ -576,7 +576,7 @@ BOOL CCalculateDialog::GetFileList()
     RefreshCounter = 0;
 
     strcpy(path, SourcePath);
-    SalamanderGeneral->SalPathAddBackslash(path, MAX_PATH); // if this fails, appending anything later would fail too (no need to handle here)
+    SalamanderGeneral->SalPathAddBackslash(path, path.Size()); // if this fails, appending anything later would fail too (no need to handle here)
     char* pathEnd = path + strlen(path);
 
     BOOL ignoreAll = FALSE;
@@ -584,7 +584,7 @@ BOOL CCalculateDialog::GetFileList()
     {
         SEEDFILEINFO* cfi = (*pSeedFileList)[i];
 
-        if ((pathEnd - path) + strlen(cfi->Name) < MAX_PATH)
+        if ((pathEnd - path) + strlen(cfi->Name) < (size_t)path.Size())
         {
             strcpy(pathEnd, cfi->Name);
             if (!cfi->bDir)
@@ -1595,9 +1595,12 @@ BOOL CVerifyDialog::LoadSourceFile()
                 ret = FALSE;
                 break;
             }
-            memset(info, 0, sizeof(FILEINFO));
+            memset(info->digest, 0, sizeof(info->digest));
+            info->size = CQuadWord(0, 0);
+            info->bFileExist = FALSE;
+            info->fileName.Get()[0] = '\0';
 
-            if (!pCalculator->ParseDigest(line, info->fileName, _countof(info->fileName), info->digest))
+            if (!pCalculator->ParseDigest(line, info->fileName, info->fileName.Size(), info->digest))
             {
                 Error(HWindow, 0, IDS_VERIFYTITLE, IDS_TOOLONGNAME);
                 ret = FALSE;
@@ -2148,8 +2151,8 @@ public:
 
     virtual unsigned Body();
 
-    char sourcePath[MAX_PATH];
-    char sourceFile[MAX_PATH];
+    CPathBuffer sourcePath; // Heap-allocated for long path support
+    CPathBuffer sourceFile; // Heap-allocated for long path support
 
 private:
     HWND hParent;
@@ -2198,9 +2201,9 @@ BOOL OpenVerifyDialog(HWND parent)
     if (t != NULL)
     {
         // hand over data to the thread
-        SalamanderGeneral->GetPanelPath(PANEL_SOURCE, t->sourcePath, MAX_PATH, NULL, NULL);
+        SalamanderGeneral->GetPanelPath(PANEL_SOURCE, t->sourcePath, t->sourcePath.Size(), NULL, NULL);
         strcpy(t->sourceFile, t->sourcePath);
-        if (SalamanderGeneral->SalPathAppend(t->sourceFile, fd->Name, MAX_PATH))
+        if (SalamanderGeneral->SalPathAppend(t->sourceFile, fd->Name, t->sourceFile.Size()))
         {
             // start the thread
             if (t->Create(ThreadQueue) != NULL)

@@ -70,14 +70,14 @@ static BOOL RestoreFile(const char* fileName, const char* sourcePath, const char
     CALL_STACK_MESSAGE4("RestoreFile(%s, %s, %s)", fileName, sourcePath, targetPath);
 
     BOOL ret = TRUE;
-    char srcpath[2 * MAX_PATH];
-    char dstpath[2 * MAX_PATH];
+    CPathBuffer srcpath; // Heap-allocated for long path support
+    CPathBuffer dstpath; // Heap-allocated for long path support
 
     // prepare source and target paths
-    lstrcpyn(srcpath, sourcePath, 2 * MAX_PATH);
-    lstrcpyn(dstpath, targetPath, 2 * MAX_PATH);
-    SalamanderGeneral->SalPathAppend(srcpath, fileName, 2 * MAX_PATH);
-    SalamanderGeneral->SalPathAppend(dstpath, fileName, 2 * MAX_PATH);
+    lstrcpyn(srcpath, sourcePath, srcpath.Size());
+    lstrcpyn(dstpath, targetPath, dstpath.Size());
+    SalamanderGeneral->SalPathAppend(srcpath, fileName, srcpath.Size());
+    SalamanderGeneral->SalPathAppend(dstpath, fileName, dstpath.Size());
 
     // open source file
     SAFE_FILE srcfile;
@@ -216,11 +216,12 @@ static BOOL RestoreDir(const char* fileName, const char* sourcePath, const char*
     CALL_STACK_MESSAGE4("RestoreDir(%s, %s, %s)", fileName, sourcePath, targetPath);
 
     // prepare source and target paths
-    char srcpath[2 * MAX_PATH], dstpath[2 * MAX_PATH];
-    lstrcpyn(srcpath, sourcePath, 2 * MAX_PATH);
-    lstrcpyn(dstpath, targetPath, 2 * MAX_PATH);
-    SalamanderGeneral->SalPathAppend(srcpath, fileName, 2 * MAX_PATH);
-    SalamanderGeneral->SalPathAppend(dstpath, fileName, 2 * MAX_PATH);
+    CPathBuffer srcpath; // Heap-allocated for long path support
+    CPathBuffer dstpath; // Heap-allocated for long path support
+    lstrcpyn(srcpath, sourcePath, srcpath.Size());
+    lstrcpyn(dstpath, targetPath, dstpath.Size());
+    SalamanderGeneral->SalPathAppend(srcpath, fileName, srcpath.Size());
+    SalamanderGeneral->SalPathAppend(dstpath, fileName, dstpath.Size());
 
     // update progress
     FileProgress = 0;

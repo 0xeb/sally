@@ -44,6 +44,8 @@
 
 #include "versinfo.rh2"
 
+#include "common/widepath.h"
+
 #include "spl_com.h"
 #include "spl_base.h"
 #include "spl_arc.h"

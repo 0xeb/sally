@@ -1938,7 +1938,7 @@ void CLogs::SaveLog(HWND parent, const char* itemName, int uid)
     ofn.Flags = OFN_PATHMUSTEXIST | OFN_LONGNAMES | OFN_NOCHANGEDIR | OFN_OVERWRITEPROMPT |
                 OFN_NOTESTFILECREATE | OFN_HIDEREADONLY;
 
-    char buf[200 + MAX_PATH];
+    CPathBuffer buf;
     if (SalamanderGeneral->SafeGetSaveFileName(&ofn))
     {
         HCURSOR oldCur = SetCursor(LoadCursor(NULL, IDC_WAIT));

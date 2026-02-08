@@ -338,7 +338,7 @@ BOOL CPluginInterfaceForArchiver::ListArchive(CSalamanderForOperationsAbstract* 
 {
     CALL_STACK_MESSAGE2("CPluginInterfaceForArchiver::ListArchive(, %s, ,)", fileName);
     BOOL ret;
-    char path[MAX_PATH + 2];
+    CPathBuffer path; // Heap-allocated for long path support
     LPSTORAGE pStorage;
     LPMALLOC pIMalloc;
 

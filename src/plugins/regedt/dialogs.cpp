@@ -770,11 +770,11 @@ BOOL CRawEditValDialog::ExportToTempFile()
     if (!SG->SalGetTempFileName(NULL, "SAL", TempDir, FALSE, NULL))
         return Error(IDS_CREATETEMP);
 
-    SG->SalPathAddBackslash(strcpy(TempFile, TempDir), MAX_PATH);
+    SG->SalPathAddBackslash(strcpy(TempFile, TempDir), TempFile.Size());
     int tlen = (int)strlen(TempFile);
     TempFile[tlen++] = '_';
-    int len = min(MAX_PATH - tlen - 1, (int)wcslen(KeyName));
-    WStrToStr(TempFile + tlen, MAX_PATH, KeyName, len);
+    int len = min(TempFile.Size() - tlen - 1, (int)wcslen(KeyName));
+    WStrToStr(TempFile.Get() + tlen, TempFile.Size(), KeyName, len);
     TempFile[len + tlen] = 0;
     ReplaceUnsafeCharacters(TempFile + tlen);
 

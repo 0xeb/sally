@@ -172,9 +172,9 @@ BOOL CRenamerOptions::Load(HKEY regKey, CSalamanderRegistryAbstract* registry)
 {
     CALL_STACK_MESSAGE1("CRenamerOptions::Load(, )");
     Reset(FALSE);
-    registry->GetValue(regKey, CONFIG_NEWNAME, REG_SZ, NewName, 2 * MAX_PATH);
-    registry->GetValue(regKey, CONFIG_SEARCHFOR, REG_SZ, SearchFor, 2 * MAX_PATH);
-    registry->GetValue(regKey, CONFIG_REPLACEWITH, REG_SZ, ReplaceWith, MAX_PATH);
+    registry->GetValue(regKey, CONFIG_NEWNAME, REG_SZ, NewName.Get(), NewName.Size());
+    registry->GetValue(regKey, CONFIG_SEARCHFOR, REG_SZ, SearchFor.Get(), SearchFor.Size());
+    registry->GetValue(regKey, CONFIG_REPLACEWITH, REG_SZ, ReplaceWith.Get(), ReplaceWith.Size());
     registry->GetValue(regKey, CONFIG_CASESENSITIVE, REG_DWORD, &CaseSensitive, sizeof(BOOL));
     registry->GetValue(regKey, CONFIG_WHOLEWORDS, REG_DWORD, &WholeWords, sizeof(BOOL));
     registry->GetValue(regKey, CONFIG_GLOBAL, REG_DWORD, &Global, sizeof(BOOL));
@@ -210,7 +210,7 @@ BOOL CRenamerOptions::Save(HKEY regKey, CSalamanderRegistryAbstract* registry)
 // CRenamer
 //
 
-CRenamer::CRenamer(char (&root)[MAX_PATH], int& rootLen)
+CRenamer::CRenamer(CPathBuffer& root, int& rootLen)
     : Root(root), RootLen(rootLen)
 {
     CALL_STACK_MESSAGE2("CRenamer::CRenamer(, %d)", rootLen);

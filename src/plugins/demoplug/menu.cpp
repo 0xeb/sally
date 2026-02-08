@@ -687,10 +687,9 @@ CPluginInterfaceForMenuExt::ExecuteMenuItem(CSalamanderForOperationsAbstract* sa
     case MENUCMD_ENTERDISKPATH: // example of validating a path entered by the user
     {
         // proposed initial string - here just the Windows path from the target panel (otherwise empty)
-        char path[MAX_PATH];
-        path[0] = 0;
+        CPathBuffer path;
         int type;
-        if (SalamanderGeneral->GetPanelPath(PANEL_TARGET, path, MAX_PATH, &type, NULL))
+        if (SalamanderGeneral->GetPanelPath(PANEL_TARGET, path, path.Size(), &type, NULL))
         {
             if (type != PATH_TYPE_WINDOWS)
                 path[0] = 0; // accept only disk paths
@@ -698,9 +697,8 @@ CPluginInterfaceForMenuExt::ExecuteMenuItem(CSalamanderForOperationsAbstract* sa
 
         // we need the current path to convert relative paths to absolute ones
         BOOL curPathIsDisk = FALSE;
-        char curPath[MAX_PATH];
-        curPath[0] = 0;
-        if (SalamanderGeneral->GetPanelPath(PANEL_SOURCE, curPath, MAX_PATH, &type, NULL))
+        CPathBuffer curPath;
+        if (SalamanderGeneral->GetPanelPath(PANEL_SOURCE, curPath, curPath.Size(), &type, NULL))
         {
             if (type != PATH_TYPE_WINDOWS)
                 curPath[0] = 0; // accept only disk paths
@@ -727,7 +725,7 @@ CPluginInterfaceForMenuExt::ExecuteMenuItem(CSalamanderForOperationsAbstract* sa
                 char* secondPart;
                 if (SalamanderGeneral->SalParsePath(parent, path, pathType, pathIsDir, secondPart,
                                                     "Path Error", NULL, curPathIsDisk, curPath,
-                                                    NULL, NULL, MAX_PATH))
+                                                    NULL, NULL, path.Size()))
                 {
                     if (pathType == PATH_TYPE_WINDOWS) // Windows path (disk + UNC)
                     {
@@ -774,7 +772,7 @@ CPluginInterfaceForMenuExt::ExecuteMenuItem(CSalamanderForOperationsAbstract* sa
                     {
                         if (pathType == PATH_TYPE_ARCHIVE && (backslashAtEnd || mustBePath)) // restore the removed backslash
                         {
-                            SalamanderGeneral->SalPathAddBackslash(path, MAX_PATH);
+                            SalamanderGeneral->SalPathAddBackslash(path, path.Size());
                         }
                         // error - FS/archive paths are not supported; ask again
                         SalamanderGeneral->SalMessageBox(parent, "File-system and archive paths are not supported here.",

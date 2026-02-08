@@ -487,14 +487,14 @@ BOOL CPluginFSInterface::GetPathForMainWindowTitle(const char* fsName, int mode,
 {
     CFTPServerPathType pathType = ControlConnection != NULL ? ControlConnection->GetFTPServerPathType(Path) : ftpsptUnknown;
     BOOL needFullPath = FALSE;
-    char root[2 * MAX_PATH];
-    char path[FTP_MAX_PATH];
+    CPathBuffer root;
+    CPathBuffer path;
     if (mode == 1) // "Directory Name Only" mode
     {
-        lstrcpyn(path, Path, FTP_MAX_PATH);
+        lstrcpyn(path, Path, path.Size());
         if (pathType == ftpsptUnknown)
             pathType = ftpsptUnix;
-        if (FTPCutDirectory(pathType, path, FTP_MAX_PATH, buf, bufSize, NULL)) // trimming succeeded
+        if (FTPCutDirectory(pathType, path, path.Size(), buf, bufSize, NULL)) // trimming succeeded
         {
             return TRUE;
         }
@@ -509,7 +509,7 @@ BOOL CPluginFSInterface::GetPathForMainWindowTitle(const char* fsName, int mode,
         {
             char* trimStart = NULL;
             char* trimEnd = NULL;
-            lstrcpyn(path, Path, FTP_MAX_PATH);
+            lstrcpyn(path, Path, path.Size());
             switch (pathType)
             {
             case ftpsptIBMz_VM: // "ACADEM:ANONYMOU.PICS" (+the root must end with a dot: "ACADEM:ANONYMOU.")
@@ -645,7 +645,7 @@ BOOL CPluginFSInterface::GetPathForMainWindowTitle(const char* fsName, int mode,
                 memcpy(trimStart, "...", 3);
                 sprintf(root, "%s:", fsName);
                 int len = (int)strlen(root);
-                if (MakeUserPart(root + len, 2 * MAX_PATH - len, path))
+                if (MakeUserPart(root + len, root.Size() - len, path))
                 {
                     lstrcpyn(buf, root, bufSize);
                     return TRUE;
@@ -659,7 +659,7 @@ BOOL CPluginFSInterface::GetPathForMainWindowTitle(const char* fsName, int mode,
     {
         sprintf(root, "%s:", fsName);
         int len = (int)strlen(root);
-        if (MakeUserPart(root + len, 2 * MAX_PATH - len, Path))
+        if (MakeUserPart(root + len, root.Size() - len, Path))
         {
             lstrcpyn(buf, root, bufSize);
             return TRUE;
@@ -745,11 +745,11 @@ void CPluginFSInterface::SendUserFTPCommand(HWND parent)
         dlg.Execute() == IDOK)
     {
         // store the path for which we will report a change after the command is executed
-        char changedPath[2 * MAX_PATH];
+        CPathBuffer changedPath;
         const char* fsName = ControlConnection->GetEncryptControlConnection() == 1 ? AssignedFSNameFTPS : AssignedFSName;
         sprintf(changedPath, "%s:", fsName);
         int len = (int)strlen(changedPath);
-        MakeUserPart(changedPath + len, 2 * MAX_PATH - len);
+        MakeUserPart(changedPath + len, changedPath.Size() - len);
 
         char cmdBuf[FTPCOMMAND_MAX_SIZE + 2];
         char logBuf[FTPCOMMAND_MAX_SIZE + 2];
@@ -775,12 +775,12 @@ void CPluginFSInterface::SendUserFTPCommand(HWND parent)
         {
             BOOL run = FALSE;
             BOOL ok = TRUE;
-            char newPath[FTP_MAX_PATH];
+            CPathBuffer newPath;
             BOOL needChangeDir = reconnected; // after reconnect try to set the working directory again
             if (!reconnected)                 // already connected for a longer time, verify that the working directory matches 'Path'
             {
                 // use the cache, under normal circumstances the path should be there
-                ok = ControlConnection->GetCurrentWorkingPath(parent, newPath, FTP_MAX_PATH, FALSE,
+                ok = ControlConnection->GetCurrentWorkingPath(parent, newPath, newPath.Size(), FALSE,
                                                               &canRetry, retryMsgBuf, 300);
                 if (!ok && canRetry) // "retry" is allowed
                 {
@@ -804,7 +804,7 @@ void CPluginFSInterface::SendUserFTPCommand(HWND parent)
                                                               &TotalConnectAttemptNum, NULL, TRUE, NULL);
                 if (ok && !success && Path[0] != 0) // send succeeded, but the server reports an error (+ignore the error for an empty path) -> user command cannot
                 {                                   // be sent (it may be tied to the current path in the panel)
-                    char errBuf[900 + FTP_MAX_PATH];
+                    CPathBuffer errBuf;
                     _snprintf_s(errBuf, _TRUNCATE, LoadStr(IDS_CHANGEWORKPATHERROR), Path, ftpReplyBuf);
                     SalamanderGeneral->SalMessageBox(parent, errBuf, LoadStr(IDS_FTPERRORTITLE),
                                                      MB_OK | MB_ICONEXCLAMATION);
@@ -827,7 +827,7 @@ void CPluginFSInterface::SendUserFTPCommand(HWND parent)
                     {
                         int panel;
                         BOOL notInPanel = !SalamanderGeneral->GetPanelWithPluginFS(this, panel);
-                        ok = ControlConnection->GetCurrentWorkingPath(parent, newPath, FTP_MAX_PATH, TRUE,
+                        ok = ControlConnection->GetCurrentWorkingPath(parent, newPath, newPath.Size(), TRUE,
                                                                       &canRetry, retryMsgBuf, 300);
                         if (!ok && canRetry) // "retry" is allowed
                         {
