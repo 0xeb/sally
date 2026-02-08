@@ -270,3 +270,190 @@ TEST(AlterFileNameW, Unicode_Uppercase)
     EXPECT_EQ(result.length(), 9u);
     EXPECT_EQ(result.substr(1), L"TUDE.TXT");
 }
+
+// ============================================================================
+// Wide path utilities from salamdr3.cpp
+// ============================================================================
+
+// Declarations
+void SalPathAppendW(std::wstring& path, const wchar_t* name);
+void SalPathAddBackslashW(std::wstring& path);
+void SalPathRemoveBackslashW(std::wstring& path);
+void SalPathStripPathW(std::wstring& path);
+const wchar_t* SalPathFindFileNameW(const wchar_t* path);
+void SalPathRemoveExtensionW(std::wstring& path);
+bool SalPathAddExtensionW(std::wstring& path, const wchar_t* extension);
+bool SalPathRenameExtensionW(std::wstring& path, const wchar_t* extension);
+
+// --- SalPathAppendW ---
+
+TEST(SalPathAppendW, BasicAppend)
+{
+    std::wstring path = L"C:\\Dir";
+    SalPathAppendW(path, L"file.txt");
+    EXPECT_EQ(path, L"C:\\Dir\\file.txt");
+}
+
+TEST(SalPathAppendW, PathWithTrailingBackslash)
+{
+    std::wstring path = L"C:\\Dir\\";
+    SalPathAppendW(path, L"file.txt");
+    EXPECT_EQ(path, L"C:\\Dir\\file.txt");
+}
+
+TEST(SalPathAppendW, NameWithLeadingBackslash)
+{
+    std::wstring path = L"C:\\Dir";
+    SalPathAppendW(path, L"\\file.txt");
+    EXPECT_EQ(path, L"C:\\Dir\\file.txt");
+}
+
+TEST(SalPathAppendW, EmptyPath)
+{
+    std::wstring path;
+    SalPathAppendW(path, L"file.txt");
+    EXPECT_EQ(path, L"file.txt");
+}
+
+TEST(SalPathAppendW, NullName)
+{
+    std::wstring path = L"C:\\Dir";
+    SalPathAppendW(path, nullptr);
+    EXPECT_EQ(path, L"C:\\Dir");
+}
+
+TEST(SalPathAppendW, LongPath)
+{
+    std::wstring path = L"C:\\" + std::wstring(200, L'a');
+    std::wstring name(100, L'b');
+    SalPathAppendW(path, name.c_str());
+    EXPECT_GT(path.length(), 260u);
+    EXPECT_EQ(path.back(), L'b');
+}
+
+// --- SalPathAddBackslashW ---
+
+TEST(SalPathAddBackslashW, AddsBackslash)
+{
+    std::wstring path = L"C:\\Dir";
+    SalPathAddBackslashW(path);
+    EXPECT_EQ(path, L"C:\\Dir\\");
+}
+
+TEST(SalPathAddBackslashW, AlreadyHasBackslash)
+{
+    std::wstring path = L"C:\\Dir\\";
+    SalPathAddBackslashW(path);
+    EXPECT_EQ(path, L"C:\\Dir\\");
+}
+
+TEST(SalPathAddBackslashW, EmptyPath)
+{
+    std::wstring path;
+    SalPathAddBackslashW(path);
+    EXPECT_TRUE(path.empty());
+}
+
+// --- SalPathRemoveBackslashW ---
+
+TEST(SalPathRemoveBackslashW, RemovesBackslash)
+{
+    std::wstring path = L"C:\\Dir\\";
+    SalPathRemoveBackslashW(path);
+    EXPECT_EQ(path, L"C:\\Dir");
+}
+
+TEST(SalPathRemoveBackslashW, NoBackslash)
+{
+    std::wstring path = L"C:\\Dir";
+    SalPathRemoveBackslashW(path);
+    EXPECT_EQ(path, L"C:\\Dir");
+}
+
+// --- SalPathStripPathW ---
+
+TEST(SalPathStripPathW, StripsPath)
+{
+    std::wstring path = L"C:\\Dir\\file.txt";
+    SalPathStripPathW(path);
+    EXPECT_EQ(path, L"file.txt");
+}
+
+TEST(SalPathStripPathW, NoBackslash)
+{
+    std::wstring path = L"file.txt";
+    SalPathStripPathW(path);
+    EXPECT_EQ(path, L"file.txt");
+}
+
+// --- SalPathFindFileNameW ---
+
+TEST(SalPathFindFileNameW, FindsFileName)
+{
+    EXPECT_STREQ(SalPathFindFileNameW(L"C:\\Dir\\file.txt"), L"file.txt");
+}
+
+TEST(SalPathFindFileNameW, NoPath)
+{
+    EXPECT_STREQ(SalPathFindFileNameW(L"file.txt"), L"file.txt");
+}
+
+TEST(SalPathFindFileNameW, NullReturnsNull)
+{
+    EXPECT_EQ(SalPathFindFileNameW(nullptr), nullptr);
+}
+
+// --- SalPathRemoveExtensionW ---
+
+TEST(SalPathRemoveExtensionW, RemovesExtension)
+{
+    std::wstring path = L"C:\\Dir\\file.txt";
+    SalPathRemoveExtensionW(path);
+    EXPECT_EQ(path, L"C:\\Dir\\file");
+}
+
+TEST(SalPathRemoveExtensionW, NoExtension)
+{
+    std::wstring path = L"C:\\Dir\\file";
+    SalPathRemoveExtensionW(path);
+    EXPECT_EQ(path, L"C:\\Dir\\file");
+}
+
+TEST(SalPathRemoveExtensionW, DotInDirectory)
+{
+    std::wstring path = L"C:\\Dir.old\\file";
+    SalPathRemoveExtensionW(path);
+    EXPECT_EQ(path, L"C:\\Dir.old\\file");
+}
+
+// --- SalPathAddExtensionW ---
+
+TEST(SalPathAddExtensionW, AddsExtension)
+{
+    std::wstring path = L"C:\\Dir\\file";
+    EXPECT_TRUE(SalPathAddExtensionW(path, L".txt"));
+    EXPECT_EQ(path, L"C:\\Dir\\file.txt");
+}
+
+TEST(SalPathAddExtensionW, ExistingExtension_NotAdded)
+{
+    std::wstring path = L"C:\\Dir\\file.txt";
+    EXPECT_TRUE(SalPathAddExtensionW(path, L".bak"));
+    EXPECT_EQ(path, L"C:\\Dir\\file.txt"); // unchanged
+}
+
+// --- SalPathRenameExtensionW ---
+
+TEST(SalPathRenameExtensionW, ReplacesExtension)
+{
+    std::wstring path = L"C:\\Dir\\file.txt";
+    EXPECT_TRUE(SalPathRenameExtensionW(path, L".bak"));
+    EXPECT_EQ(path, L"C:\\Dir\\file.bak");
+}
+
+TEST(SalPathRenameExtensionW, AddsExtensionWhenNone)
+{
+    std::wstring path = L"C:\\Dir\\file";
+    EXPECT_TRUE(SalPathRenameExtensionW(path, L".txt"));
+    EXPECT_EQ(path, L"C:\\Dir\\file.txt");
+}

@@ -289,3 +289,103 @@ std::wstring AlterFileNameW(const wchar_t* filename, int format, int change, boo
 
     return result;
 }
+
+// --- Wide path utilities (from salamdr3.cpp) ---
+
+void SalPathAppendW(std::wstring& path, const wchar_t* name)
+{
+    if (name == nullptr)
+        return;
+    if (*name == L'\\')
+        name++;
+    if (!path.empty() && path.back() == L'\\')
+        path.pop_back();
+    if (*name != L'\0')
+    {
+        if (!path.empty())
+            path += L'\\';
+        path += name;
+    }
+}
+
+void SalPathAddBackslashW(std::wstring& path)
+{
+    if (!path.empty() && path.back() != L'\\')
+        path += L'\\';
+}
+
+void SalPathRemoveBackslashW(std::wstring& path)
+{
+    if (!path.empty() && path.back() == L'\\')
+        path.pop_back();
+}
+
+void SalPathStripPathW(std::wstring& path)
+{
+    size_t pos = path.rfind(L'\\');
+    if (pos != std::wstring::npos)
+        path = path.substr(pos + 1);
+}
+
+const wchar_t* SalPathFindFileNameW(const wchar_t* path)
+{
+    if (path == nullptr)
+        return nullptr;
+    const wchar_t* result = path;
+    for (const wchar_t* p = path; *p != L'\0'; p++)
+    {
+        if (*p == L'\\')
+            result = p + 1;
+    }
+    return result;
+}
+
+void SalPathRemoveExtensionW(std::wstring& path)
+{
+    size_t len = path.length();
+    for (size_t i = len; i > 0; i--)
+    {
+        if (path[i - 1] == L'.')
+        {
+            path.resize(i - 1);
+            return;
+        }
+        if (path[i - 1] == L'\\')
+            return;
+    }
+}
+
+bool SalPathAddExtensionW(std::wstring& path, const wchar_t* extension)
+{
+    if (extension == nullptr)
+        return false;
+    size_t len = path.length();
+    for (size_t i = len; i > 0; i--)
+    {
+        if (path[i - 1] == L'.')
+            return true; // extension already exists
+        if (path[i - 1] == L'\\')
+            break;
+    }
+    path += extension;
+    return true;
+}
+
+bool SalPathRenameExtensionW(std::wstring& path, const wchar_t* extension)
+{
+    if (extension == nullptr)
+        return false;
+    size_t len = path.length();
+    for (size_t i = len; i > 0; i--)
+    {
+        if (path[i - 1] == L'.')
+        {
+            path.resize(i - 1);
+            break;
+        }
+        if (path[i - 1] == L'\\')
+            break;
+    }
+    path += extension;
+    return true;
+}
