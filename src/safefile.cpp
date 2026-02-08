@@ -43,10 +43,9 @@ BOOL CSalamanderSafeFile::SafeFileOpen(SAFE_FILE* file,
         *pressedButton = DIALOG_CANCEL;
 
     HANDLE hFile;
-    int fileNameLen = (int)strlen(fileName);
     do
     {
-        hFile = fileNameLen >= MAX_PATH ? INVALID_HANDLE_VALUE : HANDLES_Q(CreateFile(fileName, dwDesiredAccess, dwShareMode, NULL, dwCreationDisposition, dwFlagsAndAttributes, NULL));
+        hFile = SalCreateFileH(fileName, dwDesiredAccess, dwShareMode, NULL, dwCreationDisposition, dwFlagsAndAttributes, NULL);
         if (hFile == INVALID_HANDLE_VALUE)
         {
             DWORD dlgRet;
@@ -54,7 +53,7 @@ BOOL CSalamanderSafeFile::SafeFileOpen(SAFE_FILE* file,
                 dlgRet = DIALOG_SKIP;
             else
             {
-                DWORD lastError = fileNameLen >= MAX_PATH ? ERROR_FILENAME_EXCED_RANGE : GetLastError();
+                DWORD lastError = GetLastError();
                 dlgRet = DialogError(hParent, (flags & BUTTONS_MASK), fileName,
                                      GetErrorText(lastError), LoadStr(IDS_ERROROPENINGFILE));
             }
@@ -132,10 +131,9 @@ CSalamanderSafeFile::SafeFileCreate(const char* fileName,
     // check whether the target already exists
     DWORD attrs;
     HANDLE hFile;
-    int fileNameLen = (int)strlen(fileName);
     while (1)
     {
-        attrs = fileNameLen < MAX_PATH ? SalGetFileAttributes(fileName) : 0xFFFFFFFF;
+        attrs = SalGetFileAttributes(fileName);
         if (attrs == 0xFFFFFFFF)
             break;
 
@@ -382,35 +380,6 @@ CSalamanderSafeFile::SafeFileCreate(const char* fileName,
 
     if (attrs == 0xFFFFFFFF)
     {
-        if (fileNameLen > MAX_PATH - 1)
-        {
-            // Name too long -- offer Skip / Skip All / Cancel
-            int ret;
-            if (silentMask != NULL && (*silentMask & (isDir ? SILENT_SKIP_DIR_CREATE : SILENT_SKIP_FILE_CREATE)) && allowSkip)
-                ret = DIALOG_SKIP;
-            else
-            {
-                // ERROR: filename+error, buttons skip/skip all/cancel
-                ret = DialogError(hParent, allowSkip ? BUTTONS_SKIPCANCEL : BUTTONS_OK, fileName, ::GetErrorText(ERROR_FILENAME_EXCED_RANGE),
-                                  LoadStr(isDir ? IDS_ERRORCREATINGDIR : IDS_ERRORCREATINGFILE));
-            }
-            switch (ret)
-            {
-            case DIALOG_SKIPALL:
-                if (silentMask != NULL)
-                    *silentMask |= (isDir ? SILENT_SKIP_DIR_CREATE : SILENT_SKIP_FILE_CREATE);
-                // no break here
-            case DIALOG_SKIP:
-            {
-                if (skipped != NULL)
-                    *skipped = TRUE;
-                if (isDir && skipPath != NULL)
-                    lstrcpyn(skipPath, fileName, skipPathMax); // the user wants to retrieve the skipped path
-            }
-            }
-            return INVALID_HANDLE_VALUE;
-        }
-
         CPathBuffer namecopy;  // Heap-allocated for long path support
         lstrcpyn(namecopy, fileName, namecopy.Size());
         // if it is a file, obtain the directory name
