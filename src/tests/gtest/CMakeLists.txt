@@ -159,6 +159,54 @@ set_target_properties(gtest_widepath PROPERTIES
     RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/tests"
 )
 
+add_executable(gtest_fsutil_wide
+    gtest_fsutil_wide.cpp
+    ../fsutil_standalone.cpp
+)
+
+target_include_directories(gtest_fsutil_wide PRIVATE
+    ${CMAKE_CURRENT_SOURCE_DIR}/../..
+    ${CMAKE_CURRENT_SOURCE_DIR}/../../common
+)
+
+target_compile_definitions(gtest_fsutil_wide PRIVATE
+    WIN32 _WINDOWS _CRT_SECURE_NO_WARNINGS
+)
+
+target_link_libraries(gtest_fsutil_wide
+    GTest::gtest GTest::gtest_main kernel32
+)
+
+add_test(NAME gtest_fsutil_wide COMMAND gtest_fsutil_wide)
+
+set_target_properties(gtest_fsutil_wide PROPERTIES
+    RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/tests"
+)
+
+add_executable(gtest_salwidepath
+    gtest_salwidepath.cpp
+    ../widepath_standalone.cpp
+)
+
+target_include_directories(gtest_salwidepath PRIVATE
+    ${CMAKE_CURRENT_SOURCE_DIR}/../..
+    ${CMAKE_CURRENT_SOURCE_DIR}/../../common
+)
+
+target_compile_definitions(gtest_salwidepath PRIVATE
+    WIN32 _WINDOWS _CRT_SECURE_NO_WARNINGS
+)
+
+target_link_libraries(gtest_salwidepath
+    GTest::gtest GTest::gtest_main kernel32
+)
+
+add_test(NAME gtest_salwidepath COMMAND gtest_salwidepath)
+
+set_target_properties(gtest_salwidepath PROPERTIES
+    RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/tests"
+)
+
 add_executable(gtest_pathutils
     gtest_pathutils.cpp
     ../pathutils_standalone.cpp
