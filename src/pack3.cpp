@@ -1251,7 +1251,7 @@ const char* WINAPI PackExpArcDosName(HWND msgParent, void* param)
                 {
                     sprintf(s, "%X.*", randNum);
                     WIN32_FIND_DATA findData;
-                    HANDLE find = HANDLES_Q(FindFirstFile(path, &findData));
+                    HANDLE find = SalFindFirstFileH(path, &findData);
                     if (find != INVALID_HANDLE_VALUE)
                         HANDLES(FindClose(find)); // this name already exists with some extension, searching again
                     else

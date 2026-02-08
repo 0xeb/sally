@@ -568,7 +568,7 @@ BOOL ReadDirsAndFilesAux(HWND hWindow, DWORD flags, CCmpDirProgressDialog* progr
         DWORD counter = 0;
         WIN32_FIND_DATA data;
         HANDLE hFind;
-        hFind = HANDLES_Q(FindFirstFile(path, &data));
+        hFind = SalFindFirstFileH(path, &data);
         if (hFind == INVALID_HANDLE_VALUE)
         {
             DWORD err = GetLastError();

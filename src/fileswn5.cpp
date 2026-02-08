@@ -2139,7 +2139,7 @@ void CFilesWindow::RenameFileInternal(CFileData* f, const char* formatedFileName
                      err == ERROR_ALREADY_EXISTS))
                 {
                     WIN32_FIND_DATA data;
-                    HANDLE find = HANDLES_Q(FindFirstFile(tgtPath, &data));
+                    HANDLE find = SalFindFirstFileH(tgtPath, &data);
                     if (find != INVALID_HANDLE_VALUE)
                     {
                         HANDLES(FindClose(find));

@@ -918,7 +918,7 @@ BOOL CLanguageSelectorDialog::Initialize(const char* slgSearchPath, HINSTANCE pl
         lstrcpyn(path, slgSearchPath, path.Size());
 
     WIN32_FIND_DATA file;
-    HANDLE hFind = HANDLES_Q(FindFirstFile(path, &file));
+    HANDLE hFind = SalFindFirstFileH(path, &file);
     if (hFind != INVALID_HANDLE_VALUE)
     {
         do

@@ -498,7 +498,7 @@ BOOL PackUniversalCompress(HWND parent, const char* command, TPackErrorTable* co
         int i;
         for (i = 0; i < 2; i++)
         {
-            HANDLE find = HANDLES_Q(FindFirstFile(path, &findData));
+            HANDLE find = SalFindFirstFileH(path, &findData);
             if (find != INVALID_HANDLE_VALUE)
             {
                 do

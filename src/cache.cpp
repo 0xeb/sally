@@ -385,7 +385,7 @@ BOOL CCacheDirData::ContainTmpName(const char* tmpName, const char* rootTmpPath,
                 }
 
                 WIN32_FIND_DATA data;
-                HANDLE find = HANDLES_Q(FindFirstFile(tmpFullName, &data));
+                HANDLE find = SalFindFirstFileH(tmpFullName, &data);
                 if (find != INVALID_HANDLE_VALUE)
                 {
                     HANDLES(FindClose(find));
@@ -1471,7 +1471,7 @@ void CDiskCache::ClearTEMPIfNeeded(HWND parent, HWND hActivePanel)
             TIndirectArray<char> tmpDirs(10, 50);
 
             WIN32_FIND_DATA data;
-            HANDLE find = HANDLES_Q(FindFirstFile(tmpDir, &data));
+            HANDLE find = SalFindFirstFileH(tmpDir, &data);
             if (find != INVALID_HANDLE_VALUE)
             {
                 do

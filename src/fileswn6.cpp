@@ -314,7 +314,7 @@ BOOL CFilesWindow::MoveFiles(const char* source, const char* target, const char*
         strcpy(sourceDir + len, "*");
 
         WIN32_FIND_DATA file;
-        HANDLE find = HANDLES_Q(FindFirstFile(sourceDir, &file));
+        HANDLE find = SalFindFirstFileH(sourceDir, &file);
         if (find == INVALID_HANDLE_VALUE)
         {
             FreeScript(script);
@@ -1844,7 +1844,7 @@ BOOL CFilesWindow::BuildScriptDir(COperations* script, CActionType type, char* s
                             if (SalPathAppend(finalName, "*", 2 * MAX_PATH + 200))
                             {
                                 WIN32_FIND_DATA f;
-                                HANDLE search = HANDLES_Q(FindFirstFile(finalName, &f));
+                                HANDLE search = SalFindFirstFileH(finalName, &f);
                                 if (search == INVALID_HANDLE_VALUE)
                                 {
                                     DWORD err = GetLastError();
@@ -2030,7 +2030,7 @@ BOOL CFilesWindow::BuildScriptDir(COperations* script, CActionType type, char* s
     {
         WIN32_FIND_DATA f;
         strcpy(st, "\\*");
-        HANDLE search = HANDLES_Q(FindFirstFile(sourcePath, &f));
+        HANDLE search = SalFindFirstFileH(sourcePath, &f);
         *st = 0; // remove "\\*"
         if (search == INVALID_HANDLE_VALUE)
         {
@@ -2042,7 +2042,7 @@ BOOL CFilesWindow::BuildScriptDir(COperations* script, CActionType type, char* s
                     SalPathAppend(finalName, dirDOSName, 2 * MAX_PATH + 200) &&
                     SalPathAppend(finalName, "*", 2 * MAX_PATH + 200))
                 {
-                    search = HANDLES_Q(FindFirstFile(finalName, &f));
+                    search = SalFindFirstFileH(finalName, &f);
                     if (search != INVALID_HANDLE_VALUE)
                     {
                         strcpy(*sourceEnd == '\\' ? sourceEnd + 1 : sourceEnd, dirDOSName); // modify sourcePath (it's used further for handling found files and directories)
@@ -2516,7 +2516,7 @@ BOOL CFilesWindow::BuildScriptFile(COperations* script, CActionType type, char* 
                 {
                     HANDLE find;
                     WIN32_FIND_DATA dataOut;
-                    find = HANDLES_Q(FindFirstFile(op.TargetName, &dataOut));
+                    find = SalFindFirstFileH(op.TargetName, &dataOut);
                     if (find != INVALID_HANDLE_VALUE)
                     {
                         HANDLES(FindClose(find));
@@ -3102,7 +3102,7 @@ void CFilesWindow::ExecuteFromArchive(int index, BOOL edit, HWND editWithMenuPar
             SetCursor(oldCur);
             SetThreadPriority(GetCurrentThread(), THREAD_PRIORITY_ABOVE_NORMAL);
 
-            HANDLE find = HANDLES_Q(FindFirstFile(name, &data));
+            HANDLE find = SalFindFirstFileH(name, &data);
             if (find != INVALID_HANDLE_VALUE)
             {
                 HANDLES(FindClose(find));
@@ -3159,7 +3159,7 @@ void CFilesWindow::ExecuteFromArchive(int index, BOOL edit, HWND editWithMenuPar
 
     if (fileSize == CQuadWord(-1, -1))
     {
-        HANDLE find = HANDLES_Q(FindFirstFile(name, &data));
+        HANDLE find = SalFindFirstFileH(name, &data);
         if (find != INVALID_HANDLE_VALUE)
         {
             HANDLES(FindClose(find));

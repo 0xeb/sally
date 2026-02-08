@@ -2446,7 +2446,7 @@ CDriveSelectErrDlg::DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
             {
                 WIN32_FIND_DATA fileData;
                 HANDLE search;
-                search = HANDLES_Q(FindFirstFile(fileName, &fileData));
+                search = SalFindFirstFileH(fileName, &fileData);
                 if (search == INVALID_HANDLE_VALUE)
                 {
                     DWORD err = GetLastError();

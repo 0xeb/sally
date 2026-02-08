@@ -1557,7 +1557,7 @@ void SearchDirectory(CPathBuffer& path, char* end, int startPathLen,
     }
 
     WIN32_FIND_DATA file;
-    HANDLE find = HANDLES_Q(FindFirstFile(path, &file));
+    HANDLE find = SalFindFirstFileH(path, &file);
     if (find != INVALID_HANDLE_VALUE)
     {
         if (end - path > 3)

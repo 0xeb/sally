@@ -598,7 +598,7 @@ BOOL CPackACDialog::DirectorySearch(char* path)
     BOOL mustStop = FALSE;
     WIN32_FIND_DATA findData;
     // try to find the first file
-    HANDLE fileFind = HANDLES_Q(FindFirstFile(fileName, &findData));
+    HANDLE fileFind = SalFindFirstFileH(fileName, &findData);
     if (fileFind != INVALID_HANDLE_VALUE)
     {
         do

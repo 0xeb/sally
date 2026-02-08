@@ -141,7 +141,7 @@ CSalamanderSafeFile::SafeFileCreate(const char* fileName,
         if (!isDir)
         {
             WIN32_FIND_DATA data;
-            HANDLE find = HANDLES_Q(FindFirstFile(fileName, &data));
+            HANDLE find = SalFindFirstFileH(fileName, &data);
             if (find != INVALID_HANDLE_VALUE)
             {
                 HANDLES(FindClose(find));

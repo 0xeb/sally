@@ -1192,7 +1192,7 @@ BOOL EmailFilesAddDirectory(CSimpleMAPI* mapi, const char* path, BOOL* errGetFil
         myPath[l++] = '\\';
     char* name = myPath + l;
     strcpy(name, "*");
-    HANDLE find = HANDLES_Q(FindFirstFile(myPath, &file));
+    HANDLE find = SalFindFirstFileH(myPath, &file);
     if (find == INVALID_HANDLE_VALUE)
     {
         DWORD err = GetLastError();

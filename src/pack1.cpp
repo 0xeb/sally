@@ -1602,7 +1602,7 @@ BOOL PackUniversalUncompress(HWND parent, const char* command, TPackErrorTable* 
                 r++; // skip the backslash in the original rootPath
             strcat(srcDir, "\\*");
 
-            HANDLE found = HANDLES_Q(FindFirstFile(srcDir, &foundFile));
+            HANDLE found = SalFindFirstFileH(srcDir, &foundFile);
             if (found == INVALID_HANDLE_VALUE)
             {
                 strcpy(buffer, "FindFirstFile: ");
@@ -1861,7 +1861,7 @@ BOOL PackUnpackOneFile(CFilesWindow* panel, const char* archiveFileName,
     WIN32_FIND_DATA foundFile;
     strcpy(extractedFile, tmpDirNameBuf);
     strcat(extractedFile, "\\*");
-    HANDLE found = HANDLES_Q(FindFirstFile(extractedFile, &foundFile));
+    HANDLE found = SalFindFirstFileH(extractedFile, &foundFile);
     if (found == INVALID_HANDLE_VALUE)
     {
         char buffer[1000];

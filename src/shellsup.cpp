@@ -622,7 +622,7 @@ int CountNumberOfItemsOnPath(const char* path)
     if (SalPathAppend(s, "*.*", s.Size()))
     {
         WIN32_FIND_DATA fileData;
-        HANDLE search = HANDLES_Q(FindFirstFile(s, &fileData));
+        HANDLE search = SalFindFirstFileH(s, &fileData);
         if (search != INVALID_HANDLE_VALUE)
         {
             int num = 0;

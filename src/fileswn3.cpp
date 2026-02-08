@@ -1762,7 +1762,7 @@ BOOL IsWin64RedirectedDirAux(const char* subDir, const char* redirectedDir, cons
         HANDLE h;
         if (failIfDirWithSameNameExists)
         {
-            h = HANDLES_Q(FindFirstFile(winDir, &find));
+            h = SalFindFirstFileH(winDir, &find);
             if (h != INVALID_HANDLE_VALUE)
             {
                 HANDLES(FindClose(h));
@@ -1771,7 +1771,7 @@ BOOL IsWin64RedirectedDirAux(const char* subDir, const char* redirectedDir, cons
         }
 
         strcat(winDirEnd, "\\*");
-        h = HANDLES_Q(FindFirstFile(winDir, &find));
+        h = SalFindFirstFileH(winDir, &find);
         if (h != INVALID_HANDLE_VALUE)
         {
             HANDLES(FindClose(h));

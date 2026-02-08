@@ -2729,7 +2729,7 @@ int CPlugins::GetViewerCount(int index)
 void SearchForSPLs(char* buf, char* s, TIndirectArray<char>& foundFiles, WIN32_FIND_DATA& data)
 {
     strcpy(s++, "\\*");
-    HANDLE find = HANDLES_Q(FindFirstFile(buf, &data));
+    HANDLE find = SalFindFirstFileH(buf, &data);
     if (find != INVALID_HANDLE_VALUE)
     {
         do

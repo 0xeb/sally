@@ -373,7 +373,7 @@ void CFilesWindow::DragDropToArcOrFS(CTmpDragDropOperData* data)
     SalPathAppend(path, "*", path.Size());
     CPathBuffer text;
     WIN32_FIND_DATA file;
-    HANDLE find = HANDLES_Q(FindFirstFile(path, &file));
+    HANDLE find = SalFindFirstFileH(path, &file);
     *end = 0; // fix the path
     if (find == INVALID_HANDLE_VALUE)
     {

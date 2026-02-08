@@ -831,7 +831,7 @@ BOOL _ReadDirectoryTree(HWND parent, CPathBuffer& path, char* name, CSalamanderD
     strcat(end, "\\*");
 
     WIN32_FIND_DATA file;
-    HANDLE find = HANDLES_Q(FindFirstFile(path, &file));
+    HANDLE find = SalFindFirstFileH(path, &file);
     *end = 0; // restore the path
     if (find == INVALID_HANDLE_VALUE)
     {

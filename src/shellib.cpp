@@ -2455,7 +2455,7 @@ void ResolveNetHoodPath(char* path)
         if (SalPathAppend(name, "target.lnk", MAX_PATH))
         {
             WIN32_FIND_DATA data;
-            HANDLE find = HANDLES_Q(FindFirstFile(name, &data));
+            HANDLE find = SalFindFirstFileH(name, &data);
             if (find != INVALID_HANDLE_VALUE) // file exists and we have its 'data'
             {
                 HANDLES(FindClose(find));

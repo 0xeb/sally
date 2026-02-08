@@ -468,7 +468,7 @@ void CCodeTables::PreloadAllConversions()
     lstrcpy(strrchr(path, '\\') + 1, "convert\\*.*");
 
     WIN32_FIND_DATA find;
-    HANDLE hFind = HANDLES_Q(FindFirstFile(path, &find));
+    HANDLE hFind = SalFindFirstFileH(path, &find);
     if (hFind != INVALID_HANDLE_VALUE)
     {
         do

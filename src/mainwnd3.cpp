@@ -191,7 +191,7 @@ BOOL OpenHtmlHelp(char* helpFileName, HWND parent, CHtmlHelpCommand command, DWO
                     if (SalPathAppend(helpPath, "*", helpPath.Size()))
                     { // try to find at least some other directory
                         WIN32_FIND_DATA data;
-                        HANDLE find = HANDLES_Q(FindFirstFile(helpPath, &data));
+                        HANDLE find = SalFindFirstFileH(helpPath, &data);
                         if (find != INVALID_HANDLE_VALUE)
                         {
                             do
