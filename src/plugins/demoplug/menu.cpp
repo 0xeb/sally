@@ -465,7 +465,7 @@ CPluginInterfaceForMenuExt::ExecuteMenuItem(CSalamanderForOperationsAbstract* sa
       }
 */
         /*
-      char firstCreatedDir[MAX_PATH];
+      CPathBuffer firstCreatedDir;
       BOOL ok = SalamanderGeneral->CheckAndCreateDirectory("C:\\test\\test_dir\\second_dir",
                                                            NULL, FALSE, NULL, 0,
                                                            firstCreatedDir);
