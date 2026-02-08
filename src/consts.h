@@ -246,6 +246,7 @@ BOOL IsDirError(DWORD err);                               // is the error relate
 
 // Normal and UNC paths: do they have the same root?
 BOOL HasTheSameRootPath(const char* path1, const char* path2);
+BOOL HasTheSameRootPathW(const wchar_t* path1, const wchar_t* path2);
 
 // Checks if both paths have the same root and are on the same volume (handles
 // paths containing reparse points and substs)

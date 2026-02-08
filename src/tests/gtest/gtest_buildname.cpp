@@ -160,3 +160,101 @@ TEST_F(BuildNameWTest, ExtendedLengthPrefixUNC)
 {
     ExpectBuildName(L"\\\\?\\UNC\\server\\share", L"file.txt", L"\\\\?\\UNC\\server\\share\\file.txt");
 }
+
+// ============================================================================
+// HasTheSameRootPathW tests
+// ============================================================================
+
+// Standalone reimplementation for isolated testing.
+static BOOL HasTheSameRootPathW_Standalone(const wchar_t* path1, const wchar_t* path2)
+{
+    if (towlower(path1[0]) == towlower(path2[0]) && path1[1] == path2[1])
+    {
+        if (path1[1] == L':')
+            return TRUE;
+        else
+        {
+            if (path1[0] == L'\\' && path1[1] == L'\\')
+            {
+                const wchar_t* s1 = path1 + 2;
+                const wchar_t* s2 = path2 + 2;
+                while (*s1 != 0 && *s1 != L'\\')
+                {
+                    if (towlower(*s1) == towlower(*s2))
+                    {
+                        s1++;
+                        s2++;
+                    }
+                    else
+                        break;
+                }
+                if (*s1 != 0 && *s1++ == *s2++)
+                {
+                    while (*s1 != 0 && *s1 != L'\\')
+                    {
+                        if (towlower(*s1) == towlower(*s2))
+                        {
+                            s1++;
+                            s2++;
+                        }
+                        else
+                            break;
+                    }
+                    return (*s1 == 0 && (*s2 == 0 || *s2 == L'\\')) || *s1 == *s2 ||
+                           (*s2 == 0 && (*s1 == 0 || *s1 == L'\\'));
+                }
+            }
+        }
+    }
+    return FALSE;
+}
+
+TEST(HasTheSameRootPathWTest, SameDriveLetter)
+{
+    EXPECT_TRUE(HasTheSameRootPathW_Standalone(L"C:\\Dir1", L"C:\\Dir2"));
+}
+
+TEST(HasTheSameRootPathWTest, SameDriveLetterCaseInsensitive)
+{
+    EXPECT_TRUE(HasTheSameRootPathW_Standalone(L"c:\\Dir1", L"C:\\Dir2"));
+}
+
+TEST(HasTheSameRootPathWTest, DifferentDriveLetters)
+{
+    EXPECT_FALSE(HasTheSameRootPathW_Standalone(L"C:\\Dir", L"D:\\Dir"));
+}
+
+TEST(HasTheSameRootPathWTest, SameUNCRoot)
+{
+    EXPECT_TRUE(HasTheSameRootPathW_Standalone(L"\\\\server\\share\\dir1", L"\\\\server\\share\\dir2"));
+}
+
+TEST(HasTheSameRootPathWTest, SameUNCRootCaseInsensitive)
+{
+    EXPECT_TRUE(HasTheSameRootPathW_Standalone(L"\\\\Server\\Share\\dir1", L"\\\\server\\share\\dir2"));
+}
+
+TEST(HasTheSameRootPathWTest, DifferentUNCServers)
+{
+    EXPECT_FALSE(HasTheSameRootPathW_Standalone(L"\\\\server1\\share", L"\\\\server2\\share"));
+}
+
+TEST(HasTheSameRootPathWTest, DifferentUNCShares)
+{
+    EXPECT_FALSE(HasTheSameRootPathW_Standalone(L"\\\\server\\share1\\dir", L"\\\\server\\share2\\dir"));
+}
+
+TEST(HasTheSameRootPathWTest, UNCvsLocalPath)
+{
+    EXPECT_FALSE(HasTheSameRootPathW_Standalone(L"\\\\server\\share", L"C:\\Dir"));
+}
+
+TEST(HasTheSameRootPathWTest, UNCRootNoTrailingBackslash)
+{
+    EXPECT_TRUE(HasTheSameRootPathW_Standalone(L"\\\\server\\share", L"\\\\server\\share\\subfolder"));
+}
+
+TEST(HasTheSameRootPathWTest, UNCRootWithTrailingBackslash)
+{
+    EXPECT_TRUE(HasTheSameRootPathW_Standalone(L"\\\\server\\share\\", L"\\\\server\\share\\subfolder"));
+}

@@ -1177,6 +1177,50 @@ BOOL HasTheSameRootPath(const char* path1, const char* path2)
     return FALSE;
 }
 
+// Wide version of HasTheSameRootPath
+BOOL HasTheSameRootPathW(const wchar_t* path1, const wchar_t* path2)
+{
+    if (towlower(path1[0]) == towlower(path2[0]) && path1[1] == path2[1])
+    {
+        if (path1[1] == L':')
+            return TRUE; // same root for normal ("c:\path") path
+        else
+        {
+            if (path1[0] == L'\\' && path1[1] == L'\\') // both UNC
+            {
+                const wchar_t* s1 = path1 + 2;
+                const wchar_t* s2 = path2 + 2;
+                while (*s1 != 0 && *s1 != L'\\')
+                {
+                    if (towlower(*s1) == towlower(*s2))
+                    {
+                        s1++;
+                        s2++;
+                    }
+                    else
+                        break; // different machines
+                }
+                if (*s1 != 0 && *s1++ == *s2++) // skip '\\'
+                {
+                    while (*s1 != 0 && *s1 != L'\\')
+                    {
+                        if (towlower(*s1) == towlower(*s2))
+                        {
+                            s1++;
+                            s2++;
+                        }
+                        else
+                            break; // different drives
+                    }
+                    return (*s1 == 0 && (*s2 == 0 || *s2 == L'\\')) || *s1 == *s2 ||
+                           (*s2 == 0 && (*s1 == 0 || *s1 == L'\\'));
+                }
+            }
+        }
+    }
+    return FALSE;
+}
+
 // ****************************************************************************
 
 BOOL HasTheSameRootPathAndVolume(const char* p1, const char* p2)
