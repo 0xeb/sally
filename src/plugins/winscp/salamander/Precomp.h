@@ -6,4 +6,3 @@
 
 #include <windows.h>
 #include <commctrl.h>
-#include "common/widepath.h"

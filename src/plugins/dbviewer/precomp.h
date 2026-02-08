@@ -36,6 +36,5 @@
 #include "dbg.h"
 #include "arraylt.h"
 #include "winliblt.h"
-#include "common/widepath.h"
 
 #include "const.h"

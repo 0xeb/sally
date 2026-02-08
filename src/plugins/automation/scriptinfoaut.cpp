@@ -23,14 +23,14 @@ extern CAutomationPluginInterface g_oAutomationPlugin;
 CSalamanderScriptInfoAutomation::CSalamanderScriptInfoAutomation(
     CScriptInfo* pScript)
 {
-    TCHAR szExpanded[MAX_PATH];
+    CPathBuffer szExpanded;
 
     _ASSERTE(pScript != NULL);
 
     m_strName = pScript->GetDisplayName();
 
     if (g_oAutomationPlugin.ExpandPath(pScript->GetFileName(), szExpanded,
-                                       _countof(szExpanded)))
+                                       szExpanded.Size()))
     {
         m_strPath = szExpanded;
     }

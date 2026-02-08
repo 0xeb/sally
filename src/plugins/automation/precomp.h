@@ -28,7 +28,6 @@
 #include <uxtheme.h>
 #include <Tlhelp32.h>
 #include "salamander.h"
-#include "common/widepath.h"
 
 #define STRSAFE_NO_DEPRECATE
 #include <strsafe.h>

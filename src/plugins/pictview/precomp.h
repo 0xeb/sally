@@ -50,7 +50,6 @@
 #include "arraylt.h"
 #include "winliblt.h"
 #include "auxtools.h"
-#include "common/widepath.h"
 #include "plugcore\gdi.h"
 
 // When we have an old version of windowsx.h

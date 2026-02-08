@@ -134,10 +134,10 @@ void CAutomationConfigDialog::Transfer(CTransferInfo& ti)
         lvi.mask = LVIF_TEXT;
         for (iDir = 0; iDir < cDirs; iDir++)
         {
-            TCHAR szDir[MAX_PATH];
+            CPathBuffer szDir;
             lvi.iItem = iDir;
             lvi.pszText = szDir;
-            lvi.cchTextMax = _countof(szDir);
+            lvi.cchTextMax = szDir.Size();
             ListView_GetItem(hwndList, &lvi);
             g_oAutomationPlugin.AddScriptDirectory(szDir);
         }
@@ -353,7 +353,7 @@ BOOL CAutomationConfigDialog::OnDirListEndLabelEdit(NMLVDISPINFO* nmlv)
             // the edit was cancelled,
             // if the text is empty (e.g. new directory insertion
             // was cancelled), delete the item
-            TCHAR szText[MAX_PATH];
+            CPathBuffer szText;
             LVITEM lvi = {
                 0,
             };
@@ -361,7 +361,7 @@ BOOL CAutomationConfigDialog::OnDirListEndLabelEdit(NMLVDISPINFO* nmlv)
             lvi.mask = LVIF_TEXT;
             lvi.iItem = nmlv->item.iItem;
             lvi.pszText = szText;
-            lvi.cchTextMax = _countof(szText);
+            lvi.cchTextMax = szText.Size();
             if (ListView_GetItem(nmlv->hdr.hwndFrom, &lvi) && szText[0] == _T('\0'))
             {
                 DeleteDirectory();
@@ -728,10 +728,10 @@ void CAutomationConfigDialog::OnBrowseBtnClicked()
     {
     case ID_BROWSE:
     {
-        TCHAR szInit[MAX_PATH];
-        TCHAR szPath[MAX_PATH];
+        CPathBuffer szInit;
+        CPathBuffer szPath;
 
-        GetWindowText(m_hwndSubclassedEdit, szInit, _countof(szInit));
+        GetWindowText(m_hwndSubclassedEdit, szInit, szInit.Size());
 
         m_bBrowsing = true;
 
@@ -757,7 +757,7 @@ void CAutomationConfigDialog::OnBrowseBtnClicked()
             lvi.mask = LVIF_TEXT;
             lvi.iItem = iSel;
             lvi.pszText = szInit;
-            lvi.cchTextMax = _countof(szInit);
+            lvi.cchTextMax = szInit.Size();
             if (ListView_GetItem(hwndList, &lvi) && szInit[0] == _T('\0'))
             {
                 DeleteDirectory();

@@ -114,9 +114,9 @@ void CSalamanderPanelItemAutomation::Set(const CFileData* pData, PCTSTR pszPath)
 
 void CSalamanderPanelItemAutomation::Set(const CFileData* pData, int nPanel)
 {
-    TCHAR szPath[MAX_PATH];
+    CPathBuffer szPath;
 
-    SalamanderGeneral->GetPanelPath(nPanel, szPath, _countof(szPath), NULL, NULL);
+    SalamanderGeneral->GetPanelPath(nPanel, szPath, szPath.Size(), NULL, NULL);
 
     Set(pData, szPath);
 }

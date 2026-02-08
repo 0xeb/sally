@@ -207,6 +207,31 @@ set_target_properties(gtest_salwidepath PROPERTIES
     RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/tests"
 )
 
+add_executable(gtest_filesystem_ops
+    gtest_filesystem_ops.cpp
+    ../widepath_standalone.cpp
+    ../fsutil_standalone.cpp
+)
+
+target_include_directories(gtest_filesystem_ops PRIVATE
+    ${CMAKE_CURRENT_SOURCE_DIR}/../..
+    ${CMAKE_CURRENT_SOURCE_DIR}/../../common
+)
+
+target_compile_definitions(gtest_filesystem_ops PRIVATE
+    WIN32 _WINDOWS _CRT_SECURE_NO_WARNINGS
+)
+
+target_link_libraries(gtest_filesystem_ops
+    GTest::gtest GTest::gtest_main kernel32
+)
+
+add_test(NAME gtest_filesystem_ops COMMAND gtest_filesystem_ops)
+
+set_target_properties(gtest_filesystem_ops PROPERTIES
+    RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/tests"
+)
+
 add_executable(gtest_pathutils
     gtest_pathutils.cpp
     ../pathutils_standalone.cpp

@@ -64,12 +64,12 @@ BOOL WINAPI CAutomationMenuExtInterface::ExecuteMenuItem(
 
     if (id == CmdRunFocusedScript)
     {
-        TCHAR szFullName[MAX_PATH];
+        CPathBuffer szFullName;
         const CFileData* pFocusedFile;
 
-        SalamanderGeneral->GetPanelPath(PANEL_SOURCE, szFullName, _countof(szFullName), NULL, NULL);
+        SalamanderGeneral->GetPanelPath(PANEL_SOURCE, szFullName, szFullName.Size(), NULL, NULL);
         pFocusedFile = SalamanderGeneral->GetPanelFocusedItem(PANEL_SOURCE, NULL);
-        SalamanderGeneral->SalPathAppend(szFullName, pFocusedFile->Name, _countof(szFullName));
+        SalamanderGeneral->SalPathAppend(szFullName, pFocusedFile->Name, szFullName.Size());
 
         CScriptInfo scriptInfo(szFullName, NULL);
         bExecuted = scriptInfo.Execute(info);

@@ -195,10 +195,10 @@ HRESULT CScriptInfo::LoadScript(IActiveScriptParse* pParse, EXECUTION_INFO* info
     LPOLESTR pszCode;
     EXCEPINFO ei;
     ULONG cch;
-    TCHAR szExpanded[MAX_PATH];
+    CPathBuffer szExpanded;
 
     if (!g_oAutomationPlugin.ExpandPath(m_szFileName, szExpanded,
-                                        _countof(szExpanded)))
+                                        szExpanded.Size()))
     {
         return HRESULT_FROM_WIN32(ERROR_ENVVAR_NOT_FOUND);
     }
@@ -644,7 +644,7 @@ CScriptContainer* CScriptContainer::FirstChild(
     bool bFullPath)
 {
     CScriptContainer* pIter;
-    TCHAR szFullPath[MAX_PATH];
+    CPathBuffer szFullPath;
 
     if (m_pChild == NULL)
     {
@@ -655,12 +655,12 @@ CScriptContainer* CScriptContainer::FirstChild(
 
     if (bFullPath)
     {
-        StringCchCopy(szFullPath, _countof(szFullPath), pszPath);
+        StringCchCopy(szFullPath, szFullPath.Size(), pszPath);
     }
     else
     {
-        StringCchCopy(szFullPath, _countof(szFullPath), m_szPath);
-        SalamanderGeneral->SalPathAppend(szFullPath, pszPath, _countof(szFullPath));
+        StringCchCopy(szFullPath, szFullPath.Size(), m_szPath);
+        SalamanderGeneral->SalPathAppend(szFullPath, pszPath, szFullPath.Size());
     }
 
     while (pIter)
@@ -853,12 +853,12 @@ int CScriptLookup::FillContainer(
     CSalamanderRegistryAbstract* registry)
 {
     HANDLE hFind;
-    TCHAR szPattern[MAX_PATH];
+    CPathBuffer szPattern;
     WIN32_FIND_DATA fd;
     int cScripts = 0;
 
-    g_oAutomationPlugin.ExpandPath(pContainer->GetPath(), szPattern, _countof(szPattern));
-    SalamanderGeneral->SalPathAppend(szPattern, _T("*"), _countof(szPattern));
+    g_oAutomationPlugin.ExpandPath(pContainer->GetPath(), szPattern, szPattern.Size());
+    SalamanderGeneral->SalPathAppend(szPattern, _T("*"), szPattern.Size());
 
     hFind = FindFirstFile(szPattern, &fd);
     if (hFind == INVALID_HANDLE_VALUE)
@@ -908,9 +908,9 @@ int CScriptLookup::FillContainer(
             PTSTR pszExt = PathFindExtension(fd.cFileName);
             if (pszExt && *pszExt && g_oScriptAssociations.FindEngineByExt(pszExt))
             {
-                TCHAR szFullPath[MAX_PATH];
-                StringCchCopy(szFullPath, _countof(szFullPath), pContainer->GetPath());
-                SalamanderGeneral->SalPathAppend(szFullPath, fd.cFileName, _countof(szFullPath));
+                CPathBuffer szFullPath;
+                StringCchCopy(szFullPath, szFullPath.Size(), pContainer->GetPath());
+                SalamanderGeneral->SalPathAppend(szFullPath, fd.cFileName, szFullPath.Size());
                 if (AddScriptFromFile(pContainer, szFullPath, hKey, registry))
                 {
                     ++cScripts;
@@ -1146,15 +1146,15 @@ int CScriptLookup::GetUniquier(
         DWORD dwIndex = 0;
         DWORD cchName;
         DWORD dwType;
-        TCHAR szPathRead[MAX_PATH];
+        CPathBuffer szPathRead;
         DWORD cbData;
 
         for (; res == NO_ERROR; dwIndex++)
         {
             cchName = _countof(szName);
-            cbData = sizeof(szPathRead);
+            cbData = szPathRead.Size() * sizeof(TCHAR);
             res = RegEnumValue(hkSub, dwIndex, szName, &cchName,
-                               NULL, &dwType, (LPBYTE)szPathRead, &cbData);
+                               NULL, &dwType, (LPBYTE)(char*)szPathRead, &cbData);
             if (res == NO_ERROR && dwType == REG_SZ)
             {
                 nUniquier = _tcstol(szName, NULL, 16);
@@ -1216,9 +1216,9 @@ int CScriptLookup::GetUniquier(
 UINT CScriptLookup::HashPath(__in_z PCTSTR pszPath)
 {
     UINT nHash;
-    TCHAR szCanonicalPath[MAX_PATH];
+    CPathBuffer szCanonicalPath;
 
-    StringCchCopy(szCanonicalPath, _countof(szCanonicalPath), pszPath);
+    StringCchCopy(szCanonicalPath, szCanonicalPath.Size(), pszPath);
     CharLower(szCanonicalPath);
     nHash = HashString(szCanonicalPath);
     if (nHash == 0)
