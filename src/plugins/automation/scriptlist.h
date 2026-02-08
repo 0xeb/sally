@@ -56,7 +56,7 @@ public:
     };
 
 private:
-    TCHAR m_szFileName[MAX_PATH];
+    CPathBuffer m_szFileName;
     TCHAR m_szDisplayName[64];
     CLSID m_clsidEngine;
     IActiveScript* m_pScript;
@@ -221,7 +221,7 @@ private:
     CScriptContainer* m_pChild;
     CScriptContainer* m_pParent;
     CScriptInfo* m_pScripts;
-    TCHAR m_szPath[MAX_PATH];
+    CPathBuffer m_szPath;
     PTSTR m_pszName;
 
     friend class CScriptLookup;

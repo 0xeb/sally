@@ -108,7 +108,7 @@ protected:
     TDirectArray<DIRECTORY_INFO> m_aDirectories;
 
     /// Salamander directory.
-    TCHAR m_szSalDir[MAX_PATH];
+    CPathBuffer m_szSalDir;
 
     void AddScriptContainerToMenu(
         const class CScriptContainer* pContainer,

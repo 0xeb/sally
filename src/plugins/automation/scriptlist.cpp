@@ -35,7 +35,8 @@ CScriptInfo::CScriptInfo(
 {
     PCTSTR pszNameStart, pszNameEnd;
 
-    StringCchCopy(m_szFileName, _countof(m_szFileName), pszFileName);
+    int fileNameBufSize = m_szFileName.Size();
+    lstrcpyn(m_szFileName, pszFileName, fileNameBufSize);
 
     pszNameStart = PathFindFileName(pszFileName);
     pszNameEnd = PathFindExtension(pszNameStart);
@@ -337,7 +338,7 @@ bool CScriptInfo::ExecuteWorker(EXECUTION_INFO* info)
 {
     HRESULT hr = S_OK;
 
-    CALL_STACK_MESSAGE2("CScriptInfo::ExecuteWorker() (file name = \"%s\")", m_szFileName);
+    CALL_STACK_MESSAGE2("CScriptInfo::ExecuteWorker() (file name = \"%s\")", (const char*)m_szFileName);
 
     info->bDeselect = false;
 
@@ -620,15 +621,16 @@ CScriptContainer::CScriptContainer(
     m_pChild = NULL;
     m_pScripts = NULL;
 
+    int pathBufSize = m_szPath.Size();
     if (bFullPath)
     {
-        StringCchCopy(m_szPath, _countof(m_szPath), pszPath);
+        lstrcpyn(m_szPath, pszPath, pathBufSize);
     }
     else
     {
         _ASSERTE(pParent);
-        StringCchCopy(m_szPath, _countof(m_szPath), pParent->m_szPath);
-        SalamanderGeneral->SalPathAppend(m_szPath, pszPath, _countof(m_szPath));
+        lstrcpyn(m_szPath, pParent->m_szPath, pathBufSize);
+        SalamanderGeneral->SalPathAppend(m_szPath, pszPath, pathBufSize);
     }
 
     SalamanderGeneral->SalPathRemoveBackslash(m_szPath);

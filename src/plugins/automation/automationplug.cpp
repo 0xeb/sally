@@ -431,7 +431,7 @@ CAutomationPluginInterface::CAutomationPluginInterface() : m_aDirectories(4, 1)
     m_himlCold = NULL;
     m_bEnableDebugger = false;
 
-    GetModuleFileName(NULL, m_szSalDir, _countof(m_szSalDir));
+    GetModuleFileName(NULL, m_szSalDir, m_szSalDir.Size());
     PTSTR pszNamePart = PathFindFileName(m_szSalDir);
     if (pszNamePart)
     {
