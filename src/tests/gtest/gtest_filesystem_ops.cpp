@@ -84,6 +84,18 @@ protected:
         WriteFile(h, data, 4, &written, NULL);
         CloseHandle(h);
     }
+
+    // Create a test file from ANSI path (converts to wide for long-path support)
+    void CreateTestFile(const std::string& path)
+    {
+        int wlen = MultiByteToWideChar(CP_ACP, 0, path.c_str(), -1, NULL, 0);
+        std::wstring wPath(wlen - 1, L'\0');
+        MultiByteToWideChar(CP_ACP, 0, path.c_str(), -1, &wPath[0], wlen);
+        // Use \\?\ prefix for long path support
+        if (wPath.length() >= MAX_PATH && wPath.substr(0, 4) != L"\\\\?\\")
+            wPath = L"\\\\?\\" + wPath;
+        CreateTestFileW(wPath);
+    }
 };
 
 // ============================================================================
@@ -414,4 +426,100 @@ TEST_F(FilesystemOpsTest, CreateFile_OpenExisting)
     EXPECT_NE(h, INVALID_HANDLE_VALUE);
     if (h != INVALID_HANDLE_VALUE)
         CloseHandle(h);
+}
+
+// ============================================================================
+// SalFindFirstFileH / SalLPFindFirstFile tests
+// ============================================================================
+
+TEST_F(FilesystemOpsTest, SalFindFirstFileH_FindsExistingFile)
+{
+    CreateTestFile(m_tempDir + "\\testfile.txt");
+    std::string pattern = m_tempDir + "\\testfile.txt";
+    WIN32_FIND_DATAA fd;
+    HANDLE h = SalLPFindFirstFileA(pattern.c_str(), &fd);
+    EXPECT_NE(h, INVALID_HANDLE_VALUE);
+    if (h != INVALID_HANDLE_VALUE)
+    {
+        EXPECT_STREQ(fd.cFileName, "testfile.txt");
+        FindClose(h);
+    }
+}
+
+TEST_F(FilesystemOpsTest, SalFindFirstFileH_WildcardEnumeration)
+{
+    CreateTestFile(m_tempDir + "\\alpha.txt");
+    CreateTestFile(m_tempDir + "\\beta.txt");
+    std::string pattern = m_tempDir + "\\*.txt";
+    WIN32_FIND_DATAA fd;
+    HANDLE h = SalLPFindFirstFileA(pattern.c_str(), &fd);
+    EXPECT_NE(h, INVALID_HANDLE_VALUE);
+    if (h != INVALID_HANDLE_VALUE)
+    {
+        int count = 0;
+        do
+        {
+            count++;
+        } while (FindNextFileA(h, &fd));
+        EXPECT_EQ(count, 2);
+        FindClose(h);
+    }
+}
+
+TEST_F(FilesystemOpsTest, SalFindFirstFileH_NonexistentReturnsInvalid)
+{
+    std::string pattern = m_tempDir + "\\nonexistent_file_xyz.dat";
+    WIN32_FIND_DATAA fd;
+    HANDLE h = SalLPFindFirstFileA(pattern.c_str(), &fd);
+    EXPECT_EQ(h, INVALID_HANDLE_VALUE);
+}
+
+TEST_F(FilesystemOpsTest, SalLPFindFirstFile_WideData)
+{
+    CreateTestFile(m_tempDir + "\\widefile.txt");
+    std::string pattern = m_tempDir + "\\widefile.txt";
+    WIN32_FIND_DATAW fd;
+    HANDLE h = SalLPFindFirstFile(pattern.c_str(), &fd);
+    EXPECT_NE(h, INVALID_HANDLE_VALUE);
+    if (h != INVALID_HANDLE_VALUE)
+    {
+        EXPECT_STREQ(fd.cFileName, L"widefile.txt");
+        FindClose(h);
+    }
+}
+
+TEST_F(FilesystemOpsTest, SalFindFirstFileH_LongPath)
+{
+    // Build a path longer than MAX_PATH
+    std::string longDir = m_tempDir;
+    for (int i = 0; i < 15; i++)
+    {
+        longDir += "\\abcdefghijklmno";
+        SalLPCreateDirectory(longDir.c_str(), NULL);
+    }
+    EXPECT_GT(longDir.length(), (size_t)MAX_PATH);
+
+    // Create a file inside the deeply nested directory
+    std::string longFile = longDir + "\\deepfile.txt";
+    CreateTestFile(longFile);
+
+    // FindFirstFile via SalLPFindFirstFileA
+    WIN32_FIND_DATAA fd;
+    HANDLE h = SalLPFindFirstFileA(longFile.c_str(), &fd);
+    EXPECT_NE(h, INVALID_HANDLE_VALUE);
+    if (h != INVALID_HANDLE_VALUE)
+    {
+        EXPECT_STREQ(fd.cFileName, "deepfile.txt");
+        FindClose(h);
+    }
+
+    // Also test wide version
+    WIN32_FIND_DATAW fdw;
+    HANDLE hw = SalLPFindFirstFile(longFile.c_str(), &fdw);
+    EXPECT_NE(hw, INVALID_HANDLE_VALUE);
+    if (hw != INVALID_HANDLE_VALUE)
+    {
+        EXPECT_STREQ(fdw.cFileName, L"deepfile.txt");
+        FindClose(hw);
+    }
 }
