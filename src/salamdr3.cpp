@@ -1160,7 +1160,7 @@ void RemoveTemporaryDir(const char* dir)
 {
     CALL_STACK_MESSAGE2("RemoveTemporaryDir(%s)", dir);
     EnvSetCurrentDirectoryA(gEnvironment, dir); // so it deletes better (system likes cur-dir)
-    if (strlen(dir) < MAX_PATH)
+    if (strlen(dir) < SAL_MAX_LONG_PATH)
         _RemoveTemporaryDir(dir);
     SetCurrentDirectoryToSystem(); // must leave it, otherwise it won't be deletable
 
@@ -1205,7 +1205,7 @@ void RemoveEmptyDirs(const char* dir)
 {
     CALL_STACK_MESSAGE2("RemoveEmptyDirs(%s)", dir);
     EnvSetCurrentDirectoryA(gEnvironment, dir); // so it deletes better (system likes cur-dir)
-    if (strlen(dir) < MAX_PATH)
+    if (strlen(dir) < SAL_MAX_LONG_PATH)
         _RemoveEmptyDirs(dir);
     SetCurrentDirectoryToSystem(); // must leave it, otherwise it won't be deletable
 

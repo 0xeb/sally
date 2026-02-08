@@ -2151,7 +2151,7 @@ BOOL BrowseCommand(HWND hParent, int editlineResID, int filterResID)
     CALL_STACK_MESSAGE1("BrowseCommand::GetOpenFileName");
     if (GetOpenFileName(&ofn))
     {
-        if (SalGetFullName(file))
+        if (SalGetFullName(file, NULL, NULL, NULL, NULL, file.Size()))
         {
             CALL_STACK_MESSAGE2("BrowseCommand::SendMessage( , , ,%s)", file.Get());
             SendMessage(GetDlgItem(hParent, editlineResID), WM_SETTEXT, 0, (LPARAM)file.Get());

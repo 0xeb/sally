@@ -1764,7 +1764,7 @@ BOOL CopyUNCPathToClipboard(const char* path, const char* name, BOOL isDir, HWND
         }
         if (!isDir)
             strcat(uncPath, name);
-        if (SalGetFullName(uncPath)) // root "c:\\", others without '\\' at the end
+        if (SalGetFullName(uncPath, NULL, NULL, NULL, NULL, uncPath.Size())) // root "c:\\", others without '\\' at the end
             return CopyTextToClipboard(uncPath);
     }
 

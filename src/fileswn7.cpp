@@ -1528,7 +1528,7 @@ _PACK_AGAIN:
         BOOL empty = FALSE;
         CPathBuffer nextFocus; // Heap-allocated for long path support
         nextFocus[0] = 0;
-        if (SalGetFullName(fileBuf, &errTextID, Is(ptDisk) ? GetPath() : NULL, nextFocus))
+        if (SalGetFullName(fileBuf, &errTextID, Is(ptDisk) ? GetPath() : NULL, nextFocus, NULL, fileBuf.Size()))
         {
             //---  searching for a directory link in the packing source; cannot be combined with "delete files after packing"
             BOOL performPack = TRUE;
@@ -1787,7 +1787,7 @@ void CFilesWindow::Unpack(CFilesWindow* target, int pluginIndex, const char* plu
             CPathBuffer nextFocus; // Heap-allocated for long path support
             nextFocus[0] = 0;
             const char* text = NULL;
-            if (!SalGetFullName(path, &errTextID, Is(ptDisk) ? GetPath() : NULL, nextFocus))
+            if (!SalGetFullName(path, &errTextID, Is(ptDisk) ? GetPath() : NULL, nextFocus, NULL, path.Size()))
             {
                 if (errTextID == IDS_EMPTYNAMENOTALLOWED)
                     strcpy(path, GetPath());

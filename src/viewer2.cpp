@@ -112,7 +112,7 @@ unsigned ThreadViewerMessageLoopBody(void* parameter)
     if (ok) // if the window was created, run the application loop
     {
         CALL_STACK_MESSAGE1("ThreadViewerMessageLoopBody::message_loop");
-        if (SalGetFullName(name))
+        if (SalGetFullName(name, NULL, NULL, NULL, NULL, name.Size()))
             view->OpenFile(name, caption, wholeCaption);
 
         MSG msg;

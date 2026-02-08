@@ -1653,7 +1653,7 @@ BOOL CFilesWindow::ChangePathToDisk(HWND parent, const char* path, int suggested
     int errTextID;
     //  if (!SalGetFullName(backup, &errTextID, MainWindow->GetActivePanel()->Is(ptDisk) ?
     //                      MainWindow->GetActivePanel()->GetPath() : NULL))
-    if (!SalGetFullName(backup, &errTextID, Is(ptDisk) ? GetPath() : NULL)) // for the FTP plugin - relative path in "target panel path" during connect
+    if (!SalGetFullName(backup, &errTextID, Is(ptDisk) ? GetPath() : NULL, NULL, NULL, backup.Size())) // for the FTP plugin - relative path in "target panel path" during connect
     {
         gPrompter->ShowError(LoadStrW(IDS_ERRORCHANGINGDIR), LoadStrW(errTextID));
         if (failReason != NULL)
@@ -1997,7 +1997,7 @@ BOOL CFilesWindow::ChangePathToArchive(const char* archive, const char* archiveP
     int errTextID;
     //  if (!SalGetFullName(backup1, &errTextID, MainWindow->GetActivePanel()->Is(ptDisk) ?
     //                      MainWindow->GetActivePanel()->GetPath() : NULL))
-    if (!SalGetFullName(backup1, &errTextID, Is(ptDisk) ? GetPath() : NULL)) // consistent with ChangePathToDisk()
+    if (!SalGetFullName(backup1, &errTextID, Is(ptDisk) ? GetPath() : NULL, NULL, NULL, backup1.Size())) // consistent with ChangePathToDisk()
     {
         gPrompter->ShowError(LoadStrW(IDS_ERRORCHANGINGDIR), LoadStrW(errTextID));
         if (failReason != NULL)

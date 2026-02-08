@@ -1838,7 +1838,7 @@ void BrowseFileName(HWND hParent, int editlineResID, const char* name)
 
     if (SafeGetSaveFileName(&ofn))
     {
-        if (SalGetFullName(file))
+        if (SalGetFullName(file, NULL, NULL, NULL, NULL, file.Size()))
         {
             SendMessage(GetDlgItem(hParent, editlineResID), WM_SETTEXT, 0, (LPARAM)file.Get());
         }
@@ -1918,7 +1918,7 @@ void CFileListDialog::Validate(CTransferInfo& ti)
             CPathBuffer buffFile; // Heap-allocated for long path support
             SendMessage(hWnd, WM_GETTEXT, buffFile.Size(), (LPARAM)buffFile.Get());
             int errTextID;
-            if (!SalGetFullName(buffFile, &errTextID, MainWindow->GetActivePanel()->Is(ptDisk) ? MainWindow->GetActivePanel()->GetPath() : NULL))
+            if (!SalGetFullName(buffFile, &errTextID, MainWindow->GetActivePanel()->Is(ptDisk) ? MainWindow->GetActivePanel()->GetPath() : NULL, NULL, NULL, buffFile.Size()))
             {
                 gPrompter->ShowError(LoadStrW(IDS_ERRORTITLE), LoadStrW(errTextID));
                 ti.ErrorOn(IDC_FL_FILENAME);
@@ -2000,7 +2000,7 @@ CFileListDialog::DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
             MainWindow->UpdateDefaultDir(TRUE);
 
             SendMessage(GetDlgItem(HWindow, IDC_FL_FILENAME), WM_GETTEXT, buffFile.Size(), (LPARAM)buffFile.Get());
-            if (!SalGetFullName(buffFile, NULL, MainWindow->GetActivePanel()->Is(ptDisk) ? MainWindow->GetActivePanel()->GetPath() : NULL))
+            if (!SalGetFullName(buffFile, NULL, MainWindow->GetActivePanel()->Is(ptDisk) ? MainWindow->GetActivePanel()->GetPath() : NULL, NULL, NULL, buffFile.Size()))
             { // we cannot do it, so let Windows Browse handle it however it wants...
                 SendMessage(GetDlgItem(HWindow, IDC_FL_FILENAME), WM_GETTEXT, buffFile.Size(), (LPARAM)buffFile.Get());
             }

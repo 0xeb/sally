@@ -1470,7 +1470,7 @@ void CFilesWindow::EditNewFile()
             int errTextID;
             //      if (SalGetFullName(path, &errTextID, MainWindow->GetActivePanel()->Is(ptDisk) ?
             //                         MainWindow->GetActivePanel()->GetPath() : NULL, NextFocusName))
-            if (SalGetFullName(path, &errTextID, Is(ptDisk) ? GetPath() : NULL, NextFocusName)) // for consistency with ChangePathToDisk()
+            if (SalGetFullName(path, &errTextID, Is(ptDisk) ? GetPath() : NULL, NextFocusName, NULL, path.Size())) // for consistency with ChangePathToDisk()
             {
                 CPathBuffer checkPath; // Heap-allocated for long path support
                 strcpy(checkPath, path);
@@ -1922,10 +1922,10 @@ void CFilesWindow::CreateDir(CFilesWindow* target)
             MakeValidFileName(lastCompName != NULL ? lastCompName + 1 : path.Get());
 
             int errTextID;
-            if (!SalGetFullName(path, &errTextID, Is(ptDisk) ? GetPath() : NULL, nextFocus) ||
-                strlen(path) >= PATH_MAX_PATH)
+            if (!SalGetFullName(path, &errTextID, Is(ptDisk) ? GetPath() : NULL, nextFocus, NULL, path.Size()) ||
+                strlen(path) >= SAL_MAX_LONG_PATH)
             {
-                if (strlen(path) >= PATH_MAX_PATH)
+                if (strlen(path) >= SAL_MAX_LONG_PATH)
                     errTextID = IDS_TOOLONGPATH;
                 /* even if the string is empty we want an error message
         if (errTextID == IDS_EMPTYNAMENOTALLOWED)
@@ -2062,15 +2062,14 @@ void CFilesWindow::RenameFileInternal(CFileData* f, const char* formatedFileName
         MakeValidFileName(finalName);
 
         int l = (int)strlen(GetPath());
-        // Guard against buffer overflow - this function only handles paths up to MAX_PATH
-        if (l >= MAX_PATH)
+        CPathBuffer tgtPath; // Heap-allocated for long path support
+        if (l >= tgtPath.Size() - 1) // guard against buffer overflow
         {
             if (gPrompter != NULL)
                 ShowErrorViaPrompter(LoadStrW(IDS_ERRORTITLE), LoadStrW(IDS_TOOLONGNAME));
             *tryAgain = FALSE;
             return;
         }
-        CPathBuffer tgtPath; // Heap-allocated for long path support
         memmove(tgtPath.Get(), GetPath(), l);
         if (GetPath()[l - 1] != '\\')
             tgtPath[l++] = '\\';

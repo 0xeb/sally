@@ -574,7 +574,7 @@ CViewerWindow::WindowProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
         if (drag > 0)
         {
             DragQueryFile((HDROP)wParam, 0, path, path.Size());
-            if (SalGetFullName(path))
+            if (SalGetFullName(path, NULL, NULL, NULL, NULL, path.Size()))
             {
                 if (Lock != NULL)
                 {
@@ -864,7 +864,7 @@ CViewerWindow::WindowProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
 
             if (SafeGetOpenFileName(&ofn))
             {
-                if (SalGetFullName(file))
+                if (SalGetFullName(file, NULL, NULL, NULL, NULL, file.Size()))
                 {
                     if (Lock != NULL)
                     {
@@ -1550,7 +1550,7 @@ CViewerWindow::WindowProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
                 if (SafeGetSaveFileName(&ofn))
                 {
                     int errTextID;
-                    if (!SalGetFullName(fileName, &errTextID))
+                    if (!SalGetFullName(fileName, &errTextID, NULL, NULL, NULL, fileName.Size()))
                     {
                         gPrompter->ShowError(LoadStrW(IDS_ERRORTITLE), LoadStrW(errTextID));
                         goto ENTER_AGAIN;

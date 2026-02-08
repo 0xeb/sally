@@ -2842,7 +2842,7 @@ MENU_TEMPLATE_ITEM AddToSystemMenu[] =
 
             if (SafeGetSaveFileName(&ofn))
             {
-                if (SalGetFullName(file))
+                if (SalGetFullName(file, NULL, NULL, NULL, NULL, file.Size()))
                 {
                     // perform the export
                     if (ExportConfiguration(HWindow, file, clearKeyBeforeImport))

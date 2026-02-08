@@ -263,7 +263,7 @@ void CMainWindow::MakeFileList()
         {
             strcpy(fileName, Configuration.FileListName);
             int errTextID;
-            if (!SalGetFullName(fileName, &errTextID, GetActivePanel()->Is(ptDisk) ? GetActivePanel()->GetPath() : NULL, panel->NextFocusName))
+            if (!SalGetFullName(fileName, &errTextID, GetActivePanel()->Is(ptDisk) ? GetActivePanel()->GetPath() : NULL, panel->NextFocusName, NULL, fileName.Size()))
             {
                 gPrompter->ShowError(LoadStrW(IDS_ERRORTITLE), LoadStrW(errTextID));
                 fileName[0] = 0;

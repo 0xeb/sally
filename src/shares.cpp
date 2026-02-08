@@ -19,7 +19,7 @@ CSharesItem::CSharesItem(const char* localPath, const char* remoteName, const ch
         CPathBuffer buff; // Heap-allocated for long path support
         lstrcpyn(buff, localPath, buff.Size());
         SalPathAddBackslash(buff, buff.Size()); // in case it's just "c:", so that root is created
-        if (SalGetFullName(buff))            // root "c:\\", others without '\\' at the end
+        if (SalGetFullName(buff, NULL, NULL, NULL, NULL, buff.Size()))            // root "c:\\", others without '\\' at the end
         {
             LocalPath = DupStr(buff);
             RemoteName = DupStr(remoteName);
@@ -270,7 +270,7 @@ BOOL CShares::GetUNCPath(const char* path, char* uncPath, int uncPathMax)
                 s++; // skip any backslash
             strcat(unc, s);
         }
-        if (!SalGetFullName(unc)) // root "c:\\", others without '\\' at the end
+        if (!SalGetFullName(unc, NULL, NULL, NULL, NULL, unc.Size())) // root "c:\\", others without '\\' at the end
         {
             TRACE_E("Unexpected path in CSharesItem::GetUNCPath()");
             HANDLES(LeaveCriticalSection(&CS));
