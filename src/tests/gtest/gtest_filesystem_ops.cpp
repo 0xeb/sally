@@ -265,3 +265,153 @@ TEST_F(FilesystemOpsTest, LongPath_PathExistsW_And_IsDirectoryW)
     // Clean up the file (TearDown handles directories)
     DeleteFileW(prefixedFile.c_str());
 }
+
+// ============================================================================
+// SalLPGetFileAttributes / SalLPSetFileAttributes tests
+// ============================================================================
+
+TEST_F(FilesystemOpsTest, GetFileAttributes_Directory)
+{
+    std::string subdir = m_tempDir + "\\attrdir";
+    ASSERT_TRUE(SalLPCreateDirectory(subdir.c_str(), NULL));
+    DWORD attrs = SalLPGetFileAttributes(subdir.c_str());
+    EXPECT_NE(attrs, INVALID_FILE_ATTRIBUTES);
+    EXPECT_TRUE(attrs & FILE_ATTRIBUTE_DIRECTORY);
+}
+
+TEST_F(FilesystemOpsTest, GetFileAttributes_File)
+{
+    std::wstring filePath = m_tempDirW + L"\\attrfile.txt";
+    CreateTestFileW(filePath);
+    // Convert to ANSI for SalLP call
+    char ansiPath[MAX_PATH];
+    WideCharToMultiByte(CP_ACP, 0, filePath.c_str(), -1, ansiPath, MAX_PATH, NULL, NULL);
+    DWORD attrs = SalLPGetFileAttributes(ansiPath);
+    EXPECT_NE(attrs, INVALID_FILE_ATTRIBUTES);
+    EXPECT_FALSE(attrs & FILE_ATTRIBUTE_DIRECTORY);
+}
+
+TEST_F(FilesystemOpsTest, GetFileAttributes_NonExistent)
+{
+    std::string bogus = m_tempDir + "\\nonexistent_file.xyz";
+    EXPECT_EQ(SalLPGetFileAttributes(bogus.c_str()), INVALID_FILE_ATTRIBUTES);
+}
+
+TEST_F(FilesystemOpsTest, SetFileAttributes_ReadOnly)
+{
+    std::wstring filePath = m_tempDirW + L"\\readonly.txt";
+    CreateTestFileW(filePath);
+    char ansiPath[MAX_PATH];
+    WideCharToMultiByte(CP_ACP, 0, filePath.c_str(), -1, ansiPath, MAX_PATH, NULL, NULL);
+
+    // Set read-only attribute
+    EXPECT_TRUE(SalLPSetFileAttributes(ansiPath, FILE_ATTRIBUTE_READONLY));
+    DWORD attrs = SalLPGetFileAttributes(ansiPath);
+    EXPECT_TRUE(attrs & FILE_ATTRIBUTE_READONLY);
+
+    // Clear read-only so TearDown can delete
+    EXPECT_TRUE(SalLPSetFileAttributes(ansiPath, FILE_ATTRIBUTE_NORMAL));
+    attrs = SalLPGetFileAttributes(ansiPath);
+    EXPECT_FALSE(attrs & FILE_ATTRIBUTE_READONLY);
+}
+
+// ============================================================================
+// SalLPDeleteFile tests
+// ============================================================================
+
+TEST_F(FilesystemOpsTest, DeleteFile_ExistingFile)
+{
+    std::wstring filePath = m_tempDirW + L"\\todelete.txt";
+    CreateTestFileW(filePath);
+    char ansiPath[MAX_PATH];
+    WideCharToMultiByte(CP_ACP, 0, filePath.c_str(), -1, ansiPath, MAX_PATH, NULL, NULL);
+
+    EXPECT_TRUE(SalLPDeleteFile(ansiPath));
+    EXPECT_EQ(SalLPGetFileAttributes(ansiPath), INVALID_FILE_ATTRIBUTES);
+}
+
+TEST_F(FilesystemOpsTest, DeleteFile_NonExistent)
+{
+    std::string bogus = m_tempDir + "\\no_such_file.txt";
+    EXPECT_FALSE(SalLPDeleteFile(bogus.c_str()));
+}
+
+// ============================================================================
+// SalLPCopyFile tests
+// ============================================================================
+
+TEST_F(FilesystemOpsTest, CopyFile_Basic)
+{
+    std::wstring srcPath = m_tempDirW + L"\\source.txt";
+    CreateTestFileW(srcPath);
+    char ansiSrc[MAX_PATH], ansiDst[MAX_PATH];
+    WideCharToMultiByte(CP_ACP, 0, srcPath.c_str(), -1, ansiSrc, MAX_PATH, NULL, NULL);
+
+    std::string dstPath = m_tempDir + "\\copy.txt";
+    strcpy(ansiDst, dstPath.c_str());
+
+    EXPECT_TRUE(SalLPCopyFile(ansiSrc, ansiDst, TRUE));
+    EXPECT_NE(SalLPGetFileAttributes(ansiDst), INVALID_FILE_ATTRIBUTES);
+}
+
+TEST_F(FilesystemOpsTest, CopyFile_FailIfExists)
+{
+    std::wstring srcPath = m_tempDirW + L"\\src2.txt";
+    std::wstring dstPath = m_tempDirW + L"\\dst2.txt";
+    CreateTestFileW(srcPath);
+    CreateTestFileW(dstPath);
+    char ansiSrc[MAX_PATH], ansiDst[MAX_PATH];
+    WideCharToMultiByte(CP_ACP, 0, srcPath.c_str(), -1, ansiSrc, MAX_PATH, NULL, NULL);
+    WideCharToMultiByte(CP_ACP, 0, dstPath.c_str(), -1, ansiDst, MAX_PATH, NULL, NULL);
+
+    // Should fail because destination exists and failIfExists=TRUE
+    EXPECT_FALSE(SalLPCopyFile(ansiSrc, ansiDst, TRUE));
+}
+
+// ============================================================================
+// SalLPMoveFile tests
+// ============================================================================
+
+TEST_F(FilesystemOpsTest, MoveFile_Basic)
+{
+    std::wstring srcPath = m_tempDirW + L"\\movesrc.txt";
+    CreateTestFileW(srcPath);
+    char ansiSrc[MAX_PATH], ansiDst[MAX_PATH];
+    WideCharToMultiByte(CP_ACP, 0, srcPath.c_str(), -1, ansiSrc, MAX_PATH, NULL, NULL);
+
+    std::string dstPath = m_tempDir + "\\movedst.txt";
+    strcpy(ansiDst, dstPath.c_str());
+
+    EXPECT_TRUE(SalLPMoveFile(ansiSrc, ansiDst));
+    // Source should be gone
+    EXPECT_EQ(SalLPGetFileAttributes(ansiSrc), INVALID_FILE_ATTRIBUTES);
+    // Destination should exist
+    EXPECT_NE(SalLPGetFileAttributes(ansiDst), INVALID_FILE_ATTRIBUTES);
+}
+
+// ============================================================================
+// SalLPCreateFile tests
+// ============================================================================
+
+TEST_F(FilesystemOpsTest, CreateFile_NewFile)
+{
+    std::string filePath = m_tempDir + "\\created.txt";
+    HANDLE h = SalLPCreateFile(filePath.c_str(), GENERIC_WRITE, 0, NULL,
+                               CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL, NULL);
+    EXPECT_NE(h, INVALID_HANDLE_VALUE);
+    if (h != INVALID_HANDLE_VALUE)
+        CloseHandle(h);
+    EXPECT_NE(SalLPGetFileAttributes(filePath.c_str()), INVALID_FILE_ATTRIBUTES);
+}
+
+TEST_F(FilesystemOpsTest, CreateFile_OpenExisting)
+{
+    std::wstring wPath = m_tempDirW + L"\\existing.txt";
+    CreateTestFileW(wPath);
+    std::string filePath = m_tempDir + "\\existing.txt";
+    HANDLE h = SalLPCreateFile(filePath.c_str(), GENERIC_READ, FILE_SHARE_READ, NULL,
+                               OPEN_EXISTING, 0, NULL);
+    EXPECT_NE(h, INVALID_HANDLE_VALUE);
+    if (h != INVALID_HANDLE_VALUE)
+        CloseHandle(h);
+}
