@@ -251,3 +251,27 @@ add_test(NAME gtest_pathutils COMMAND gtest_pathutils)
 set_target_properties(gtest_pathutils PROPERTIES
     RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/tests"
 )
+
+add_executable(gtest_cpathbuffer_winapi
+    gtest_cpathbuffer_winapi.cpp
+    ../widepath_standalone.cpp
+)
+
+target_include_directories(gtest_cpathbuffer_winapi PRIVATE
+    ${CMAKE_CURRENT_SOURCE_DIR}/../..
+    ${CMAKE_CURRENT_SOURCE_DIR}/../../common
+)
+
+target_compile_definitions(gtest_cpathbuffer_winapi PRIVATE
+    WIN32 _WINDOWS _CRT_SECURE_NO_WARNINGS
+)
+
+target_link_libraries(gtest_cpathbuffer_winapi
+    GTest::gtest GTest::gtest_main kernel32 shlwapi
+)
+
+add_test(NAME gtest_cpathbuffer_winapi COMMAND gtest_cpathbuffer_winapi)
+
+set_target_properties(gtest_cpathbuffer_winapi PROPERTIES
+    RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/tests"
+)
