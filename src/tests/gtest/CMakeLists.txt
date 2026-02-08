@@ -275,3 +275,24 @@ add_test(NAME gtest_cpathbuffer_winapi COMMAND gtest_cpathbuffer_winapi)
 set_target_properties(gtest_cpathbuffer_winapi PROPERTIES
     RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/tests"
 )
+
+# SalGetFullNameW tests
+add_executable(gtest_salgetfullname
+    gtest_salgetfullname.cpp
+    ../salgetfullname_standalone.cpp
+)
+
+target_compile_definitions(gtest_salgetfullname PRIVATE
+    WIN32 _WINDOWS _CRT_SECURE_NO_WARNINGS
+)
+
+target_link_libraries(gtest_salgetfullname
+    GTest::gtest
+    GTest::gtest_main
+)
+
+add_test(NAME gtest_salgetfullname COMMAND gtest_salgetfullname)
+
+set_target_properties(gtest_salgetfullname PROPERTIES
+    RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/tests"
+)

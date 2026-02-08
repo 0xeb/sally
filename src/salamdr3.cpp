@@ -786,6 +786,232 @@ BOOL SalGetFullName(char* name, int* errTextID, const char* curDir, char* nextFo
     return err == 0;
 }
 
+// Wide version of SalGetFullName
+BOOL SalGetFullNameW(std::wstring& name, int* errTextID, const wchar_t* curDir,
+                     std::wstring* nextFocus, BOOL* callNethood,
+                     BOOL allowRelPathWithSpaces)
+{
+    int err = 0;
+
+    int rootOffset = 3; // offset of directory part start (3 for "c:\path")
+    size_t sOff = 0;    // offset into name (replaces pointer arithmetic)
+
+    // Skip leading whitespace
+    while (sOff < name.length() && name[sOff] >= 1 && name[sOff] <= L' ')
+        sOff++;
+
+    if (sOff < name.length() && name[sOff] == L'\\' && sOff + 1 < name.length() && name[sOff + 1] == L'\\')
+    {
+        // UNC (\\server\share\...)
+        if (sOff > 0)
+            name.erase(0, sOff);
+        sOff = 2;
+        if (sOff < name.length() && (name[sOff] == L'.' || name[sOff] == L'?'))
+            err = IDS_PATHISINVALID;
+        else
+        {
+            if (sOff >= name.length() || name[sOff] == L'\\')
+            {
+                if (callNethood != NULL)
+                    *callNethood = (sOff >= name.length());
+                err = IDS_SERVERNAMEMISSING;
+            }
+            else
+            {
+                while (sOff < name.length() && name[sOff] != L'\\')
+                    sOff++; // skip servername
+                if (sOff < name.length() && name[sOff] == L'\\')
+                    sOff++;
+                if (sOff > SAL_MAX_LONG_PATH - 1)
+                    err = IDS_SERVERNAMEMISSING;
+                else
+                {
+                    if (sOff >= name.length() || name[sOff] == L'\\')
+                    {
+                        if (callNethood != NULL)
+                            *callNethood = (sOff >= name.length()) &&
+                                           (sOff < 2 || name[sOff - 1] != L'.' || name[sOff - 2] != L'\\') &&
+                                           (sOff < 3 || name[sOff - 1] != L'\\' || name[sOff - 2] != L'.' || name[sOff - 3] != L'\\');
+                        err = IDS_SHARENAMEMISSING;
+                    }
+                    else
+                    {
+                        while (sOff < name.length() && name[sOff] != L'\\')
+                            sOff++; // skip sharename
+                        if (sOff + 1 > SAL_MAX_LONG_PATH - 1)
+                            err = IDS_SHARENAMEMISSING;
+                        if (sOff < name.length() && name[sOff] == L'\\')
+                            sOff++;
+                    }
+                }
+            }
+        }
+    }
+    else // path specified using drive (c:\...)
+    {
+        if (sOff < name.length())
+        {
+            wchar_t ch = name[sOff];
+            if (sOff + 1 < name.length() && name[sOff + 1] == L':') // "c:..."
+            {
+                if (sOff + 2 < name.length() && name[sOff + 2] == L'\\') // "c:\..."
+                {
+                    if (sOff > 0)
+                        name.erase(0, sOff);
+                }
+                else // "c:path..."
+                {
+                    std::wstring remainder = name.substr(sOff + 2);
+                    wchar_t lower = (wchar_t)towlower(ch);
+                    if (lower >= L'a' && lower <= L'z')
+                    {
+                        std::wstring head;
+                        if (curDir != NULL && (wchar_t)towlower(curDir[0]) == lower)
+                            head = curDir;
+                        else
+                            head = AnsiToWide(DefaultDir[lower - L'a']);
+                        if (!head.empty() && head.back() != L'\\')
+                            head += L'\\';
+                        if (head.length() + remainder.length() >= SAL_MAX_LONG_PATH)
+                            err = IDS_TOOLONGPATH;
+                        else
+                            name = head + remainder;
+                    }
+                    else
+                        err = IDS_INVALIDDRIVE;
+                }
+            }
+            else
+            {
+                if (curDir != NULL)
+                {
+                    if (allowRelPathWithSpaces && sOff < name.length() && name[sOff] != L'\\')
+                        sOff = 0;
+                    std::wstring tail = name.substr(sOff);
+
+                    if (!tail.empty() && tail[0] == L'\\') // "\path...."
+                    {
+                        std::wstring curDirW = curDir;
+                        if (curDirW.length() >= 2 && curDirW[0] == L'\\' && curDirW[1] == L'\\') // UNC
+                        {
+                            size_t root = 2;
+                            while (root < curDirW.length() && curDirW[root] != L'\\')
+                                root++;
+                            root++; // '\\'
+                            while (root < curDirW.length() && curDirW[root] != L'\\')
+                                root++;
+                            if (tail.length() + root >= SAL_MAX_LONG_PATH)
+                                err = IDS_TOOLONGPATH;
+                            else
+                                name = curDirW.substr(0, root) + tail;
+                            rootOffset = (int)root + 1;
+                        }
+                        else
+                        {
+                            if (tail.length() + 2 >= SAL_MAX_LONG_PATH)
+                                err = IDS_TOOLONGPATH;
+                            else
+                            {
+                                name.clear();
+                                name += curDirW[0];
+                                name += L':';
+                                name += tail;
+                            }
+                        }
+                    }
+                    else // "path..."
+                    {
+                        if (nextFocus != NULL)
+                        {
+                            size_t bsPos = tail.find(L'\\');
+                            if (bsPos == std::wstring::npos)
+                                *nextFocus = tail;
+                        }
+
+                        std::wstring curDirW = curDir;
+                        if (!curDirW.empty() && curDirW.back() != L'\\')
+                            curDirW += L'\\';
+                        if (tail.length() + curDirW.length() >= SAL_MAX_LONG_PATH)
+                            err = IDS_TOOLONGPATH;
+                        else
+                            name = curDirW + tail;
+                    }
+                }
+                else
+                    err = IDS_INCOMLETEFILENAME;
+            }
+            sOff = rootOffset;
+        }
+        else
+        {
+            name.clear();
+            err = IDS_EMPTYNAMENOTALLOWED;
+        }
+    }
+
+    if (err == 0) // eliminate '.' and '..' in path
+    {
+        // SalRemovePointsFromPath works in-place on a wchar_t buffer.
+        // Allocate a temporary buffer from the wstring content.
+        size_t len = name.length();
+        wchar_t* buf = new wchar_t[len + 1];
+        memcpy(buf, name.c_str(), (len + 1) * sizeof(wchar_t));
+        if (sOff <= len)
+        {
+            if (!SalRemovePointsFromPath(buf + sOff))
+                err = IDS_PATHISINVALID;
+            else
+                name = buf;
+        }
+        delete[] buf;
+    }
+
+    if (err == 0) // remove any unwanted backslash from end of string
+    {
+        size_t l = name.length();
+        if (l > 1 && name[1] == L':') // path type "c:\path"
+        {
+            if (l > 3) // not a root path
+            {
+                if (name[l - 1] == L'\\')
+                    name.resize(l - 1);
+            }
+            else
+            {
+                name.resize(3);
+                name[2] = L'\\'; // root path, backslash required ("c:\")
+            }
+        }
+        else
+        {
+            if (l >= 7 && name[0] == L'\\' && name[1] == L'\\' && name[2] == L'.' && name[3] == L'\\' &&
+                name[4] != 0 && name[5] == L':') // path type "\\.\C:\"
+            {
+                if (l > 7) // not a root path
+                {
+                    if (name[l - 1] == L'\\')
+                        name.resize(l - 1);
+                }
+                else
+                {
+                    name.resize(7);
+                    name[6] = L'\\'; // root path, backslash required ("\\.\C:\")
+                }
+            }
+            else // UNC path
+            {
+                if (l > 0 && name[l - 1] == L'\\')
+                    name.resize(l - 1);
+            }
+        }
+    }
+
+    if (errTextID != NULL)
+        *errTextID = err;
+
+    return err == 0;
+}
+
 // ****************************************************************************
 
 TDirectArray<HANDLE> AuxThreads(10, 5);

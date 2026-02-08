@@ -371,6 +371,14 @@ BOOL SalGetFullName(char* name, int* errTextID = NULL, const char* curDir = NULL
                     char* nextFocus = NULL, BOOL* callNethood = NULL, int nameBufSize = MAX_PATH,
                     BOOL allowRelPathWithSpaces = FALSE);
 
+// Wide version of SalGetFullName — resolves relative/partial paths to absolute.
+// Works with std::wstring for native long path support.
+// 'name' is modified in-place to the resolved absolute path.
+// Returns TRUE on success, FALSE on error (errTextID set to IDS_* error code).
+BOOL SalGetFullNameW(std::wstring& name, int* errTextID = NULL, const wchar_t* curDir = NULL,
+                     std::wstring* nextFocus = NULL, BOOL* callNethood = NULL,
+                     BOOL allowRelPathWithSpaces = FALSE);
+
 // Tries to access path 'path' (normal or UNC), runs in a secondary thread, so it allows
 // interruption with ESC key (after some time shows a message about ESC)
 // 'echo' TRUE means error message display is allowed (if path is not accessible);
