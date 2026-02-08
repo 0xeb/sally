@@ -427,7 +427,7 @@ BOOL CPluginInterfaceForArchiver::UnpackFiles(TIndirectArray2<CFileInfo>& files,
                 // Declare path buffers before goto block to avoid skipping initialization
                 CPathBuffer targetName; // Heap-allocated for long path support
                 CPathBuffer arcName; // Heap-allocated for long path support
-                if (lstrlen(targetDir) + lstrlen(file) - rootLen >= MAX_PATH)
+                if (lstrlen(targetDir) + lstrlen(file) - rootLen >= SAL_MAX_LONG_PATH)
                 {
                     if (Silent & SF_LONGNAMES)
                         goto l_next;
@@ -594,7 +594,7 @@ BOOL CPluginInterfaceForArchiver::UnpackOneFile(CSalamanderForOperationsAbstract
                 name++;
             else
                 name = nameInArchive;
-            if (lstrlen(targetDir) + lstrlen(name) + 1 >= MAX_PATH)
+            if (lstrlen(targetDir) + lstrlen(name) + 1 >= SAL_MAX_LONG_PATH)
             {
                 SalamanderGeneral->ShowMessageBox(LoadStr(IDS_TOOLONGNAME), LoadStr(IDS_PLUGINNAME), MSGBOX_ERROR);
             }

@@ -255,7 +255,7 @@ static BOOL AddFile(TIndirectArray<char>& files, LPTSTR sourceDir, LPTSTR name, 
         return FALSE;
     }
     strcpy(str, sourceDir);
-    if (!SalamanderGeneral->SalPathAppend(str, name, MAX_PATH))
+    if (!SalamanderGeneral->SalPathAppend(str, name, (int)(strlen(sourceDir) + 2 + strlen(name))))
     {
         SalamanderGeneral->ShowMessageBox(LoadStr(IDS_TOOLONGNAME2), LoadStr(IDS_COMBINE), MSGBOX_ERROR);
         return FALSE;
@@ -322,7 +322,7 @@ static BOOL FindName(const char* text, const char* text_locase, LPCTSTR searchst
             if (*p == '\"')
                 p++;
             char* q = name;
-            while (*p && *p != '\r' && *p != '\n' && *p != '\"' && (q - name < MAX_PATH))
+            while (*p && *p != '\r' && *p != '\n' && *p != '\"' && (q - name < SAL_MAX_LONG_PATH))
                 *q++ = *p++;
             *q = 0;
             return TRUE;
@@ -466,8 +466,8 @@ BOOL CombineCommand(DWORD eventMask, HWND parent, CSalamanderForOperationsAbstra
         if (!bAllSameNames)
             strcpy(name1, "combinedfile");
         strcpy(companionFile, sourceDir);
-        if (!SalamanderGeneral->SalPathAppend(companionFile, name1, MAX_PATH) ||
-            strlen(companionFile) + 1 >= MAX_PATH) // safety check for the strcat() below
+        if (!SalamanderGeneral->SalPathAppend(companionFile, name1, companionFile.Size()) ||
+            strlen(companionFile) + 1 >= (size_t)companionFile.Size()) // safety check for the strcat() below
         {
             SalamanderGeneral->ShowMessageBox(LoadStr(IDS_TOOLONGNAME2), LoadStr(IDS_COMBINE), MSGBOX_ERROR);
             return FALSE;
@@ -526,7 +526,7 @@ BOOL CombineCommand(DWORD eventMask, HWND parent, CSalamanderForOperationsAbstra
 
             lstrcpyn(name1, pfd->Name, (int)(ext - pfd->Name + 2));
             strcpy(companionFile, sourceDir);
-            if (!SalamanderGeneral->SalPathAppend(companionFile, name1, MAX_PATH))
+            if (!SalamanderGeneral->SalPathAppend(companionFile, name1, companionFile.Size()))
             {
                 SalamanderGeneral->ShowMessageBox(LoadStr(IDS_TOOLONGNAME2), LoadStr(IDS_COMBINE), MSGBOX_ERROR);
                 return FALSE;
@@ -563,7 +563,7 @@ BOOL CombineCommand(DWORD eventMask, HWND parent, CSalamanderForOperationsAbstra
         { // missing extension - skip it, we will not extend anything
             bJustOneFile = TRUE;
             strcpy(companionFile, sourceDir);
-            if (!SalamanderGeneral->SalPathAppend(companionFile, "combinedfile", MAX_PATH))
+            if (!SalamanderGeneral->SalPathAppend(companionFile, "combinedfile", companionFile.Size()))
             {
                 SalamanderGeneral->ShowMessageBox(LoadStr(IDS_TOOLONGNAME2), LoadStr(IDS_COMBINE), MSGBOX_ERROR);
                 return FALSE;
@@ -582,7 +582,7 @@ BOOL CombineCommand(DWORD eventMask, HWND parent, CSalamanderForOperationsAbstra
     if (bTestCompanionFile)
     { // inspect a potential BAT or CRC
         size_t ext = strlen(companionFile);
-        if (ext + 3 >= MAX_PATH) // safety check for the strcat() below
+        if (ext + 3 >= (size_t)companionFile.Size()) // safety check for the strcat() below
         {
             SalamanderGeneral->ShowMessageBox(LoadStr(IDS_TOOLONGNAME2), LoadStr(IDS_COMBINE), MSGBOX_ERROR);
             return FALSE;
@@ -599,7 +599,7 @@ BOOL CombineCommand(DWORD eventMask, HWND parent, CSalamanderForOperationsAbstra
         if (bName)
         {
             strcpy(name1, sourceDir);
-            if (!SalamanderGeneral->SalPathAppend(name1, name2, MAX_PATH))
+            if (!SalamanderGeneral->SalPathAppend(name1, name2, name1.Size()))
             {
                 SalamanderGeneral->ShowMessageBox(LoadStr(IDS_TOOLONGNAME2), LoadStr(IDS_COMBINE), MSGBOX_ERROR);
                 return FALSE;
@@ -614,7 +614,7 @@ BOOL CombineCommand(DWORD eventMask, HWND parent, CSalamanderForOperationsAbstra
         char* dot = _tcsrchr(name1, '.');
         if (dot == NULL) // ".cvspass" is an extension in Windows
         {
-            if (strlen(name1) + 4 >= MAX_PATH) // safety check for the strcat() below
+            if (strlen(name1) + 4 >= (size_t)name1.Size()) // safety check for the strcat() below
             {
                 SalamanderGeneral->ShowMessageBox(LoadStr(IDS_TOOLONGNAME2), LoadStr(IDS_COMBINE), MSGBOX_ERROR);
                 return FALSE;
@@ -629,7 +629,7 @@ BOOL CombineCommand(DWORD eventMask, HWND parent, CSalamanderForOperationsAbstra
         // This code replaces the path in "name1", which points to the source panel, with the target panel path
         SalamanderGeneral->SalPathStripPath(name1);
         GetTargetDir(name2, NULL, FALSE);
-        if (!SalamanderGeneral->SalPathAppend(name2, name1, MAX_PATH))
+        if (!SalamanderGeneral->SalPathAppend(name2, name1, name2.Size()))
         {
             SalamanderGeneral->ShowMessageBox(LoadStr(IDS_TOOLONGNAME2), LoadStr(IDS_COMBINE), MSGBOX_ERROR);
             return FALSE;

@@ -306,7 +306,7 @@ static BOOL SplitFile(LPTSTR fileName, LPTSTR targetDir, CQuadWord& qwPartSize,
     if (ret != FALSE && configCreateBatchFile)
     {
         char* batfile = new char[MAX_BAT];
-        char* line = new char[4 * MAX_PATH];
+        char* line = new char[4 * SAL_MAX_LONG_PATH];
         int nparts = partNum - 1;
         int linenum = 1, partnum = 1;
         const char* origName = SalamanderGeneral->SalPathFindFileName(fileName);

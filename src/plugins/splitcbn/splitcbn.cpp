@@ -329,14 +329,14 @@ void GetTargetDir(LPTSTR targetDir, LPTSTR subdirName, BOOL bSplit)
     int type;
     SalamanderGeneral->GetPanelPath(
         (bSplit ? configSplitToOther : configCombineToOther) ? PANEL_TARGET : PANEL_SOURCE,
-        targetDir, MAX_PATH, &type, NULL);
+        targetDir, SAL_MAX_LONG_PATH, &type, NULL);
 
     if (type != PATH_TYPE_WINDOWS)
-        SalamanderGeneral->GetPanelPath(PANEL_SOURCE, targetDir, MAX_PATH, NULL, NULL);
+        SalamanderGeneral->GetPanelPath(PANEL_SOURCE, targetDir, SAL_MAX_LONG_PATH, NULL, NULL);
 
     if (bSplit && configSplitToSubdir && subdirName != NULL)
     {
-        if (SalamanderGeneral->SalPathAppend(targetDir, subdirName, MAX_PATH))
+        if (SalamanderGeneral->SalPathAppend(targetDir, subdirName, SAL_MAX_LONG_PATH))
             SalamanderGeneral->SalPathRemoveExtension(targetDir);
     }
 }
@@ -349,7 +349,7 @@ BOOL MakePathAbsolute(char* path, BOOL pathIsDir, char* absRoot, BOOL activePref
 
     SalamanderGeneral->SalUpdateDefaultDir(!configCombineToOther);
     if (!SalamanderGeneral->SalParsePath(SalamanderGeneral->GetMsgBoxParent(), path, type, isDir, secondPart,
-                                         LoadStr(IDS_PATHERROR), NULL, TRUE, absRoot, NULL, NULL, MAX_PATH))
+                                         LoadStr(IDS_PATHERROR), NULL, TRUE, absRoot, NULL, NULL, SAL_MAX_LONG_PATH))
         return FALSE;
 
     if (type != PATH_TYPE_WINDOWS) // only Windows paths are supported

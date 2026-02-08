@@ -14,7 +14,7 @@
 #include "lang\lang.rh"
 
 // FS name assigned by Salamander after the plugin is loaded
-char AssignedFSName[MAX_PATH] = "";
+CPathBuffer AssignedFSName; // Heap-allocated for long path support
 
 // image list for simple FS icons
 HIMAGELIST DFSImageList = NULL;

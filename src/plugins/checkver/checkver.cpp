@@ -47,7 +47,7 @@ CSalamanderDebugAbstract* SalamanderDebug = NULL;
 int SalamanderVersion = 0;
 
 // running Salamander version text (for example, "2.52 beta 3 (PB 32)")
-char SalamanderTextVersion[MAX_PATH];
+CPathBuffer SalamanderTextVersion; // Heap-allocated for long path support
 
 // ****************************************************************************
 

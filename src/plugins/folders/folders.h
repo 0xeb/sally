@@ -11,7 +11,7 @@ extern CSalamanderGeneralAbstract* SalamanderGeneral;
 extern CSalamanderGUIAbstract* SalamanderGUI;
 
 // FS name assigned by Salamander after the plugin is loaded
-extern char AssignedFSName[MAX_PATH];
+extern CPathBuffer AssignedFSName; // Heap-allocated for long path support
 
 BOOL InitFS();
 void ReleaseFS();

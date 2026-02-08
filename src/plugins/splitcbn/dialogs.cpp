@@ -258,7 +258,7 @@ namespace split
             }
 
             case IDOK:
-                GetDlgItemText(hWnd, IDC_EDIT_DIR, pszTargetDir, MAX_PATH);
+                GetDlgItemText(hWnd, IDC_EDIT_DIR, pszTargetDir, SAL_MAX_LONG_PATH);
                 EndDialog(hWnd, TRUE);
                 break;
 
@@ -467,7 +467,7 @@ namespace combine
     {
         CALL_STACK_MESSAGE1("OnAdd()");
         OPENFILENAME ofn;
-        char* filenames = new char[MAX_PATH * 100];
+        char* filenames = new char[SAL_MAX_LONG_PATH];
         if (filenames == NULL)
         {
             SalamanderGeneral->SalMessageBox(hDialog, LoadStr(IDS_OUTOFMEM), LoadStr(IDS_COMBINE),
@@ -485,7 +485,7 @@ namespace combine
         ofn.lpstrFilter = filter;
         ofn.lpstrCustomFilter = NULL;
         ofn.lpstrFile = filenames;
-        ofn.nMaxFile = MAX_PATH * 100;
+        ofn.nMaxFile = SAL_MAX_LONG_PATH;
         ofn.lpstrTitle = LoadStr(IDS_ADDTITLE);
         CPathBuffer initdir; // Heap-allocated for long path support
         SalamanderGeneral->GetPanelPath(PANEL_SOURCE, initdir, initdir.Size(), NULL, NULL);
@@ -661,7 +661,7 @@ namespace combine
                 break;
 
             case IDOK:
-                GetDlgItemText(hWnd, IDC_EDIT_TARGET, targetName, MAX_PATH);
+                GetDlgItemText(hWnd, IDC_EDIT_TARGET, targetName, SAL_MAX_LONG_PATH);
                 EndDialog(hWnd, TRUE);
                 break;
 

@@ -1558,7 +1558,7 @@ BOOL GetOpenFileName(HWND parent, const char* title, char* filter, char* buffer,
     else
         strcpy(fileName, buffer);
     ofn.lpstrFile = fileName;
-    ofn.nMaxFile = MAX_PATH;
+    ofn.nMaxFile = fileName.Size();
     ofn.lpstrTitle = title;
     ofn.lpstrDefExt = ext + 1;
     //ofn.lpfnHook = OFNHookProc;

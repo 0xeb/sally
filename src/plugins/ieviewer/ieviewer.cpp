@@ -42,7 +42,7 @@ CSalamanderDebugAbstract* SalamanderDebug = NULL;
 // variable definition for "spl_com.h"
 int SalamanderVersion = 0;
 
-char GetStringFromIIDBuffer[MAX_PATH];
+CPathBuffer GetStringFromIIDBuffer; // Heap-allocated for long path support
 char* GetStringFromIID(REFIID riid)
 {
     CALL_STACK_MESSAGE1("GetStringFromIID()");
@@ -59,10 +59,10 @@ char* GetStringFromIID(REFIID riid)
                             lplpsz,
                             -1,
                             GetStringFromIIDBuffer,
-                            MAX_PATH,
+                            GetStringFromIIDBuffer.Size(),
                             NULL,
                             NULL);
-        GetStringFromIIDBuffer[MAX_PATH - 1] = 0;
+        GetStringFromIIDBuffer[GetStringFromIIDBuffer.Size() - 1] = 0;
 
         //free the string
         LPMALLOC pMalloc;

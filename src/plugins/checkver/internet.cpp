@@ -211,7 +211,7 @@ DWORD WINAPI ThreadDownload(void* param)
             char scriptURL[200];
             _snprintf_s(scriptURL, _TRUNCATE, "%s?version=%s&lang=%s",
                         firstLoadAfterInstall ? SCRIPT_URL_HTTP_AFTERINSTALL : SCRIPT_URL_HTTP,
-                        SalamanderTextVersion, LoadStr(IDS_UPDATE_SCRIPT_LANG));
+                        (const char*)SalamanderTextVersion, LoadStr(IDS_UPDATE_SCRIPT_LANG));
             hUrl = InternetOpenUrl(hSession, scriptURL, NULL, 0,
                                    INTERNET_FLAG_DONT_CACHE | INTERNET_FLAG_RELOAD, 0);
             break;

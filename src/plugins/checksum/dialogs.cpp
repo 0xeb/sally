@@ -874,14 +874,14 @@ BOOL CCalculateDialog::GetSaveFileName(LPTSTR buffer, LPCTSTR title)
         const char* slash = _tcsrchr(SourcePath, '\\');
         if (slash != NULL && slash[1])
         {
-            lstrcpyn(buffer, slash + 1, MAX_PATH);
+            lstrcpyn(buffer, slash + 1, SAL_MAX_LONG_PATH);
         }
         else
             buffer[0] = 0; // no default name
     }
     else
     {
-        lstrcpyn(buffer, file1, MAX_PATH);
+        lstrcpyn(buffer, file1, SAL_MAX_LONG_PATH);
     }
 
     // save dialog
@@ -906,7 +906,7 @@ BOOL CCalculateDialog::GetSaveFileName(LPTSTR buffer, LPCTSTR title)
     while (NULL != (s = _tcschr(s, '|')))
         *s++ = 0;
     ofn.lpstrFile = buffer;
-    ofn.nMaxFile = MAX_PATH;
+    ofn.nMaxFile = SAL_MAX_LONG_PATH;
     ofn.lpstrInitialDir = SourcePath;
     ofn.lpstrTitle = title;
     ofn.Flags = OFN_PATHMUSTEXIST;
