@@ -250,7 +250,7 @@ CZipCommon::CZipCommon(const char* zipName, const char* zipRoot,
     CALL_STACK_MESSAGE3("CZipCommon::CZipCommon(%s, %s, )", zipName, zipRoot);
     Config = ::Config;
     ZipFile = 0;
-    lstrcpy(ZipName, zipName);
+    lstrcpyn(ZipName, zipName, ZipName.Size());
     ZipRoot = zipRoot;
     RootLen = lstrlen(ZipRoot);
     ZeroZip = false;
@@ -263,8 +263,8 @@ CZipCommon::CZipCommon(const char* zipName, const char* zipRoot,
     Unix = FALSE;
     ArchiveVolumes = archiveVolumes;
 
-    DWORD ret = GetCurrentDirectory(MAX_PATH + 1, OriginalCurrentDir);
-    if (!ret || ret > MAX_PATH + 1)
+    DWORD ret = GetCurrentDirectory(OriginalCurrentDir.Size(), OriginalCurrentDir);
+    if (!ret || ret > (DWORD)OriginalCurrentDir.Size())
         *OriginalCurrentDir = 0;
 }
 
@@ -2263,8 +2263,7 @@ int MakeFileName(int number, bool seqNames, const char* archive,
         ext = archive + strlen(archive); // ".cvspass" is extension in Windows
     int namelen = (int)(ext - archive);
 
-    char buf[MAX_PATH + 12];
-    memcpy(buf, archive, namelen);
+    CPathBuffer buf;    memcpy(buf, archive, namelen);
 
     if (winZipNames)
         sprintf(buf + namelen, ".z%02d", number);

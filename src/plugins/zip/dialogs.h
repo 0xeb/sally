@@ -173,14 +173,14 @@ class CChangeDiskDialog2 : public CDlgRoot
 {
     //int     VolumeNumber;
     char* FileName;
-    char CurrentPath[MAX_PATH];
+    CPathBuffer CurrentPath;
 
 public:
     CChangeDiskDialog2(HWND parent, /*int volNum,*/ char* fileName) : CDlgRoot(parent)
     {
         //VolumeNumber = volNumber;
         FileName = fileName;
-        strcpy(CurrentPath, FileName);
+        lstrcpyn(CurrentPath, FileName, CurrentPath.Size());
         SalamanderGeneral->CutDirectory(CurrentPath);
     }
 
@@ -200,7 +200,7 @@ class CChangeDiskDialog3 : public CDlgRoot
     bool Last;
     char* OldName;
     unsigned* Flags;
-    char CurrentPath[MAX_PATH];
+    CPathBuffer CurrentPath;
 
 public:
     CChangeDiskDialog3(HWND parent, int volNum, bool last,
@@ -210,7 +210,7 @@ public:
         Last = last;
         OldName = fileName;
         Flags = flags;
-        strcpy(CurrentPath, OldName);
+        lstrcpyn(CurrentPath, OldName, CurrentPath.Size());
         SalamanderGeneral->CutDirectory(CurrentPath);
     }
 

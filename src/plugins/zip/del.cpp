@@ -95,7 +95,7 @@ int CZipPack::DeleteFiles(int* deletedFiles)
     int errorID = 0;
     int ret;
     //bool              cancel =  false;
-    char progrTextBuf[MAX_PATH + 32];
+    CPathBuffer progrTextBuf;
     char* progrText;
     char* sour;
     int progrPrefixLen; //"deleting: "
@@ -135,7 +135,7 @@ int CZipPack::DeleteFiles(int* deletedFiles)
               ", isdir: " << curFile->IsDir <<
               ", file attr:" << curFile->FileAttr);
 */
-            lstrcpyn(progrText, curFile->Name + RootLen + (RootLen ? 1 : 0), MAX_PATH + 32 - progrPrefixLen);
+            lstrcpyn(progrText, curFile->Name + RootLen + (RootLen ? 1 : 0), progrTextBuf.Size() - progrPrefixLen);
             Salamander->ProgressDialogAddText(progrTextBuf, TRUE);
             if (i + 1 < DelFiles.Count)
                 nextFile = DelFiles[i + 1];

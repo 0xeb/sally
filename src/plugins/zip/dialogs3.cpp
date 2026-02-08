@@ -182,8 +182,8 @@ BOOL CCommentDialog::OnInit(WPARAM wParam, LPARAM lParam)
     SetDlgItemText(Dlg, IDC_COMMENT, PackObject->Comment);
     SendDlgItemMessage(Dlg, IDC_COMMENT, EM_SETLIMITTEXT, MAX_ZIPCOMMENT - 1, 0);
 
-    char title[MAX_PATH + 128];
-    sprintf(title, LoadStr(IDS_COMMENTDLGTITLE), PackObject->ZipName);
+    CPathBuffer title;
+    sprintf(title, LoadStr(IDS_COMMENTDLGTITLE), PackObject->ZipName.Get());
     SetWindowText(Dlg, title);
     SendMessage(Dlg, WM_SETICON, ICON_SMALL, (WPARAM)LoadIcon(DLLInstance, MAKEINTRESOURCE(IDI_COMMENT)));
 
@@ -502,7 +502,7 @@ BOOL LoadLangChache(HWND parent)
     char* file;
     GetModuleFileName(DLLInstance, path, path.Size());
     SalamanderGeneral->CutDirectory(path);
-    SalamanderGeneral->SalPathAppend(path, "sfx\\*.sfx", MAX_PATH);
+    SalamanderGeneral->SalPathAppend(path, "sfx\\*.sfx", path.Size());
     WIN32_FIND_DATA fd;
     HANDLE find = FindFirstFile(path, &fd);
     if (find == INVALID_HANDLE_VALUE)
@@ -532,7 +532,7 @@ BOOL LoadLangChache(HWND parent)
     }
 
     SalamanderGeneral->CutDirectory(path);
-    SalamanderGeneral->SalPathAddBackslash(path, MAX_PATH);
+    SalamanderGeneral->SalPathAddBackslash(path, path.Size());
     file = path + lstrlen(path);
 
     CSfxLang* lang;

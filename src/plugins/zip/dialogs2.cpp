@@ -359,8 +359,8 @@ BOOL CAdvancedSEDialog::OnTargetDir(WORD wNotifyCode, WORD wID, HWND hwndCtl)
                         wNotifyCode, wID);
     if (wNotifyCode == EN_UPDATE)
     {
-        char buffer[2 * MAX_PATH];
-        SendDlgItemMessage(Dlg, IDC_TARGETDIR, WM_GETTEXT, 2 * MAX_PATH, (LPARAM)buffer);
+        CPathBuffer buffer;
+        SendDlgItemMessage(Dlg, IDC_TARGETDIR, WM_GETTEXT, buffer.Size(), (LPARAM)(char*)buffer);
         // trim trailing spaces
         char* sour = buffer + lstrlen(buffer);
         while (--sour >= buffer && *sour == ' ')

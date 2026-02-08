@@ -85,7 +85,7 @@ public:
     char* NewCentrDir;
     DWORD ZipAttr;
     CFile* TempFile;
-    char TempName[MAX_PATH + 1];
+    CPathBuffer TempName;
     //bool                Backup;
     CQuadWord AddTotalSize;
     int SizeToAdd;

@@ -159,7 +159,7 @@ class CZipCommon
 {
 public:
     CFile* ZipFile;             //zip file hanndle
-    char ZipName[MAX_PATH + 1]; //name of zip file
+    CPathBuffer ZipName; //name of zip file
     const char* ZipRoot;
     int RootLen; //length of ZipRoot
     bool ZeroZip;
@@ -179,7 +179,7 @@ public:
     CQuadWord ProgressTotalSize;
     bool Fatal;
     bool UserBreak;
-    char OriginalCurrentDir[MAX_PATH + 1];
+    CPathBuffer OriginalCurrentDir;
     bool Extract;
     //bool                MenuSfx;//this is set when creating self extracting archive from menu
     char* Comment;
@@ -265,7 +265,7 @@ public:
 
 struct CSfxLang
 {
-    char FileName[MAX_PATH];
+    CPathBuffer FileName;
     DWORD LangID;
     char* DlgTitle;
     char* DlgText;

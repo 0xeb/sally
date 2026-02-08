@@ -434,7 +434,7 @@ int CZipPack::PackSelfExtract(SalEnumSelection2 next, void* param)
     CALL_STACK_MESSAGE1("CZipPack::PackSelfExtract( , )");
     int ret;
 
-    if (!SalamanderGeneral->SalPathRenameExtension(ZipName, ".exe", MAX_PATH))
+    if (!SalamanderGeneral->SalPathRenameExtension(ZipName, ".exe", ZipName.Size()))
         return IDS_TOOLONGZIPNAME;
 
     if (TestIfExist(ZipName))
@@ -884,7 +884,7 @@ int CZipPack::ExportName(char* name, CFileInfo* fileInfo)
 int CZipPack::CreateTempFile()
 {
     CALL_STACK_MESSAGE1("CZipPack::CreateTempFile()");
-    char pathBuf[MAX_PATH + 1];
+    CPathBuffer pathBuf;
     char* path = pathBuf;
     char* name;
     DWORD lastError; //value returned by GetLastError()
@@ -1394,7 +1394,7 @@ int CZipPack::PackFiles()
     __UINT64 writePos;
     CDeflate* defObj = new CDeflate();
     int errorID = 0;
-    char progrTextBuf[MAX_PATH + 32];
+    CPathBuffer progrTextBuf;
     char* progrText;
     int progrPrefixLen; //"adding: "
     char* sour;
@@ -1439,7 +1439,7 @@ int CZipPack::PackFiles()
         if (next->Action != AF_ADD && next->Action != AF_OVERWRITE)
             continue;
         //TRACE_I("Packing file: " << next->Name);
-        lstrcpyn(progrText, next->Name + SourceLen + 1, MAX_PATH + 32 - progrPrefixLen);
+        lstrcpyn(progrText, next->Name + SourceLen + 1, progrTextBuf.Size() - progrPrefixLen);
         Salamander->ProgressDialogAddText(progrTextBuf, TRUE);
         if (!Salamander->ProgressSetSize(CQuadWord(0, 0), CQuadWord(-1, -1), TRUE))
         {
@@ -1947,16 +1947,16 @@ int CZipPack::GetDirInfo(const char* name, DWORD* attr, FILETIME* lastWrite)
 int CZipPack::IsDirectoryEmpty(const char* name)
 {
     CALL_STACK_MESSAGE2("CZipPack::IsDirectoryEmpty(%s)", name);
-    char buf[MAX_PATH + 1];
+    CPathBuffer buf;
     int len;
     HANDLE search;
     WIN32_FIND_DATA data;
     int lastError;
     BOOL ret;
 
-    lstrcpyn(buf, name, MAX_PATH + 1);
+    lstrcpyn(buf, name, buf.Size());
     len = lstrlen(buf);
-    lstrcpyn(buf + len, "\\*.*", MAX_PATH + 1 - len);
+    lstrcpyn(buf + len, "\\*.*", buf.Size() - len);
     search = FindFirstFile(buf, &data);
     if (search == INVALID_HANDLE_VALUE)
     {
@@ -2141,7 +2141,7 @@ int CZipPack::CreateNextFile(bool firstSfxDisk)
     const char* text;
     int flags;
     bool retry;
-    char pathBuf[MAX_PATH + 1];
+    CPathBuffer pathBuf;
     char* zipPath;
     char* dummy;
     bool testSpace = true;

@@ -358,7 +358,7 @@ int CZipUnpack::PrepareMaskArray(TIndirectArray2<char>& maskArray, const char* m
     char* dest;
     char* newMask;
     int newMaskLen;
-    char buffer[MAX_PATH + 1];
+    CPathBuffer buffer;
 
     sour = masks;
     while (*sour)

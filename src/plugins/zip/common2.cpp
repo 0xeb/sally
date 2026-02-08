@@ -55,8 +55,7 @@ int RenumberName(int number, const char* oldName, char* newName,
         }
     }
 
-    char buf[MAX_PATH + 12];
-
+    CPathBuffer buf;
     if (numberEnd && !winzip)
     {
         if (lastFile && ext && ext < numberStart) // in Windows ".cvspass" is treated as an extension
