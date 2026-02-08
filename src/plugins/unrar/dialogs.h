@@ -23,14 +23,14 @@ public:
 class CNextVolumeDialog : public CDlgRoot
 {
     LPTSTR VolumeName;
-    TCHAR CurrentPath[MAX_PATH];
+    CPathBuffer CurrentPath;
     LPCSTR Message;
 
 public:
     CNextVolumeDialog(HWND parent, LPTSTR volumeName, LPCTSTR message = NULL) : CDlgRoot(parent)
     {
         VolumeName = volumeName;
-        lstrcpyn(CurrentPath, VolumeName, MAX_PATH);
+        lstrcpyn(CurrentPath, VolumeName, CurrentPath.Size());
         SalamanderGeneral->CutDirectory(CurrentPath);
         Message = message;
     }

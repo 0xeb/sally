@@ -1,4 +1,4 @@
-﻿// SPDX-FileCopyrightText: 2023 Open Salamander Authors
+// SPDX-FileCopyrightText: 2023 Open Salamander Authors
 // SPDX-License-Identifier: GPL-2.0-or-later
 // CommentsTranslationProject: TRANSLATED
 
@@ -29,4 +29,3 @@
 #include "spl_arc.h"
 #include "spl_vers.h"
 #include "dbg.h"
-#include "common/widepath.h"

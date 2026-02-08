@@ -1,4 +1,4 @@
-﻿// SPDX-FileCopyrightText: 2023 Open Salamander Authors
+// SPDX-FileCopyrightText: 2023 Open Salamander Authors
 // SPDX-License-Identifier: GPL-2.0-or-later
 // CommentsTranslationProject: TRANSLATED
 
@@ -44,7 +44,6 @@
 
 #include "versinfo.rh2"
 
-#include "common/widepath.h"
 
 #include "spl_com.h"
 #include "spl_base.h"

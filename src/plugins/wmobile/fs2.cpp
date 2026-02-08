@@ -120,7 +120,7 @@ CPluginFSInterface::ChangePath(int currentFSNameIndex, char* fsName, int fsNameI
     CPathBuffer path;
     int err = 0;
 
-    lstrcpyn(path, userPart, MAX_PATH);
+    lstrcpyn(path, userPart, path.Size());
 
     BOOL fileNameAlreadyCut = FALSE;
     if (PathError) // error while listing the path (the user already saw the error in ListCurrentPath)
@@ -157,7 +157,7 @@ CPluginFSInterface::ChangePath(int currentFSNameIndex, char* fsName, int fsNameI
                     sprintf(errBuf, LoadStr(IDS_ERR_FILEINPATH));
                 }
                 else
-                    SalamanderGeneral->GetErrorText(err, errBuf, MAX_PATH);
+                    SalamanderGeneral->GetErrorText(err, errBuf, errBuf.Size());
 
                 // if opening the FS is time-consuming and we want to adjust Change Directory (Shift+F7)
                 // to behave like archives, comment out the following line with "break" for mode 3
@@ -170,7 +170,7 @@ CPluginFSInterface::ChangePath(int currentFSNameIndex, char* fsName, int fsNameI
             char* cut;
             if (!SalamanderGeneral->CutDirectory(path, &cut)) // nowhere to shorten, fatal error
             {
-                SalamanderGeneral->GetErrorText(err, errBuf, MAX_PATH);
+                SalamanderGeneral->GetErrorText(err, errBuf, errBuf.Size());
                 break;
             }
             else
@@ -632,7 +632,7 @@ CPluginFSInterface::CreateDir(const char* fsName, int mode, HWND parent, char* n
             {
                 CPathBuffer errBuf;
                 errBuf[0] = 0;
-                SalamanderGeneral->GetGFNErrorText(errTextID, errBuf, MAX_PATH);
+                SalamanderGeneral->GetGFNErrorText(errTextID, errBuf, errBuf.Size());
                 SalamanderGeneral->ShowMessageBox(errBuf, TitleWMobileError, MSGBOX_ERROR);
                 return FALSE;
             }
@@ -2066,7 +2066,7 @@ static BOOL FindAllFilesInTree(LPCTSTR rootPath, char (&path)[MAX_PATH], LPCTSTR
     strcpy(fullPath, rootPath);
     if (!SalamanderGeneral->SalPathAppend(fullPath, path, fullPath.Size()) ||
 
-        !SalamanderGeneral->SalPathAppend(fullPath, fileName, MAX_PATH))
+        !SalamanderGeneral->SalPathAppend(fullPath, fileName, fullPath.Size()))
         goto ONERROR_TOOLONG;
 
     find = FindFirstFile(fullPath, &data);

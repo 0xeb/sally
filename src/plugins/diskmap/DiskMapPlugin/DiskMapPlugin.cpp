@@ -67,14 +67,14 @@ BOOL APIENTRY DllMain(HMODULE hModule,
 
 class CSalamanderCallback : public CSalamanderCallbackAbstract
 {
-    TCHAR FocusPathBuf[MAX_PATH];
+    CPathBuffer FocusPathBuf;
 
 public:
     BOOL FocusFile(TCHAR const* fileName)
     {
         if (SalamanderGeneral->SalamanderIsNotBusy(NULL))
         {
-            lstrcpyn(FocusPathBuf, fileName, MAX_PATH);
+            lstrcpyn(FocusPathBuf, fileName, FocusPathBuf.Size());
             SalamanderGeneral->PostMenuExtCommand(MENUCMD_FAKE_FOCUS, TRUE);
             Sleep(500);          // the switch to the panel happens, so this wait occurs in the viewer's inactive window and therefore does not matter
             FocusPathBuf[0] = 0; // after 0.5 second we no longer care about the focus (handles the case where we hit the beginning of Salamander's BUSY mode)
@@ -118,7 +118,7 @@ public:
     {
         if (SalamanderGeneral->SalamanderIsNotBusy(NULL))
         {
-            lstrcpyn(FocusPathBuf, path, MAX_PATH);
+            lstrcpyn(FocusPathBuf, path, FocusPathBuf.Size());
             SalamanderGeneral->PostMenuExtCommand(MENUCMD_FAKE_OPEN, TRUE);
             Sleep(500);          // the switch to the panel happens, so this wait occurs in the viewer's inactive window and therefore does not matter
             FocusPathBuf[0] = 0; // after 0.5 second we no longer care about the focus (handles the case where we hit the beginning of Salamander's BUSY mode)

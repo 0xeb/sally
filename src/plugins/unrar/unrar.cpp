@@ -584,7 +584,7 @@ BOOL CPluginInterfaceForArchiver::UnpackOneFile(CSalamanderForOperationsAbstract
     //  FirstFile = TRUE;
     AllocateWholeFile = TRUE;
     TestAllocateWholeFile = TRUE;
-    TCHAR justName[MAX_PATH];
+    CPathBuffer justName;
     lstrcpy(justName, nameInArchive);
     SalamanderGeneral->SalPathStripPath(justName);
     PluginData = (CPluginDataInterface*)pluginDataPar;
@@ -1370,7 +1370,7 @@ BOOL CPluginInterfaceForArchiver::SwitchToFirstVol(LPCTSTR arcName, BOOL* saveFi
     if (lstrlen(ext) > 3 &&
         isdigit(ext[2]) && isdigit(ext[3]))
     {
-        TCHAR oldExt[MAX_PATH];
+        CPathBuffer oldExt;
         lstrcpy(oldExt, ext);
         if (isdigit(ext[1]))
         {
@@ -1383,7 +1383,7 @@ BOOL CPluginInterfaceForArchiver::SwitchToFirstVol(LPCTSTR arcName, BOOL* saveFi
         DWORD attr = SalamanderGeneral->SalGetFileAttributes(ArcFileName);
         if (attr == -1 || attr & FILE_ATTRIBUTE_DIRECTORY)
         {
-            TCHAR path[MAX_PATH];
+            CPathBuffer path;
             _tcscpy(path, ArcFileName);
             if (NextVolumeDialog(SalamanderGeneral->GetMsgBoxParent(), path, LoadStr(IDS_SELECTFIRST)) == IDOK)
             {
@@ -1417,10 +1417,10 @@ BOOL CPluginInterfaceForArchiver::SwitchToFirstVol(LPCTSTR arcName, BOOL* saveFi
         if (digits && *iterator == '.')
         {
             // the file is named according to the new convention
-            TCHAR path[MAX_PATH];
+            CPathBuffer path;
 
-            _tcsncpy_s(path, ArcFileName, part - ArcFileName);
-            _stprintf_s(path + (part - ArcFileName), _countof(path) - (part - ArcFileName), _T(".part%0*d.rar"), digits, 1);
+            _tcsncpy_s(path, path.Size(), ArcFileName, part - ArcFileName);
+            _stprintf_s(path + (part - ArcFileName), path.Size() - (part - ArcFileName), _T(".part%0*d.rar"), digits, 1);
 
             DWORD attr = SalamanderGeneral->SalGetFileAttributes(path);
             if (!(attr & FILE_ATTRIBUTE_DIRECTORY))
@@ -1453,7 +1453,7 @@ BOOL CPluginInterfaceForArchiver::MakeFilesList(TIndirectArray2<CRARExtractInfo>
     LPCTSTR nextName;
     BOOL isDir;
     CQuadWord size;
-    TCHAR dir[MAX_PATH];
+    CPathBuffer dir;
     LPTSTR addDir;
     int dirLen;
     const CFileData* pFileData;
@@ -1639,7 +1639,7 @@ BOOL CPluginInterfaceForArchiver::ConstructMaskArray(TIndirectArray2<char>& mask
     LPCTSTR sour;
     LPTSTR dest;
     size_t newMaskLen;
-    TCHAR buffer[MAX_PATH];
+    CPathBuffer buffer;
 
     sour = masks;
     while (*sour)
@@ -1654,7 +1654,7 @@ BOOL CPluginInterfaceForArchiver::ConstructMaskArray(TIndirectArray2<char>& mask
                 else
                     break;
             }
-            if (dest == buffer + MAX_PATH - 1)
+            if (dest == (char*)buffer + buffer.Size() - 1)
             {
                 SalamanderGeneral->ShowMessageBox(LoadStr(IDS_TOOLONGMASK), LoadStr(IDS_PLUGINNAME), MSGBOX_ERROR);
                 return FALSE;

@@ -1,4 +1,4 @@
-﻿// SPDX-FileCopyrightText: 2023 Open Salamander Authors
+// SPDX-FileCopyrightText: 2023 Open Salamander Authors
 // SPDX-License-Identifier: GPL-2.0-or-later
 // CommentsTranslationProject: TRANSLATED
 
@@ -30,7 +30,6 @@
 
 #include "array2.h"
 
-#include "common/widepath.h"
 
 #include "unrar.h"
 #include "dialogs.h"
