@@ -231,6 +231,72 @@ TEST(CPathBufferWinAPI, PathFindFileNameA)
 }
 
 // ============================================================================
+// Long path construction — verifies paths > MAX_PATH (260) are not truncated
+// These test the patterns fixed during MAX_PATH barrier removal.
+// ============================================================================
+
+TEST(CPathBufferLongPath, CanHoldPathLongerThanMAX_PATH)
+{
+    CPathBuffer buf;
+    // Build a path of ~300 chars: C:\<long_dir>\file.txt
+    std::string longDir(280, 'a');
+    std::string path = "C:\\" + longDir + "\\file.txt";
+    ASSERT_GT(path.length(), (size_t)MAX_PATH);
+
+    strcpy(buf, path.c_str());
+    EXPECT_STREQ(buf, path.c_str());
+    EXPECT_EQ(strlen(buf), path.length());
+}
+
+TEST(CPathBufferLongPath, PathConcatExceedingMAX_PATH)
+{
+    // Simulates the pattern in SalGetFullName where curDir + name are joined
+    CPathBuffer buf;
+    std::string dir(200, 'd');
+    std::string name(100, 'n');
+    std::string fullPath = "C:\\" + dir + "\\" + name;
+    ASSERT_GT(fullPath.length(), (size_t)MAX_PATH);
+
+    strcpy(buf, "C:\\");
+    strcat(buf, dir.c_str());
+    strcat(buf, "\\");
+    strcat(buf, name.c_str());
+    EXPECT_STREQ(buf, fullPath.c_str());
+}
+
+TEST(CPathBufferLongPath, SizeReturnsFullCapacity)
+{
+    CPathBuffer buf;
+    // SAL_MAX_LONG_PATH = 32767
+    EXPECT_EQ(buf.Size(), 32767);
+    EXPECT_GT(buf.Size(), MAX_PATH);
+}
+
+TEST(CPathBufferLongPath, LstrcpynWithLongPath)
+{
+    CPathBuffer buf;
+    std::string longPath(500, 'x');
+    lstrcpynA(buf, longPath.c_str(), buf.Size());
+    EXPECT_EQ(strlen(buf), 500u);
+}
+
+TEST(CPathBufferLongPath, MemmoveWithLongPath)
+{
+    // Simulates the pattern in SalGetFullName: memmove(name + offset, s, len)
+    CPathBuffer buf;
+    std::string prefix = "C:\\";
+    std::string suffix(300, 's');
+    strcpy(buf, suffix.c_str());
+    // Insert prefix at start
+    memmove(buf.Get() + prefix.length(), buf.Get(), strlen(buf) + 1);
+    memcpy(buf.Get(), prefix.c_str(), prefix.length());
+
+    std::string expected = prefix + suffix;
+    ASSERT_GT(expected.length(), (size_t)MAX_PATH);
+    EXPECT_STREQ(buf, expected.c_str());
+}
+
+// ============================================================================
 // Buffer size checks
 // ============================================================================
 
