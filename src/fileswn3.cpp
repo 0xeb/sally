@@ -1961,7 +1961,8 @@ BOOL CFilesWindow::ChangeDir(const char* newDir, int suggestedTopIndex, const ch
     CPathBuffer errBuf;
     GetGeneralPath(path, path.Size(), TRUE);
     BOOL sendDirectlyToPlugin = FALSE;
-    CChangeDirDlg dlg(HWindow, path, MainWindow->GetActivePanel()->Is(ptPluginFS) ? &sendDirectlyToPlugin : NULL);
+    CChangeDirDlg dlg(HWindow, path, path.Size(), MainWindow->GetActivePanel()->Is(ptPluginFS) ? &sendDirectlyToPlugin : NULL);
+    dlg.SetUnicodePath(AnsiToWide(path));
 
     // refresh DefaultDir
     MainWindow->UpdateDefaultDir(TRUE);

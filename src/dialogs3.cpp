@@ -1392,10 +1392,18 @@ MENU_TEMPLATE_ITEM CopyMoveMoreDialogMenu[] =
 // CChangeDirDlg
 //
 
-CChangeDirDlg::CChangeDirDlg(HWND parent, char* path, BOOL* sendDirectlyToPlugin) : CCommonDialog(HLanguage, IDD_CHANGEDIR, IDD_CHANGEDIR, parent)
+CChangeDirDlg::CChangeDirDlg(HWND parent, char* path, int pathBufSize, BOOL* sendDirectlyToPlugin) : CCommonDialog(HLanguage, IDD_CHANGEDIR, IDD_CHANGEDIR, parent)
 {
     Path = path;
+    PathBufSize = pathBufSize;
     SendDirectlyToPlugin = sendDirectlyToPlugin;
+    HUnicodeEdit = NULL;
+}
+
+void CChangeDirDlg::SetUnicodePath(const std::wstring& pathW)
+{
+    PathW = pathW;
+    ResultW.clear();
 }
 
 void CChangeDirDlg::Transfer(CTransferInfo& ti)
@@ -1408,12 +1416,26 @@ void CChangeDirDlg::Transfer(CTransferInfo& ti)
         if (ti.Type == ttDataToWindow)
         {
             LoadComboFromStdHistoryValues(hWnd, history, CHANGEDIR_HISTORY_SIZE);
-            SendMessage(hWnd, CB_LIMITTEXT, 2 * MAX_PATH - 1, 0);
+            SendMessage(hWnd, CB_LIMITTEXT, PathBufSize - 1, 0);
             SendMessage(hWnd, WM_SETTEXT, 0, (LPARAM)Path);
         }
         else
         {
-            SendMessage(hWnd, WM_GETTEXT, 2 * MAX_PATH, (LPARAM)Path);
+            if (HUnicodeEdit != NULL)
+            {
+                int len = GetWindowTextLengthW(HUnicodeEdit);
+                if (len > 0)
+                {
+                    std::vector<wchar_t> buffer(len + 1);
+                    GetWindowTextW(HUnicodeEdit, buffer.data(), len + 1);
+                    ResultW = buffer.data();
+                }
+                WideCharToMultiByte(CP_ACP, 0, ResultW.c_str(), -1, Path, PathBufSize, "?", NULL);
+            }
+            else
+            {
+                SendMessage(hWnd, WM_GETTEXT, PathBufSize, (LPARAM)Path);
+            }
             AddValueToStdHistoryValues(history, CHANGEDIR_HISTORY_SIZE, Path, FALSE);
         }
     }
@@ -1439,12 +1461,46 @@ CChangeDirDlg::DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
         if (hl != NULL)
             hl->SetActionShowHint(LoadStr(IDS_CHANGEDIR_HINT));
 
+        // Unicode overlay for long path support
+        if (!PathW.empty())
+        {
+            HWND hCombo = GetDlgItem(HWindow, IDE_PATH);
+            if (hCombo != NULL)
+            {
+                COMBOBOXINFO cbi = {sizeof(COMBOBOXINFO)};
+                if (GetComboBoxInfo(hCombo, &cbi) && cbi.hwndItem)
+                {
+                    RECT editRect;
+                    GetWindowRect(cbi.hwndItem, &editRect);
+                    MapWindowPoints(NULL, HWindow, (LPPOINT)&editRect, 2);
+
+                    HFONT hFont = (HFONT)SendMessage(hCombo, WM_GETFONT, 0, 0);
+
+                    HUnicodeEdit = CreateWindowExW(
+                        0, L"EDIT", PathW.c_str(),
+                        WS_CHILD | WS_VISIBLE | ES_AUTOHSCROLL,
+                        editRect.left, editRect.top,
+                        editRect.right - editRect.left, editRect.bottom - editRect.top,
+                        HWindow, NULL, HInstance, NULL);
+
+                    if (HUnicodeEdit != NULL)
+                    {
+                        ShowWindow(cbi.hwndItem, SW_HIDE);
+                        if (hFont != NULL)
+                            SendMessage(HUnicodeEdit, WM_SETFONT, (WPARAM)hFont, TRUE);
+                        SetWindowSubclass(HUnicodeEdit, UnicodeEditSubclassProc, 1, (DWORD_PTR)hCombo);
+                        PostMessage(HUnicodeEdit, EM_SETSEL, 0, -1);
+                        SetFocus(HUnicodeEdit);
+                    }
+                }
+            }
+        }
         break;
     }
 
     case WM_USER_KEYDOWN:
     {
-        BOOL processed = OnDirectoryKeyDown((DWORD)lParam, HWindow, IDE_PATH, 2 * MAX_PATH, IDB_BROWSE);
+        BOOL processed = OnDirectoryKeyDown((DWORD)lParam, HWindow, IDE_PATH, PathBufSize, IDB_BROWSE);
         if (!processed)
             processed = OnKeyDownHandleSelectAll((DWORD)lParam, HWindow, IDE_PATH);
         SetWindowLongPtr(HWindow, DWLP_MSGRESULT, processed);
@@ -1453,8 +1509,27 @@ CChangeDirDlg::DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
 
     case WM_USER_BUTTON:
     {
-        OnDirectoryButton(HWindow, IDE_PATH, 2 * MAX_PATH, IDB_BROWSE, wParam, lParam);
+        OnDirectoryButton(HWindow, IDE_PATH, PathBufSize, IDB_BROWSE, wParam, lParam);
         return 0;
+    }
+
+    case WM_COMMAND:
+    {
+        // Handle combobox selection change - update overlay edit if present
+        if (LOWORD(wParam) == IDE_PATH && HIWORD(wParam) == CBN_SELCHANGE && HUnicodeEdit != NULL)
+        {
+            HWND hCombo = (HWND)lParam;
+            CPathBuffer ansiText;
+            int len = (int)SendMessage(hCombo, WM_GETTEXT, ansiText.Size(), (LPARAM)ansiText.Get());
+            if (len > 0)
+            {
+                std::wstring wideText(ansiText.Size(), L'\0');
+                int wideLen = MultiByteToWideChar(CP_ACP, 0, ansiText, -1, &wideText[0], (int)wideText.size());
+                wideText.resize(wideLen > 0 ? wideLen - 1 : 0);
+                SetWindowTextW(HUnicodeEdit, wideText.c_str());
+            }
+        }
+        break;
     }
     }
     return CCommonDialog::DialogProc(uMsg, wParam, lParam);

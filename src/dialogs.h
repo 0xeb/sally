@@ -745,7 +745,11 @@ protected:
 class CChangeDirDlg : public CCommonDialog
 {
 public:
-    CChangeDirDlg(HWND parent, char* path, BOOL* sendDirectlyToPlugin);
+    CChangeDirDlg(HWND parent, char* path, int pathBufSize, BOOL* sendDirectlyToPlugin);
+
+    void SetUnicodePath(const std::wstring& pathW);
+    const std::wstring& GetUnicodeResult() const { return ResultW; }
+    BOOL IsUnicodeMode() const { return !PathW.empty(); }
 
     virtual void Transfer(CTransferInfo& ti);
 
@@ -753,7 +757,13 @@ protected:
     INT_PTR DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam);
 
     char* Path;
+    int PathBufSize;
     BOOL* SendDirectlyToPlugin;
+
+    // Unicode support
+    std::wstring PathW;
+    std::wstring ResultW;
+    HWND HUnicodeEdit;
 };
 
 //
