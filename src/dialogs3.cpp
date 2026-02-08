@@ -1166,6 +1166,41 @@ CCopyMoveMoreDialog::DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
 
         if (!Criteria->IsDirty()) // collapse the dialog if Criteria do not contain any data
             DisplayMore(FALSE, TRUE);
+
+        // If Unicode path is set, create an overlay Unicode edit control
+        if (!PathW.empty())
+        {
+            HWND hCombo = GetDlgItem(HWindow, IDE_PATH);
+            if (hCombo != NULL)
+            {
+                COMBOBOXINFO cbi = {sizeof(COMBOBOXINFO)};
+                if (GetComboBoxInfo(hCombo, &cbi) && cbi.hwndItem)
+                {
+                    RECT editRect;
+                    GetWindowRect(cbi.hwndItem, &editRect);
+                    MapWindowPoints(NULL, HWindow, (LPPOINT)&editRect, 2);
+
+                    HFONT hFont = (HFONT)SendMessage(hCombo, WM_GETFONT, 0, 0);
+
+                    HUnicodeEdit = CreateWindowExW(
+                        0, L"EDIT", PathW.c_str(),
+                        WS_CHILD | WS_VISIBLE | ES_AUTOHSCROLL,
+                        editRect.left, editRect.top,
+                        editRect.right - editRect.left, editRect.bottom - editRect.top,
+                        HWindow, NULL, HInstance, NULL);
+
+                    if (HUnicodeEdit != NULL)
+                    {
+                        ShowWindow(cbi.hwndItem, SW_HIDE);
+                        if (hFont != NULL)
+                            SendMessage(HUnicodeEdit, WM_SETFONT, (WPARAM)hFont, TRUE);
+                        SetWindowSubclass(HUnicodeEdit, UnicodeEditSubclassProc, 1, (DWORD_PTR)hCombo);
+                        PostMessage(HUnicodeEdit, EM_SETSEL, 0, -1); // select all
+                        SetFocus(HUnicodeEdit);
+                    }
+                }
+            }
+        }
         break;
     }
 
@@ -1266,6 +1301,21 @@ MENU_TEMPLATE_ITEM CopyMoveMoreDialogMenu[] =
 
     case WM_COMMAND:
     {
+        // Handle combobox selection change - update overlay edit if present
+        if (LOWORD(wParam) == IDE_PATH && HIWORD(wParam) == CBN_SELCHANGE && HUnicodeEdit != NULL)
+        {
+            HWND hCombo = (HWND)lParam;
+            CPathBuffer ansiText;
+            int len = (int)SendMessage(hCombo, WM_GETTEXT, ansiText.Size(), (LPARAM)ansiText.Get());
+            if (len > 0)
+            {
+                std::wstring wideText(ansiText.Size(), L'\0');
+                int wideLen = MultiByteToWideChar(CP_ACP, 0, ansiText, -1, &wideText[0], (int)wideText.size());
+                wideText.resize(wideLen > 0 ? wideLen - 1 : 0);
+                SetWindowTextW(HUnicodeEdit, wideText.c_str());
+            }
+        }
+
         if (HIWORD(wParam) == BN_CLICKED)
         {
             switch (LOWORD(wParam))
