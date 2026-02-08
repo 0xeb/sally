@@ -612,9 +612,9 @@ CPluginInterfaceForArchiver::UnpackWholeArchive(CSalamanderForOperationsAbstract
     CPluginDataInterfaceAbstract *pluginData = NULL;
     if (ListArchive(salamander, fileName, dir, pluginData))
     {
-      char path[MAX_PATH];
+      CPathBuffer path;
       path[0] = 0;
-      EnumAllItems(dir, path, MAX_PATH);
+      EnumAllItems(dir, path, path.Size());
       dir->Clear(pluginData);
       if (pluginData != NULL) PluginInterface.ReleasePluginDataInterface(pluginData);
     }

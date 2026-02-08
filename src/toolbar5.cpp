@@ -30,7 +30,7 @@ private:
     IDataObject* DataObject;   // IDataObject that entered the drag
     CUserMenuBar* UserMenuBar; // bar we are associated with
     IDropTarget* DropTarget;
-    char DropTargetFileName[MAX_PATH];
+    CPathBuffer DropTargetFileName;
 
 public:
     CUMDropTarget(CUserMenuBar* userMenuBar)

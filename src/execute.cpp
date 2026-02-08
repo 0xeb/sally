@@ -580,7 +580,7 @@ struct CExecuteExpData
 {
     const char* Name;
     const char* DosName;
-    char Buffer[MAX_PATH];
+    CPathBuffer Buffer;
     BOOL* FileNameUsed;
 
     CUserMenuAdvancedData* UserMenuAdvancedData; // applies only to User Menu, otherwise NULL here
@@ -945,7 +945,7 @@ struct CFileDataExpData
     const CFileData* FileData;
     BOOL IsDir;          // this is a file, not a directory
     DWORD ValidFileData; // mask of valid data in CFileData
-    char Path[MAX_PATH]; // path to the current panel (only for Make File List)
+    CPathBuffer Path; // path to the current panel (only for Make File List)
     char Buffer[2000];
 };
 

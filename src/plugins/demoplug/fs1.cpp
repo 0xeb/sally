@@ -188,8 +188,8 @@ CPluginInterfaceForFS::ExecuteChangeDriveMenuItem(int panel)
       }
 */
             /*
-      char buf[MAX_PATH];
-      if (SalamanderGeneral->GetLastWindowsPanelPath(panel, buf, MAX_PATH))
+      CPathBuffer buf;
+      if (SalamanderGeneral->GetLastWindowsPanelPath(panel, buf, buf.Size()))
       {
         if (!SalamanderGeneral->ChangePanelPathToDisk(panel, buf, &failReason))
         {

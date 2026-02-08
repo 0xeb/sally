@@ -224,7 +224,7 @@ void WINAPI TestLoadOrSaveConfiguration(BOOL load, HKEY regKey,
                                         CSalamanderRegistryAbstract *registry, void *param)
 {
   CALL_STACK_MESSAGE2("TestLoadOrSaveConfiguration(%d, ,)", load);
-  char buf[MAX_PATH];
+  CPathBuffer buf;
   if (load)  // load
   {
     // load default configuration
@@ -235,7 +235,7 @@ void WINAPI TestLoadOrSaveConfiguration(BOOL load, HKEY regKey,
       HKEY actKey;
       if (registry->OpenKey(regKey, "test-key", actKey))
       {
-        if (!registry->GetValue(actKey, "test-value", REG_SZ, buf, MAX_PATH)) buf[0] = 0;
+        if (!registry->GetValue(actKey, "test-value", REG_SZ, buf, buf.Size())) buf[0] = 0;
         registry->CloseKey(actKey);
       }
     }
@@ -471,8 +471,8 @@ CPluginInterfaceAbstract* WINAPI SalamanderPluginEntry(CSalamanderPluginEntryAbs
     // test module enumeration
     /*
   int index = 0;
-  char module[MAX_PATH];
-  char version[MAX_PATH];
+  CPathBuffer module;
+  CPathBuffer version;
   while (SalamanderGeneral->EnumInstalledModules(&index, module, version))
   {
     TRACE_I("Module " << module << ", version " << version);

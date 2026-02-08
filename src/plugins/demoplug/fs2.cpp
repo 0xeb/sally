@@ -1353,7 +1353,7 @@ CPluginFSInterface::Delete(const char* fsName, int mode, HWND parent, int panel,
 
   char buf[2 * MAX_PATH];  // buffer for error texts
 
-  char fileName[MAX_PATH];   // buffer for the full name
+  CPathBuffer fileName;   // buffer for the full name
   strcpy(fileName, Path);
   char *end = fileName + strlen(fileName);  // space reserved for names from the panel
   if (end > fileName && *(end - 1) != '\\')
@@ -1361,10 +1361,10 @@ CPluginFSInterface::Delete(const char* fsName, int mode, HWND parent, int panel,
     *end++ = '\\';
     *end = 0;
   }
-  int endSize = MAX_PATH - (end - fileName);  // maximum number of characters available for a panel name
+  int endSize = fileName.Size() - (int)(end - fileName);  // maximum number of characters available for a panel name
 
   char dfsFileName[2 * MAX_PATH];   // buffer for the full DFS name
-  sprintf(dfsFileName, "%s:%s", fsName, fileName);
+  sprintf(dfsFileName, "%s:%s", fsName, (const char*)fileName);
   char *endDFSName = dfsFileName + strlen(dfsFileName);  // space reserved for names from the panel
   int endDFSNameSize = 2 * MAX_PATH - (endDFSName - dfsFileName); // maximum number of characters available for a panel name
 
@@ -1616,9 +1616,9 @@ CPluginFSInterface::CopyOrMoveFromFS(BOOL copy, int mode, const char* fsName, HW
       int fileNameFormat;
       SalamanderGeneral->GetConfigParameter(SALCFG_FILENAMEFORMAT, &fileNameFormat,
                                             sizeof(fileNameFormat), NULL);
-      char formatedFileName[MAX_PATH];  // CFileData::Name is at most MAX_PATH-5 characters - Salamander's limit
+      CPathBuffer formatedFileName;  // CFileData::Name is at most MAX_PATH-5 characters - Salamander's limit
       SalamanderGeneral->AlterFileName(formatedFileName, f->Name, fileNameFormat, 0, isDir);
-      _snprintf_s(subjectSrc, _TRUNCATE, isDir ? "directory \"%s\"" : "file \"%s\"", formatedFileName);
+      _snprintf_s(subjectSrc, _TRUNCATE, isDir ? "directory \"%s\"" : "file \"%s\"", (const char*)formatedFileName);
       subjectSrc[MAX_PATH + 100 - 1] = 0;
     }
     else  // multiple directories and files

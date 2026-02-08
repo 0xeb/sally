@@ -146,8 +146,8 @@ struct CNBWNetAC3ThreadFParams
 
     char bufUserName[USERNAME_MAXLEN];
     char bufPassword[PASSWORD_MAXLEN];
-    char bufLocalName[MAX_PATH];
-    char bufRemoteName[MAX_PATH];
+    CPathBuffer bufLocalName;
+    CPathBuffer bufRemoteName;
 
     DWORD errProviderCode;
     char errBuf[300];
@@ -230,12 +230,12 @@ BOOL NonBlockingWNetAddConnection3(DWORD& err, LPNETRESOURCE lpNetResource,
     NBWNetAC3ThreadFParams.netResource = *lpNetResource;
     if (lpNetResource->lpLocalName != NULL)
     {
-        lstrcpyn(NBWNetAC3ThreadFParams.bufLocalName, lpNetResource->lpLocalName, MAX_PATH);
+        lstrcpyn(NBWNetAC3ThreadFParams.bufLocalName, lpNetResource->lpLocalName, NBWNetAC3ThreadFParams.bufLocalName.Size());
         NBWNetAC3ThreadFParams.netResource.lpLocalName = NBWNetAC3ThreadFParams.bufLocalName;
     }
     if (lpNetResource->lpRemoteName != NULL)
     {
-        lstrcpyn(NBWNetAC3ThreadFParams.bufRemoteName, lpNetResource->lpRemoteName, MAX_PATH);
+        lstrcpyn(NBWNetAC3ThreadFParams.bufRemoteName, lpNetResource->lpRemoteName, NBWNetAC3ThreadFParams.bufRemoteName.Size());
         NBWNetAC3ThreadFParams.netResource.lpRemoteName = NBWNetAC3ThreadFParams.bufRemoteName;
     }
     NBWNetAC3ThreadFParams.err = 0;

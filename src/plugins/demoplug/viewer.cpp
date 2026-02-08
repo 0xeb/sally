@@ -202,7 +202,7 @@ unsigned WINAPI ViewerThreadBody(void *param)
   }
 
   CALL_STACK_MESSAGE1("ViewerThreadBody::SetEvent");
-  char name[MAX_PATH];
+  CPathBuffer name;
   strcpy(name, data->Name);
   BOOL openFile = data->Success;
   SetEvent(data->Continue);    // wake the main thread; the data are no longer valid past this point (=NULL)

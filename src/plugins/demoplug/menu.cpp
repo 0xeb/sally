@@ -210,33 +210,33 @@ CPluginInterfaceForMenuExt::ExecuteMenuItem(CSalamanderForOperationsAbstract* sa
 
       BOOL b2 = SalamanderGeneral->IsTheSamePath("c:\\path", "c:\\path\\");
 
-      char root[MAX_PATH];
+      CPathBuffer root;
       int len = SalamanderGeneral->GetRootPath(root, "\\\\server\\share\\test\\path");
 
-      char path[MAX_PATH];
+      CPathBuffer path;
       strcpy(path, "\\\\server\\share\\test\\path");
       char *cutDir;
       BOOL b3 = SalamanderGeneral->CutDirectory(path, &cutDir);
       strcpy(path, "\\\\server\\share\\test\\path");
-      SalamanderGeneral->SalPathAppend(path, "new", MAX_PATH);
+      SalamanderGeneral->SalPathAppend(path, "new", path.Size());
       strcpy(path, "\\\\server\\share\\test\\path");
-      SalamanderGeneral->SalPathAddBackslash(path, MAX_PATH);
+      SalamanderGeneral->SalPathAddBackslash(path, path.Size());
       strcpy(path, "\\\\server\\share\\test\\path\\");
       SalamanderGeneral->SalPathRemoveBackslash(path);
       strcpy(path, "\\\\server\\share\\test\\file");
       SalamanderGeneral->SalPathStripPath(path);
       strcpy(path, "\\\\server\\share\\test\\file.ext");
-      SalamanderGeneral->SalPathAddExtension(path, ".txt", MAX_PATH);
+      SalamanderGeneral->SalPathAddExtension(path, ".txt", path.Size());
       SalamanderGeneral->SalPathRemoveExtension(path);
-      SalamanderGeneral->SalPathAddExtension(path, ".txt", MAX_PATH);
+      SalamanderGeneral->SalPathAddExtension(path, ".txt", path.Size());
       strcpy(path, "\\\\server\\share\\test\\file.ext");
-      SalamanderGeneral->SalPathRenameExtension(path, ".txt", MAX_PATH);
+      SalamanderGeneral->SalPathRenameExtension(path, ".txt", path.Size());
       strcpy(path, "\\\\server\\share\\test\\file.ext");
       const char *name = SalamanderGeneral->SalPathFindFileName(path);
 
       strcpy(path, "path\\ignore\\..\\.\\name");
       int errTextID;
-      char nextFocus[MAX_PATH];
+      CPathBuffer nextFocus;
       SalamanderGeneral->SalUpdateDefaultDir(TRUE);
       if (!SalamanderGeneral->SalGetFullName(path, &errTextID, "c:\\junk", nextFocus))
       {
@@ -253,7 +253,7 @@ CPluginInterfaceForMenuExt::ExecuteMenuItem(CSalamanderForOperationsAbstract* sa
       // test ViewFileInPluginViewer
 //      CSalamanderPluginViewerData viewerData;
       CSalamanderPluginInternalViewerData viewerData;
-      char fileNameBuf[MAX_PATH];
+      CPathBuffer fileNameBuf;
       viewerData.Size = sizeof(viewerData);
       viewerData.FileName = fileNameBuf;
       DWORD error;
@@ -283,7 +283,7 @@ CPluginInterfaceForMenuExt::ExecuteMenuItem(CSalamanderForOperationsAbstract* sa
       }
 */
         /*
-      char path[MAX_PATH];
+      CPathBuffer path;
       BOOL havePath = SalamanderGeneral->GetTargetDirectory(parent, parent, "Change Directory",
                                                             "Select the directory you want to visit.",
                                                             path, FALSE, "C:\\");
@@ -336,8 +336,8 @@ CPluginInterfaceForMenuExt::ExecuteMenuItem(CSalamanderForOperationsAbstract* sa
       else TRACE_I("Not all files and directories were processed! Processed part of selection has size of " << size.GetDouble() << " bytes.");
 */
         /*
-      char path[MAX_PATH];
-      lstrcpyn(path, "F:\\DRIVE_D", MAX_PATH);
+      CPathBuffer path;
+      lstrcpyn(path, "F:\\DRIVE_D", path.Size());
       CQuadWord total;
       CQuadWord space;
       SalamanderGeneral->GetDiskFreeSpace(&space, path, &total);
@@ -345,7 +345,7 @@ CPluginInterfaceForMenuExt::ExecuteMenuItem(CSalamanderForOperationsAbstract* sa
       DWORD a, b, donot_use_1, donot_use_2;
       if (SalamanderGeneral->SalGetDiskFreeSpace(path, &a, &b, &donot_use_1, &donot_use_2))
         TRACE_I("Disk parameters: " << a << ", " << b);
-      char rootOrCurReparsePoint[MAX_PATH];
+      CPathBuffer rootOrCurReparsePoint;
       char volumeNameBuffer[200];
       DWORD volumeSerialNumber;
       DWORD maximumComponentLength;
@@ -448,7 +448,7 @@ CPluginInterfaceForMenuExt::ExecuteMenuItem(CSalamanderForOperationsAbstract* sa
       res = SalamanderGeneral->RegSetStrCmpEx(s1, l1, s2, l2, &numericalyEqual);
 */
         /*
-      char fileComp[MAX_PATH];
+      CPathBuffer fileComp;
       BOOL ok;
       strcpy(fileComp, "prn");
       ok = SalamanderGeneral->SalIsValidFileNameComponent(fileComp);
