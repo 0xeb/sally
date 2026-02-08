@@ -575,6 +575,8 @@ void AddStrToStr(char* dstStr, int dstBufSize, const char* srcStr);
 // path that would cause problem in target path).
 char* BuildName(char* path, char* name, char* dosName = NULL, BOOL* skip = NULL, BOOL* skipAll = NULL,
                 const char* sourcePath = NULL);
+wchar_t* BuildNameW(const wchar_t* path, const wchar_t* name = NULL, BOOL* skip = NULL, BOOL* skipAll = NULL,
+                     const wchar_t* sourcePath = NULL);
 
 // Returns date+time from panel for file/directory 'f' (also handles dates+times provided by plugins - may not
 // be valid)

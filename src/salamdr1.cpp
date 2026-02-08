@@ -1068,6 +1068,70 @@ char* BuildName(char* path, char* name, char* dosName, BOOL* skip, BOOL* skipAll
     return txt;
 }
 
+// Wide version of BuildName: constructs full path from directory + name.
+// Returns malloc'd wchar_t* (caller must free) or NULL on error.
+// No DOS name fallback — wide paths support long names natively.
+wchar_t* BuildNameW(const wchar_t* path, const wchar_t* name, BOOL* skip, BOOL* skipAll, const wchar_t* sourcePath)
+{
+    if (skip != NULL)
+        *skip = FALSE;
+    int l1 = (int)wcslen(path);
+    int l2, len = l1;
+    if (name != NULL)
+    {
+        l2 = (int)wcslen(name);
+        len += l2;
+        if (path[l1 - 1] != L'\\')
+            len++;
+    }
+    if (len >= SAL_MAX_LONG_PATH)
+    {
+        wchar_t* text = (wchar_t*)malloc((len + 200) * sizeof(wchar_t));
+        if (text != NULL)
+        {
+            _snwprintf_s(text, len + 200, _TRUNCATE, L"%s: name too long for path %s", name, path);
+
+            if (skip != NULL)
+            {
+                if (skipAll == NULL || !*skipAll)
+                {
+                    PromptResult res = gPrompter->AskSkipSkipAllFocus(LoadStrW(IDS_ERRORTITLE), text);
+                    if (res.type == PromptResult::kSkip || res.type == PromptResult::kSkipAll)
+                        *skip = TRUE;
+                    if (res.type == PromptResult::kSkipAll && skipAll != NULL)
+                        *skipAll = TRUE;
+                    if (res.type == PromptResult::kFocus)
+                        MainWindow->PostFocusNameInPanel(PANEL_SOURCE, WideToAnsi(sourcePath).c_str(), WideToAnsi(name).c_str());
+                }
+                else
+                    *skip = TRUE;
+            }
+            else
+            {
+                gPrompter->ShowError(LoadStrW(IDS_ERRORTITLE), text);
+            }
+            free(text);
+        }
+        return NULL;
+    }
+    wchar_t* txt = (wchar_t*)malloc((len + 1) * sizeof(wchar_t));
+    if (txt == NULL)
+    {
+        TRACE_E(LOW_MEMORY);
+        return txt;
+    }
+    if (name != NULL)
+    {
+        memmove(txt, path, l1 * sizeof(wchar_t));
+        if (path[l1 - 1] != L'\\')
+            txt[l1++] = L'\\';
+        memmove(txt + l1, name, (l2 + 1) * sizeof(wchar_t));
+    }
+    else
+        memmove(txt, path, (l1 + 1) * sizeof(wchar_t));
+    return txt;
+}
+
 // ****************************************************************************
 
 BOOL HasTheSameRootPath(const char* path1, const char* path2)

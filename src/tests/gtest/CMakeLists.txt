@@ -296,3 +296,23 @@ add_test(NAME gtest_salgetfullname COMMAND gtest_salgetfullname)
 set_target_properties(gtest_salgetfullname PROPERTIES
     RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/tests"
 )
+
+# BuildNameW tests
+add_executable(gtest_buildname
+    gtest_buildname.cpp
+)
+
+target_compile_definitions(gtest_buildname PRIVATE
+    WIN32 _WINDOWS _CRT_SECURE_NO_WARNINGS
+)
+
+target_link_libraries(gtest_buildname
+    GTest::gtest
+    GTest::gtest_main
+)
+
+add_test(NAME gtest_buildname COMMAND gtest_buildname)
+
+set_target_properties(gtest_buildname PROPERTIES
+    RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/tests"
+)
