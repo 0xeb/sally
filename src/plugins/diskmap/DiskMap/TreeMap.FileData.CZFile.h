@@ -98,7 +98,7 @@ public:
     void LoadFileInfo(TCHAR* displayName, TCHAR* typeName)
     {
         SHFILEINFO shfi;
-        TCHAR path[2 * MAX_PATH + 1];
+        CPathBuffer path;
         //SHGetFileInfo(buff, 0, &shfi, sizeof(shfi), SHGFI_ICON | SHGFI_SHELLICONSIZE | SHGFI_DISPLAYNAME | SHGFI_TYPENAME);
         UINT flags = 0;
         if (displayName)
@@ -113,7 +113,7 @@ public:
         }
         if (flags)
         {
-            int len = (int)this->GetFullName(path, 2 * MAX_PATH);
+            int len = (int)this->GetFullName(path, path.Size());
             DWORD_PTR result = 0;
             if (len <= MAX_PATH)
             {

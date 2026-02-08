@@ -199,8 +199,8 @@ protected:
             CZFile* f = cs->GetFile();
             if (f != NULL)
             {
-                TCHAR buff[2 * MAX_PATH + 1];
-                f->GetFullName(buff, ARRAYSIZE(buff));
+                CPathBuffer buff;
+                f->GetFullName(buff, buff.Size());
                 int icmd = 0;
 #ifdef SALAMANDER
                 if (this->_connector->GetSalamander() != NULL)
@@ -360,8 +360,8 @@ protected:
         //this->_diskmap->GetParentDir()
         this->_tooltip->SetDirInfo(this->_diskmap->GetRootDir(), this->_diskmap->GetViewDir());
 
-        TCHAR buff[MAX_PATH];
-        this->_diskmap->GetSubDirName(buff, ARRAYSIZE(buff));
+        CPathBuffer buff;
+        this->_diskmap->GetSubDirName(buff, buff.Size());
         CZString s(buff);
         this->_connector->DL_SetSubPath(&s);
 
@@ -567,8 +567,8 @@ public:
                 CZFile* f = csel->GetFile();
                 if (f != NULL)
                 {
-                    TCHAR buff[2 * MAX_PATH + 1];
-                    f->GetFullName(buff, ARRAYSIZE(buff));
+                    CPathBuffer buff;
+                    f->GetFullName(buff, buff.Size());
                     return this->_shellmenu->InvokeDefaultCommand(buff);
                 }
             }

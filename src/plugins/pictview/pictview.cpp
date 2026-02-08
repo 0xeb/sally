@@ -1519,7 +1519,7 @@ BOOL InitEXIF(HWND hParent, BOOL bSilent)
         if (!bSilent)
         {
             TCHAR errText[2 * MAX_PATH];
-            _stprintf(errText, LoadStr(IDS_LOADEXIF), path);
+            _stprintf(errText, LoadStr(IDS_LOADEXIF), (const char*)path);
             SalamanderGeneral->SalMessageBox(hParent, errText, LoadStr(IDS_PLUGINNAME),
                                              MB_ICONEXCLAMATION | MB_OK);
         }

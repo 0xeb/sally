@@ -24,8 +24,8 @@ public:
 
     explicit CZString(CZFile* file)
     {
-        TCHAR buff[2 * MAX_PATH + 1];
-        this->_l = file->GetFullName(buff, ARRAYSIZE(buff));
+        CPathBuffer buff;
+        this->_l = file->GetFullName(buff, buff.Size());
         this->_s = (TCHAR*)malloc((this->_l + 1) * sizeof(TCHAR));
         _tcscpy(this->_s, buff);
     }

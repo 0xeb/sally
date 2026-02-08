@@ -539,9 +539,9 @@ protected:
     {
         if (this->_mouseNode >= NODEID_ROOT && this->_mouseNode <= NODEID_MAXP)
         {
-            TCHAR buff[MAX_PATH];
+            CPathBuffer buff;
             size_t plen = this->_nodes[this->_mouseNode].strpos;
-            size_t l = this->_path->GetSubString(0, plen, buff, ARRAYSIZE(buff));
+            size_t l = this->_path->GetSubString(0, plen, buff, buff.Size());
             if (l > 0)
             {
                 int icmd = 0;

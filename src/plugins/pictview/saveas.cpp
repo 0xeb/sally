@@ -805,7 +805,7 @@ BOOL CRendererWindow::OnFileSaveAs(LPCTSTR pInitDir)
                     // yes, it does -> make it lower-case like extension
                     _tcslwr(fileName + ofn.ofn.nFileOffset);
                 }
-                if ((ext - fileName) + strlen(s) < _countof(fileName))
+                if ((ext - fileName) + strlen(s) < (size_t)fileName.Size())
                     _tcscat(ext, s); // append the default suffix
                 else
                 {

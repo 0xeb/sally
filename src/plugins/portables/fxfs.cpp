@@ -180,7 +180,7 @@ namespace Fx
 
     BOOL WINAPI CFxPluginFSInterface::IsCurrentPath(int currentFSNameIndex, int fsNameIndex, const char* userPart)
     {
-        TCHAR currentPath[MAX_PATH];
+        CPathBuffer currentPath;
         BOOL ok = GetCurrentPath(currentPath);
         _ASSERTE(ok);
         return (currentFSNameIndex == fsNameIndex) &&
@@ -946,7 +946,7 @@ namespace Fx
     {
         // We only want up dirs for non-root paths.
         bool isRoot = false;
-        TCHAR rootPath[MAX_PATH];
+        CPathBuffer rootPath;
         if (GetRootPath(rootPath) && m_currentPath != nullptr)
         {
             isRoot = m_currentPath->Equals(rootPath);
@@ -972,8 +972,8 @@ namespace Fx
     {
         _ASSERTE(m_currentPath != nullptr);
         CFxPath* newPath = CreatePath(m_currentPath->GetString());
-        TCHAR cutComponent[MAX_PATH];
-        newPath->CutLastComponent(cutComponent, _countof(cutComponent));
+        CPathBuffer cutComponent;
+        newPath->CutLastComponent(cutComponent, cutComponent.Size());
         ChangeDirectory(newPath->GetString(), cutComponent);
         delete newPath;
     }
@@ -1006,7 +1006,7 @@ namespace Fx
         bool gotFSOk = !!SalamanderGeneral->GetPanelWithPluginFS(this, panel);
         _ASSERTE(gotFSOk);
 
-        TCHAR fsName[MAX_PATH];
+        CPathBuffer fsName;
         SalamanderGeneral->GetPluginFSName(fsName, 0);
 
         SalamanderGeneral->ChangePanelPathToPluginFS(

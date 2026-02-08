@@ -69,8 +69,8 @@ public:
     }
     static HICON LoadIconSync(CZFile* file, DWORD flags)
     {
-        TCHAR path[2 * MAX_PATH + 1];
-        file->GetFullName(path, ARRAYSIZE(path));
+        CPathBuffer path;
+        file->GetFullName(path, path.Size());
         return CZIconLoader::LoadIconSync(path, flags);
     }
     static HICON LoadIconSync(TCHAR* path, DWORD flags)

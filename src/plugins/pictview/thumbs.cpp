@@ -387,7 +387,7 @@ void UpdateThumbnails(CSalamanderForOperationsAbstract* Salamander)
 #endif
                             // SalamanderGeneral->SalGetTempFileName created the file
                             DeleteFile(newFile);
-                            _stprintf((char*)newFile, LoadStr(IDS_REGENERATE_THUMB_WRITEFILE), str ? str + 1 : path);
+                            _stprintf((char*)newFile, LoadStr(IDS_REGENERATE_THUMB_WRITEFILE), str ? str + 1 : (const char*)path);
                             SalamanderGeneral->ShowMessageBox(newFile, LoadStr(IDS_PLUGINNAME), MSGBOX_ERROR);
                         }
                         else

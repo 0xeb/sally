@@ -380,8 +380,8 @@ namespace Fx
     {
         // By default the configuration key is equal to the name of the plugin
         // module (without the extension).
-        TCHAR fileName[MAX_PATH];
-        DWORD cch = GetModuleFileName(FxGetModuleInstance(), fileName, _countof(fileName));
+        CPathBuffer fileName;
+        DWORD cch = GetModuleFileName(FxGetModuleInstance(), fileName, fileName.Size());
         _ASSERTE(cch > 0);
         PTSTR namePart = PathFindFileName(fileName);
         PTSTR ext = PathFindExtension(namePart);
