@@ -393,12 +393,14 @@ BOOL SalGetFullNameW(std::wstring& name, int* errTextID = NULL, const wchar_t* c
 // otherwise returns standard Windows error code or ERROR_USER_TERMINATED if user
 // used ESC key to interrupt the test
 DWORD SalCheckPath(BOOL echo, const char* path, DWORD err, BOOL postRefresh, HWND parent);
+DWORD SalCheckPathW(BOOL echo, const wchar_t* path, DWORD err, BOOL postRefresh, HWND parent);
 
 // Tries if path 'path' is accessible, optionally restores network connections using functions
 // CheckAndRestoreNetworkConnection and CheckAndConnectUNCNetworkPath; returns TRUE if
 // path is accessible; 'parent' is parent of messagebox; 'tryNet' is TRUE if it makes sense
 // to try to restore network connections
 BOOL SalCheckAndRestorePath(HWND parent, const char* path, BOOL tryNet);
+BOOL SalCheckAndRestorePathW(HWND parent, const wchar_t* path, BOOL tryNet);
 
 // Tries if path 'path' is accessible, optionally shortens it; if 'tryNet' is TRUE, optionally restores
 // network connections using CheckAndRestoreNetworkConnection and CheckAndConnectUNCNetworkPath functions

@@ -540,6 +540,21 @@ RETRY:
     return lastError;
 }
 
+// Wide wrapper: converts to ANSI and calls SalCheckPath.
+// The underlying implementation uses ANSI thread paths and UI dialogs.
+// Full wide conversion requires threading infrastructure changes.
+DWORD SalCheckPathW(BOOL echo, const wchar_t* path, DWORD err, BOOL postRefresh, HWND parent)
+{
+    std::string pathA = WideToAnsi(path);
+    return SalCheckPath(echo, pathA.c_str(), err, postRefresh, parent);
+}
+
+BOOL SalCheckAndRestorePathW(HWND parent, const wchar_t* path, BOOL tryNet)
+{
+    std::string pathA = WideToAnsi(path);
+    return SalCheckAndRestorePath(parent, pathA.c_str(), tryNet);
+}
+
 BOOL SalCheckAndRestorePath(HWND parent, const char* path, BOOL tryNet)
 {
     CALL_STACK_MESSAGE3("SalCheckAndRestorePath(, %s, %d)", path, tryNet);
