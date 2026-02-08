@@ -331,7 +331,7 @@ BOOL PackUniversalCompress(HWND parent, const char* command, TPackErrorTable* co
         }
         else
         {
-            if (GetShortPathName(name, namecnv, MAX_PATH) == 0)
+            if (GetShortPathName(name, namecnv, namecnv.Size()) == 0)
             {
                 char buffer[1000];
                 strcpy(buffer, "File: ");

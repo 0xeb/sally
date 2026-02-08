@@ -1192,7 +1192,7 @@ void CAssociations::ReadAssociations(BOOL showWaitWnd)
         { // open extension key
             if (ext[0] == '.' && HANDLES_Q(RegOpenKey(HKEY_CLASSES_ROOT, ext, &extKey)) == ERROR_SUCCESS)
             {
-                size = MAX_PATH; // getting association type
+                size = extType.Size(); // getting association type
                 iconLocation[0] = 0;
                 data.SetFlag(0);
                 data.SetIndexAll(-1);
@@ -1341,12 +1341,12 @@ void CAssociations::ReadAssociations(BOOL showWaitWnd)
                         if (WindowsVistaAndLater && HANDLES_Q(RegOpenKey(extKey, "OpenWithProgids", &openKey)) == ERROR_SUCCESS)
                         {
                             DWORD j = 0;
-                            size = MAX_PATH; // getting association type
+                            size = extType.Size(); // getting association type
                             while (RegEnumValue(openKey, j++, extType, (DWORD*)&size, NULL, NULL, NULL, NULL) == ERROR_SUCCESS)
                             { // sequentially enumerate all association types
                                 if (extType[0] != 0)
                                 {
-                                    extType[MAX_PATH - 1] = 0; // just to be sure (value may not be string type, then null-terminator may be missing)
+                                    extType[extType.Size() - 1] = 0; // just to be sure (value may not be string type, then null-terminator may be missing)
 
                                     if (GetIconFromAssocAux(TRUE, HKEY_CLASSES_ROOT, extType, (LONG)strlen(extType) + 1, data, iconLocation, type))
                                     {
@@ -1355,7 +1355,7 @@ void CAssociations::ReadAssociations(BOOL showWaitWnd)
                                         break;
                                     }
                                 }
-                                size = MAX_PATH; // getting association type
+                                size = extType.Size(); // getting association type
                             }
                             HANDLES(RegCloseKey(openKey));
                         }
