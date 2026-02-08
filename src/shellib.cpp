@@ -505,14 +505,14 @@ BOOL IsSimpleSelection(IDataObject* pDataObject, CDragDropOperData* namesList)
                                             int len;
                                             if ((len = WideCharToMultiByte(CP_ACP, 0, lastBackslash + 1,
                                                                            (int)(s - (lastBackslash + 1)), mulbyteName,
-                                                                           MAX_PATH, NULL, NULL)) == 0)
+                                                                           mulbyteName.Size(), NULL, NULL)) == 0)
                                             {
                                                 DWORD err = GetLastError();
                                                 TRACE_E("IsSimpleSelection(): WideCharToMultiByte: " << GetErrorText(err));
                                                 mulbyteName[0] = 0;
                                             }
                                             else
-                                                mulbyteName[min(MAX_PATH - 1, len)] = 0;
+                                                mulbyteName[min(mulbyteName.Size() - 1, len)] = 0;
                                             char* add = DupStr(mulbyteName);
                                             if (add != NULL)
                                             {
@@ -2451,8 +2451,8 @@ void ResolveNetHoodPath(char* path)
 
     if (tryTarget)
     {
-        lstrcpyn(name, path, MAX_PATH);
-        if (SalPathAppend(name, "target.lnk", MAX_PATH))
+        lstrcpyn(name, path, name.Size());
+        if (SalPathAppend(name, "target.lnk", name.Size()))
         {
             WIN32_FIND_DATA data;
             HANDLE find = SalFindFirstFileH(name, &data);
@@ -2474,7 +2474,7 @@ void ResolveNetHoodPath(char* path)
                         oleName[oleName.Size() - 1] = 0;
                         if (fileInt->Load(oleName, STGM_READ) == S_OK)
                         {
-                            if (link->GetPath(name, MAX_PATH, &data, SLGP_UNCPRIORITY) == NOERROR)
+                            if (link->GetPath(name, name.Size(), &data, SLGP_UNCPRIORITY) == NOERROR)
                             {                       // we don't use Resolve because it's not that critical here and would slow things down considerably
                                 strcpy(path, name); // eureka, finally we know where that link leads
                             }

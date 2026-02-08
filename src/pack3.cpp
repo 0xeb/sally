@@ -1284,7 +1284,7 @@ const char* WINAPI PackExpArcDosName(HWND msgParent, void* param)
                 {
                     HANDLES(CloseHandle(h));
                     strcpy(data->DOSTmpFile, path);
-                    BOOL ok = GetShortPathName(data->DOSTmpFile, buff2, MAX_PATH);
+                    BOOL ok = GetShortPathName(data->DOSTmpFile, buff2, buff2.Size());
                     DeleteFileA(gFileSystem, data->DOSTmpFile); // we no longer need the file (let the archiver create it)
                     if (!ok)
                     {

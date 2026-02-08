@@ -534,9 +534,9 @@ BOOL ExpandCommand2(HWND parent,
                 }
                 else
                 {
-                    SalPathAddBackslash(dosName, MAX_PATH);
+                    SalPathAddBackslash(dosName, dosName.Size());
                 }
-                SalPathAddBackslash(fileName, MAX_PATH);
+                SalPathAddBackslash(fileName, fileName.Size());
             }
 
             char expArguments[USRMNUARGS_MAXLEN];
@@ -845,7 +845,7 @@ MENU_TEMPLATE_ITEM MsgBoxButtons[] =
                 BOOL expandOK = ExpandCommand2(parent,
                                                cmdLine, USRMNUCMDLINE_MAXLEN,
                                                arguments, USRMNUARGS_MAXLEN, buildBat, // if we are running via a batch file, allow
-                                               initDir, MAX_PATH,                      // arguments will be inserted into cmdLine
+                                               initDir, initDir.Size(),                      // arguments will be inserted into cmdLine
                                                UserMenuItems->At(itemIndex),
                                                path, name, &fileNameUsed,
                                                userMenuAdvancedData,
@@ -2062,10 +2062,10 @@ void CMainWindow::PostFocusNameInPanel(int panel, const char* path, const char* 
     CFilesWindow* p = GetPanel(panel);
     if (p != NULL)
     {
-        static char pathBackup[MAX_PATH + 200];
-        static char nameBackup[MAX_PATH + 200];
-        lstrcpyn(pathBackup, path, MAX_PATH + 200);
-        lstrcpyn(nameBackup, name, MAX_PATH + 200);
-        PostMessage(p->HWindow, WM_USER_FOCUSFILE, (WPARAM)nameBackup, (LPARAM)pathBackup);
+        static CPathBuffer pathBackup; // Heap-allocated for long path support
+        static CPathBuffer nameBackup; // Heap-allocated for long path support
+        lstrcpyn(pathBackup, path, pathBackup.Size());
+        lstrcpyn(nameBackup, name, nameBackup.Size());
+        PostMessage(p->HWindow, WM_USER_FOCUSFILE, (WPARAM)nameBackup.Get(), (LPARAM)pathBackup.Get());
     }
 }
