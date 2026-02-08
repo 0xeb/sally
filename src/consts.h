@@ -195,6 +195,7 @@ BOOL FileNameInvalidForManualCreate(const char* path);
 // Trims spaces from beginning and end of name (CutWS or StripWS or CutWhiteSpace or StripWhiteSpace)
 // returns TRUE if trimming occurred
 BOOL CutSpacesFromBothSides(char* path);
+BOOL CutSpacesFromBothSidesW(wchar_t* path);
 
 // Trims spaces from beginning and spaces and dots from end of name, Explorer does this
 // and people insisted they want it too, see https://forum.altap.cz/viewtopic.php?f=16&t=5891
@@ -300,8 +301,11 @@ BOOL SalPathAppend(char* path, const char* name, int pathSize);
 // chars; returns TRUE if backslash fits after 'path'; if 'path' is empty, backslash is not added
 BOOL SalPathAddBackslash(char* path, int pathSize);
 void SalPathAppendW(std::wstring& path, const wchar_t* name);
+BOOL SalPathAppendW(wchar_t* path, const wchar_t* name, int pathSize);
 void SalPathAddBackslashW(std::wstring& path);
+BOOL SalPathAddBackslashW(wchar_t* path, int pathSize);
 void SalPathRemoveBackslashW(std::wstring& path);
+void SalPathRemoveBackslashW(wchar_t* path);
 void SalPathStripPathW(std::wstring& path);
 const wchar_t* SalPathFindFileNameW(const wchar_t* path);
 void SalPathRemoveExtensionW(std::wstring& path);
@@ -481,6 +485,12 @@ BOOL SalSplitGeneralPath(HWND parent, const char* title, const char* errorTitle,
                          char* path, char* afterRoot, char* secondPart, BOOL pathIsDir, BOOL backslashAtEnd,
                          const char* dirName, const char* curPath, char*& mask, char* newDirs,
                          SGP_IsTheSamePathF isTheSamePathF);
+
+typedef BOOL(WINAPI* SGP_IsTheSamePathWF)(const wchar_t* path1, const wchar_t* path2);
+BOOL SalSplitGeneralPathW(HWND parent, const wchar_t* title, const wchar_t* errorTitle, int selCount,
+                           wchar_t* path, wchar_t* afterRoot, wchar_t* secondPart, BOOL pathIsDir, BOOL backslashAtEnd,
+                           const wchar_t* dirName, const wchar_t* curPath, wchar_t*& mask, wchar_t* newDirs,
+                           SGP_IsTheSamePathWF isTheSamePathF);
 
 // Checks if string 'fileNameComponent' can be used as a name component
 // on Windows filesystem (handles strings longer than MAX_PATH-4 (4 = "C:\"

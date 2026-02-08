@@ -102,6 +102,28 @@ void SalPathAppendW(std::wstring& path, const wchar_t* name)
     }
 }
 
+// Raw-buffer overload for in-place path manipulation
+BOOL SalPathAppendW(wchar_t* path, const wchar_t* name, int pathSize)
+{
+    if (name == NULL)
+        return TRUE;
+    int l1 = (int)wcslen(path);
+    int l2 = (int)wcslen(name);
+    if (l1 > 0 && path[l1 - 1] != L'\\')
+    {
+        if (l1 + 1 + l2 + 1 > pathSize)
+            return FALSE;
+        path[l1++] = L'\\';
+    }
+    else
+    {
+        if (l1 + l2 + 1 > pathSize)
+            return FALSE;
+    }
+    memmove(path + l1, name, (l2 + 1) * sizeof(wchar_t));
+    return TRUE;
+}
+
 // Wide version - ensures path ends with backslash
 void SalPathAddBackslashW(std::wstring& path)
 {
@@ -109,11 +131,33 @@ void SalPathAddBackslashW(std::wstring& path)
         path += L'\\';
 }
 
+// Raw-buffer overload for in-place path manipulation
+BOOL SalPathAddBackslashW(wchar_t* path, int pathSize)
+{
+    int l = (int)wcslen(path);
+    if (l > 0 && path[l - 1] != L'\\')
+    {
+        if (l + 2 > pathSize)
+            return FALSE;
+        path[l] = L'\\';
+        path[l + 1] = 0;
+    }
+    return TRUE;
+}
+
 // Wide version - removes trailing backslash
 void SalPathRemoveBackslashW(std::wstring& path)
 {
     if (!path.empty() && path.back() == L'\\')
         path.pop_back();
+}
+
+// Raw-buffer overload for in-place path manipulation
+void SalPathRemoveBackslashW(wchar_t* path)
+{
+    int l = (int)wcslen(path);
+    if (l > 0 && path[l - 1] == L'\\')
+        path[l - 1] = 0;
 }
 
 // Wide version - strips path leaving just filename

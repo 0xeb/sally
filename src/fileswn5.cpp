@@ -1872,6 +1872,28 @@ BOOL CutSpacesFromBothSides(char* path)
     return ch;
 }
 
+BOOL CutSpacesFromBothSidesW(wchar_t* path)
+{
+    BOOL ch = FALSE;
+    wchar_t* n = path;
+    while (*n != 0 && *n <= L' ')
+        n++;
+    if (n > path)
+    {
+        memmove(path, n, (wcslen(n) + 1) * sizeof(wchar_t));
+        ch = TRUE;
+    }
+    n = path + wcslen(path);
+    while (n > path && (*(n - 1) <= L' '))
+        n--;
+    if (*n != 0)
+    {
+        *n = 0;
+        ch = TRUE;
+    }
+    return ch;
+}
+
 BOOL CutDoubleQuotesFromBothSides(char* path)
 {
     int len = (int)strlen(path);

@@ -15,6 +15,7 @@
 #include "ui/IPrompter.h"
 #include "common/unicode/helpers.h"
 #include "common/IFileSystem.h"
+#include "common/fsutil.h"
 
 CSystemPolicies SystemPolicies;
 
@@ -1184,6 +1185,202 @@ BOOL SalSplitGeneralPath(HWND parent, const char* title, const char* errorTitle,
             return FALSE;                                // back to copy/move dialog
         }
     }
+}
+
+// Wide version of SalSplitGeneralPath: splits target path into existing path + mask + new dirs.
+// All char* parameters replaced with wchar_t*. Uses IsTheSamePathW for path comparison.
+typedef BOOL(WINAPI* SGP_IsTheSamePathWF)(const wchar_t* path1, const wchar_t* path2);
+
+BOOL SalSplitGeneralPathW(HWND parent, const wchar_t* title, const wchar_t* errorTitle, int selCount,
+                           wchar_t* path, wchar_t* afterRoot, wchar_t* secondPart, BOOL pathIsDir, BOOL backslashAtEnd,
+                           const wchar_t* dirName, const wchar_t* curPath, wchar_t*& mask, wchar_t* newDirs,
+                           SGP_IsTheSamePathWF isTheSamePathF)
+{
+    mask = NULL;
+    wchar_t* tmpNewDirs = (wchar_t*)malloc(SAL_MAX_LONG_PATH * sizeof(wchar_t));
+    if (tmpNewDirs == NULL)
+    {
+        TRACE_E(LOW_MEMORY);
+        return FALSE;
+    }
+    tmpNewDirs[0] = 0;
+    if (newDirs != NULL)
+        newDirs[0] = 0;
+
+    BOOL result = FALSE;
+
+    if (pathIsDir) // existing part of path is a directory
+    {
+        if (*secondPart != 0) // there's also non-existent part of path
+        {
+            // analyze non-existent part of path - file/directory + mask?
+            wchar_t* s = secondPart;
+            BOOL hasMask = FALSE;
+            wchar_t* maskFrom = secondPart;
+            while (1)
+            {
+                while (*s != 0 && *s != L'?' && *s != L'*' && *s != L'\\')
+                    s++;
+                if (*s == L'\\')
+                    maskFrom = ++s;
+                else
+                {
+                    hasMask = (*s != 0);
+                    break;
+                }
+            }
+
+            if (maskFrom != secondPart) // there's some path before the mask
+            {
+                memcpy(tmpNewDirs, secondPart, (maskFrom - secondPart) * sizeof(wchar_t));
+                tmpNewDirs[maskFrom - secondPart] = 0;
+            }
+
+            if (hasMask)
+            {
+                // ensure splitting into path (ending with backslash) and mask
+                memmove(maskFrom + 1, maskFrom, (wcslen(maskFrom) + 1) * sizeof(wchar_t));
+                *maskFrom++ = 0;
+
+                mask = maskFrom;
+            }
+            else
+            {
+                if (!backslashAtEnd) // just name (mask without '*' and '?')
+                {
+                    if (selCount > 1 &&
+                        gPrompter->AskYesNo(title, LoadStrW(IDS_MOVECOPY_NONSENSE)).type != PromptResult::kYes)
+                    {
+                        free(tmpNewDirs);
+                        return FALSE; // back to copy/move dialog
+                    }
+
+                    // ensure splitting into path (ending with backslash) and mask
+                    memmove(maskFrom + 1, maskFrom, (wcslen(maskFrom) + 1) * sizeof(wchar_t));
+                    *maskFrom++ = 0;
+
+                    mask = maskFrom;
+                }
+                else // name with slash at end -> directory
+                {
+                    SalPathAppendW(tmpNewDirs, maskFrom, SAL_MAX_LONG_PATH);
+                    SalPathAddBackslashW(path, SAL_MAX_LONG_PATH);
+                    mask = path + wcslen(path) + 1;
+                    wcscpy(mask, L"*.*");
+                }
+            }
+            CutSpacesFromBothSidesW(mask);
+
+            if (tmpNewDirs[0] != 0) // still need to create those new directories
+            {
+                if (newDirs != NULL) // creation is supported
+                {
+                    wcscpy(newDirs, tmpNewDirs);
+                    memmove(tmpNewDirs, path, (secondPart - path) * sizeof(wchar_t));
+                    wcscpy(tmpNewDirs + (secondPart - path), newDirs);
+                    SalPathRemoveBackslashW(tmpNewDirs);
+
+                    if (Configuration.CnfrmCreatePath) // ask if path should be created
+                    {
+                        std::wstring msg = FormatStrW(LoadStrW(IDS_MOVECOPY_CREATEPATH), tmpNewDirs);
+                        bool dontShow = false;
+                        PromptResult res = gPrompter->AskYesNoWithCheckbox(title, msg.c_str(),
+                                                                           LoadStrW(IDS_MOVECOPY_CREATEPATH_CNFRM), &dontShow);
+                        Configuration.CnfrmCreatePath = !dontShow;
+                        if (res.type != PromptResult::kYes)
+                        {
+                            wchar_t* e = path + wcslen(path); // fix 'path' (join 'path' and 'mask')
+                            if (e > path && *(e - 1) != L'\\')
+                                *e++ = L'\\';
+                            if (e != mask)
+                                memmove(e, mask, (wcslen(mask) + 1) * sizeof(wchar_t));
+                            free(tmpNewDirs);
+                            return FALSE; // back to copy/move dialog
+                        }
+                    }
+                }
+                else
+                {
+                    gPrompter->ShowError(errorTitle, LoadStrW(IDS_TARGETPATHMUSTEXIST));
+                    wchar_t* e = path + wcslen(path); // fix 'path' (join 'path' and 'mask')
+                    if (e > path && *(e - 1) != L'\\')
+                        *e++ = L'\\';
+                    if (e != mask)
+                        memmove(e, mask, (wcslen(mask) + 1) * sizeof(wchar_t));
+                    free(tmpNewDirs);
+                    return FALSE; // back to copy/move dialog
+                }
+            }
+            result = TRUE; // exit Copy/Move dialog loop and go perform the operation
+        }
+        else // no non-existent part of path (specified path completely exists)
+        {
+            if (dirName != NULL && curPath != NULL &&
+                !backslashAtEnd && selCount <= 1) // no '\\' at end of path (force directory) + single source
+            {
+                wchar_t* name = path + wcslen(path);
+                while (name >= afterRoot && *(name - 1) != L'\\')
+                    name--;
+                if (name >= afterRoot && *name != 0)
+                {
+                    *(name - 1) = 0;
+                    if (_wcsicmp(dirName, name) == 0 &&
+                        (isTheSamePathF != NULL && isTheSamePathF(path, curPath) ||
+                         isTheSamePathF == NULL && IsTheSamePathW(path, curPath)))
+                    { // renaming directory to same name (except letter case, identity possible)
+                        // ensure splitting into path (ending with backslash) and mask
+                        memmove(name + 1, name, (wcslen(name) + 1) * sizeof(wchar_t));
+                        *(name - 1) = L'\\';
+                        *name++ = 0;
+
+                        mask = name;
+                        free(tmpNewDirs);
+                        return TRUE; // exit Copy/Move dialog loop and go perform the operation
+                    }
+                    *(name - 1) = L'\\';
+                }
+            }
+
+            // simple path target with universal mask
+            SalPathAddBackslashW(path, SAL_MAX_LONG_PATH);
+            mask = path + wcslen(path) + 1;
+            wcscpy(mask, L"*.*");
+            result = TRUE; // exit Copy/Move dialog loop and go perform the operation
+        }
+    }
+    else // file overwrite - 'secondPart' points to filename in path 'path'
+    {
+        wchar_t* nameEnd = secondPart;
+        while (*nameEnd != 0 && *nameEnd != L'\\')
+            nameEnd++;
+        if (*nameEnd == 0 && !backslashAtEnd) // renaming/overwriting existing file
+        {
+            if (selCount > 1 &&
+                gPrompter->AskYesNo(title, LoadStrW(IDS_MOVECOPY_NONSENSE)).type != PromptResult::kYes)
+            {
+                free(tmpNewDirs);
+                return FALSE; // back to copy/move dialog
+            }
+
+            // ensure splitting into path (ending with backslash) and mask
+            memmove(secondPart + 1, secondPart, (wcslen(secondPart) + 1) * sizeof(wchar_t));
+            *secondPart++ = 0;
+
+            mask = secondPart;
+            result = TRUE; // exit Copy/Move dialog loop and go perform the operation
+        }
+        else // path into archive? not possible here...
+        {
+            gPrompter->ShowError(errorTitle, LoadStrW(IDS_ARCPATHNOTSUPPORTED));
+            if (backslashAtEnd)
+                SalPathAddBackslashW(path, SAL_MAX_LONG_PATH);
+            free(tmpNewDirs);
+            return FALSE; // back to copy/move dialog
+        }
+    }
+
+    free(tmpNewDirs);
+    return result;
 }
 
 void MakeCopyWithBackslashIfNeeded(const char*& name, char (&nameCopy)[3 * MAX_PATH])
