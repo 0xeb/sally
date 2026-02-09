@@ -375,7 +375,7 @@ struct C__ClientServerInitData
     HANDLE HPipeSemaphore;
 };
 
-#define __SIZEOF_CLIENTSERVERINITDATA 16
+#define __SIZEOF_CLIENTSERVERINITDATA sizeof(C__ClientServerInitData)
 
 //****************************************************************************
 //
@@ -397,7 +397,7 @@ struct C__PipeDataHeader
     double Counter;          // precise counter in ms
 };
 
-#define __SIZEOF_PIPEDATAHEADER 48
+#define __SIZEOF_PIPEDATAHEADER sizeof(C__PipeDataHeader)
 
 // For Type == __mtSetProcessName
 // C__MessageType Type;              // message type

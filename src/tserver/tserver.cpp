@@ -534,7 +534,7 @@ unsigned __stdcall ConnectingThreadF(void* mainWndPtr)
     SetSecurityDescriptorDacl(sa.lpSecurityDescriptor, TRUE, 0, FALSE);
     SECURITY_ATTRIBUTES* saPtr = &sa;
 
-    HANDLE hFileMapping = HANDLES_Q(CreateFileMapping((HANDLE)0xFFFFFFFF,
+    HANDLE hFileMapping = HANDLES_Q(CreateFileMapping(INVALID_HANDLE_VALUE,
                                                       saPtr,
                                                       PAGE_READWRITE,
                                                       0, sizeof(C__ClientServerInitData),
@@ -578,7 +578,8 @@ unsigned __stdcall ConnectingThreadF(void* mainWndPtr)
 
         case WAIT_OBJECT_0 + 1: // data ready
         {
-            C__ClientServerInitData data = *((C__ClientServerInitData*)mapAddress);
+            C__ClientServerInitData* sharedData = (C__ClientServerInitData*)mapAddress;
+            C__ClientServerInitData data = *sharedData;
             if (data.Version == TRACE_SERVER_VERSION - 1 || // the client created the pipe and semaphore, we have to adopt them
                 data.Version == TRACE_SERVER_VERSION - 3)   // old client, let it connect (but without __mtIgnoreAutoClear)
             {
@@ -630,7 +631,7 @@ unsigned __stdcall ConnectingThreadF(void* mainWndPtr)
 
                         WaitForSingleObject(ContinueEvent, INFINITE);
 
-                        *((BOOL*)mapAddress) = TRUE; // write the result
+                        sharedData->Version = TRUE; // write the result
                     }
                     else
                     {
@@ -638,7 +639,7 @@ unsigned __stdcall ConnectingThreadF(void* mainWndPtr)
                         HANDLES(CloseHandle(pipeSemaphore));
                         PostMessage(mainWnd, WM_USER_SHOWERROR,
                                     EC_CANNOT_CREATE_READ_PIPE_THREAD, 0);
-                        *((BOOL*)mapAddress) = FALSE; // write the result
+                        sharedData->Version = FALSE; // write the result
                     }
                 }
                 else
@@ -647,7 +648,7 @@ unsigned __stdcall ConnectingThreadF(void* mainWndPtr)
                         HANDLES(CloseHandle(readPipe));
                     if (pipeSemaphore != NULL)
                         HANDLES(CloseHandle(pipeSemaphore));
-                    *((BOOL*)mapAddress) = FALSE; // write the result -> it failed
+                    sharedData->Version = FALSE; // write the result -> it failed
                 }
                 if (clientProcess != NULL)
                     HANDLES(CloseHandle(clientProcess));
@@ -670,26 +671,25 @@ unsigned __stdcall ConnectingThreadF(void* mainWndPtr)
                     SetSecurityDescriptorDacl(sa.lpSecurityDescriptor, TRUE, 0, FALSE);
                     SECURITY_ATTRIBUTES* saPtr = &sa;
 
-                    C__ClientServerInitData* dataWr = (C__ClientServerInitData*)mapAddress;
                     HANDLE pipeSemaphore = HANDLES(CreateSemaphore(saPtr, __PIPE_SIZE, __PIPE_SIZE, NULL));
                     HANDLE readPipe = NULL;
                     HANDLE writePipe = NULL;
                     if (pipeSemaphore != NULL && HANDLES(CreatePipe(&readPipe, &writePipe, saPtr, __PIPE_SIZE * 1024)))
                     {
                         // write into shared memory the handle for writing to the pipe (for the client)
-                        dataWr->Version = TRUE;                                  // BOOL value: TRUE = we have a pipe
-                        dataWr->ClientOrServerProcessId = GetCurrentProcessId(); // here it is the server PID
-                        dataWr->HReadOrWritePipe = writePipe;
-                        dataWr->HPipeSemaphore = pipeSemaphore;
+                        sharedData->Version = TRUE;                                  // BOOL value: TRUE = we have a pipe
+                        sharedData->ClientOrServerProcessId = GetCurrentProcessId(); // here it is the server PID
+                        sharedData->HReadOrWritePipe = writePipe;
+                        sharedData->HPipeSemaphore = pipeSemaphore;
 
                         SetEvent(ConnectDataAcceptedEvent); // hand data to the client, the results are stored
                         ConnectDataAcceptedEventMayBeSignaled = TRUE;
 
                         // wait until the server processes the data
                         DWORD waitRet = WaitForSingleObject(ConnectDataReadyEvent, __COMMUNICATION_WAIT_TIMEOUT);
-                        if (waitRet == WAIT_OBJECT_0 && dataWr->Version == 3 /* 3 = success, the client took the handles */) // look at the result from the client
+                        if (waitRet == WAIT_OBJECT_0 && sharedData->Version == 3 /* 3 = success, the client took the handles */) // look at the result from the client
                         {
-                            DWORD clientPID = dataWr->ClientOrServerProcessId; /* client PID */
+                            DWORD clientPID = sharedData->ClientOrServerProcessId; /* client PID */
                             BOOL newProcess = IsReadPipeThreadForNewProcess(clientPID);
                             unsigned threadID;
                             CReadPipeData readPipeData;
@@ -723,7 +723,7 @@ unsigned __stdcall ConnectingThreadF(void* mainWndPtr)
                                 ResumeThread(thread); // start readPipeThread
 
                                 WaitForSingleObject(ContinueEvent, INFINITE);
-                                dataWr->Version = 2; // 2 = thread started successfully, communication established!
+                                sharedData->Version = 2; // 2 = thread started successfully, communication established!
 
                                 readPipe = NULL; // clear these variables so the handles do not get closed (already used in the thread)
                                 pipeSemaphore = NULL;
@@ -731,12 +731,12 @@ unsigned __stdcall ConnectingThreadF(void* mainWndPtr)
                             else
                             {
                                 PostMessage(mainWnd, WM_USER_SHOWERROR, EC_CANNOT_CREATE_READ_PIPE_THREAD, 0);
-                                dataWr->Version = FALSE; // BOOL value: FALSE = report failure, end of communication
+                                sharedData->Version = FALSE; // BOOL value: FALSE = report failure, end of communication
                             }
                         }
                     }
                     else
-                        dataWr->Version = FALSE; // BOOL value: FALSE = report failure, end of communication
+                        sharedData->Version = FALSE; // BOOL value: FALSE = report failure, end of communication
                     if (readPipe != NULL)
                         HANDLES(CloseHandle(readPipe));
                     if (writePipe != NULL)
@@ -746,7 +746,7 @@ unsigned __stdcall ConnectingThreadF(void* mainWndPtr)
                 }
                 else
                 {
-                    *((BOOL*)mapAddress) = FALSE; // write the result -> it failed
+                    sharedData->Version = FALSE; // write the result -> it failed
                     PostMessage(mainWnd, WM_USER_INCORRECT_VERSION,
                                 data.Version, data.ClientOrServerProcessId);
                 }

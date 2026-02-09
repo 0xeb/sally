@@ -514,7 +514,7 @@ BOOL C__Trace::Connect(BOOL onUserRequest)
                 {
                     // map shared memory
                     char* mapAddress;
-                    mapAddress = (char*)MapViewOfFile(hFileMapping, FILE_MAP_ALL_ACCESS, // FIXME_X64 are we not passing x86/x64 incompatible data?
+                    mapAddress = (char*)MapViewOfFile(hFileMapping, FILE_MAP_ALL_ACCESS,
                                                       0, 0, __SIZEOF_CLIENTSERVERINITDATA);
                     if (mapAddress != NULL)
                     {
@@ -537,10 +537,11 @@ BOOL C__Trace::Connect(BOOL onUserRequest)
                             {
                                 // write handle for reading from pipe to shared memory
                                 int expectedServerVer = TRACE_CLIENT_VERSION;
-                                *(int*)&mapAddress[0] = expectedServerVer - 1;               // Version (try oldest connection method first)
-                                *(DWORD*)&mapAddress[4] = GetCurrentProcessId();             // ClientOrServerProcessId (here it is client PID)
-                                *(DWORD*)&mapAddress[8] = (DWORD)(DWORD_PTR)HReadPipe;       // HReadOrWritePipe (here it is HReadPipe)
-                                *(DWORD*)&mapAddress[12] = (DWORD)(DWORD_PTR)HPipeSemaphore; // HPipeSemaphore
+                                C__ClientServerInitData* initData = (C__ClientServerInitData*)mapAddress;
+                                initData->Version = expectedServerVer - 1;               // try oldest connection method first
+                                initData->ClientOrServerProcessId = GetCurrentProcessId();
+                                initData->HReadOrWritePipe = HReadPipe;
+                                initData->HPipeSemaphore = HPipeSemaphore;
 
                                 // open hReadyEvent
                                 HANDLE hReadyEvent;
@@ -564,7 +565,7 @@ BOOL C__Trace::Connect(BOOL onUserRequest)
                                             const char* oldTraceServerA = "Disconnecting: this is not Unicode version of Trace Server.";
 
                                             // check the result from server
-                                            if (*((BOOL*)mapAddress) == TRUE)
+                                            if (initData->Version == TRUE)
                                             {
                                                 if (expectedServerVer == TRACE_CLIENT_VERSION) // great, successfully connected to new Trace Server!
                                                 {
@@ -580,35 +581,35 @@ BOOL C__Trace::Connect(BOOL onUserRequest)
                                             else // failed: try to create pipe on server side
                                             {
                                                 // write new version to shared memory, thus asking server to send handle for writing to pipe
-                                                *(int*)&mapAddress[0] = expectedServerVer; // Version
+                                                initData->Version = expectedServerVer; // Version
 
                                                 SetEvent(hReadyEvent); // tell server I have prepared data
 
                                                 // wait for server to process data
                                                 waitRet = WaitForSingleObject(hAcceptedEvent, __COMMUNICATION_WAIT_TIMEOUT);
-                                                if (waitRet == WAIT_OBJECT_0 && *((BOOL*)mapAddress) == TRUE) // check the result from server
+                                                if (waitRet == WAIT_OBJECT_0 && initData->Version == TRUE) // check the result from server
                                                 {
                                                     HANDLE hWritePipeFromSrv = NULL;
                                                     HANDLE hPipeSemaphoreFromSrv = NULL;
 
                                                     // obtain server process handle
                                                     HANDLE hServerProcess = OpenProcess(PROCESS_DUP_HANDLE, FALSE,
-                                                                                        *(DWORD*)&mapAddress[4] /* ClientOrServerProcessId (here it is server PID) */);
+                                                                                        initData->ClientOrServerProcessId /* here it is server PID */);
                                                     // obtain pipe and semaphore handles
                                                     if (hServerProcess != NULL &&
-                                                        DuplicateHandle(hServerProcess, (HANDLE)(DWORD_PTR)(*(DWORD*)&mapAddress[8]) /* HReadOrWritePipe (here it is HWritePipe) */, // server
-                                                                        GetCurrentProcess(), &hWritePipeFromSrv,                                                                     // client
+                                                        DuplicateHandle(hServerProcess, initData->HReadOrWritePipe /* here it is HWritePipe */, // server
+                                                                        GetCurrentProcess(), &hWritePipeFromSrv,                                // client
                                                                         GENERIC_WRITE, FALSE, 0) &&
-                                                        DuplicateHandle(hServerProcess, (HANDLE)(DWORD_PTR)(*(DWORD*)&mapAddress[12]) /* HPipeSemaphore */, // server
+                                                        DuplicateHandle(hServerProcess, initData->HPipeSemaphore, // server
                                                                         GetCurrentProcess(), &hPipeSemaphoreFromSrv,                                        // client
                                                                         0, FALSE, DUPLICATE_SAME_ACCESS))
                                                     {
-                                                        *((int*)mapAddress) = 3;                         // write result -> 3 = succeeded, we have handles
-                                                        *(DWORD*)&mapAddress[4] = GetCurrentProcessId(); // ClientOrServerProcessId (here it is client PID)
+                                                        initData->Version = 3;                                   // write result -> 3 = succeeded, we have handles
+                                                        initData->ClientOrServerProcessId = GetCurrentProcessId(); // here it is client PID
                                                     }
                                                     else
                                                     {
-                                                        *((BOOL*)mapAddress) = FALSE; // write result -> failed
+                                                        initData->Version = FALSE; // write result -> failed
                                                     }
                                                     if (hServerProcess != NULL)
                                                         CloseHandle(hServerProcess);
@@ -619,7 +620,7 @@ BOOL C__Trace::Connect(BOOL onUserRequest)
                                                     // on failure: tell server it failed, return failure again
                                                     waitRet = WaitForSingleObject(hAcceptedEvent, __COMMUNICATION_WAIT_TIMEOUT);
                                                     if (waitRet == WAIT_OBJECT_0 && // check the result from server
-                                                        *((int*)mapAddress) == 2 /* 2 = reading thread successfully started in server */)
+                                                        initData->Version == 2 /* 2 = reading thread successfully started in server */)
                                                     {
                                                         CloseHandle(HPipeSemaphore);
                                                         HPipeSemaphore = hPipeSemaphoreFromSrv; // use semaphore from server (close client one)
@@ -652,7 +653,7 @@ BOOL C__Trace::Connect(BOOL onUserRequest)
                                                     {
                                                         expectedServerVer = TRACE_CLIENT_VERSION - 2; // now try older server version
                                                         // write version to shared memory that old server version supports
-                                                        *(int*)&mapAddress[0] = expectedServerVer - 1; // Version
+                                                        initData->Version = expectedServerVer - 1; // Version
                                                         continue;
                                                     }
                                                 }
