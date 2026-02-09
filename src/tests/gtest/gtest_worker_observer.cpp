@@ -25,7 +25,7 @@ struct CProgressData
     const char* Target;
 };
 
-#include "../../common/TestWorkerObserver.h"
+#include "TestWorkerObserver.h"
 
 // ============================================================================
 // Basic observer behavior
