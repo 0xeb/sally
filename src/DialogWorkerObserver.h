@@ -100,6 +100,11 @@ public:
         return AskFileError(LoadStr(titleId), fileName, GetErrorText(win32Error));
     }
 
+    int AskFileErrorByIds(int titleId, const char* fileName, int errorTextId) override
+    {
+        return AskFileError(LoadStr(titleId), fileName, LoadStr(errorTextId));
+    }
+
     int AskOverwrite(const char* sourceName, const char* sourceInfo,
                      const char* targetName, const char* targetInfo) override
     {
@@ -127,6 +132,11 @@ public:
         return ret;
     }
 
+    int AskHiddenOrSystemById(int titleId, const char* fileName, int actionId) override
+    {
+        return AskHiddenOrSystem(LoadStr(titleId), fileName, LoadStr(actionId));
+    }
+
     int AskCannotMove(const char* errorText, const char* fileName,
                       const char* destPath, bool isDirectory) override
     {
@@ -140,6 +150,12 @@ public:
         return ret;
     }
 
+    int AskCannotMoveErr(const char* sourceName, const char* targetName,
+                         DWORD win32Error, bool isDirectory) override
+    {
+        return AskCannotMove(sourceName, targetName, GetErrorText(win32Error), isDirectory);
+    }
+
     void NotifyError(const char* title, const char* fileName, const char* errorText) override
     {
         char* data[3];
@@ -147,6 +163,11 @@ public:
         data[1] = const_cast<char*>(fileName);
         data[2] = const_cast<char*>(errorText);
         SendMessage(m_hProgressDlg, WM_USER_DIALOG, 5, (LPARAM)data);
+    }
+
+    void NotifyErrorById(int titleId, const char* fileName, int detailId) override
+    {
+        NotifyError(LoadStr(titleId), fileName, LoadStr(detailId));
     }
 
     int AskADSReadError(const char* fileName, const char* adsName) override
@@ -185,6 +206,11 @@ public:
         data[3] = const_cast<char*>(errorText);
         SendMessage(m_hProgressDlg, WM_USER_DIALOG, 8, (LPARAM)data);
         return ret;
+    }
+
+    int AskADSOpenErrorById(int titleId, const char* fileName, DWORD win32Error) override
+    {
+        return AskADSOpenError(LoadStr(titleId), fileName, GetErrorText(win32Error));
     }
 
     int AskSetAttrsError(const char* fileName, DWORD failedAttrs, DWORD currentAttrs) override

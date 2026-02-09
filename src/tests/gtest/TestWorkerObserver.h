@@ -243,6 +243,17 @@ public:
         return ret;
     }
 
+    int AskFileErrorByIds(int titleId, const char* fileName, int errorTextId) override
+    {
+        int ret = PolicyToReturnValue(m_fileErrorPolicy);
+        char buf[64];
+        wsprintfA(buf, "IDS_%d/IDS_%d", titleId, errorTextId);
+        m_calls.push_back({TestObserverCall::kAskFileError,
+                           fileName ? fileName : "",
+                           buf, ret});
+        return ret;
+    }
+
     int AskOverwrite(const char* sourceName, const char* sourceInfo,
                      const char* targetName, const char* targetInfo) override
     {
@@ -262,6 +273,14 @@ public:
         return ret;
     }
 
+    int AskHiddenOrSystemById(int titleId, const char* fileName, int actionId) override
+    {
+        int ret = PolicyToReturnValue(m_hiddenSystemPolicy);
+        m_calls.push_back({TestObserverCall::kAskHiddenOrSystem,
+                           fileName ? fileName : "", {}, ret});
+        return ret;
+    }
+
     int AskCannotMove(const char* errorText, const char* fileName,
                       const char* destPath, bool isDirectory) override
     {
@@ -271,12 +290,30 @@ public:
         return ret;
     }
 
+    int AskCannotMoveErr(const char* sourceName, const char* targetName,
+                         DWORD win32Error, bool isDirectory) override
+    {
+        int ret = PolicyToReturnValue(m_cannotMovePolicy);
+        m_calls.push_back({TestObserverCall::kAskCannotMove,
+                           sourceName ? sourceName : "", {}, ret});
+        return ret;
+    }
+
     void NotifyError(const char* title, const char* fileName,
                      const char* errorText) override
     {
         m_calls.push_back({TestObserverCall::kNotifyError,
                            fileName ? fileName : "",
                            errorText ? errorText : "", 0});
+    }
+
+    void NotifyErrorById(int titleId, const char* fileName, int detailId) override
+    {
+        char buf[64];
+        wsprintfA(buf, "IDS_%d/IDS_%d", titleId, detailId);
+        m_calls.push_back({TestObserverCall::kNotifyError,
+                           fileName ? fileName : "",
+                           buf, 0});
     }
 
     int AskADSReadError(const char* fileName, const char* adsName) override
@@ -298,6 +335,14 @@ public:
 
     int AskADSOpenError(const char* fileName, const char* adsName,
                         const char* errorText) override
+    {
+        int ret = PolicyToReturnValue(m_fileErrorPolicy);
+        m_calls.push_back({TestObserverCall::kAskADSOpenError,
+                           fileName ? fileName : "", {}, ret});
+        return ret;
+    }
+
+    int AskADSOpenErrorById(int titleId, const char* fileName, DWORD win32Error) override
     {
         int ret = PolicyToReturnValue(m_fileErrorPolicy);
         m_calls.push_back({TestObserverCall::kAskADSOpenError,

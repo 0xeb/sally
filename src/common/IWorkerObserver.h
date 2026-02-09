@@ -68,6 +68,9 @@ public:
     // observer handles localization (LoadStr / GetErrorText).
     virtual int AskFileErrorById(int titleId, const char* fileName, DWORD win32Error) = 0;
 
+    // Variant where both title and error text are string resource IDs.
+    virtual int AskFileErrorByIds(int titleId, const char* fileName, int errorTextId) = 0;
+
     // --- Overwrite confirmation (message ID 1) ---
     // Ask whether to overwrite a file. Shows source and target info.
     // Returns IDYES, IDB_ALL (yes to all), IDB_SKIP, IDB_SKIPALL, IDCANCEL.
@@ -79,15 +82,25 @@ public:
     virtual int AskHiddenOrSystem(const char* title, const char* fileName,
                                   const char* actionText) = 0;
 
+    // ID-based variant — worker passes IDS_* constants, observer handles localization.
+    virtual int AskHiddenOrSystemById(int titleId, const char* fileName, int actionId) = 0;
+
     // --- Cannot move/rename (message IDs 3, 4) ---
     // Returns IDRETRY, IDB_SKIP, IDB_SKIPALL, IDCANCEL.
     virtual int AskCannotMove(const char* errorText, const char* fileName,
                               const char* destPath, bool isDirectory) = 0;
 
+    // Variant with Win32 error code — observer formats error text.
+    virtual int AskCannotMoveErr(const char* sourceName, const char* targetName,
+                                 DWORD win32Error, bool isDirectory) = 0;
+
     // --- Simple error notification (message ID 5) ---
     // Informational only — no return value expected.
     virtual void NotifyError(const char* title, const char* fileName,
                              const char* errorText) = 0;
+
+    // ID-based variant — worker passes IDS_* constants, observer handles localization.
+    virtual void NotifyErrorById(int titleId, const char* fileName, int detailId) = 0;
 
     // --- ADS read error (message ID 6) ---
     // Returns IDB_SKIP, IDB_SKIPALL, IDB_IGNORE, IDB_ALL (ignore all), IDCANCEL.
@@ -102,6 +115,9 @@ public:
     // Returns IDRETRY, IDB_SKIP, IDB_SKIPALL, IDB_IGNORE, IDB_ALL (ignore all), IDCANCEL.
     virtual int AskADSOpenError(const char* fileName, const char* adsName,
                                 const char* errorText) = 0;
+
+    // ID-based variant — worker passes IDS_* constant + Win32 error code.
+    virtual int AskADSOpenErrorById(int titleId, const char* fileName, DWORD win32Error) = 0;
 
     // --- Error setting attributes (message ID 9) ---
     // Returns IDRETRY, IDB_SKIP, IDB_SKIPALL, IDB_IGNORE, IDB_ALL (ignore all), IDCANCEL.

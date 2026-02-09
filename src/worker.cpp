@@ -2050,7 +2050,7 @@ DWORD MyEncryptFile(IWorkerObserver& observer, char* fileName, DWORD attrs, DWOR
                 return retEnc;
 
             int ret = IDCANCEL;
-            ret = observer.AskHiddenOrSystem(LoadStr(IDS_CONFIRMSFILEENCRYPT), fileName, LoadStr(IDS_ENCRYPTSFILE));
+            ret = observer.AskHiddenOrSystemById(IDS_CONFIRMSFILEENCRYPT, fileName, IDS_ENCRYPTSFILE);
             switch (ret)
             {
             case IDB_ALL:
@@ -2322,7 +2322,7 @@ DWORD MyEncryptFileW(IWorkerObserver& observer, const wchar_t* fileName, const c
                 return retEnc;
 
             int ret = IDCANCEL;
-            ret = observer.AskHiddenOrSystem(LoadStr(IDS_CONFIRMSFILEENCRYPT), fileNameA, LoadStr(IDS_ENCRYPTSFILE));
+            ret = observer.AskHiddenOrSystemById(IDS_CONFIRMSFILEENCRYPT, fileNameA, IDS_ENCRYPTSFILE);
             switch (ret)
             {
             case IDB_ALL:
@@ -3264,7 +3264,7 @@ COPY_ADS_AGAIN:
                             WideCharToMultiByte(CP_ACP, 0, tgtName, -1, nameBuf, nameBuf.Size(), NULL, NULL);
                             nameBuf[nameBuf.Size() - 1] = 0;
                             CutADSNameSuffix(nameBuf);
-                            ret = observer.AskADSOpenError(LoadStr(IDS_ERROROPENINGADS), nameBuf, GetErrorText(err));
+                            ret = observer.AskADSOpenErrorById(IDS_ERROROPENINGADS, nameBuf, err);
                             switch (ret)
                             {
                             case IDRETRY:
@@ -4384,7 +4384,7 @@ BOOL CCopy_Context::HandleReadingErr(int blkIndex, DWORD err, BOOL* copyError, B
         }
         else
         {
-            ret = Observer->AskFileError(LoadStr(IDS_ERRORREADINGFILE), Op->SourceName, GetErrorText(err));
+            ret = Observer->AskFileErrorById(IDS_ERRORREADINGFILE, Op->SourceName, err);
         }
         CancelOpPhase2(blkIndex);
         BOOL errAgain = FALSE;
@@ -4505,7 +4505,7 @@ BOOL CCopy_Context::HandleWritingErr(int blkIndex, DWORD err, BOOL* copyError, B
         }
 
         int ret = IDCANCEL;
-        ret = Observer->AskFileError(LoadStr(IDS_ERRORWRITINGFILE), Op->TargetName, GetErrorText(err));
+        ret = Observer->AskFileErrorById(IDS_ERRORWRITINGFILE, Op->TargetName, err);
         CancelOpPhase2(blkIndex);
         BOOL errAgain = FALSE;
         switch (ret)
@@ -5293,7 +5293,7 @@ COPY_AGAIN:
 
                         int ret;
                         ret = IDCANCEL;
-                        ret = observer.AskADSOpenError(LoadStr(IDS_ERRORGETTINGFILETIME), op->SourceName, GetErrorText(err));
+                        ret = observer.AskADSOpenErrorById(IDS_ERRORGETTINGFILETIME, op->SourceName, err);
                         switch (ret)
                         {
                         case IDRETRY:
@@ -5374,7 +5374,7 @@ COPY_AGAIN:
 
                                 int ret;
                                 ret = IDCANCEL;
-                                ret = observer.AskADSOpenError(LoadStr(IDS_ERRORSETTINGFILETIME), op->TargetName, GetErrorText(err));
+                                ret = observer.AskADSOpenErrorById(IDS_ERRORSETTINGFILETIME, op->TargetName, err);
                                 switch (ret)
                                 {
                                 case IDRETRY:
@@ -5668,7 +5668,7 @@ COPY_AGAIN:
                                         goto SKIP_OPEN;
 
                                     int ret = IDCANCEL;
-                                    ret = observer.AskHiddenOrSystem(LoadStr(IDS_CONFIRMFILEOVERWRITING), op->TargetName, LoadStr(IDS_WANTOVERWRITESHFILE));
+                                    ret = observer.AskHiddenOrSystemById(IDS_CONFIRMFILEOVERWRITING, op->TargetName, IDS_WANTOVERWRITESHFILE);
                                     switch (ret)
                                     {
                                     case IDB_ALL:
@@ -5869,7 +5869,7 @@ COPY_AGAIN:
 
                             int ret;
                             ret = IDCANCEL;
-                            ret = observer.AskFileError(LoadStr(errDeletingFile ? IDS_ERRORDELETINGFILE : IDS_ERROROPENINGFILE), op->TargetName, GetErrorText(err));
+                            ret = observer.AskFileErrorById(errDeletingFile ? IDS_ERRORDELETINGFILE : IDS_ERROROPENINGFILE, op->TargetName, err);
                             switch (ret)
                             {
                             case IDRETRY:
@@ -6310,7 +6310,7 @@ BOOL DoMoveFile(COperation* op, IWorkerObserver& observer, void* buffer,
                                 goto SKIP_OPEN;
 
                             int ret = IDCANCEL;
-                            ret = observer.AskHiddenOrSystem(LoadStr(IDS_CONFIRMFILEOVERWRITING), op->TargetName, LoadStr(IDS_WANTOVERWRITESHFILE));
+                            ret = observer.AskHiddenOrSystemById(IDS_CONFIRMFILEOVERWRITING, op->TargetName, IDS_WANTOVERWRITESHFILE);
                             switch (ret)
                             {
                             case IDB_ALL:
@@ -6396,7 +6396,7 @@ BOOL DoMoveFile(COperation* op, IWorkerObserver& observer, void* buffer,
                     {
                         int ret;
                         ret = IDCANCEL;
-                        ret = observer.AskCannotMove(op->SourceName, op->TargetName, GetErrorText(err), dir != FALSE);
+                        ret = observer.AskCannotMoveErr(op->SourceName, op->TargetName, err, dir != FALSE);
                         switch (ret)
                         {
                         case IDRETRY:
@@ -6497,7 +6497,7 @@ BOOL DoDeleteFile(IWorkerObserver& observer, char* name, const CQuadWord& size, 
                         goto SKIP_DELETE;
 
                     int ret = IDCANCEL;
-                    ret = observer.AskHiddenOrSystem(LoadStr(IDS_CONFIRMSHFILEDELETE), name, LoadStr(IDS_DELETESHFILE));
+                    ret = observer.AskHiddenOrSystemById(IDS_CONFIRMSHFILEDELETE, name, IDS_DELETESHFILE);
                     switch (ret)
                     {
                     case IDB_ALL:
@@ -7066,7 +7066,7 @@ BOOL DoCreateDir(IWorkerObserver& observer, char* name, DWORD attr,
                     goto SKIP_CREATE_ERROR;
 
                 int ret = IDCANCEL;
-                ret = observer.AskFileError(LoadStr(IDS_ERRORCREATINGDIR), name, LoadStr(IDS_NAMEALREADYUSED));
+                ret = observer.AskFileErrorByIds(IDS_ERRORCREATINGDIR, name, IDS_NAMEALREADYUSED);
                 switch (ret)
                 {
                 case IDRETRY:
@@ -7744,7 +7744,7 @@ CONVERT_AGAIN:
                                             return TRUE;
 
                                         int ret = IDCANCEL;
-                                        ret = observer.AskCannotMove(tmpFileName, name, GetErrorText(err), false);
+                                        ret = observer.AskCannotMoveErr(tmpFileName, name, err, false);
                                         switch (ret)
                                         {
                                         case IDRETRY:
@@ -7930,14 +7930,14 @@ BOOL DoChangeAttrs(IWorkerObserver& observer, char* name, const CQuadWord& size,
         DWORD error = ERROR_SUCCESS;
         BOOL showCompressErr = FALSE;
         BOOL showEncryptErr = FALSE;
-        char* errTitle = NULL;
+        int errTitleId = 0;
         if (changeCompression && (attrs & FILE_ATTRIBUTE_COMPRESSED) == 0)
         {
             error = !nameW.empty() ? UncompressFileW(nameW.c_str(), fileAttr)
                                    : UncompressFile(name, fileAttr);
             if (error != ERROR_SUCCESS)
             {
-                errTitle = LoadStr(IDS_ERRORCOMPRESSING);
+                errTitleId = IDS_ERRORCOMPRESSING;
                 if (error == ERROR_INVALID_FUNCTION)
                     showCompressErr = TRUE; // not supported
             }
@@ -7948,7 +7948,7 @@ BOOL DoChangeAttrs(IWorkerObserver& observer, char* name, const CQuadWord& size,
                                    : MyDecryptFile(name, fileAttr, TRUE);
             if (error != ERROR_SUCCESS)
             {
-                errTitle = LoadStr(IDS_ERRORENCRYPTING);
+                errTitleId = IDS_ERRORENCRYPTING;
                 if (error == ERROR_INVALID_FUNCTION)
                     showEncryptErr = TRUE; // not supported
             }
@@ -7959,7 +7959,7 @@ BOOL DoChangeAttrs(IWorkerObserver& observer, char* name, const CQuadWord& size,
                                    : CompressFile(name, fileAttr);
             if (error != ERROR_SUCCESS)
             {
-                errTitle = LoadStr(IDS_ERRORCOMPRESSING);
+                errTitleId = IDS_ERRORCOMPRESSING;
                 if (error == ERROR_INVALID_FUNCTION)
                     showCompressErr = TRUE; // not supported
             }
@@ -7973,7 +7973,7 @@ BOOL DoChangeAttrs(IWorkerObserver& observer, char* name, const CQuadWord& size,
                 return FALSE;
             if (error != ERROR_SUCCESS)
             {
-                errTitle = LoadStr(IDS_ERRORENCRYPTING);
+                errTitleId = IDS_ERRORENCRYPTING;
                 if (error == ERROR_INVALID_FUNCTION)
                     showEncryptErr = TRUE; // not supported
             }
@@ -7988,7 +7988,9 @@ BOOL DoChangeAttrs(IWorkerObserver& observer, char* name, const CQuadWord& size,
                 changeCompression = FALSE;
             if (showEncryptErr)
                 changeEncryption = FALSE;
-            observer.NotifyError(LoadStr((showCompressErr && (attrs & FILE_ATTRIBUTE_COMPRESSED) || !showEncryptErr) ? IDS_ERRORCOMPRESSING : IDS_ERRORENCRYPTING), name, LoadStr((showCompressErr && (attrs & FILE_ATTRIBUTE_COMPRESSED) || !showEncryptErr) ? IDS_COMPRNOTSUPPORTED : IDS_ENCRYPNOTSUPPORTED));
+            int notifyTitleId = (showCompressErr && (attrs & FILE_ATTRIBUTE_COMPRESSED) || !showEncryptErr) ? IDS_ERRORCOMPRESSING : IDS_ERRORENCRYPTING;
+            int notifyDetailId = (showCompressErr && (attrs & FILE_ATTRIBUTE_COMPRESSED) || !showEncryptErr) ? IDS_COMPRNOTSUPPORTED : IDS_ENCRYPNOTSUPPORTED;
+            observer.NotifyErrorById(notifyTitleId, name, notifyDetailId);
             error = ERROR_SUCCESS;
         }
         if (error == ERROR_SUCCESS &&
@@ -8056,8 +8058,8 @@ BOOL DoChangeAttrs(IWorkerObserver& observer, char* name, const CQuadWord& size,
 
             if (error == ERROR_SUCCESS)
                 error = GetLastError();
-            if (errTitle == NULL)
-                errTitle = LoadStr(IDS_ERRORCHANGINGATTRS);
+            if (errTitleId == 0)
+                errTitleId = IDS_ERRORCHANGINGATTRS;
 
             observer.WaitIfSuspended(); // if we should be in suspend mode, wait ...
             if (observer.IsCancelled())
@@ -8068,7 +8070,7 @@ BOOL DoChangeAttrs(IWorkerObserver& observer, char* name, const CQuadWord& size,
 
             int ret;
             ret = IDCANCEL;
-            ret = observer.AskFileError(errTitle, name, GetErrorText(error));
+            ret = observer.AskFileErrorById(errTitleId, name, error);
             switch (ret)
             {
             case IDRETRY:
