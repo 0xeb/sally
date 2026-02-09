@@ -360,3 +360,27 @@ add_test(NAME gtest_worker_observer COMMAND gtest_worker_observer)
 set_target_properties(gtest_worker_observer PROPERTIES
     RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/tests"
 )
+
+# Headless integration tests — real file I/O through decoupled observer
+add_executable(gtest_headless_worker
+    gtest_headless_worker.cpp
+)
+
+target_include_directories(gtest_headless_worker PRIVATE
+    ${CMAKE_CURRENT_SOURCE_DIR}/../..
+    ${CMAKE_CURRENT_SOURCE_DIR}/../../common
+)
+
+target_compile_definitions(gtest_headless_worker PRIVATE
+    WIN32 _WINDOWS _CRT_SECURE_NO_WARNINGS UNICODE _UNICODE
+)
+
+target_link_libraries(gtest_headless_worker
+    GTest::gtest GTest::gtest_main
+)
+
+add_test(NAME gtest_headless_worker COMMAND gtest_headless_worker)
+
+set_target_properties(gtest_headless_worker PROPERTIES
+    RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/tests"
+)
