@@ -77,13 +77,8 @@ BOOL CFoundFilesData::Set(const char* path, const char* name, const CQuadWord& s
 {
     CALL_STACK_MESSAGE_NONE
     //  CALL_STACK_MESSAGE5("CFoundFilesData::Set(%s, %s, %g, 0x%X, )", path, name, size.GetDouble(), attr);
-    int l1 = (int)strlen(path), l2 = (int)strlen(name);
-    Path = (char*)malloc(l1 + 1);
-    Name = (char*)malloc(l2 + 1);
-    if (Path == NULL || Name == NULL)
-        return FALSE;
-    memmove(Path, path, l1 + 1);
-    memmove(Name, name, l2 + 1);
+    Path = path;
+    Name = name;
     Size = size;
     Attr = attr;
     LastWrite = *lastWrite;
@@ -99,12 +94,12 @@ char* CFoundFilesData::GetText(int i, char* text, int fileNameFormat)
     {
     case 0:
     {
-        AlterFileName(text, Name, -1, fileNameFormat, 0, IsDir);
+        AlterFileName(text, Name.c_str(), -1, fileNameFormat, 0, IsDir);
         return text;
     }
 
     case 1:
-        return Path;
+        return const_cast<char*>(Path.c_str());
 
     case 2:
     {
@@ -268,10 +263,10 @@ CFoundFilesListView::GetSelectedListSize()
         if (index != -1)
         {
             CFoundFilesData* ptr = Data[index];
-            int pathLen = lstrlen(ptr->Path);
-            if (ptr->Path[pathLen - 1] != '\\')
+            int pathLen = lstrlen(ptr->Path.c_str());
+            if (ptr->Path.c_str()[pathLen - 1] != '\\')
                 pathLen++; // if the path does not contain a backslash, reserve space for it
-            int nameLen = lstrlen(ptr->Name);
+            int nameLen = lstrlen(ptr->Name.c_str());
             size += pathLen + nameLen + 1; // reserve space for the terminator
         }
     } while (index != -1);
@@ -293,8 +288,8 @@ BOOL CFoundFilesListView::GetSelectedList(char* list, DWORD maxSize)
         if (index != -1)
         {
             CFoundFilesData* ptr = Data[index];
-            int pathLen = lstrlen(ptr->Path);
-            if (ptr->Path[pathLen - 1] != '\\')
+            int pathLen = lstrlen(ptr->Path.c_str());
+            if (ptr->Path.c_str()[pathLen - 1] != '\\')
                 size++; // if the path does not contain a backslash, reserve space for it
             size += pathLen;
             if (size > maxSize)
@@ -302,18 +297,18 @@ BOOL CFoundFilesListView::GetSelectedList(char* list, DWORD maxSize)
                 TRACE_E("Buffer is too short");
                 return FALSE;
             }
-            memmove(list, ptr->Path, pathLen);
+            memmove(list, ptr->Path.c_str(), pathLen);
             list += pathLen;
-            if (ptr->Path[pathLen - 1] != '\\')
+            if (ptr->Path.c_str()[pathLen - 1] != '\\')
                 *list++ = '\\';
-            int nameLen = lstrlen(ptr->Name);
+            int nameLen = lstrlen(ptr->Name.c_str());
             size += nameLen + 1; // reserve space for the terminator
             if (size > maxSize)
             {
                 TRACE_E("Buffer is too short");
                 return FALSE;
             }
-            memmove(list, ptr->Name, nameLen + 1);
+            memmove(list, ptr->Name.c_str(), nameLen + 1);
             list += nameLen + 1;
         }
     } while (index != -1);
@@ -354,14 +349,14 @@ void CFoundFilesListView::CheckAndRemoveSelectedItems(BOOL forceRemove, int last
             if (!forceRemove)
             {
                 CPathBuffer fullPath; // Heap-allocated for long path support
-                int pathLen = lstrlen(ptr->Path);
-                memmove(fullPath.Get(), ptr->Path, pathLen + 1);
-                if (ptr->Path[pathLen - 1] != '\\')
+                int pathLen = lstrlen(ptr->Path.c_str());
+                memmove(fullPath.Get(), ptr->Path.c_str(), pathLen + 1);
+                if (ptr->Path.c_str()[pathLen - 1] != '\\')
                 {
                     fullPath[pathLen] = '\\';
                     fullPath[pathLen + 1] = '\0';
                 }
-                lstrcat(fullPath, ptr->Name);
+                lstrcat(fullPath, ptr->Name.c_str());
                 remove = (SalGetFileAttributes(fullPath) == -1);
             }
             if (remove)
@@ -389,8 +384,8 @@ void CFoundFilesListView::CheckAndRemoveSelectedItems(BOOL forceRemove, int last
                 {
                     CFoundFilesData* ptr = Data[i];
                     if (lastFocusedItem != NULL &&
-                        lastFocusedItem->Name != NULL && strcmp(ptr->Name, lastFocusedItem->Name) == 0 &&
-                        lastFocusedItem->Path != NULL && strcmp(ptr->Path, lastFocusedItem->Path) == 0)
+                        !lastFocusedItem->Name.empty() && strcmp(ptr->Name.c_str(), lastFocusedItem->Name.c_str()) == 0 &&
+                        !lastFocusedItem->Path.empty() && strcmp(ptr->Path.c_str(), lastFocusedItem->Path.c_str()) == 0)
                     {
                         selectIndex = i;
                         break;
@@ -615,13 +610,13 @@ int CFoundFilesListView::CompareFunc(CFoundFilesData* f1, CFoundFilesData* f2, i
             {
             case 0:
             {
-                res = RegSetStrICmp(f1->Name, f2->Name);
+                res = RegSetStrICmp(f1->Name.c_str(), f2->Name.c_str());
                 break;
             }
 
             case 1:
             {
-                res = RegSetStrICmp(f1->Path, f2->Path);
+                res = RegSetStrICmp(f1->Path.c_str(), f2->Path.c_str());
                 break;
                 break;
             }
@@ -736,7 +731,7 @@ int CFoundFilesListView::CompareDuplicatesFunc(CFoundFilesData* f1, CFoundFilesD
     if (byName)
     {
         // by name
-        res = RegSetStrICmp(f1->Name, f2->Name);
+        res = RegSetStrICmp(f1->Name.c_str(), f2->Name.c_str());
         if (res == 0)
         {
             // by size
@@ -772,7 +767,7 @@ int CFoundFilesListView::CompareDuplicatesFunc(CFoundFilesData* f1, CFoundFilesD
             if (f1->Size == f2->Size)
             {
                 // by name
-                res = RegSetStrICmp(f1->Name, f2->Name);
+                res = RegSetStrICmp(f1->Name.c_str(), f2->Name.c_str());
                 if (res == 0)
                 {
                     // by group
@@ -792,7 +787,7 @@ int CFoundFilesListView::CompareDuplicatesFunc(CFoundFilesData* f1, CFoundFilesD
         }
     }
     if (res == 0)
-        res = RegSetStrICmp(f1->Path, f2->Path);
+        res = RegSetStrICmp(f1->Path.c_str(), f2->Path.c_str());
     return res;
 }
 
@@ -851,8 +846,8 @@ BOOL GetNextItemFromFind(int index, char* path, char* name, void* param)
     if (index >= 0 && index < data->Count)
     {
         CFoundFilesData* file = listView->At(data->Index[index]);
-        strcpy(path, file->Path);
-        strcpy(name, file->Name);
+        strcpy(path, file->Path.c_str());
+        strcpy(name, file->Name.c_str());
         return TRUE;
     }
     if (data->Index != NULL)
@@ -988,10 +983,10 @@ CFoundFilesListView::WindowProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
                     BOOL ok = FALSE;
                     CFoundFilesData* f = (index >= 0 && index < count) ? Data[index] : NULL;
                     CPathBuffer fileName; // Heap-allocated for long path support
-                    if (f != NULL && f->Path != NULL && f->Name != NULL)
+                    if (f != NULL && !f->Path.empty() && !f->Name.empty())
                     {
-                        lstrcpyn(fileName, f->Path, fileName.Size());
-                        SalPathAppend(fileName, f->Name, fileName.Size());
+                        lstrcpyn(fileName, f->Path.c_str(), fileName.Size());
+                        SalPathAppend(fileName, f->Name.c_str(), fileName.Size());
                         if (StrICmp(fileName, FileNamesEnumData.LastFileName) == 0)
                         {
                             ok = TRUE;
@@ -1004,10 +999,10 @@ CFoundFilesListView::WindowProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
                         for (i = 0; i < count; i++)
                         {
                             f = Data[i];
-                            if (f->Path != NULL && f->Name != NULL)
+                            if (!f->Path.empty() && !f->Name.empty())
                             {
-                                lstrcpyn(fileName, f->Path, fileName.Size());
-                                SalPathAppend(fileName, f->Name, fileName.Size());
+                                lstrcpyn(fileName, f->Path.c_str(), fileName.Size());
+                                SalPathAppend(fileName, f->Name.c_str(), fileName.Size());
                                 if (StrICmp(fileName, FileNamesEnumData.LastFileName) == 0)
                                     break;
                             }
@@ -1073,7 +1068,7 @@ CFoundFilesListView::WindowProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
                                     index = i;
                                     if (!Data[index]->IsDir) // we only search for files
                                     {
-                                        if (!onlyAssociatedExtensions || masks.AgreeMasks(Data[index]->Name, NULL))
+                                        if (!onlyAssociatedExtensions || masks.AgreeMasks(Data[index]->Name.c_str(), NULL))
                                         {
                                             FileNamesEnumData.Found = TRUE;
                                             break;
@@ -1087,7 +1082,7 @@ CFoundFilesListView::WindowProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
                             {
                                 if (!Data[index]->IsDir)
                                 {
-                                    if (!onlyAssociatedExtensions || masks.AgreeMasks(Data[index]->Name, NULL))
+                                    if (!onlyAssociatedExtensions || masks.AgreeMasks(Data[index]->Name.c_str(), NULL))
                                     {
                                         FileNamesEnumData.Found = TRUE;
                                         break;
@@ -1118,7 +1113,7 @@ CFoundFilesListView::WindowProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
                                 (!preferSelected ||
                                  (ListView_GetItemState(HWindow, index, LVIS_SELECTED) & LVIS_SELECTED)))
                             {
-                                if (!onlyAssociatedExtensions || masks.AgreeMasks(Data[index]->Name, NULL))
+                                if (!onlyAssociatedExtensions || masks.AgreeMasks(Data[index]->Name.c_str(), NULL))
                                 {
                                     FileNamesEnumData.Found = TRUE;
                                     break;
@@ -1156,10 +1151,10 @@ CFoundFilesListView::WindowProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
             if (FileNamesEnumData.Found)
             {
                 CFoundFilesData* f = Data[index];
-                if (f->Path != NULL && f->Name != NULL)
+                if (!f->Path.empty() && !f->Name.empty())
                 {
-                    lstrcpyn(FileNamesEnumData.FileName, f->Path, MAX_PATH);
-                    SalPathAppend(FileNamesEnumData.FileName, f->Name, MAX_PATH);
+                    lstrcpyn(FileNamesEnumData.FileName, f->Path.c_str(), MAX_PATH);
+                    SalPathAppend(FileNamesEnumData.FileName, f->Name.c_str(), MAX_PATH);
                     FileNamesEnumData.LastFileIndex = index;
                 }
                 else // should never happen
@@ -2358,7 +2353,7 @@ void CFindDialog::OnFocusFile()
         }
     }
     CFoundFilesData* data = FoundFilesListView->At(index);
-    SendMessage(MainWindow->GetActivePanel()->HWindow, WM_USER_FOCUSFILE, (WPARAM)data->Name, (LPARAM)data->Path);
+    SendMessage(MainWindow->GetActivePanel()->HWindow, WM_USER_FOCUSFILE, (WPARAM)data->Name.c_str(), (LPARAM)data->Path.c_str());
 }
 
 BOOL CFindDialog::GetFocusedFile(char* buffer, int bufferLen, int* viewedIndex)
@@ -2374,11 +2369,11 @@ BOOL CFindDialog::GetFocusedFile(char* buffer, int bufferLen, int* viewedIndex)
     if (data->IsDir)
         return FALSE;
     CPathBuffer longName; // Heap-allocated for long path support
-    int len = (int)strlen(data->Path);
-    memmove(longName, data->Path, len);
-    if (data->Path[len - 1] != '\\')
+    int len = (int)data->Path.size();
+    memmove(longName, data->Path.c_str(), len);
+    if (len > 0 && data->Path[len - 1] != '\\')
         longName[len++] = '\\';
-    strcpy(longName + len, data->Name);
+    strcpy(longName + len, data->Name.c_str());
 
     lstrcpyn(buffer, longName, bufferLen);
     return TRUE;
@@ -2582,7 +2577,7 @@ void CFindDialog::OnUserMenu()
                         break;
                 }
                 CFoundFilesData* file = FoundFilesListView->At(findItem);
-                if (!AddToListOfNames(&list, listEnd, file->Name, (int)strlen(file->Name)))
+                if (!AddToListOfNames(&list, listEnd, file->Name.c_str(), (int)strlen(file->Name.c_str())))
                     break;
             }
         }
@@ -2609,8 +2604,8 @@ void CFindDialog::OnUserMenu()
                 }
                 CFoundFilesData* file = FoundFilesListView->At(findItem);
                 CPathBuffer fullName; // Heap-allocated for long path support
-                lstrcpyn(fullName, file->Path, fullName.Size());
-                if (!SalPathAppend(fullName, file->Name, fullName.Size()) ||
+                lstrcpyn(fullName, file->Path.c_str(), fullName.Size());
+                if (!SalPathAppend(fullName, file->Name.c_str(), fullName.Size()) ||
                     !AddToListOfNames(&listFull, listFullEnd, fullName, (int)strlen(fullName)))
                     break;
             }
@@ -2651,8 +2646,8 @@ void CFindDialog::OnUserMenu()
         {
             CFoundFilesData* file = FoundFilesListView->At(comp1);
             userMenuAdvancedData.CompareNamesAreDirs = file->IsDir;
-            lstrcpyn(userMenuAdvancedData.CompareName1, file->Path, userMenuAdvancedData.CompareName1.Size());
-            if (!SalPathAppend(userMenuAdvancedData.CompareName1, file->Name, userMenuAdvancedData.CompareName1.Size()))
+            lstrcpyn(userMenuAdvancedData.CompareName1, file->Path.c_str(), userMenuAdvancedData.CompareName1.Size());
+            if (!SalPathAppend(userMenuAdvancedData.CompareName1, file->Name.c_str(), userMenuAdvancedData.CompareName1.Size()))
                 userMenuAdvancedData.CompareName1[0] = 0;
         }
         if (comp2 == -1)
@@ -2661,8 +2656,8 @@ void CFindDialog::OnUserMenu()
         {
             CFoundFilesData* file = FoundFilesListView->At(comp2);
             userMenuAdvancedData.CompareNamesAreDirs = file->IsDir;
-            lstrcpyn(userMenuAdvancedData.CompareName2, file->Path, userMenuAdvancedData.CompareName2.Size());
-            if (!SalPathAppend(userMenuAdvancedData.CompareName2, file->Name, userMenuAdvancedData.CompareName2.Size()))
+            lstrcpyn(userMenuAdvancedData.CompareName2, file->Path.c_str(), userMenuAdvancedData.CompareName2.Size());
+            if (!SalPathAppend(userMenuAdvancedData.CompareName2, file->Name.c_str(), userMenuAdvancedData.CompareName2.Size()))
                 userMenuAdvancedData.CompareName2[0] = 0;
         }
 
@@ -2689,30 +2684,30 @@ void CFindDialog::OnCopyNameToClipboard(CCopyNameToClipboardModeEnum mode)
     {
     case cntcmFullName:
     {
-        lstrcpyn(buff, data->Path, buff.Size());
+        lstrcpyn(buff, data->Path.c_str(), buff.Size());
         int len = (int)strlen(buff);
         if (len > 0 && buff[len - 1] != '\\')
             strcat(buff, "\\");
-        AlterFileName(buff + strlen(buff), data->Name, -1, FileNameFormat, 0, data->IsDir);
+        AlterFileName(buff + strlen(buff), data->Name.c_str(), -1, FileNameFormat, 0, data->IsDir);
         break;
     }
 
     case cntcmName:
     {
-        AlterFileName(buff, data->Name, -1, FileNameFormat, 0, data->IsDir);
+        AlterFileName(buff, data->Name.c_str(), -1, FileNameFormat, 0, data->IsDir);
         break;
     }
 
     case cntcmFullPath:
     {
-        lstrcpyn(buff, data->Path, buff.Size());
+        lstrcpyn(buff, data->Path.c_str(), buff.Size());
         break;
     }
 
     case cntcmUNCName:
     {
-        AlterFileName(buff, data->Name, -1, FileNameFormat, 0, data->IsDir);
-        CopyUNCPathToClipboard(data->Path, buff, data->IsDir, HWindow);
+        AlterFileName(buff, data->Name.c_str(), -1, FileNameFormat, 0, data->IsDir);
+        CopyUNCPathToClipboard(data->Path.c_str(), buff, data->IsDir, HWindow);
         break;
     }
     }
@@ -3968,7 +3963,7 @@ MENU_TEMPLATE_ITEM FindLookInBrowseMenu[] =
                         // DT_PATH_ELLIPSIS doesn't work on some strings and causing clipped text to be printed
                         // PathCompactPath() requires a copy in a local buffer but doesn't clip text
                         CPathBuffer buff;
-                        strncpy_s(buff, buff.Size(), item2->Path, _TRUNCATE);
+                        strncpy_s(buff, buff.Size(), item2->Path.c_str(), _TRUNCATE);
                         PathCompactPath(CacheBitmap->HMemDC, buff, r2.right - r2.left);
                         DrawText(CacheBitmap->HMemDC, buff, -1, &r2,
                                  DT_VCENTER | DT_LEFT | DT_NOPREFIX | DT_SINGLELINE);
@@ -4018,7 +4013,7 @@ MENU_TEMPLATE_ITEM FindLookInBrowseMenu[] =
                         const CFoundFilesData* item = FoundFilesListView->At(i);
                         if (partial)
                         {
-                            if (StrNICmp(item->Name, fi->psz, (int)strlen(fi->psz)) == 0)
+                            if (StrNICmp(item->Name.c_str(), fi->psz, (int)strlen(fi->psz)) == 0)
                             {
                                 ret = i;
                                 break;
@@ -4026,7 +4021,7 @@ MENU_TEMPLATE_ITEM FindLookInBrowseMenu[] =
                         }
                         else
                         {
-                            if (StrICmp(item->Name, fi->psz) == 0)
+                            if (StrICmp(item->Name.c_str(), fi->psz) == 0)
                             {
                                 ret = i;
                                 break;
@@ -4040,7 +4035,7 @@ MENU_TEMPLATE_ITEM FindLookInBrowseMenu[] =
                             const CFoundFilesData* item = FoundFilesListView->At(i);
                             if (partial)
                             {
-                                if (StrNICmp(item->Name, fi->psz, (int)strlen(fi->psz)) == 0)
+                                if (StrNICmp(item->Name.c_str(), fi->psz, (int)strlen(fi->psz)) == 0)
                                 {
                                     ret = i;
                                     break;
@@ -4048,7 +4043,7 @@ MENU_TEMPLATE_ITEM FindLookInBrowseMenu[] =
                             }
                             else
                             {
-                                if (StrICmp(item->Name, fi->psz) == 0)
+                                if (StrICmp(item->Name.c_str(), fi->psz) == 0)
                                 {
                                     ret = i;
                                     break;

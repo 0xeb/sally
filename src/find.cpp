@@ -725,7 +725,7 @@ int CDuplicateCandidates::CompareFunc(CFoundFilesData* f1, CFoundFilesData* f2,
     if (bySize)
     {
         if (byName)
-            res = RegSetStrICmp(f1->Name, f2->Name);
+            res = RegSetStrICmp(f1->Name.c_str(), f2->Name.c_str());
         else
             res = 0;
         if (res == 0)
@@ -749,10 +749,10 @@ int CDuplicateCandidates::CompareFunc(CFoundFilesData* f1, CFoundFilesData* f2,
     else
     {
         // byName && !bySize
-        res = RegSetStrICmp(f1->Name, f2->Name);
+        res = RegSetStrICmp(f1->Name.c_str(), f2->Name.c_str());
     }
     if (byPath && res == 0)
-        res = RegSetStrICmp(f1->Path, f2->Path);
+        res = RegSetStrICmp(f1->Path.c_str(), f2->Path.c_str());
     return res;
 }
 
@@ -825,8 +825,8 @@ BOOL CDuplicateCandidates::GetMD5Digest(CGrepData* data, CFoundFilesData* file,
 {
     // build full path to the file
     CPathBuffer fullPath;  // Heap-allocated for long path support
-    lstrcpyn(fullPath, file->Path, fullPath.Size());
-    SalPathAppend(fullPath, file->Name, fullPath.Size());
+    lstrcpyn(fullPath, file->Path.c_str(), fullPath.Size());
+    SalPathAppend(fullPath, file->Name.c_str(), fullPath.Size());
 
     data->SearchingText->Set(fullPath); // set the current file
 
@@ -1819,7 +1819,7 @@ void RefineData(CMaskGroup* masksGroup, CGrepData* data)
             ok = FALSE;
 
         // file name (let the extension be resolved if ext==NULL)
-        if (ok && !masksGroup->AgreeMasks(refineData->Name, NULL))
+        if (ok && !masksGroup->AgreeMasks(refineData->Name.c_str(), NULL))
             ok = FALSE;
 
         // content
@@ -1830,10 +1830,10 @@ void RefineData(CMaskGroup* masksGroup, CGrepData* data)
             else
             {
                 CPathBuffer fullPath;  // Heap-allocated for long path support
-                strcpy(fullPath, refineData->Path);
+                strcpy(fullPath, refineData->Path.c_str());
                 if (fullPath[strlen(fullPath) - 1] != '\\')
                     strcat(fullPath, "\\");
-                strcat(fullPath, refineData->Name);
+                strcat(fullPath, refineData->Name.c_str());
                 // links: refineData->Size == 0, the file size must be additionally obtained via SalGetFileSize()
                 BOOL isLink = (refineData->Attr & FILE_ATTRIBUTE_REPARSE_POINT) != 0; // size == 0, the file size must be obtained via SalGetFileSize()
                 ok = TestFileContent(refineData->Size.LoDWord, refineData->Size.HiDWord,
@@ -1846,7 +1846,7 @@ void RefineData(CMaskGroup* masksGroup, CGrepData* data)
         if (data->Refine == 1 && ok ||
             data->Refine == 2 && !ok)
         {
-            AddFoundItem(refineData->Path, refineData->Name,
+            AddFoundItem(refineData->Path.c_str(), refineData->Name.c_str(),
                          refineData->Size.LoDWord, refineData->Size.HiDWord,
                          refineData->Attr, &refineData->LastWrite,
                          refineData->IsDir, data, NULL);

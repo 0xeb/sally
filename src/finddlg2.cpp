@@ -99,8 +99,8 @@ void CFindDialog::OnHideDuplicateNames()
         {
             CFoundFilesData* data = FoundFilesListView->At(i);
             if (lastData->IsDir == data->IsDir &&
-                RegSetStrICmp(lastData->Path, data->Path) == 0 &&
-                RegSetStrICmp(lastData->Name, data->Name) == 0)
+                RegSetStrICmp(lastData->Path.c_str(), data->Path.c_str()) == 0 &&
+                RegSetStrICmp(lastData->Name.c_str(), data->Name.c_str()) == 0)
             {
                 FoundFilesListView->Delete(i);
                 deletedCount++;
@@ -161,7 +161,7 @@ void CFindDialog::OnDelete(BOOL toRecycle)
     if (lastFocusedIndex != -1)
     {
         CFoundFilesData* lastItem = FoundFilesListView->At(lastFocusedIndex);
-        lastFocusedItem.Set(lastItem->Path, lastItem->Name, lastItem->Size, lastItem->Attr, &lastItem->LastWrite, lastItem->IsDir);
+        lastFocusedItem.Set(lastItem->Path.c_str(), lastItem->Name.c_str(), lastItem->Size, lastItem->Attr, &lastItem->LastWrite, lastItem->IsDir);
     }
 
     CShellExecuteWnd shellExecuteWnd;
@@ -1187,7 +1187,7 @@ CFindDialog::GetName(int index)
 {
     if (index < 0 || index >= FoundFilesListView->GetCount())
         return FALSE;
-    return FoundFilesListView->At(index)->Name;
+    return FoundFilesListView->At(index)->Name.c_str();
 }
 
 const char*
@@ -1195,7 +1195,7 @@ CFindDialog::GetPath(int index)
 {
     if (index < 0 || index >= FoundFilesListView->GetCount())
         return FALSE;
-    return FoundFilesListView->At(index)->Path;
+    return FoundFilesListView->At(index)->Path.c_str();
 }
 
 BOOL CFindDialog::GetCommonPrefixPath(char* buffer, int bufferMax, int& commonPrefixChars)
@@ -1221,12 +1221,12 @@ BOOL CFindDialog::GetCommonPrefixPath(char* buffer, int bufferMax, int& commonPr
             CFoundFilesData* file = FoundFilesListView->At(index);
             if (path[0] == 0)
             {
-                lstrcpy(path, file->Path); // in the first step we only copy the path
+                lstrcpy(path, file->Path.c_str()); // in the first step we only copy the path
                 pathLen = lstrlen(path);
             }
             else
             {
-                int count = CommonPrefixLength(path, file->Path);
+                int count = CommonPrefixLength(path, file->Path.c_str());
                 if (count < pathLen)
                 {
                     // the path has shortened
@@ -1357,7 +1357,7 @@ void CFindDialog::OnDrag(BOOL rightMouseButton)
     if (lastFocusedIndex != -1)
     {
         CFoundFilesData* lastItem = FoundFilesListView->At(lastFocusedIndex);
-        lastFocusedItem.Set(lastItem->Path, lastItem->Name, lastItem->Size, lastItem->Attr, &lastItem->LastWrite, lastItem->IsDir);
+        lastFocusedItem.Set(lastItem->Path.c_str(), lastItem->Name.c_str(), lastItem->Size, lastItem->Attr, &lastItem->LastWrite, lastItem->IsDir);
     }
 
     CMyEnumFileNamesData data;
@@ -1585,11 +1585,11 @@ void CFindDialog::OnOpen(BOOL onlyFocused)
                 oldCur = SetCursor(LoadCursor(NULL, IDC_WAIT));
 
             CPathBuffer fullPath; // Heap-allocated for long path support
-            lstrcpy(fullPath, file->Path);
-            if (SalPathAppend(fullPath, file->Name, fullPath.Size()))
+            lstrcpy(fullPath, file->Path.c_str());
+            if (SalPathAppend(fullPath, file->Name.c_str(), fullPath.Size()))
                 MainWindow->FileHistory->AddFile(fhitOpen, 0, fullPath);
 
-            ExecuteAssociation(HWindow, file->Path, file->Name);
+            ExecuteAssociation(HWindow, file->Path.c_str(), file->Name.c_str());
             if (setWait)
                 SetCursor(oldCur);
         }

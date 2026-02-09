@@ -1703,7 +1703,7 @@ void GetMessagePos(POINT& p)
 //
 //   dir    - is it a directory?
 
-void AlterFileName(char* tgtName, char* filename, int filenameLen, int format, int change, BOOL dir)
+void AlterFileName(char* tgtName, const char* filename, int filenameLen, int format, int change, BOOL dir)
 {
     // j.r. I disabled the macro because AlterFileName is called heavily from RefreshListBox()
     CALL_STACK_MESSAGE_NONE
@@ -1713,37 +1713,38 @@ void AlterFileName(char* tgtName, char* filename, int filenameLen, int format, i
     if (format == 7 && change != 0)
         format = (change == 1) ? 1 : 2; // convert to mixed/lower case
 
-    char* ext = NULL; // points past the last dot or is NULL (no extension)
+    const char* ext = NULL; // points past the last dot or is NULL (no extension)
+    char* extW = NULL;     // writable ext pointer (for change==1 post-processing, points into tgtName)
     if (change != 0 && format != 5 && format != 7)
     {
-        char* s = filename;
-        while (*s != 0) // searching for the last dot (file extensions)
-            if (*s++ == '.')
-                ext = s;
-        //  if (ext != NULL && ext <= filename + 1) ext = NULL;  // ".cvspass" in Windows is considered an extension ..
+        // Copy filename into tgtName so we can modify it safely
+        strcpy(tgtName, filename);
+        char* ws = tgtName;
+        char* wext = NULL;
+        while (*ws != 0)
+            if (*ws++ == '.')
+                wext = ws;
         if (change == 1) // change only the name
         {
-            if (ext != NULL)
-                *(ext - 1) = 0; // overwrite '.' with the end of string (0)
+            if (wext != NULL)
+                *(wext - 1) = 0; // overwrite '.' with end of string
+            extW = wext;
         }
         else // change only the extension
         {
-            if (ext == NULL || *ext == 0) // no extension
-            {
-                strcpy(tgtName, filename);
-                return;
-            }
-            memmove(tgtName, filename, ext - filename); // copy of the name + '.'
-            tgtName += ext - filename;
-            filename = ext;
+            if (wext == NULL || *wext == 0) // no extension
+                return; // tgtName already has the full copy
+            tgtName += wext - tgtName;
+            filename = wext;
         }
+        filename = tgtName; // now filename points to the truncated copy
     }
 
     switch (format)
     {
     case 5: // explorer style
     {
-        char* s = filename;
+        const char* s = filename;
         int c = 8;
         while (c-- && *s != 0 && *s == UpperCase[*s] && *s != '.')
             s++; // name
@@ -1764,7 +1765,7 @@ void AlterFileName(char* tgtName, char* filename, int filenameLen, int format, i
         }
         BOOL capital = TRUE;
         char* tgt = tgtName;
-        char* name = filename;
+        const char* name = filename;
         while (*name != 0)
         {
             if (!capital)
@@ -1788,7 +1789,7 @@ void AlterFileName(char* tgtName, char* filename, int filenameLen, int format, i
     {
         BOOL capital = TRUE;
         char* tgt = tgtName;
-        char* name = filename;
+        const char* name = filename;
         while (*name != 0)
         {
             if (!capital)
@@ -1812,7 +1813,7 @@ void AlterFileName(char* tgtName, char* filename, int filenameLen, int format, i
     case 2: // lower case
     {
         char* tgt = tgtName;
-        char* name = filename;
+        const char* name = filename;
         while (*name != 0)
             *tgt++ = LowerCase[*name++];
         *tgt = 0;
@@ -1822,7 +1823,7 @@ void AlterFileName(char* tgtName, char* filename, int filenameLen, int format, i
     case 3: // upper case
     {
         char* tgt = tgtName;
-        char* name = filename;
+        const char* name = filename;
         while (*name != 0)
             *tgt++ = UpperCase[*name++];
         *tgt = 0;
@@ -1831,7 +1832,7 @@ void AlterFileName(char* tgtName, char* filename, int filenameLen, int format, i
 
     case 7: // name mixed case, extension lower case
     {
-        char* s = filename;
+        const char* s = filename;
         while (*s != 0) // searching for the last dot (file extension)
             if (*s++ == '.')
                 ext = s;
@@ -1841,7 +1842,7 @@ void AlterFileName(char* tgtName, char* filename, int filenameLen, int format, i
 
         BOOL capital = TRUE;
         char* tgt = tgtName;
-        char* name = filename;
+        const char* name = filename;
         while (name < ext) // name mixed case
         {
             if (!capital)
@@ -1875,10 +1876,10 @@ void AlterFileName(char* tgtName, char* filename, int filenameLen, int format, i
 
     if (change == 1 && format != 5 && format != 7) // change only the name
     {
-        if (ext != NULL)
+        if (extW != NULL)
         {
-            *--ext = '.';                            // restore '.' in the name
-            strcpy(tgtName + (ext - filename), ext); // append the extension
+            *--extW = '.';                               // restore '.' in the name
+            strcpy(tgtName + (extW - filename), extW);   // append the extension
         }
     }
 }

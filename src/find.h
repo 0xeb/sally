@@ -497,8 +497,8 @@ struct CMD5Digest
 
 struct CFoundFilesData
 {
-    char* Name;
-    char* Path;
+    std::string Name;
+    std::string Path;
     CQuadWord Size;
     DWORD Attr;
     FILETIME LastWrite;
@@ -519,8 +519,6 @@ struct CFoundFilesData
 
     CFoundFilesData()
     {
-        Path = NULL;
-        Name = NULL;
         Attr = 0;
         ZeroMemory(&LastWrite, sizeof(LastWrite));
         Group = 0;
@@ -528,13 +526,7 @@ struct CFoundFilesData
         Selected = 0;
         Different = 0;
     }
-    ~CFoundFilesData()
-    {
-        if (Path != NULL)
-            free(Path);
-        if (Name != NULL)
-            free(Name);
-    }
+    ~CFoundFilesData() = default;
     BOOL Set(const char* path, const char* name, const CQuadWord& size, DWORD attr,
              const FILETIME* lastWrite, BOOL isDir);
     // if 'i' refers to Name or Path, returns a pointer to the corresponding variable
