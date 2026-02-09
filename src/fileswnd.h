@@ -5,6 +5,7 @@
 #pragma once
 
 #include "common/widepath.h"
+#include "common/CSelectionSnapshot.h"
 
 #define NUM_OF_CHECKTHREADS 30                   // maximum number of threads for "non-blocking" path accessibility tests
 #define ICONOVR_REFRESH_PERIOD 2000              // minimum interval between icon-overlay refreshes in the panel (see IconOverlaysChangedOnPath)
@@ -1300,6 +1301,9 @@ public:
 
     // performs deletion using the SHFileOperation API function (only when deleting to the Recycle Bin)
     BOOL DeleteThroughRecycleBin(int* selection, int selCount, CFileData* oneFile);
+
+    CSelectionSnapshot TakeSnapshot(CActionType type, int selCount, int* selection,
+                                    CFileData* oneFile);
 
     BOOL BuildScriptMain(COperations* script, CActionType type, char* targetPath,
                          char* mask, int selCount, int* selection,

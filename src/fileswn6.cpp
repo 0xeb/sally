@@ -22,6 +22,80 @@
 #include "common/widepath.h"
 
 #include "common/CBuildScriptState.h"
+#include "common/CSelectionSnapshot.h"
+
+CSelectionSnapshot CFilesWindow::TakeSnapshot(CActionType type, int selCount,
+                                              int* selection, CFileData* oneFile)
+{
+    CSelectionSnapshot snap;
+    snap.SourcePath = GetPath();
+    // TODO: snap.SourcePathW when wide path is available
+
+    // Map CActionType to EActionType
+    switch (type)
+    {
+    case atCopy:
+        snap.Action = EActionType::Copy;
+        break;
+    case atMove:
+        snap.Action = EActionType::Move;
+        break;
+    case atDelete:
+        snap.Action = EActionType::Delete;
+        break;
+    case atCountSize:
+        snap.Action = EActionType::CountSize;
+        break;
+    case atChangeAttrs:
+        snap.Action = EActionType::ChangeAttrs;
+        break;
+    case atChangeCase:
+        snap.Action = EActionType::ChangeCase;
+        break;
+    case atRecursiveConvert:
+        snap.Action = EActionType::RecursiveConvert;
+        break;
+    case atConvert:
+        snap.Action = EActionType::Convert;
+        break;
+    }
+
+    // Capture selected items
+    if (selCount > 0 || oneFile != NULL)
+    {
+        int i = 0;
+        do
+        {
+            const CFileData* file;
+            if (selCount > 1 || oneFile == NULL)
+            {
+                file = (selection[i] < Dirs->Count)
+                           ? &Dirs->At(selection[i])
+                           : &Files->At(selection[i] - Dirs->Count);
+            }
+            else
+            {
+                file = oneFile;
+            }
+            i++;
+
+            CSnapshotItem item;
+            item.Name = file->Name;
+            if (!file->NameW.empty())
+                item.NameW = file->NameW;
+            if (file->DosName != NULL)
+                item.DosName = file->DosName;
+            item.IsDir = (file->Attr & FILE_ATTRIBUTE_DIRECTORY) != 0;
+            item.Size = file->Size.Value;
+            item.Attr = file->Attr;
+            item.LastWrite = file->LastWrite;
+
+            snap.Items.push_back(std::move(item));
+        } while (i < selCount);
+    }
+
+    return snap;
+}
 
 // Transient state for BuildScriptMain/Dir/File
 static CBuildScriptState bsState;
