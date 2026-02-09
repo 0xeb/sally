@@ -7640,7 +7640,7 @@ CONVERT_AGAIN:
                                     ret = IDCANCEL;
                                     if (hTarget != NULL && err == NO_ERROR && targetIterator - targetBuffer != (int)written)
                                         err = ERROR_DISK_FULL;
-                                    ret = observer.AskFileError(LoadStr(IDS_ERRORWRITINGFILE), tmpFileName, GetErrorText(err));
+                                    ret = observer.AskFileErrorById(IDS_ERRORWRITINGFILE, tmpFileName, err);
                                     switch (ret)
                                     {
                                     case IDRETRY:
@@ -7696,7 +7696,7 @@ CONVERT_AGAIN:
                                     goto SKIP_CONVERT;
 
                                 int ret = IDCANCEL;
-                                ret = observer.AskFileError(LoadStr(IDS_ERRORREADINGFILE), name, GetErrorText(err));
+                                ret = observer.AskFileErrorById(IDS_ERRORREADINGFILE, name, err);
                                 switch (ret)
                                 {
                                 case IDRETRY:
@@ -7780,7 +7780,7 @@ CONVERT_AGAIN:
 
                                 int ret;
                                 ret = IDCANCEL;
-                                ret = observer.AskFileError(LoadStr(IDS_ERROROVERWRITINGFILE), name, GetErrorText(err));
+                                ret = observer.AskFileErrorById(IDS_ERROROVERWRITINGFILE, name, err);
                                 switch (ret)
                                 {
                                 case IDRETRY:
@@ -7839,7 +7839,7 @@ CONVERT_AGAIN:
 
                     int ret;
                     ret = IDCANCEL;
-                    ret = observer.AskFileError(LoadStr(IDS_ERRORCREATINGTMPFILE), fakeName, GetErrorText(err));
+                    ret = observer.AskFileErrorById(IDS_ERRORCREATINGTMPFILE, fakeName, err);
                     switch (ret)
                     {
                     case IDRETRY:
@@ -7882,7 +7882,7 @@ CONVERT_AGAIN:
 
             int ret;
             ret = IDCANCEL;
-            ret = observer.AskFileError(LoadStr(IDS_ERROROPENINGFILE), name, GetErrorText(err));
+            ret = observer.AskFileErrorById(IDS_ERROROPENINGFILE, name, err);
             switch (ret)
             {
             case IDRETRY:
