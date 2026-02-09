@@ -384,3 +384,27 @@ add_test(NAME gtest_headless_worker COMMAND gtest_headless_worker)
 set_target_properties(gtest_headless_worker PROPERTIES
     RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/tests"
 )
+
+# Headless copy/move integration tests
+add_executable(gtest_headless_copy
+    gtest_headless_copy.cpp
+)
+
+target_include_directories(gtest_headless_copy PRIVATE
+    ${CMAKE_CURRENT_SOURCE_DIR}/../..
+    ${CMAKE_CURRENT_SOURCE_DIR}/../../common
+)
+
+target_compile_definitions(gtest_headless_copy PRIVATE
+    WIN32 _WINDOWS _CRT_SECURE_NO_WARNINGS UNICODE _UNICODE
+)
+
+target_link_libraries(gtest_headless_copy
+    GTest::gtest GTest::gtest_main
+)
+
+add_test(NAME gtest_headless_copy COMMAND gtest_headless_copy)
+
+set_target_properties(gtest_headless_copy PROPERTIES
+    RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/tests"
+)
