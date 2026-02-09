@@ -7,6 +7,8 @@
 #include <vector>
 #include <string>
 
+class IWorkerObserver; // forward declaration for RunWorkerDirect
+
 #define CREATE_DIR_SIZE CQuadWord(4096, 0) // operation cost estimates (uncached measurements based on worker thread runtimes)
 #define MOVE_DIR_SIZE CQuadWord(5050, 0)
 #define DELETE_DIR_SIZE CQuadWord(2400, 0)
@@ -534,6 +536,12 @@ extern COperationsQueue OperationsQueue; // queue of disk Copy/Move operations
 HANDLE StartWorker(COperations* script, HWND hDlg, CChangeAttrsData* attrsData,
                    CConvertData* convertData, HANDLE wContinue, HANDLE workerNotSuspended,
                    BOOL* cancelWorker, int* operationProgress, int* summaryProgress);
+
+// Headless worker execution — runs operations synchronously on the calling thread.
+// Uses the provided IWorkerObserver instead of the progress dialog.
+// Returns TRUE if all operations completed without error, FALSE on error/cancel.
+BOOL RunWorkerDirect(COperations* script, IWorkerObserver& observer,
+                     CChangeAttrsData* attrsData = NULL, CConvertData* convertData = NULL);
 
 void FreeScript(COperations* script);
 

@@ -8455,6 +8455,272 @@ unsigned ThreadWorkerBody(void* parameter)
     return 0;
 }
 
+BOOL RunWorkerDirect(COperations* script, IWorkerObserver& observer,
+                     CChangeAttrsData* attrsData, CConvertData* convertData)
+{
+    CWorkerState workerState;
+    workerState.Init();
+
+    if (script->TotalSize == CQuadWord(0, 0))
+        script->TotalSize = CQuadWord(1, 0);
+
+    if (script->CopySecurity)
+        GainWriteOwnerAccess();
+
+    void* buffer;
+    BOOL bufferIsAllocated;
+    if (attrsData != NULL)
+    {
+        buffer = attrsData;
+        bufferIsAllocated = FALSE;
+    }
+    else
+    {
+        bufferIsAllocated = TRUE;
+        buffer = malloc(max(REMOVABLE_DISK_COPY_BUFFER, OPERATION_BUFFER));
+        if (buffer == NULL)
+        {
+            observer.SetError(true);
+            observer.NotifyDone();
+            return FALSE;
+        }
+    }
+
+    observer.SetProgress(0, 0);
+    script->InitSpeedMeters(FALSE);
+
+    CPathBuffer lastLantasticCheckRoot;
+    lastLantasticCheckRoot[0] = 0;
+    BOOL lastIsLantasticPath = FALSE;
+    int mustDeleteFileBeforeOverwrite = 0;
+    int allocWholeFileOnStart = 0;
+    int setDirTimeAfterMove = script->PreserveDirTime && script->SourcePathIsNetwork ? 0 : 2;
+
+    BOOL Error = FALSE;
+    CQuadWord totalDone(0, 0);
+    CProgressData pd;
+    BOOL novellRenamePatch = FALSE;
+    char* tgtBuffer = NULL;
+    CAsyncCopyParams* asyncPar = NULL;
+    DWORD clearReadonlyMask = script->ClearReadonlyMask;
+    CConvertData convertDataLocal;
+    if (convertData != NULL)
+        convertDataLocal = *convertData;
+
+    int i;
+    for (i = 0; !observer.IsCancelled() && i < script->Count; i++)
+    {
+        COperation* op = &script->At(i);
+
+        switch (op->Opcode)
+        {
+        case ocCopyFile:
+        {
+            pd.Operation = workerState.OpStrCopying;
+            pd.Source = op->SourceName;
+            pd.Preposition = workerState.OpStrCopyingPrep;
+            pd.Target = op->TargetName;
+            observer.SetOperationInfo(&pd);
+            observer.SetProgress(0, CaclProg(totalDone, script->TotalSize));
+
+            BOOL lantasticCheck = IsLantasticDrive(op->TargetName, lastLantasticCheckRoot, lastIsLantasticPath);
+            Error = !DoCopyFile(op, observer, buffer, script, totalDone,
+                                clearReadonlyMask, NULL, lantasticCheck, mustDeleteFileBeforeOverwrite,
+                                allocWholeFileOnStart, workerState,
+                                (op->OpFlags & OPFL_COPY_ADS) != 0,
+                                (op->OpFlags & OPFL_AS_ENCRYPTED) != 0,
+                                FALSE, asyncPar);
+            break;
+        }
+        case ocMoveFile:
+        case ocMoveDir:
+        {
+            pd.Operation = workerState.OpStrMoving;
+            pd.Source = op->SourceName;
+            pd.Preposition = workerState.OpStrMovingPrep;
+            pd.Target = op->TargetName;
+            observer.SetOperationInfo(&pd);
+            observer.SetProgress(0, CaclProg(totalDone, script->TotalSize));
+
+            BOOL lantasticCheck2 = IsLantasticDrive(op->TargetName, lastLantasticCheckRoot, lastIsLantasticPath);
+            BOOL ignInvalidName = op->Opcode == ocMoveDir && (op->OpFlags & OPFL_IGNORE_INVALID_NAME) != 0;
+            Error = !DoMoveFile(op, observer, buffer, script, totalDone,
+                                op->Opcode == ocMoveDir, clearReadonlyMask, &novellRenamePatch,
+                                lantasticCheck2, mustDeleteFileBeforeOverwrite,
+                                allocWholeFileOnStart, workerState,
+                                (op->OpFlags & OPFL_COPY_ADS) != 0,
+                                (op->OpFlags & OPFL_AS_ENCRYPTED) != 0,
+                                &setDirTimeAfterMove, asyncPar, ignInvalidName);
+            break;
+        }
+        case ocDeleteFile:
+        {
+            pd.Operation = workerState.OpStrDeleting;
+            pd.Source = op->SourceName;
+            pd.Preposition = "";
+            pd.Target = "";
+            observer.SetOperationInfo(&pd);
+            observer.SetProgress(0, CaclProg(totalDone, script->TotalSize));
+
+            Error = !DoDeleteFile(observer, op->SourceName, op->Size,
+                                  script, totalDone, op->Attr, workerState,
+                                  op->SourceNameW);
+            break;
+        }
+        case ocCreateDir:
+        {
+            BOOL copyADS = (op->OpFlags & OPFL_COPY_ADS) != 0;
+            BOOL crAsEncrypted = (op->OpFlags & OPFL_AS_ENCRYPTED) != 0;
+            BOOL ignInvalidName2 = (op->OpFlags & OPFL_IGNORE_INVALID_NAME) != 0;
+            pd.Operation = workerState.OpStrCreatingDir;
+            pd.Source = op->TargetName;
+            pd.Preposition = "";
+            pd.Target = "";
+            observer.SetOperationInfo(&pd);
+            observer.SetProgress(0, CaclProg(totalDone, script->TotalSize));
+
+            BOOL skip, alreadyExisted;
+            Error = !DoCreateDir(observer, op->TargetName, op->Attr, clearReadonlyMask, workerState,
+                                 totalDone, op->Size, op->SourceName, copyADS, script, buffer, skip,
+                                 alreadyExisted, crAsEncrypted, ignInvalidName2);
+            if (!Error)
+            {
+                if (skip)
+                {
+                    CQuadWord skipTotal(0, 0);
+                    int createDirIndex = i;
+                    while (++i < script->Count)
+                    {
+                        COperation* oper = &script->At(i);
+                        if (oper->Opcode == ocLabelForSkipOfCreateDir && (int)oper->Attr == createDirIndex)
+                        {
+                            script->AddBytesToTFS(CQuadWord((DWORD)(DWORD_PTR)oper->SourceName, (DWORD)(DWORD_PTR)oper->TargetName));
+                            break;
+                        }
+                        skipTotal += oper->Size;
+                    }
+                    if (i == script->Count)
+                        i = createDirIndex;
+                    else
+                        totalDone += skipTotal;
+                }
+                else
+                {
+                    if (alreadyExisted)
+                        op->Attr = 0x10000000;
+                    else
+                        op->Attr = 0x01000000;
+                    totalDone += op->Size;
+                    script->SetProgressSize(totalDone);
+                    observer.SetProgress(0, CaclProg(totalDone, script->TotalSize));
+                }
+            }
+            break;
+        }
+        case ocDeleteDir:
+        case ocDeleteDirLink:
+        {
+            pd.Operation = workerState.OpStrDeleting;
+            pd.Source = op->SourceName;
+            pd.Preposition = "";
+            pd.Target = "";
+            observer.SetOperationInfo(&pd);
+            observer.SetProgress(0, CaclProg(totalDone, script->TotalSize));
+
+            if (op->Opcode == ocDeleteDir)
+            {
+                Error = !DoDeleteDir(observer, op->SourceName, op->Size,
+                                     script, totalDone, op->Attr, (DWORD)(DWORD_PTR)op->TargetName != -1,
+                                     workerState);
+            }
+            else
+            {
+                Error = !DoDeleteDirLink(observer, op->SourceName, op->Size,
+                                         script, totalDone, workerState);
+            }
+            break;
+        }
+        case ocCopyDirTime:
+        {
+            FILETIME modified;
+            modified.dwLowDateTime = (DWORD)(DWORD_PTR)op->SourceName;
+            modified.dwHighDateTime = op->Attr;
+            Error = !DoCopyDirTime(observer, op->TargetName, &modified, workerState, FALSE);
+            if (!Error)
+            {
+                script->AddBytesToSpeedMetersAndTFSandPS((DWORD)op->Size.Value, TRUE, 0, NULL, MAX_OP_FILESIZE);
+                totalDone += op->Size;
+                observer.SetProgress(0, CaclProg(totalDone, script->TotalSize));
+            }
+            break;
+        }
+        case ocCountSize:
+            totalDone += op->Size;
+            break;
+        case ocConvert:
+        {
+            if (tgtBuffer == NULL)
+            {
+                tgtBuffer = (char*)malloc(OPERATION_BUFFER * 2);
+                if (tgtBuffer == NULL)
+                {
+                    Error = TRUE;
+                    break;
+                }
+            }
+            pd.Operation = workerState.OpStrConverting;
+            pd.Source = op->SourceName;
+            pd.Preposition = "";
+            pd.Target = "";
+            observer.SetOperationInfo(&pd);
+            observer.SetProgress(0, CaclProg(totalDone, script->TotalSize));
+
+            Error = !DoConvert(observer, op->SourceName, (char*)buffer, tgtBuffer, op->Size, script,
+                               totalDone, convertDataLocal, workerState);
+            break;
+        }
+        case ocChangeAttrs:
+        {
+            pd.Operation = workerState.OpStrChangingAttrs;
+            pd.Source = op->SourceName;
+            pd.Preposition = "";
+            pd.Target = "";
+            observer.SetOperationInfo(&pd);
+            observer.SetProgress(0, CaclProg(totalDone, script->TotalSize));
+
+            BOOL changeCompr = attrsData != NULL ? attrsData->ChangeCompression : FALSE;
+            BOOL changeEncr = attrsData != NULL ? attrsData->ChangeEncryption : FALSE;
+            Error = !DoChangeAttrs(observer, op->SourceName, op->Size, (DWORD)(DWORD_PTR)op->TargetName,
+                                   script, totalDone,
+                                   attrsData != NULL && attrsData->ChangeTimeModified ? &attrsData->TimeModified : NULL,
+                                   attrsData != NULL && attrsData->ChangeTimeCreated ? &attrsData->TimeCreated : NULL,
+                                   attrsData != NULL && attrsData->ChangeTimeAccessed ? &attrsData->TimeAccessed : NULL,
+                                   changeCompr, changeEncr,
+                                   op->Attr, workerState,
+                                   op->SourceNameW);
+            break;
+        }
+        case ocLabelForSkipOfCreateDir:
+            break;
+        }
+        if (Error)
+            break;
+        observer.WaitIfSuspended();
+    }
+
+    if (asyncPar != NULL)
+        delete asyncPar;
+    if (tgtBuffer != NULL)
+        free(tgtBuffer);
+    if (bufferIsAllocated)
+        free(buffer);
+
+    BOOL success = !Error && !observer.IsCancelled();
+    observer.SetError(Error != FALSE);
+    observer.NotifyDone();
+    return success;
+}
+
 unsigned ThreadWorkerEH(void* param)
 {
 #ifndef CALLSTK_DISABLE
