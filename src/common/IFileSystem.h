@@ -97,6 +97,18 @@ inline FileResult MoveFileA(IFileSystem* fs, const char* source, const char* tar
     return fs->MoveFile(wideSource.c_str(), wideTarget.c_str());
 }
 
+// Wide-path-aware MoveFile: uses wideSource/wideTarget when non-empty, otherwise falls back to ANSI conversion
+inline FileResult MoveFileAW(IFileSystem* fs, const char* source, const char* target,
+                             const std::wstring& wideSource, const std::wstring& wideTarget)
+{
+    std::wstring srcFallback, tgtFallback;
+    const std::wstring& src = !wideSource.empty() ? wideSource : (srcFallback = AnsiPathToWide(source));
+    const std::wstring& tgt = !wideTarget.empty() ? wideTarget : (tgtFallback = AnsiPathToWide(target));
+    if ((src.empty() && source && *source) || (tgt.empty() && target && *target))
+        return FileResult::Error(GetLastError());
+    return fs->MoveFile(src.c_str(), tgt.c_str());
+}
+
 inline FileResult CopyFileA(IFileSystem* fs, const char* source, const char* target, bool failIfExists)
 {
     std::wstring wideSource = AnsiPathToWide(source);

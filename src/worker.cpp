@@ -716,6 +716,45 @@ DWORD COperation::GetTargetAttributes() const
         return SalLPGetFileAttributes(TargetName);
     }
 }
+
+// Deletes source file - uses SourceNameW if available
+BOOL COperation::DeleteSourceFile() const
+{
+    if (HasWideSource())
+    {
+        return DeleteFileW(SourceNameW.c_str());
+    }
+    else
+    {
+        return SalLPDeleteFile(SourceName);
+    }
+}
+
+// Sets source file attributes - uses SourceNameW if available
+BOOL COperation::SetSourceAttributes(DWORD attrs) const
+{
+    if (HasWideSource())
+    {
+        return SetFileAttributesW(SourceNameW.c_str(), attrs);
+    }
+    else
+    {
+        return SalLPSetFileAttributes(SourceName, attrs);
+    }
+}
+
+// Gets source file attributes - uses SourceNameW if available
+DWORD COperation::GetSourceAttributes() const
+{
+    if (HasWideSource())
+    {
+        return GetFileAttributesW(SourceNameW.c_str());
+    }
+    else
+    {
+        return SalLPGetFileAttributes(SourceName);
+    }
+}
 //
 // ****************************************************************************
 // COperations
@@ -5809,6 +5848,10 @@ BOOL DoMoveFile(COperation* op, HWND hProgressDlg, void* buffer,
         CPathBuffer targetNameMvDirCopy; // Heap-allocated for long path support
         MakeCopyWithBackslashIfNeeded(targetNameMvDir, targetNameMvDirCopy);
 
+        // Compute wide versions for Unicode-correct file operations
+        std::wstring sourceNameMvDirW = op->HasWideSource() ? MakeCopyWithBackslashIfNeededW(op->SourceNameW.c_str()) : std::wstring();
+        std::wstring targetNameMvDirW = op->HasWideTarget() ? MakeCopyWithBackslashIfNeededW(op->TargetNameW.c_str()) : std::wstring();
+
         int autoRetryAttempts = 0;
         CSrcSecurity srcSecurity;
         BOOL srcSecurityErr = FALSE;
@@ -5856,7 +5899,7 @@ BOOL DoMoveFile(COperation* op, HWND hProgressDlg, void* buffer,
             dirTimeModifiedIsValid = GetDirTime(sourceNameMvDir, &dirTimeModified);
         while (1)
         {
-            if (!invalidName && !*novellRenamePatch && MoveFileA(gFileSystem, sourceNameMvDir, targetNameMvDir).success)
+            if (!invalidName && !*novellRenamePatch && MoveFileAW(gFileSystem, sourceNameMvDir, targetNameMvDir, sourceNameMvDirW, targetNameMvDirW).success)
             {
                 if (script->CopyAttrs && (op->Attr & FILE_ATTRIBUTE_ARCHIVE) == 0) // Archive attribute was not set, MoveFile turned it on, clear it again
                     SalLPSetFileAttributes(targetNameMvDir, op->Attr);                  // leave without handling or retry, not important (it normally toggles chaotically)
@@ -5973,7 +6016,7 @@ BOOL DoMoveFile(COperation* op, HWND hProgressDlg, void* buffer,
                 {
                     DWORD attr = SalGetFileAttributes(sourceNameMvDir);
                     BOOL setAttr = ClearReadOnlyAttr(sourceNameMvDir, attr);
-                    if (MoveFileA(gFileSystem, sourceNameMvDir, targetNameMvDir).success)
+                    if (MoveFileAW(gFileSystem, sourceNameMvDir, targetNameMvDir, sourceNameMvDirW, targetNameMvDirW).success)
                     {
                         if (!*novellRenamePatch)
                             *novellRenamePatch = TRUE; // the next operations will go straight through here
@@ -6319,7 +6362,7 @@ BOOL DoMoveFile(COperation* op, HWND hProgressDlg, void* buffer,
             ClearReadOnlyAttr(op->SourceName); // ensure it can be deleted
             while (1)
             {
-                if (DeleteFileA(gFileSystem, op->SourceName).success)
+                if (op->HasWideSource() ? DeleteFileW(op->SourceNameW.c_str()) : DeleteFileA(gFileSystem, op->SourceName).success)
                     break;
                 {
                     DWORD err = GetLastError();
@@ -6357,7 +6400,8 @@ BOOL DoMoveFile(COperation* op, HWND hProgressDlg, void* buffer,
 }
 
 BOOL DoDeleteFile(HWND hProgressDlg, char* name, const CQuadWord& size, COperations* script,
-                  CQuadWord& totalDone, DWORD attr, CProgressDlgData& dlgData)
+                  CQuadWord& totalDone, DWORD attr, CProgressDlgData& dlgData,
+                  const std::wstring& nameW = std::wstring())
 {
     // if the path ends with a space/dot it is invalid and we must not delete it,
     // DeleteFile would trim the spaces/dots and remove a different file
@@ -6473,7 +6517,7 @@ BOOL DoDeleteFile(HWND hProgressDlg, char* name, const CQuadWord& size, COperati
             }
             else
             {
-                if (!DeleteFileA(gFileSystem, name).success)
+                if (!nameW.empty() ? !DeleteFileW(nameW.c_str()) : !DeleteFileA(gFileSystem, name).success)
                     err = GetLastError();
             }
         }
@@ -8326,7 +8370,8 @@ unsigned ThreadWorkerBody(void* parameter)
                 if (op->Opcode == ocDeleteFile)
                 {
                     Error = !DoDeleteFile(hProgressDlg, op->SourceName, op->Size,
-                                          script, totalDone, op->Attr, dlgData);
+                                          script, totalDone, op->Attr, dlgData,
+                                          op->SourceNameW);
                 }
                 else
                 {

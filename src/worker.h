@@ -370,8 +370,11 @@ struct COperation
     HANDLE OpenTargetFile(DWORD access, DWORD shareMode, DWORD disposition, DWORD flags) const;
     HANDLE CreateTargetFileEx(DWORD desiredAccess, DWORD shareMode, DWORD flagsAndAttributes, BOOL* encryptionNotSupported) const;
     BOOL DeleteTargetFile() const;
+    BOOL DeleteSourceFile() const;
     BOOL SetTargetAttributes(DWORD attrs) const;
+    BOOL SetSourceAttributes(DWORD attrs) const;
     DWORD GetTargetAttributes() const;
+    DWORD GetSourceAttributes() const;
 };
 
 class COperations
