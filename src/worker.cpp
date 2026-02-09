@@ -2121,6 +2121,221 @@ DWORD MyDecryptFile(char* fileName, DWORD attrs, BOOL preserveDate)
     return ret;
 }
 
+// --- Wide versions of compression/encryption helpers ---
+// These are the real implementations; the ANSI versions above will eventually
+// become thin wrappers that convert and call these.
+
+DWORD CompressFileW(const wchar_t* fileName, DWORD attrs)
+{
+    DWORD ret = ERROR_SUCCESS;
+    if (attrs & FILE_ATTRIBUTE_COMPRESSED)
+        return ret;
+
+    std::wstring fileNameCrFile = MakeCopyWithBackslashIfNeededW(fileName);
+
+    BOOL attrsChange = FALSE;
+    if (attrs & FILE_ATTRIBUTE_READONLY)
+    {
+        attrsChange = TRUE;
+        SetFileAttributesW(fileNameCrFile.c_str(), attrs & ~FILE_ATTRIBUTE_READONLY);
+    }
+    HANDLE file = CreateFileW(fileNameCrFile.c_str(), FILE_READ_DATA | FILE_WRITE_DATA,
+                              FILE_SHARE_READ | FILE_SHARE_WRITE, NULL,
+                              OPEN_EXISTING, FILE_FLAG_BACKUP_SEMANTICS, NULL);
+    if (file == INVALID_HANDLE_VALUE)
+        ret = GetLastError();
+    else
+    {
+        USHORT state = COMPRESSION_FORMAT_DEFAULT;
+        ULONG length;
+        if (!DeviceIoControl(file, FSCTL_SET_COMPRESSION, &state,
+                             sizeof(USHORT), NULL, 0, &length, FALSE))
+            ret = GetLastError();
+        HANDLES(CloseHandle(file));
+    }
+    if (attrsChange)
+        SetFileAttributesW(fileNameCrFile.c_str(), attrs);
+    return ret;
+}
+
+DWORD UncompressFileW(const wchar_t* fileName, DWORD attrs)
+{
+    DWORD ret = ERROR_SUCCESS;
+    if ((attrs & FILE_ATTRIBUTE_COMPRESSED) == 0)
+        return ret;
+
+    std::wstring fileNameCrFile = MakeCopyWithBackslashIfNeededW(fileName);
+
+    BOOL attrsChange = FALSE;
+    if (attrs & FILE_ATTRIBUTE_READONLY)
+    {
+        attrsChange = TRUE;
+        SetFileAttributesW(fileNameCrFile.c_str(), attrs & ~FILE_ATTRIBUTE_READONLY);
+    }
+
+    HANDLE file = CreateFileW(fileNameCrFile.c_str(), FILE_READ_DATA | FILE_WRITE_DATA,
+                              FILE_SHARE_READ | FILE_SHARE_WRITE,
+                              NULL, OPEN_EXISTING, FILE_FLAG_BACKUP_SEMANTICS, NULL);
+    if (file == INVALID_HANDLE_VALUE)
+        ret = GetLastError();
+    else
+    {
+        USHORT state = COMPRESSION_FORMAT_NONE;
+        ULONG length;
+        if (!DeviceIoControl(file, FSCTL_SET_COMPRESSION, &state,
+                             sizeof(USHORT), NULL, 0, &length, FALSE))
+            ret = GetLastError();
+        HANDLES(CloseHandle(file));
+    }
+    if (attrsChange)
+        SetFileAttributesW(fileNameCrFile.c_str(), attrs);
+    return ret;
+}
+
+DWORD MyDecryptFileW(const wchar_t* fileName, DWORD attrs, BOOL preserveDate)
+{
+    DWORD ret = ERROR_SUCCESS;
+    if ((attrs & FILE_ATTRIBUTE_ENCRYPTED) == 0)
+        return ret;
+
+    std::wstring fileNameCrFile = MakeCopyWithBackslashIfNeededW(fileName);
+
+    BOOL attrsChange = FALSE;
+    if (attrs & FILE_ATTRIBUTE_READONLY)
+    {
+        attrsChange = TRUE;
+        SetFileAttributesW(fileNameCrFile.c_str(), attrs & ~FILE_ATTRIBUTE_READONLY);
+    }
+    if (preserveDate)
+    {
+        HANDLE file;
+        file = CreateFileW(fileNameCrFile.c_str(), GENERIC_READ,
+                           FILE_SHARE_READ | FILE_SHARE_WRITE,
+                           NULL, OPEN_EXISTING,
+                           (attrs & FILE_ATTRIBUTE_DIRECTORY) ? FILE_FLAG_BACKUP_SEMANTICS : 0, NULL);
+        if (file != INVALID_HANDLE_VALUE)
+        {
+            FILETIME ftCreated, ftModified;
+            GetFileTime(file, &ftCreated, NULL, &ftModified);
+            HANDLES(CloseHandle(file));
+
+            if (!DecryptFileW(fileNameCrFile.c_str(), 0))
+                ret = GetLastError();
+
+            file = CreateFileW(fileNameCrFile.c_str(), GENERIC_WRITE,
+                               FILE_SHARE_READ | FILE_SHARE_WRITE,
+                               NULL, OPEN_EXISTING,
+                               (attrs & FILE_ATTRIBUTE_DIRECTORY) ? FILE_FLAG_BACKUP_SEMANTICS : 0, NULL);
+            if (file != INVALID_HANDLE_VALUE)
+            {
+                SetFileTime(file, &ftCreated, NULL, &ftModified);
+                HANDLES(CloseHandle(file));
+            }
+        }
+        else
+            ret = GetLastError();
+    }
+    else
+    {
+        if (!DecryptFileW(fileNameCrFile.c_str(), 0))
+            ret = GetLastError();
+    }
+    if (attrsChange)
+        SetFileAttributesW(fileNameCrFile.c_str(), attrs);
+    return ret;
+}
+
+DWORD MyEncryptFileW(IWorkerObserver& observer, const wchar_t* fileName, const char* fileNameA,
+                     DWORD attrs, DWORD finalAttrs,
+                     CWorkerState& dlgData, BOOL& cancelOper, BOOL preserveDate)
+{
+    DWORD retEnc = ERROR_SUCCESS;
+    cancelOper = FALSE;
+    if (attrs & FILE_ATTRIBUTE_ENCRYPTED)
+        return retEnc;
+
+    std::wstring fileNameCrFile = MakeCopyWithBackslashIfNeededW(fileName);
+
+    // SYSTEM attribute check — EncryptFile reports "access denied" for SYSTEM files
+    if ((attrs & FILE_ATTRIBUTE_SYSTEM) && (finalAttrs & FILE_ATTRIBUTE_SYSTEM))
+    {
+        if (!dlgData.EncryptSystemAll)
+        {
+            observer.WaitIfSuspended();
+            if (observer.IsCancelled())
+                return retEnc;
+
+            if (dlgData.SkipAllEncryptSystem)
+                return retEnc;
+
+            int ret = IDCANCEL;
+            ret = observer.AskHiddenOrSystem(LoadStr(IDS_CONFIRMSFILEENCRYPT), fileNameA, LoadStr(IDS_ENCRYPTSFILE));
+            switch (ret)
+            {
+            case IDB_ALL:
+                dlgData.EncryptSystemAll = TRUE;
+            case IDYES:
+                break;
+
+            case IDB_SKIPALL:
+                dlgData.SkipAllEncryptSystem = TRUE;
+            case IDB_SKIP:
+                return retEnc;
+
+            case IDCANCEL:
+            {
+                cancelOper = TRUE;
+                return retEnc;
+            }
+            }
+        }
+    }
+
+    BOOL attrsChange = FALSE;
+    if (attrs & (FILE_ATTRIBUTE_SYSTEM | FILE_ATTRIBUTE_READONLY))
+    {
+        attrsChange = TRUE;
+        SetFileAttributesW(fileNameCrFile.c_str(), attrs & ~(FILE_ATTRIBUTE_SYSTEM | FILE_ATTRIBUTE_READONLY));
+    }
+    if (preserveDate)
+    {
+        HANDLE file;
+        file = CreateFileW(fileNameCrFile.c_str(), GENERIC_READ,
+                           FILE_SHARE_READ | FILE_SHARE_WRITE,
+                           NULL, OPEN_EXISTING,
+                           (attrs & FILE_ATTRIBUTE_DIRECTORY) ? FILE_FLAG_BACKUP_SEMANTICS : 0, NULL);
+        if (file != INVALID_HANDLE_VALUE)
+        {
+            FILETIME ftCreated, ftModified;
+            GetFileTime(file, &ftCreated, NULL, &ftModified);
+            HANDLES(CloseHandle(file));
+
+            if (!EncryptFileW(fileNameCrFile.c_str()))
+                retEnc = GetLastError();
+
+            file = CreateFileW(fileNameCrFile.c_str(), GENERIC_WRITE,
+                               FILE_SHARE_READ | FILE_SHARE_WRITE,
+                               NULL, OPEN_EXISTING,
+                               (attrs & FILE_ATTRIBUTE_DIRECTORY) ? FILE_FLAG_BACKUP_SEMANTICS : 0, NULL);
+            if (file != INVALID_HANDLE_VALUE)
+            {
+                SetFileTime(file, &ftCreated, NULL, &ftModified);
+                HANDLES(CloseHandle(file));
+            }
+        }
+        else
+            retEnc = GetLastError();
+    }
+    else
+    {
+        if (!EncryptFileW(fileNameCrFile.c_str()))
+            retEnc = GetLastError();
+    }
+    if (attrsChange)
+        SetFileAttributesW(fileNameCrFile.c_str(), attrs);
+    return retEnc;
+}
+
 BOOL CheckFileOrDirADS(const char* fileName, BOOL isDir, CQuadWord* adsSize, wchar_t*** streamNames,
                        int* streamNamesCount, BOOL* lowMemory, DWORD* winError,
                        DWORD bytesPerCluster, CQuadWord* adsOccupiedSpace,
@@ -7642,7 +7857,8 @@ BOOL DoChangeAttrs(IWorkerObserver& observer, char* name, const CQuadWord& size,
                    COperations* script, CQuadWord& totalDone,
                    FILETIME* timeModified, FILETIME* timeCreated, FILETIME* timeAccessed,
                    BOOL& changeCompression, BOOL& changeEncryption, DWORD fileAttr,
-                   CWorkerState& dlgData)
+                   CWorkerState& dlgData,
+                   const std::wstring& nameW = std::wstring())
 {
     // if the path ends with a space/dot, we must append '\\'; otherwise
     // SetFileAttributes (and others) trims the spaces/dots and operates
@@ -7650,6 +7866,11 @@ BOOL DoChangeAttrs(IWorkerObserver& observer, char* name, const CQuadWord& size,
     const char* nameSetAttrs = name;
     CPathBuffer nameSetAttrsCopy; // Heap-allocated for long path support
     MakeCopyWithBackslashIfNeeded(nameSetAttrs, nameSetAttrsCopy);
+
+    // Use wide path for SetFileAttributes if available
+    std::wstring nameSetAttrsW;
+    if (!nameW.empty())
+        nameSetAttrsW = MakeCopyWithBackslashIfNeededW(nameW.c_str());
 
     while (1)
     {
@@ -7659,7 +7880,8 @@ BOOL DoChangeAttrs(IWorkerObserver& observer, char* name, const CQuadWord& size,
         char* errTitle = NULL;
         if (changeCompression && (attrs & FILE_ATTRIBUTE_COMPRESSED) == 0)
         {
-            error = UncompressFile(name, fileAttr);
+            error = !nameW.empty() ? UncompressFileW(nameW.c_str(), fileAttr)
+                                   : UncompressFile(name, fileAttr);
             if (error != ERROR_SUCCESS)
             {
                 errTitle = LoadStr(IDS_ERRORCOMPRESSING);
@@ -7669,7 +7891,8 @@ BOOL DoChangeAttrs(IWorkerObserver& observer, char* name, const CQuadWord& size,
         }
         if (error == ERROR_SUCCESS && changeEncryption && (attrs & FILE_ATTRIBUTE_ENCRYPTED) == 0)
         {
-            error = MyDecryptFile(name, fileAttr, TRUE);
+            error = !nameW.empty() ? MyDecryptFileW(nameW.c_str(), fileAttr, TRUE)
+                                   : MyDecryptFile(name, fileAttr, TRUE);
             if (error != ERROR_SUCCESS)
             {
                 errTitle = LoadStr(IDS_ERRORENCRYPTING);
@@ -7679,7 +7902,8 @@ BOOL DoChangeAttrs(IWorkerObserver& observer, char* name, const CQuadWord& size,
         }
         if (error == ERROR_SUCCESS && changeCompression && (attrs & FILE_ATTRIBUTE_COMPRESSED))
         {
-            error = CompressFile(name, fileAttr);
+            error = !nameW.empty() ? CompressFileW(nameW.c_str(), fileAttr)
+                                   : CompressFile(name, fileAttr);
             if (error != ERROR_SUCCESS)
             {
                 errTitle = LoadStr(IDS_ERRORCOMPRESSING);
@@ -7690,7 +7914,8 @@ BOOL DoChangeAttrs(IWorkerObserver& observer, char* name, const CQuadWord& size,
         if (error == ERROR_SUCCESS && changeEncryption && (attrs & FILE_ATTRIBUTE_ENCRYPTED))
         {
             BOOL cancelOper = FALSE;
-            error = MyEncryptFile(observer, name, fileAttr, attrs, dlgData, cancelOper, TRUE);
+            error = !nameW.empty() ? MyEncryptFileW(observer, nameW.c_str(), name, fileAttr, attrs, dlgData, cancelOper, TRUE)
+                                   : MyEncryptFile(observer, name, fileAttr, attrs, dlgData, cancelOper, TRUE);
             if (observer.IsCancelled() || cancelOper)
                 return FALSE;
             if (error != ERROR_SUCCESS)
@@ -7713,7 +7938,9 @@ BOOL DoChangeAttrs(IWorkerObserver& observer, char* name, const CQuadWord& size,
             observer.NotifyError(LoadStr((showCompressErr && (attrs & FILE_ATTRIBUTE_COMPRESSED) || !showEncryptErr) ? IDS_ERRORCOMPRESSING : IDS_ERRORENCRYPTING), name, LoadStr((showCompressErr && (attrs & FILE_ATTRIBUTE_COMPRESSED) || !showEncryptErr) ? IDS_COMPRNOTSUPPORTED : IDS_ENCRYPNOTSUPPORTED));
             error = ERROR_SUCCESS;
         }
-        if (error == ERROR_SUCCESS && SalLPSetFileAttributes(nameSetAttrs, attrs))
+        if (error == ERROR_SUCCESS &&
+            (!nameSetAttrsW.empty() ? SetFileAttributesW(nameSetAttrsW.c_str(), attrs)
+                                    : SalLPSetFileAttributes(nameSetAttrs, attrs)))
         {
             BOOL isDir = ((attrs & FILE_ATTRIBUTE_DIRECTORY) != 0);
             // if any of the timestamps need to be set
@@ -7721,10 +7948,19 @@ BOOL DoChangeAttrs(IWorkerObserver& observer, char* name, const CQuadWord& size,
             {
                 HANDLE file;
                 if (attrs & FILE_ATTRIBUTE_READONLY)
-                    SalLPSetFileAttributes(nameSetAttrs, attrs & (~FILE_ATTRIBUTE_READONLY));
-                file = SalCreateFileH(nameSetAttrs, GENERIC_READ | GENERIC_WRITE,
-                                      FILE_SHARE_READ | FILE_SHARE_WRITE,
-                                      NULL, OPEN_EXISTING, isDir ? FILE_FLAG_BACKUP_SEMANTICS : 0, NULL);
+                {
+                    if (!nameSetAttrsW.empty())
+                        SetFileAttributesW(nameSetAttrsW.c_str(), attrs & (~FILE_ATTRIBUTE_READONLY));
+                    else
+                        SalLPSetFileAttributes(nameSetAttrs, attrs & (~FILE_ATTRIBUTE_READONLY));
+                }
+                file = !nameSetAttrsW.empty()
+                           ? CreateFileW(nameSetAttrsW.c_str(), GENERIC_READ | GENERIC_WRITE,
+                                         FILE_SHARE_READ | FILE_SHARE_WRITE,
+                                         NULL, OPEN_EXISTING, isDir ? FILE_FLAG_BACKUP_SEMANTICS : 0, NULL)
+                           : SalCreateFileH(nameSetAttrs, GENERIC_READ | GENERIC_WRITE,
+                                            FILE_SHARE_READ | FILE_SHARE_WRITE,
+                                            NULL, OPEN_EXISTING, isDir ? FILE_FLAG_BACKUP_SEMANTICS : 0, NULL);
                 if (file != INVALID_HANDLE_VALUE)
                 {
                     FILETIME ftCreated, ftAccessed, ftModified;
@@ -7738,12 +7974,22 @@ BOOL DoChangeAttrs(IWorkerObserver& observer, char* name, const CQuadWord& size,
                     SetFileTime(file, &ftCreated, &ftAccessed, &ftModified);
                     HANDLES(CloseHandle(file));
                     if (attrs & FILE_ATTRIBUTE_READONLY)
-                        SalLPSetFileAttributes(nameSetAttrs, attrs);
+                    {
+                        if (!nameSetAttrsW.empty())
+                            SetFileAttributesW(nameSetAttrsW.c_str(), attrs);
+                        else
+                            SalLPSetFileAttributes(nameSetAttrs, attrs);
+                    }
                 }
                 else
                 {
                     if (attrs & FILE_ATTRIBUTE_READONLY)
-                        SalLPSetFileAttributes(nameSetAttrs, attrs);
+                    {
+                        if (!nameSetAttrsW.empty())
+                            SetFileAttributesW(nameSetAttrsW.c_str(), attrs);
+                        else
+                            SalLPSetFileAttributes(nameSetAttrs, attrs);
+                    }
                     goto SHOW_ERROR;
                 }
             }
@@ -8148,7 +8394,8 @@ unsigned ThreadWorkerBody(void* parameter)
                                        attrsData->ChangeTimeCreated ? &attrsData->TimeCreated : NULL,
                                        attrsData->ChangeTimeAccessed ? &attrsData->TimeAccessed : NULL,
                                        attrsData->ChangeCompression, attrsData->ChangeEncryption,
-                                       op->Attr, dlgData);
+                                       op->Attr, dlgData,
+                                       op->SourceNameW);
                 break;
             }
 
