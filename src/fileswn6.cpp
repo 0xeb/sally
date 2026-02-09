@@ -2786,6 +2786,8 @@ BOOL CFilesWindow::BuildScriptFile(COperations* script, CActionType type, char* 
             return skip;
         }
         op.TargetName = NULL;
+        if (fileNameW != NULL)
+            op.SetSourceNameW(sourcePath, fileNameW);
         script->Add(op);
         if (!script->IsGood())
         {
@@ -2893,6 +2895,8 @@ BOOL CFilesWindow::BuildScriptFile(COperations* script, CActionType type, char* 
             op.Size = fileSizeLoc;
         else
             op.Size = CONVERT_MIN_FILE_SIZE; // zero/small files take at least as long as files of size CONVERT_MIN_FILE_SIZE
+        if (fileNameW != NULL)
+            op.SetSourceNameW(sourcePath, fileNameW);
         script->Add(op);
         if (!script->IsGood())
         {
@@ -2920,6 +2924,8 @@ BOOL CFilesWindow::BuildScriptFile(COperations* script, CActionType type, char* 
         }
         op.TargetName = (char*)(DWORD_PTR)((SalGetFileAttributes(op.SourceName) & attrsData->AttrAnd) | attrsData->AttrOr);
         op.OwnsTargetName = false;  // TargetName stores attributes, not a pointer
+        if (fileNameW != NULL)
+            op.SetSourceNameW(sourcePath, fileNameW);
         script->Add(op);
         if (!script->IsGood())
         {
@@ -2956,7 +2962,15 @@ BOOL CFilesWindow::BuildScriptFile(COperations* script, CActionType type, char* 
                       chCaseData->FileNameFormat, chCaseData->Change, FALSE);
         BOOL sameName = strcmp(op.SourceName + offset, op.TargetName + offset) == 0;
         if (!sameName)
+        {
+            if (fileNameW != NULL)
+            {
+                op.SetSourceNameW(sourcePath, fileNameW);
+                std::wstring alteredW = AlterFileNameW(fileNameW, chCaseData->FileNameFormat, chCaseData->Change, FALSE);
+                op.SetTargetNameW(sourcePath, alteredW);
+            }
             script->Add(op);
+        }
         if (sameName || !script->IsGood())
         {
             free(op.SourceName);
