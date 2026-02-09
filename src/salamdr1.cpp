@@ -1237,7 +1237,7 @@ BOOL HasTheSameRootPathAndVolume(const char* p1, const char* p2)
         char p2Volume[100] = "2";
         CPathBuffer resPath;  // Heap-allocated for long path support
         lstrcpyn(resPath, p1, resPath.Size());
-        ResolveSubsts(resPath);
+        ResolveSubsts(resPath, resPath.Size());
         GetRootPath(root, resPath);
         if (!IsUNCPath(root) && GetDriveType(root) == DRIVE_FIXED) // it makes sense to look for reparse points only on fixed drives
         {
@@ -1299,10 +1299,10 @@ BOOL PathsAreOnTheSameVolume(const char* path1, const char* path2, BOOL* resIsOn
     CPathBuffer path1NetPath; // Heap-allocated for long path support
     CPathBuffer path2NetPath; // Heap-allocated for long path support
     lstrcpyn(ourPath, path1, ourPath.Size());
-    ResolveSubsts(ourPath);
+    ResolveSubsts(ourPath, ourPath.Size());
     GetRootPath(root1, ourPath);
     lstrcpyn(ourPath, path2, ourPath.Size());
-    ResolveSubsts(ourPath);
+    ResolveSubsts(ourPath, ourPath.Size());
     GetRootPath(root2, ourPath);
     BOOL ret = TRUE;
     BOOL trySimpleTest = TRUE;
@@ -1400,7 +1400,7 @@ BOOL PathsAreOnTheSameVolume(const char* path1, const char* path2, BOOL* resIsOn
         {
             lstrcpyn(path1NetPath, path1, path1NetPath.Size());
             lstrcpyn(path2NetPath, path2, path2NetPath.Size());
-            if (ResolveSubsts(path1NetPath) && ResolveSubsts(path2NetPath))
+            if (ResolveSubsts(path1NetPath, path1NetPath.Size()) && ResolveSubsts(path2NetPath, path2NetPath.Size()))
             {
                 if (IsTheSamePath(path1NetPath, path2NetPath))
                     *resIsOnlyEstimation = FALSE; // same paths = definitely same volumes

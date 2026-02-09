@@ -1114,7 +1114,7 @@ BOOL IsUNCRootPath(const char* path)
     return FALSE;
 }
 
-BOOL ResolveSubsts(char* resPath)
+BOOL ResolveSubsts(char* resPath, int resPathSize)
 {
     BOOL ret = TRUE;
     int cycle = 0;
@@ -1141,12 +1141,17 @@ BOOL ResolveSubsts(char* resPath)
                 tgt[2] = '\\';
                 tgt[3] = 0;
             }
-            lstrcpyn(resPath, tgt, MAX_PATH);
+            lstrcpyn(resPath, tgt, resPathSize);
         }
         else
             break;
     }
     return ret;
+}
+
+BOOL ResolveSubsts(char* resPath)
+{
+    return ResolveSubsts(resPath, MAX_PATH);
 }
 
 // Wide wrapper: converts to ANSI, calls ResolveSubsts, converts back.
@@ -1156,7 +1161,7 @@ BOOL ResolveSubstsW(wchar_t* resPath, int resPathSize)
     std::string pathA = WideToAnsi(resPath);
     CPathBuffer buf;
     lstrcpyn(buf, pathA.c_str(), buf.Size());
-    BOOL ret = ResolveSubsts(buf);
+    BOOL ret = ResolveSubsts(buf, buf.Size());
     std::wstring result = AnsiToWide(buf.Get());
     lstrcpynW(resPath, result.c_str(), resPathSize);
     return ret;
@@ -1218,7 +1223,7 @@ void ResolveLocalPathWithReparsePoints(char* resPath, const char* path, BOOL* cu
                         if (linkType != NULL)
                             *linkType = repPointType;
                     }
-                    ResolveSubsts(repPointPath);
+                    ResolveSubsts(repPointPath, repPointPath.Size());
                 }
                 firstRepPoint = FALSE;
                 UINT drvType = getRepPointDestRes && repPointPath[0] != 0 && repPointPath[1] == ':' ? GetDriveTypeForDriveLetterPath(repPointPath) : DRIVE_UNKNOWN;
@@ -1269,7 +1274,7 @@ BOOL MyGetDiskFreeSpace(const char* path, LPDWORD lpSectorsPerCluster,
     CPathBuffer ourPath; // Heap-allocated for long path support
     CPathBuffer resPath; // Heap-allocated for long path support
     lstrcpyn(resPath, path, resPath.Size());
-    ResolveSubsts(resPath);
+    ResolveSubsts(resPath, resPath.Size());
     GetRootPath(ourPath, resPath);
     if (!IsUNCPath(ourPath) && GetDriveType(ourPath) == DRIVE_FIXED) // reparse points only make sense to look for on fixed disks
     {                                                                // gradually try shortening the path; on a mounted directory it can return the mounted disk parameters
@@ -1306,7 +1311,7 @@ BOOL MyGetVolumeInformation(const char* path, char* rootOrCurReparsePoint, char*
         *linkType = 0;
     CPathBuffer resPath; // Heap-allocated for long path support
     lstrcpyn(resPath, path, resPath.Size());
-    ResolveSubsts(resPath);
+    ResolveSubsts(resPath, resPath.Size());
     GetRootPath(ourPath, resPath);
     if (!IsUNCPath(ourPath) && GetDriveType(ourPath) == DRIVE_FIXED) // reparse points only make sense to look for on fixed disks
     {                                                                // gradually try shortening the path; on a mounted directory it can return the mounted disk parameters
@@ -1331,7 +1336,7 @@ BOOL MyGetVolumeInformation(const char* path, char* rootOrCurReparsePoint, char*
         if (!rootOrCurReparsePointSet && rootOrCurReparsePoint != NULL)
         { // ourPath is ResolveSubsts(path) or a shortened version of ResolveSubsts(path)
             GetRootPath(resPath, path);
-            ResolveSubsts(resPath);
+            ResolveSubsts(resPath, resPath.Size());
             GetRootPath(rootOrCurReparsePoint, path);
             if (strlen(resPath) < strlen(ourPath)) // if the path we return volume info for is longer than the path obtained by resolving the subst, we must append this part of the path after the subst root
             {
@@ -1577,7 +1582,7 @@ UINT MyGetDriveType(const char* path)
     CPathBuffer ourPath; // Heap-allocated for long path support
     CPathBuffer resPath; // Heap-allocated for long path support
     lstrcpyn(resPath, path, resPath.Size());
-    ResolveSubsts(resPath);
+    ResolveSubsts(resPath, resPath.Size());
     GetRootPath(ourPath, resPath);
     UINT ret = DRIVE_UNKNOWN;
     if (!IsUNCPath(ourPath))

@@ -387,7 +387,7 @@ void CFilesWindow::FilesAction(CActionType type, CFilesWindow* target, int count
                 if (type == atDelete && recycle != 1 && (f->Attr & FILE_ATTRIBUTE_REPARSE_POINT))
                 { // it's a link (junction, symlink or volume mount point)
                     lstrcpyn(formatedFileName, GetPath(), formatedFileName.Size());
-                    ResolveSubsts(formatedFileName);
+                    ResolveSubsts(formatedFileName, formatedFileName.Size());
                     int repPointType;
                     if (SalPathAppend(formatedFileName, f->Name, formatedFileName.Size()) &&
                         GetReparsePointDestination(formatedFileName, NULL, 0, &repPointType, TRUE))

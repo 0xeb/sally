@@ -503,7 +503,7 @@ BOOL GetResolvedPathMountPointAndGUID(const char* path, char* mountPoint, char* 
 {
     CPathBuffer resolvedPath; // Heap-allocated for long path support
     strcpy(resolvedPath, path);
-    ResolveSubsts(resolvedPath);
+    ResolveSubsts(resolvedPath, resolvedPath.Size());
     CPathBuffer rootPath; // Heap-allocated for long path support
     GetRootPath(rootPath, resolvedPath);
     BOOL remotePath = TRUE;

@@ -915,7 +915,8 @@ void SetCurrentDirectoryToSystem();
 
 // Replaces substs in path 'resPath' with their target paths (conversion to path without SUBST drive-letters);
 // returns FALSE on error
-BOOL ResolveSubsts(char* resPath);
+BOOL ResolveSubsts(char* resPath, int resPathSize);
+BOOL ResolveSubsts(char* resPath); // backward compat — uses MAX_PATH
 BOOL ResolveSubstsW(wchar_t* resPath, int resPathSize);
 
 // Resolves subst and reparse points for path 'path', then for mount-point path
