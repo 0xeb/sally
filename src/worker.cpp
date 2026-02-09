@@ -1308,6 +1308,15 @@ struct CWorkerState
     BOOL IgnoreAllCopyPermErr;
     BOOL IgnoreAllCopyDirTimeErr;
 
+    char OpStrCopying[50];
+    char OpStrCopyingPrep[50];
+    char OpStrMoving[50];
+    char OpStrMovingPrep[50];
+    char OpStrCreatingDir[50];
+    char OpStrDeleting[50];
+    char OpStrConverting[50];
+    char OpStrChangingAttrs[50];
+
     int CnfrmFileOver; // local copy of the Salamander configuration
     int CnfrmDirOver;
     int CnfrmSHFileOver;
@@ -6567,7 +6576,7 @@ BOOL DoDeleteFile(IWorkerObserver& observer, char* name, const CQuadWord& size, 
             }
             else
             {
-                if (!nameW.empty() ? !DeleteFileW(nameW.c_str()) : !DeleteFileA(gFileSystem, name).success)
+                if (!nameW.empty() ? !DeleteFileW(nameW.c_str()) : !SalLPDeleteFile(name))
                     err = GetLastError();
             }
         }
