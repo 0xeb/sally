@@ -34,6 +34,7 @@ set(SALAMANDER_SOURCES
   "${SAL_SRC}/common/Win32Process.cpp"
   "${SAL_SRC}/common/Win32Shell.cpp"
   "${SAL_SRC}/common/Win32Environment.cpp"
+  "${SAL_SRC}/common/BuildScript.cpp"
   "${SAL_SRC}/common/winlib.cpp"
   "${SAL_SRC}/common/dep/crypt/aescrypt.c"
   "${SAL_SRC}/common/dep/crypt/aeskey.c"

@@ -432,3 +432,27 @@ add_test(NAME gtest_snapshot COMMAND gtest_snapshot)
 set_target_properties(gtest_snapshot PROPERTIES
     RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/tests"
 )
+
+# End-to-end integration tests — full pipeline through headless worker
+add_executable(gtest_e2e_worker
+    gtest_e2e_worker.cpp
+)
+
+target_include_directories(gtest_e2e_worker PRIVATE
+    ${CMAKE_CURRENT_SOURCE_DIR}/../..
+    ${CMAKE_CURRENT_SOURCE_DIR}/../../common
+)
+
+target_compile_definitions(gtest_e2e_worker PRIVATE
+    WIN32 _WINDOWS _CRT_SECURE_NO_WARNINGS UNICODE _UNICODE
+)
+
+target_link_libraries(gtest_e2e_worker
+    GTest::gtest GTest::gtest_main
+)
+
+add_test(NAME gtest_e2e_worker COMMAND gtest_e2e_worker)
+
+set_target_properties(gtest_e2e_worker PROPERTIES
+    RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/tests"
+)
