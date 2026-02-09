@@ -3521,8 +3521,7 @@ void DoCopyFileLoopOrig(HANDLE& in, HANDLE& out, void* buffer, int& limitBufferS
                             SetEndOfFile(out);     // otherwise on a floppy the remaining bytes would be written
                         HANDLES(CloseHandle(out)); // close the invalid handle
                     }
-                    out = SalCreateFileH(op->TargetName, GENERIC_WRITE | GENERIC_READ, 0, NULL,
-                                         OPEN_ALWAYS, FILE_FLAG_SEQUENTIAL_SCAN, NULL);
+                    out = op->OpenTargetFile(GENERIC_WRITE | GENERIC_READ, 0, OPEN_ALWAYS, FILE_FLAG_SEQUENTIAL_SCAN);
                     if (out != INVALID_HANDLE_VALUE) // opened successfully; now adjust the offset
                     {
                         LONG lo, hi;
@@ -4881,7 +4880,7 @@ COPY_AGAIN:
                     if (out != INVALID_HANDLE_VALUE && (fileAttrs & FILE_ATTRIBUTE_ENCRYPTED))
                     { // verify that the Encrypted attribute is really set (on FAT it is simply ignored, the system does not return an error (for CreateFile specifically))
                         DWORD attrs;
-                        attrs = SalGetFileAttributes(op->TargetName);
+                        attrs = op->GetTargetAttributes();
                         if (attrs != INVALID_FILE_ATTRIBUTES && (attrs & FILE_ATTRIBUTE_ENCRYPTED) == 0)
                         { // unable to apply the Encrypted attribute, ask the user what to do...
                             if (dlgData.FileOutLossEncrAll)
@@ -5432,8 +5431,7 @@ COPY_AGAIN:
                                 GetFileOverwriteInfo(sAttr, _countof(sAttr), in, op->SourceName, &sFileTime, &getTimeFailed);
                                 HANDLES(CloseHandle(in));
                                 in = NULL;
-                                out = SalCreateFileH(op->TargetName, 0, FILE_SHARE_READ | FILE_SHARE_WRITE, NULL,
-                                                     OPEN_EXISTING, 0, NULL);
+                                out = op->OpenTargetFile(0, FILE_SHARE_READ | FILE_SHARE_WRITE, OPEN_EXISTING, 0);
                                 if (out != INVALID_HANDLE_VALUE)
                                 {
                                     GetFileOverwriteInfo(tAttr, _countof(tAttr), out, op->TargetName, &tFileTime, &getTimeFailed);
@@ -5515,7 +5513,7 @@ COPY_AGAIN:
                                 }
                             }
 
-                            DWORD attr = SalGetFileAttributes(op->TargetName);
+                            DWORD attr = op->GetTargetAttributes();
                             if (attr != INVALID_FILE_ATTRIBUTES && (attr & (FILE_ATTRIBUTE_HIDDEN | FILE_ATTRIBUTE_SYSTEM)))
                             {
                                 if (!dlgData.OverwriteHiddenAll && dlgData.CnfrmSHFileOver) // ignore script->OverwriteOlder here; user wants to see that this is a SYSTEM or HIDDEN file even with the option enabled
@@ -5547,7 +5545,7 @@ COPY_AGAIN:
                                         in = op->OpenSourceFile(asyncPar->GetOverlappedFlag() | FILE_FLAG_SEQUENTIAL_SCAN);
                                         if (in == INVALID_HANDLE_VALUE)
                                             goto OPEN_IN_ERROR;
-                                        attr = SalGetFileAttributes(op->TargetName); // refresh attributes in case the user changed them
+                                        attr = op->GetTargetAttributes(); // refresh attributes in case the user changed them
                                         break;
                                     }
 
@@ -5592,8 +5590,7 @@ COPY_AGAIN:
                                     CQuadWord origFileSize(0, 0); // file size before truncation
                                     if (mustDeleteFileBeforeOverwrite == 0 /* need test */)
                                     {
-                                        out = SalCreateFileH(op->TargetName, 0, FILE_SHARE_READ | FILE_SHARE_WRITE, NULL,
-                                                             OPEN_EXISTING, 0, NULL);
+                                        out = op->OpenTargetFile(0, FILE_SHARE_READ | FILE_SHARE_WRITE, OPEN_EXISTING, 0);
                                         if (out != INVALID_HANDLE_VALUE)
                                         {
                                             origFileSize.LoDWord = GetFileSize(out, &origFileSize.HiDWord);
@@ -5616,15 +5613,15 @@ COPY_AGAIN:
                                     fileAttrs = asyncPar->GetOverlappedFlag() | FILE_FLAG_SEQUENTIAL_SCAN |
                                                 (!lossEncryptionAttr && copyAsEncrypted ? FILE_ATTRIBUTE_ENCRYPTED : 0) | // setting attributes during CREATE_ALWAYS works since XP and is the only way to apply Encrypted attribute when the file denies read access
                                                 (script->CopyAttrs ? (op->Attr & (FILE_ATTRIBUTE_COMPRESSED | (lossEncryptionAttr ? 0 : FILE_ATTRIBUTE_ENCRYPTED))) : 0);
-                                    out = SalCreateFileH(op->TargetName, access, 0, NULL, CREATE_ALWAYS, fileAttrs, NULL);
+                                    out = op->OpenTargetFile(access, 0, CREATE_ALWAYS, fileAttrs);
                                     if (out == INVALID_HANDLE_VALUE && fileAttrs != (asyncPar->GetOverlappedFlag() | FILE_FLAG_SEQUENTIAL_SCAN)) // when the target disk cannot create an Encrypted file (observed on NTFS network disk (tested on share from XP) while logged in under a different username than we have in the system (on the current console) - the remote machine has a same-named user without a password, so it cannot be used over the network)
-                                        out = SalCreateFileH(op->TargetName, access, 0, NULL, CREATE_ALWAYS, asyncPar->GetOverlappedFlag() | FILE_FLAG_SEQUENTIAL_SCAN, NULL);
+                                        out = op->OpenTargetFile(access, 0, CREATE_ALWAYS, asyncPar->GetOverlappedFlag() | FILE_FLAG_SEQUENTIAL_SCAN);
                                     if (script->CopyAttrs && out == INVALID_HANDLE_VALUE)
                                     { // if read access to the directory is denied (we added it only for setting the Compressed attribute), try opening the file for write only
                                         access = GENERIC_WRITE;
-                                        out = SalCreateFileH(op->TargetName, access, 0, NULL, CREATE_ALWAYS, fileAttrs, NULL);
+                                        out = op->OpenTargetFile(access, 0, CREATE_ALWAYS, fileAttrs);
                                         if (out == INVALID_HANDLE_VALUE && fileAttrs != (asyncPar->GetOverlappedFlag() | FILE_FLAG_SEQUENTIAL_SCAN)) // when the target disk cannot create an Encrypted file (observed on NTFS network disk (tested on share from XP) while logged in under a different username than we have in the system (on the current console) - the remote machine has a same-named user without a password, so it cannot be used over the network)
-                                            out = SalCreateFileH(op->TargetName, access, 0, NULL, CREATE_ALWAYS, asyncPar->GetOverlappedFlag() | FILE_FLAG_SEQUENTIAL_SCAN, NULL);
+                                            out = op->OpenTargetFile(access, 0, CREATE_ALWAYS, asyncPar->GetOverlappedFlag() | FILE_FLAG_SEQUENTIAL_SCAN);
                                     }
                                     if (out == INVALID_HANDLE_VALUE) // target file cannot be opened for writing, so delete it and create it again
                                     {
@@ -5656,7 +5653,7 @@ COPY_AGAIN:
                                     if (mustDeleteFileBeforeOverwrite == 0 /* need test */)
                                     {
                                         HANDLES(CloseHandle(out));
-                                        out = SalCreateFileH(op->TargetName, access, 0, NULL, OPEN_ALWAYS, asyncPar->GetOverlappedFlag() | FILE_FLAG_SEQUENTIAL_SCAN, NULL);
+                                        out = op->OpenTargetFile(access, 0, OPEN_ALWAYS, asyncPar->GetOverlappedFlag() | FILE_FLAG_SEQUENTIAL_SCAN);
                                         if (out == INVALID_HANDLE_VALUE) // cannot reopen the target file we just opened, unlikely, try deleting and recreating it
                                         {
                                             targetCannotOpenForWrite = TRUE;
@@ -6106,15 +6103,13 @@ BOOL DoMoveFile(COperation* op, HWND hProgressDlg, void* buffer,
                     sourceNameMvDir == op->SourceName && targetNameMvDir == op->TargetName) // no invalid names allowed here (files only, and their names are validated)
                 {
                     HANDLE in, out;
-                    in = SalCreateFileH(op->SourceName, 0, FILE_SHARE_READ | FILE_SHARE_WRITE, NULL,
-                                        OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, NULL);
+                    in = op->OpenSourceFile(FILE_ATTRIBUTE_NORMAL);
                     if (in == INVALID_HANDLE_VALUE)
                     {
                         err = GetLastError();
                         goto NORMAL_ERROR;
                     }
-                    out = SalCreateFileH(op->TargetName, 0, FILE_SHARE_READ | FILE_SHARE_WRITE, NULL,
-                                         OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, NULL);
+                    out = op->OpenTargetFile(0, FILE_SHARE_READ | FILE_SHARE_WRITE, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL);
                     if (out == INVALID_HANDLE_VALUE)
                     {
                         err = GetLastError();
@@ -6201,7 +6196,7 @@ BOOL DoMoveFile(COperation* op, HWND hProgressDlg, void* buffer,
                         HANDLES(CloseHandle(out));
                     }
 
-                    DWORD attr = SalGetFileAttributes(op->TargetName);
+                    DWORD attr = op->GetTargetAttributes();
                     if (attr != INVALID_FILE_ATTRIBUTES && (attr & (FILE_ATTRIBUTE_HIDDEN | FILE_ATTRIBUTE_SYSTEM)))
                     {
                         if (!dlgData.OverwriteHiddenAll && dlgData.CnfrmSHFileOver) // ignore script->OverwriteOlder here; user wants to see that this is a SYSTEM or HIDDEN file even with the option enabled
@@ -6238,7 +6233,7 @@ BOOL DoMoveFile(COperation* op, HWND hProgressDlg, void* buffer,
                             case IDCANCEL:
                                 goto CANCEL_OPEN;
                             }
-                            attr = SalGetFileAttributes(op->TargetName); // may also fail (returns INVALID_FILE_ATTRIBUTES)
+                            attr = op->GetTargetAttributes(); // may also fail (returns INVALID_FILE_ATTRIBUTES)
                         }
                     }
 
