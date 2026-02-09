@@ -336,3 +336,27 @@ add_test(NAME gtest_splitpath COMMAND gtest_splitpath)
 set_target_properties(gtest_splitpath PROPERTIES
     RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/tests"
 )
+
+# IWorkerObserver / CTestWorkerObserver headless tests
+add_executable(gtest_worker_observer
+    gtest_worker_observer.cpp
+)
+
+target_include_directories(gtest_worker_observer PRIVATE
+    ${CMAKE_CURRENT_SOURCE_DIR}/../..
+    ${CMAKE_CURRENT_SOURCE_DIR}/../../common
+)
+
+target_compile_definitions(gtest_worker_observer PRIVATE
+    WIN32 _WINDOWS _CRT_SECURE_NO_WARNINGS
+)
+
+target_link_libraries(gtest_worker_observer
+    GTest::gtest GTest::gtest_main
+)
+
+add_test(NAME gtest_worker_observer COMMAND gtest_worker_observer)
+
+set_target_properties(gtest_worker_observer PROPERTIES
+    RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/tests"
+)
