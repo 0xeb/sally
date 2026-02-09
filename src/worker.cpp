@@ -1,4 +1,4 @@
-﻿// SPDX-FileCopyrightText: 2023 Open Salamander Authors
+// SPDX-FileCopyrightText: 2023 Open Salamander Authors
 // SPDX-License-Identifier: GPL-2.0-or-later
 // CommentsTranslationProject: TRANSLATED
 
@@ -1267,13 +1267,8 @@ struct CWorkerData
     int* SummaryProgress;
 };
 
-struct CProgressDlgData
+struct CWorkerState
 {
-    HANDLE WorkerNotSuspended;
-    BOOL* CancelWorker;
-    int* OperationProgress;
-    int* SummaryProgress;
-
     BOOL OverwriteAll; // keeps the state of automatic overwriting of the target with the source
     BOOL OverwriteHiddenAll;
     BOOL DeleteHiddenAll;
@@ -1337,7 +1332,7 @@ int CaclProg(const CQuadWord& progressCurrent, const CQuadWord& progressTotal)
 }
 
 BOOL GetDirTime(const char* dirName, FILETIME* ftModified);
-BOOL DoCopyDirTime(HWND hProgressDlg, IWorkerObserver& observer, const char* targetName, FILETIME* modified, CProgressDlgData& dlgData, BOOL quiet);
+BOOL DoCopyDirTime(IWorkerObserver& observer, const char* targetName, FILETIME* modified, CWorkerState& dlgData, BOOL quiet);
 
 void GetFileOverwriteInfo(char* buff, int buffLen, HANDLE file, const char* fileName, FILETIME* fileTime, BOOL* getTimeFailed)
 {
@@ -1975,8 +1970,8 @@ DWORD UncompressFile(char* fileName, DWORD attrs)
     return ret;
 }
 
-DWORD MyEncryptFile(HWND hProgressDlg, IWorkerObserver& observer, char* fileName, DWORD attrs, DWORD finalAttrs,
-                    CProgressDlgData& dlgData, BOOL& cancelOper, BOOL preserveDate)
+DWORD MyEncryptFile(IWorkerObserver& observer, char* fileName, DWORD attrs, DWORD finalAttrs,
+                    CWorkerState& dlgData, BOOL& cancelOper, BOOL preserveDate)
 {
     DWORD retEnc = ERROR_SUCCESS;
     cancelOper = FALSE;
@@ -2586,9 +2581,9 @@ BOOL CheckTailOfOutFile(CAsyncCopyParams* asyncPar, HANDLE in, HANDLE out, const
 // copies ADS into the newly created file/directory
 // returns FALSE only when cancelled; success + Skip both return TRUE; Skip sets 'skip'
 // (when not NULL) to TRUE
-BOOL DoCopyADS(HWND hProgressDlg, IWorkerObserver& observer, const char* sourceName, BOOL isDir, const char* targetName,
+BOOL DoCopyADS(IWorkerObserver& observer, const char* sourceName, BOOL isDir, const char* targetName,
                CQuadWord const& totalDone, CQuadWord& operDone, CQuadWord const& operTotal,
-               CProgressDlgData& dlgData, COperations* script, BOOL* skip, void* buffer)
+               CWorkerState& dlgData, COperations* script, BOOL* skip, void* buffer)
 {
     BOOL doCopyADSRet = TRUE;
     BOOL lowMemory;
@@ -3394,9 +3389,9 @@ void SetTFSandPSforSkippedFile(COperation* op, CQuadWord& lastTransferredFileSiz
 }
 
 void DoCopyFileLoopOrig(HANDLE& in, HANDLE& out, void* buffer, int& limitBufferSize,
-                        COperations* script, CProgressDlgData& dlgData, BOOL wholeFileAllocated,
+                        COperations* script, CWorkerState& dlgData, BOOL wholeFileAllocated,
                         COperation* op, const CQuadWord& totalDone, BOOL& copyError, BOOL& skipCopy,
-                        HWND hProgressDlg, IWorkerObserver& observer, CQuadWord& operationDone, CQuadWord& fileSize,
+                        IWorkerObserver& observer, CQuadWord& operationDone, CQuadWord& fileSize,
                         int bufferSize, int& allocWholeFileOnStart, BOOL& copyAgain)
 {
     int autoRetryAttemptsSNAP = 0;
@@ -3698,9 +3693,8 @@ struct CCopy_Context
     int AutoRetryAttemptsSNAP;    // number of automatic Retry attempts (max 3): SNAP servers sporadically return ERROR_NETNAME_DELETED while reading, Retry button reportedly helps, so trigger it automatically
 
     // selected DoCopyFileLoopAsync parameters to avoid passing a long argument list everywhere
-    CProgressDlgData* DlgData;
+    CWorkerState* DlgData;
     COperation* Op;
-    HWND HProgressDlg;
     IWorkerObserver* Observer;
     HANDLE* In;
     HANDLE* Out;
@@ -3710,8 +3704,8 @@ struct CCopy_Context
     const CQuadWord* TotalDone;
     const CQuadWord* LastTransferredFileSize;
 
-    CCopy_Context(CAsyncCopyParams* asyncPar, int numOfBlocks, CProgressDlgData* dlgData, COperation* op,
-                  HWND hProgressDlg, IWorkerObserver& observer, HANDLE* in, HANDLE* out, BOOL wholeFileAllocated, COperations* script,
+    CCopy_Context(CAsyncCopyParams* asyncPar, int numOfBlocks, CWorkerState* dlgData, COperation* op,
+                  IWorkerObserver& observer, HANDLE* in, HANDLE* out, BOOL wholeFileAllocated, COperations* script,
                   CQuadWord* operationDone, const CQuadWord* totalDone, const CQuadWord* lastTransferredFileSize)
     {
         AsyncPar = asyncPar;
@@ -3733,7 +3727,6 @@ struct CCopy_Context
 
         DlgData = dlgData;
         Op = op;
-        HProgressDlg = hProgressDlg;
         Observer = &observer;
         In = in;
         Out = out;
@@ -4297,8 +4290,8 @@ BOOL CCopy_Context::HandleSuspModeAndCancel(BOOL* copyError)
 }
 
 void DoCopyFileLoopAsync(CAsyncCopyParams* asyncPar, HANDLE& in, HANDLE& out, void* buffer, int& limitBufferSize,
-                         COperations* script, CProgressDlgData& dlgData, BOOL wholeFileAllocated, COperation* op,
-                         const CQuadWord& totalDone, BOOL& copyError, BOOL& skipCopy, HWND hProgressDlg, IWorkerObserver& observer,
+                         COperations* script, CWorkerState& dlgData, BOOL wholeFileAllocated, COperation* op,
+                         const CQuadWord& totalDone, BOOL& copyError, BOOL& skipCopy, IWorkerObserver& observer,
                          CQuadWord& operationDone, CQuadWord& fileSize, int bufferSize,
                          int& allocWholeFileOnStart, BOOL& copyAgain, const CQuadWord& lastTransferredFileSize)
 {
@@ -4317,7 +4310,7 @@ void DoCopyFileLoopAsync(CAsyncCopyParams* asyncPar, HANDLE& in, HANDLE& out, vo
     int numOfBlocks = 8;
 
     // Copy operation context (prevents passing heaps of parameters to helper functions, now context methods)
-    CCopy_Context ctx(asyncPar, numOfBlocks, &dlgData, op, hProgressDlg, observer, &in, &out, wholeFileAllocated, script,
+    CCopy_Context ctx(asyncPar, numOfBlocks, &dlgData, op, observer, &in, &out, wholeFileAllocated, script,
                       &operationDone, &totalDone, &lastTransferredFileSize);
     BOOL doCopy = TRUE;
     while (doCopy)
@@ -4630,11 +4623,11 @@ void DoCopyFileLoopAsync(CAsyncCopyParams* asyncPar, HANDLE& in, HANDLE& out, vo
     }
 }
 
-BOOL DoCopyFile(COperation* op, HWND hProgressDlg, IWorkerObserver& observer, void* buffer,
+BOOL DoCopyFile(COperation* op, IWorkerObserver& observer, void* buffer,
                 COperations* script, CQuadWord& totalDone,
                 DWORD clearReadonlyMask, BOOL* skip, BOOL lantasticCheck,
                 int& mustDeleteFileBeforeOverwrite, int& allocWholeFileOnStart,
-                CProgressDlgData& dlgData, BOOL copyADS, BOOL copyAsEncrypted,
+                CWorkerState& dlgData, BOOL copyADS, BOOL copyAsEncrypted,
                 BOOL isMove, CAsyncCopyParams*& asyncPar)
 {
     if (script->CopyAttrs && copyAsEncrypted)
@@ -4922,7 +4915,7 @@ COPY_AGAIN:
                     if (useAsyncAlg)
                     {
                         DoCopyFileLoopAsync(asyncPar, in, out, buffer, limitBufferSize, script, dlgData, wholeFileAllocated, op,
-                                            totalDone, copyError, skipCopy, hProgressDlg, observer, operationDone, fileSize,
+                                            totalDone, copyError, skipCopy, observer, operationDone, fileSize,
                                             bufferSize, allocWholeFileOnStart, copyAgain, lastTransferredFileSize);
                         // NOTE: neither 'in' nor 'out' has the file pointer (SetFilePointer) positioned at the end of the file,
                         //       'out' has it set only when (copyError || skipCopy)
@@ -4930,7 +4923,7 @@ COPY_AGAIN:
                     else
                     {
                         DoCopyFileLoopOrig(in, out, buffer, limitBufferSize, script, dlgData, wholeFileAllocated, op,
-                                           totalDone, copyError, skipCopy, hProgressDlg, observer, operationDone, fileSize,
+                                           totalDone, copyError, skipCopy, observer, operationDone, fileSize,
                                            bufferSize, allocWholeFileOnStart, copyAgain);
                     }
 
@@ -5072,7 +5065,7 @@ COPY_AGAIN:
                         if (operDone < COPY_MIN_FILE_SIZE)
                             operDone = COPY_MIN_FILE_SIZE; // zero/small files take at least as long as files of size COPY_MIN_FILE_SIZE
                         BOOL adsSkip = FALSE;
-                        if (!DoCopyADS(hProgressDlg, observer, op->SourceName, FALSE, op->TargetName, totalDone,
+                        if (!DoCopyADS(observer, op->SourceName, FALSE, op->TargetName, totalDone,
                                        operDone, op->Size, dlgData, script, &adsSkip, buffer) ||
                             adsSkip) // user hit cancel or skipped at least one ADS
                         {
@@ -5673,11 +5666,11 @@ COPY_AGAIN:
     }
 }
 
-BOOL DoMoveFile(COperation* op, HWND hProgressDlg, IWorkerObserver& observer, void* buffer,
+BOOL DoMoveFile(COperation* op, IWorkerObserver& observer, void* buffer,
                 COperations* script, CQuadWord& totalDone, BOOL dir,
                 DWORD clearReadonlyMask, BOOL* novellRenamePatch, BOOL lantasticCheck,
                 int& mustDeleteFileBeforeOverwrite, int& allocWholeFileOnStart,
-                CProgressDlgData& dlgData, BOOL copyADS, BOOL copyAsEncrypted,
+                CWorkerState& dlgData, BOOL copyADS, BOOL copyAsEncrypted,
                 BOOL* setDirTimeAfterMove, CAsyncCopyParams*& asyncPar,
                 BOOL ignInvalidName)
 {
@@ -5835,7 +5828,7 @@ BOOL DoMoveFile(COperation* op, HWND hProgressDlg, IWorkerObserver& observer, vo
                         {
                             if (*setDirTimeAfterMove == 0 /* need test */)
                                 *setDirTimeAfterMove = 1 /* yes */;
-                            DoCopyDirTime(hProgressDlg, observer, targetNameMvDir, &dirTimeModified, dlgData, TRUE); // ignore any failure, this is just a hack (we already ignore time read errors from the directory); MoveFile should not change times
+                            DoCopyDirTime(observer, targetNameMvDir, &dirTimeModified, dlgData, TRUE); // ignore any failure, this is just a hack (we already ignore time read errors from the directory); MoveFile should not change times
                         }
                     }
                 }
@@ -6170,7 +6163,7 @@ BOOL DoMoveFile(COperation* op, HWND hProgressDlg, IWorkerObserver& observer, vo
         }
 
         BOOL skip;
-        BOOL notError = DoCopyFile(op, hProgressDlg, observer, buffer, script, totalDone,
+        BOOL notError = DoCopyFile(op, observer, buffer, script, totalDone,
                                    clearReadonlyMask, &skip, lantasticCheck,
                                    mustDeleteFileBeforeOverwrite, allocWholeFileOnStart,
                                    dlgData, copyADS, copyAsEncrypted, TRUE, asyncPar);
@@ -6212,7 +6205,7 @@ BOOL DoMoveFile(COperation* op, HWND hProgressDlg, IWorkerObserver& observer, vo
 }
 
 BOOL DoDeleteFile(HWND hProgressDlg, IWorkerObserver& observer, char* name, const CQuadWord& size, COperations* script,
-                  CQuadWord& totalDone, DWORD attr, CProgressDlgData& dlgData,
+                  CQuadWord& totalDone, DWORD attr, CWorkerState& dlgData,
                   const std::wstring& nameW = std::wstring())
 {
     // if the path ends with a space/dot it is invalid and we must not delete it,
@@ -6482,7 +6475,7 @@ BOOL GetDirTime(const char* dirName, FILETIME* ftModified)
     return FALSE;
 }
 
-BOOL DoCopyDirTime(HWND hProgressDlg, IWorkerObserver& observer, const char* targetName, FILETIME* modified, CProgressDlgData& dlgData, BOOL quiet)
+BOOL DoCopyDirTime(IWorkerObserver& observer, const char* targetName, FILETIME* modified, CWorkerState& dlgData, BOOL quiet)
 {
     // if the path ends with a space/dot, we must append '\\', otherwise CreateFile
     // trims the spaces/dots and works with a different path
@@ -6545,8 +6538,8 @@ BOOL DoCopyDirTime(HWND hProgressDlg, IWorkerObserver& observer, const char* tar
     return TRUE;
 }
 
-BOOL DoCreateDir(HWND hProgressDlg, IWorkerObserver& observer, char* name, DWORD attr,
-                 DWORD clearReadonlyMask, CProgressDlgData& dlgData,
+BOOL DoCreateDir(IWorkerObserver& observer, char* name, DWORD attr,
+                 DWORD clearReadonlyMask, CWorkerState& dlgData,
                  CQuadWord& totalDone, CQuadWord& operTotal,
                  const char* sourceDir, BOOL adsCopy, COperations* script,
                  void* buffer, BOOL& skip, BOOL& alreadyExisted,
@@ -6584,7 +6577,7 @@ BOOL DoCreateDir(HWND hProgressDlg, IWorkerObserver& observer, char* name, DWORD
             {
                 CQuadWord operDone = CREATE_DIR_SIZE; // directory already created
                 BOOL adsSkip = FALSE;
-                if (!DoCopyADS(hProgressDlg, observer, sourceDir, TRUE, name, totalDone,
+                if (!DoCopyADS(observer, sourceDir, TRUE, name, totalDone,
                                operDone, operTotal, dlgData, script, &adsSkip, buffer) ||
                     adsSkip) // user cancelled or skipped at least one ADS
                 {
@@ -6623,7 +6616,7 @@ BOOL DoCreateDir(HWND hProgressDlg, IWorkerObserver& observer, char* name, DWORD
                             BOOL dummyCancelOper = FALSE;
                             if (newAttr & FILE_ATTRIBUTE_ENCRYPTED)
                             {
-                                changeAttrErr = MyEncryptFile(hProgressDlg, observer, name, currentAttrs, 0 /* allow encrypting directories with the SYSTEM attribute */,
+                                changeAttrErr = MyEncryptFile(observer, name, currentAttrs, 0 /* allow encrypting directories with the SYSTEM attribute */,
                                                               dlgData, dummyCancelOper, FALSE);
 
                                 if ( //(WindowsVistaAndLater || script->TargetPathSupEFS) &&  // complain regardless of OS version and EFS support; originally directories on FAT could not be encrypted before Vista, we behave the same (to match Explorer, the Encrypted attribute is not that important)
@@ -6854,7 +6847,7 @@ BOOL DoCreateDir(HWND hProgressDlg, IWorkerObserver& observer, char* name, DWORD
 }
 
 BOOL DoDeleteDir(HWND hProgressDlg, IWorkerObserver& observer, char* name, const CQuadWord& size, COperations* script,
-                 CQuadWord& totalDone, DWORD attr, BOOL dontUseRecycleBin, CProgressDlgData& dlgData)
+                 CQuadWord& totalDone, DWORD attr, BOOL dontUseRecycleBin, CWorkerState& dlgData)
 {
     DWORD err;
     int AutoRetryCounter = 0;
@@ -7112,8 +7105,8 @@ BOOL DeleteDirLink(const char* name, DWORD* err)
     return DoDeleteDirLinkAux(nameDelLink, err);
 }
 
-BOOL DoDeleteDirLink(HWND hProgressDlg, IWorkerObserver& observer, char* name, const CQuadWord& size, COperations* script,
-                     CQuadWord& totalDone, CProgressDlgData& dlgData)
+BOOL DoDeleteDirLink(IWorkerObserver& observer, char* name, const CQuadWord& size, COperations* script,
+                     CQuadWord& totalDone, CWorkerState& dlgData)
 {
     // if the path ends with a space/dot, we must append '\\'; otherwise CreateFile
     // and RemoveDirectory trim the spaces/dots and operate on a different path
@@ -7181,9 +7174,9 @@ BOOL DoDeleteDirLink(HWND hProgressDlg, IWorkerObserver& observer, char* name, c
 //            1: replace line endings with CRLF (DOS, Windows, OS/2)
 //            2: replace line endings with LF (UNIX)
 //            3: replace line endings with CR (MAC)
-BOOL DoConvert(HWND hProgressDlg, IWorkerObserver& observer, char* name, char* sourceBuffer, char* targetBuffer,
+BOOL DoConvert(IWorkerObserver& observer, char* name, char* sourceBuffer, char* targetBuffer,
                const CQuadWord& size, COperations* script, CQuadWord& totalDone,
-               CConvertData& convertData, CProgressDlgData& dlgData)
+               CConvertData& convertData, CWorkerState& dlgData)
 {
     // if the path ends with a space/dot it is invalid and we must not run the conversion,
     // CreateFile would trim the spaces/dots and convert a different file
@@ -7249,7 +7242,7 @@ CONVERT_AGAIN:
                             BOOL cancelOper = FALSE;
                             if (srcAttrs & FILE_ATTRIBUTE_ENCRYPTED)
                             {
-                                MyEncryptFile(hProgressDlg, observer, tmpFileName, tgtAttrs, 0 /* allow encrypting files with the SYSTEM attribute */,
+                                MyEncryptFile(observer, tmpFileName, tgtAttrs, 0 /* allow encrypting files with the SYSTEM attribute */,
                                               dlgData, cancelOper, FALSE);
                             }
                             else
@@ -7645,11 +7638,11 @@ CONVERT_AGAIN:
     }
 }
 
-BOOL DoChangeAttrs(HWND hProgressDlg, IWorkerObserver& observer, char* name, const CQuadWord& size, DWORD attrs,
+BOOL DoChangeAttrs(IWorkerObserver& observer, char* name, const CQuadWord& size, DWORD attrs,
                    COperations* script, CQuadWord& totalDone,
                    FILETIME* timeModified, FILETIME* timeCreated, FILETIME* timeAccessed,
                    BOOL& changeCompression, BOOL& changeEncryption, DWORD fileAttr,
-                   CProgressDlgData& dlgData)
+                   CWorkerState& dlgData)
 {
     // if the path ends with a space/dot, we must append '\\'; otherwise
     // SetFileAttributes (and others) trims the spaces/dots and operates
@@ -7697,7 +7690,7 @@ BOOL DoChangeAttrs(HWND hProgressDlg, IWorkerObserver& observer, char* name, con
         if (error == ERROR_SUCCESS && changeEncryption && (attrs & FILE_ATTRIBUTE_ENCRYPTED))
         {
             BOOL cancelOper = FALSE;
-            error = MyEncryptFile(hProgressDlg, observer, name, fileAttr, attrs, dlgData, cancelOper, TRUE);
+            error = MyEncryptFile(observer, name, fileAttr, attrs, dlgData, cancelOper, TRUE);
             if (observer.IsCancelled() || cancelOper)
                 return FALSE;
             if (error != ERROR_SUCCESS)
@@ -7809,11 +7802,7 @@ unsigned ThreadWorkerBody(void* parameter)
     CWorkerData* data = (CWorkerData*)parameter;
     //--- create a local copy of the data
     HANDLE wContinue = data->WContinue;
-    CProgressDlgData dlgData;
-    dlgData.WorkerNotSuspended = data->WorkerNotSuspended;
-    dlgData.CancelWorker = data->CancelWorker;
-    dlgData.OperationProgress = data->OperationProgress;
-    dlgData.SummaryProgress = data->SummaryProgress;
+    CWorkerState dlgData;
     dlgData.OverwriteAll = dlgData.OverwriteHiddenAll = dlgData.DeleteHiddenAll =
         dlgData.SkipAllFileWrite = dlgData.SkipAllFileRead =
             dlgData.SkipAllOverwrite = dlgData.SkipAllSystemOrHidden =
@@ -7854,9 +7843,9 @@ unsigned ThreadWorkerBody(void* parameter)
         GainWriteOwnerAccess();
 
     HWND hProgressDlg = data->HProgressDlg;
-    CDialogWorkerObserver dialogObserver(hProgressDlg, dlgData.WorkerNotSuspended,
-                                         dlgData.CancelWorker, dlgData.OperationProgress,
-                                         dlgData.SummaryProgress);
+    CDialogWorkerObserver dialogObserver(hProgressDlg, data->WorkerNotSuspended,
+                                         data->CancelWorker, data->OperationProgress,
+                                         data->SummaryProgress);
     IWorkerObserver& observer = dialogObserver;
     void* buffer = data->Buffer;
     BOOL bufferIsAllocated = data->BufferIsAllocated;
@@ -7926,7 +7915,7 @@ unsigned ThreadWorkerBody(void* parameter)
 
                 BOOL lantasticCheck = IsLantasticDrive(op->TargetName, lastLantasticCheckRoot, lastIsLantasticPath);
 
-                Error = !DoCopyFile(op, hProgressDlg, observer, buffer, script, totalDone,
+                Error = !DoCopyFile(op, observer, buffer, script, totalDone,
                                     clearReadonlyMask, NULL, lantasticCheck, mustDeleteFileBeforeOverwrite,
                                     allocWholeFileOnStart, dlgData,
                                     (op->OpFlags & OPFL_COPY_ADS) != 0,
@@ -7949,7 +7938,7 @@ unsigned ThreadWorkerBody(void* parameter)
                 BOOL lantasticCheck = IsLantasticDrive(op->TargetName, lastLantasticCheckRoot, lastIsLantasticPath);
                 BOOL ignInvalidName = op->Opcode == ocMoveDir && (op->OpFlags & OPFL_IGNORE_INVALID_NAME) != 0;
 
-                Error = !DoMoveFile(op, hProgressDlg, observer, buffer, script, totalDone,
+                Error = !DoMoveFile(op, observer, buffer, script, totalDone,
                                     op->Opcode == ocMoveDir, clearReadonlyMask, &novellRenamePatch,
                                     lantasticCheck, mustDeleteFileBeforeOverwrite,
                                     allocWholeFileOnStart, dlgData,
@@ -7973,7 +7962,7 @@ unsigned ThreadWorkerBody(void* parameter)
                 observer.SetProgress(0, CaclProg(totalDone, script->TotalSize));
 
                 BOOL skip, alreadyExisted;
-                Error = !DoCreateDir(hProgressDlg, observer, op->TargetName, op->Attr, clearReadonlyMask, dlgData,
+                Error = !DoCreateDir(observer, op->TargetName, op->Attr, clearReadonlyMask, dlgData,
                                      totalDone, op->Size, op->SourceName, copyADS, script, buffer, skip,
                                      alreadyExisted, crAsEncrypted, ignInvalidName);
                 if (!Error)
@@ -8066,7 +8055,7 @@ unsigned ThreadWorkerBody(void* parameter)
                     FILETIME modified;
                     modified.dwLowDateTime = (DWORD)(DWORD_PTR)op->SourceName;
                     modified.dwHighDateTime = op->Attr;
-                    Error = !DoCopyDirTime(hProgressDlg, observer, op->TargetName, &modified, dlgData, FALSE);
+                    Error = !DoCopyDirTime(observer, op->TargetName, &modified, dlgData, FALSE);
                 }
                 if (!Error)
                 {
@@ -8107,7 +8096,7 @@ unsigned ThreadWorkerBody(void* parameter)
                     }
                     else
                     {
-                        Error = !DoDeleteDirLink(hProgressDlg, observer, op->SourceName, op->Size,
+                        Error = !DoDeleteDirLink(observer, op->SourceName, op->Size,
                                                  script, totalDone, dlgData);
                     }
                 }
@@ -8138,7 +8127,7 @@ unsigned ThreadWorkerBody(void* parameter)
 
                 observer.SetProgress(0, CaclProg(totalDone, script->TotalSize));
 
-                Error = !DoConvert(hProgressDlg, observer, op->SourceName, (char*)buffer, tgtBuffer, op->Size, script,
+                Error = !DoConvert(observer, op->SourceName, (char*)buffer, tgtBuffer, op->Size, script,
                                    totalDone, convertData, dlgData);
                 break;
             }
@@ -8153,7 +8142,7 @@ unsigned ThreadWorkerBody(void* parameter)
 
                 observer.SetProgress(0, CaclProg(totalDone, script->TotalSize));
 
-                Error = !DoChangeAttrs(hProgressDlg, observer, op->SourceName, op->Size, (DWORD)(DWORD_PTR)op->TargetName,
+                Error = !DoChangeAttrs(observer, op->SourceName, op->Size, (DWORD)(DWORD_PTR)op->TargetName,
                                        script, totalDone,
                                        attrsData->ChangeTimeModified ? &attrsData->TimeModified : NULL,
                                        attrsData->ChangeTimeCreated ? &attrsData->TimeCreated : NULL,
