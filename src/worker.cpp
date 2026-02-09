@@ -1313,7 +1313,42 @@ struct CWorkerState
     int CnfrmSHFileOver;
     int CnfrmSHFileDel;
     int UseRecycleBin;
+    BOOL UseAsyncCopyAlg;
     CMaskGroup RecycleMasks;
+
+    // Initialize all skip/confirm flags to FALSE and copy config values
+    void Init()
+    {
+        OverwriteAll = OverwriteHiddenAll = DeleteHiddenAll =
+            SkipAllFileWrite = SkipAllFileRead =
+                SkipAllOverwrite = SkipAllSystemOrHidden =
+                    SkipAllFileOpenIn = SkipAllFileOpenOut =
+                        SkipAllOverwriteErr = SkipAllMoveErrors =
+                            SkipAllDeleteErr = SkipAllDirCreate =
+                                SkipAllDirCreateErr = SkipAllChangeAttrs =
+                                    EncryptSystemAll = SkipAllEncryptSystem =
+                                        IgnoreAllADSReadErr = SkipAllFileADSOpenIn =
+                                            SkipAllFileADSOpenOut = SkipAllFileADSRead =
+                                                SkipAllFileADSWrite = DirOverwriteAll =
+                                                    SkipAllDirOver = IgnoreAllADSOpenOutErr =
+                                                        IgnoreAllSetAttrsErr = IgnoreAllCopyPermErr =
+                                                            IgnoreAllCopyDirTimeErr = SkipAllFileOutLossEncr =
+                                                                FileOutLossEncrAll = SkipAllDirCrLossEncr =
+                                                                    DirCrLossEncrAll = IgnoreAllGetFileTimeErr =
+                                                                        IgnoreAllSetFileTimeErr = SkipAllGetFileTime =
+                                                                            SkipAllSetFileTime = FALSE;
+        CnfrmFileOver = Configuration.CnfrmFileOver;
+        CnfrmDirOver = Configuration.CnfrmDirOver;
+        CnfrmSHFileOver = Configuration.CnfrmSHFileOver;
+        CnfrmSHFileDel = Configuration.CnfrmSHFileDel;
+        UseRecycleBin = Configuration.UseRecycleBin;
+        UseAsyncCopyAlg = Windows7AndLater && Configuration.UseAsyncCopyAlg;
+        RecycleMasks.SetMasksString(Configuration.RecycleMasks.GetMasksString(),
+                                    Configuration.RecycleMasks.GetExtendedMode());
+        int errorPos;
+        if (UseRecycleBin == 2 && !PrepareRecycleMasks(errorPos))
+            TRACE_E("Error in recycle-bin group mask.");
+    }
 
     BOOL PrepareRecycleMasks(int& errorPos)
     {
@@ -4915,7 +4950,7 @@ BOOL DoCopyFile(COperation* op, IWorkerObserver& observer, void* buffer,
     // - the asynchronous algorithm makes sense only over the network + when source/target is fast or network-based
     // - with the old algorithm, copying on Win7 over the network is easily 2x-3x slower for downloads,
     //   almost 2x slower for uploads, and about 30% slower for network-to-network copies
-    BOOL useAsyncAlg = Windows7AndLater && Configuration.UseAsyncCopyAlg &&
+    BOOL useAsyncAlg = dlgData.UseAsyncCopyAlg &&
                        op->FileSize.Value > 0 && // empty files are copied synchronously (no data)
                        ((op->OpFlags & OPFL_SRCPATH_IS_NET) && ((op->OpFlags & OPFL_TGTPATH_IS_NET) ||
                                                                 (op->OpFlags & OPFL_TGTPATH_IS_FAST)) ||
@@ -8049,35 +8084,7 @@ unsigned ThreadWorkerBody(void* parameter)
     //--- create a local copy of the data
     HANDLE wContinue = data->WContinue;
     CWorkerState dlgData;
-    dlgData.OverwriteAll = dlgData.OverwriteHiddenAll = dlgData.DeleteHiddenAll =
-        dlgData.SkipAllFileWrite = dlgData.SkipAllFileRead =
-            dlgData.SkipAllOverwrite = dlgData.SkipAllSystemOrHidden =
-                dlgData.SkipAllFileOpenIn = dlgData.SkipAllFileOpenOut =
-                    dlgData.SkipAllOverwriteErr = dlgData.SkipAllMoveErrors =
-                        dlgData.SkipAllDeleteErr = dlgData.SkipAllDirCreate =
-                            dlgData.SkipAllDirCreateErr = dlgData.SkipAllChangeAttrs =
-                                dlgData.EncryptSystemAll = dlgData.SkipAllEncryptSystem =
-                                    dlgData.IgnoreAllADSReadErr = dlgData.SkipAllFileADSOpenIn =
-                                        dlgData.SkipAllFileADSOpenOut = dlgData.SkipAllFileADSRead =
-                                            dlgData.SkipAllFileADSWrite = dlgData.DirOverwriteAll =
-                                                dlgData.SkipAllDirOver = dlgData.IgnoreAllADSOpenOutErr =
-                                                    dlgData.IgnoreAllSetAttrsErr = dlgData.IgnoreAllCopyPermErr =
-                                                        dlgData.IgnoreAllCopyDirTimeErr = dlgData.SkipAllFileOutLossEncr =
-                                                            dlgData.FileOutLossEncrAll = dlgData.SkipAllDirCrLossEncr =
-                                                                dlgData.DirCrLossEncrAll = dlgData.IgnoreAllGetFileTimeErr =
-                                                                    dlgData.IgnoreAllSetFileTimeErr = dlgData.SkipAllGetFileTime =
-                                                                        dlgData.SkipAllSetFileTime = FALSE;
-    dlgData.CnfrmFileOver = Configuration.CnfrmFileOver;
-    dlgData.CnfrmDirOver = Configuration.CnfrmDirOver;
-    dlgData.CnfrmSHFileOver = Configuration.CnfrmSHFileOver;
-    dlgData.CnfrmSHFileDel = Configuration.CnfrmSHFileDel;
-    dlgData.UseRecycleBin = Configuration.UseRecycleBin;
-    dlgData.RecycleMasks.SetMasksString(Configuration.RecycleMasks.GetMasksString(),
-                                        Configuration.RecycleMasks.GetExtendedMode());
-    int errorPos;
-    if (dlgData.UseRecycleBin == 2 &&
-        !dlgData.PrepareRecycleMasks(errorPos))
-        TRACE_E("Error in recycle-bin group mask.");
+    dlgData.Init();
     COperations* script = data->Script;
     if (script->TotalSize == CQuadWord(0, 0))
     {
@@ -8088,8 +8095,7 @@ unsigned ThreadWorkerBody(void* parameter)
     if (script->CopySecurity)
         GainWriteOwnerAccess();
 
-    HWND hProgressDlg = data->HProgressDlg;
-    CDialogWorkerObserver dialogObserver(hProgressDlg, data->WorkerNotSuspended,
+    CDialogWorkerObserver dialogObserver(data->HProgressDlg, data->WorkerNotSuspended,
                                          data->CancelWorker, data->OperationProgress,
                                          data->SummaryProgress);
     IWorkerObserver& observer = dialogObserver;
