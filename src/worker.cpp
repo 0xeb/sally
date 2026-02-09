@@ -4322,7 +4322,7 @@ BOOL CCopy_Context::RetryCopyReadErr(DWORD* err, BOOL* copyAgain, BOOL* errAgain
         if (WholeFileAllocated)
             SetEndOfFile(*Out); // otherwise on a floppy the remaining bytes would be written
         HANDLES(CloseHandle(*Out));
-        DeleteFileA(gFileSystem, Op->TargetName);
+        Op->DeleteTargetFile();
         *copyAgain = TRUE; // goto COPY_AGAIN;
         return FALSE;
     }
@@ -4442,7 +4442,7 @@ BOOL CCopy_Context::RetryCopyWriteErr(DWORD* err, BOOL* copyAgain, BOOL* errAgai
         {
             HANDLES(CloseHandle(*In));
             HANDLES(CloseHandle(*Out));
-            DeleteFileA(gFileSystem, Op->TargetName);
+            Op->DeleteTargetFile();
             *copyAgain = TRUE; // goto COPY_AGAIN;
             return FALSE;
         }
@@ -6422,7 +6422,7 @@ BOOL DoMoveFile(COperation* op, IWorkerObserver& observer, void* buffer,
             ClearReadOnlyAttr(op->SourceName); // ensure it can be deleted
             while (1)
             {
-                if (op->HasWideSource() ? DeleteFileW(op->SourceNameW.c_str()) : DeleteFileA(gFileSystem, op->SourceName).success)
+                if (op->DeleteSourceFile())
                     break;
                 {
                     DWORD err = GetLastError();
