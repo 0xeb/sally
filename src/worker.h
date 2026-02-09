@@ -429,9 +429,9 @@ public:
     CPathBuffer WorkPath2;     // when non-empty string second path processed (used for change notifications)
     BOOL WorkPath2InclSubDirs; // TRUE/FALSE = with/without subdirectories (second path)
 
-    char* WaitInQueueSubject; // text for the "waiting in queue" state: dialog title
-    char* WaitInQueueFrom;    // text for the "waiting in queue" state: top line (From)
-    char* WaitInQueueTo;      // text for the "waiting in queue" state: bottom line (To)
+    std::string WaitInQueueSubject; // text for the "waiting in queue" state: dialog title
+    std::string WaitInQueueFrom;    // text for the "waiting in queue" state: top line (From)
+    std::string WaitInQueueTo;      // text for the "waiting in queue" state: bottom line (To)
 
 private:
     // for the status line in the progress dialog (Copy and Move only)
@@ -457,7 +457,7 @@ private:
     DWORD LastFileStartTime;      // GetTickCount() from when we started copying the last file
 
 public:
-    COperations(int base, int delta, char* waitInQueueSubject, char* waitInQueueFrom, char* waitInQueueTo);
+    COperations(int base, int delta, const char* waitInQueueSubject, const char* waitInQueueFrom, const char* waitInQueueTo);
     ~COperations() { HANDLES(DeleteCriticalSection(&StatusCS)); }
 
     void SetWorkPath1(const char* path, BOOL inclSubDirs)

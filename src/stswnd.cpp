@@ -34,10 +34,10 @@ CStatusWindow::CStatusWindow(CFilesWindow* filesWindow, int border, CObjectOrigi
     DelayedThrobber = FALSE;
     DelayedThrobberShowTime = 0;
     Throbber = FALSE;
-    ThrobberTooltip = NULL;
+    ThrobberTooltip.clear();
     ThrobberID = -1;
     Security = sisNone;
-    SecurityTooltip = NULL;
+    SecurityTooltip.clear();
     HiddenFilesCount = 0;
     HiddenDirsCount = 0;
     Left = TRUE; // dummy
@@ -75,10 +75,7 @@ CStatusWindow::~CStatusWindow()
         free(AlpDX);
     if (Size != NULL)
         free(Size);
-    if (ThrobberTooltip != NULL)
-        free(ThrobberTooltip);
-    if (SecurityTooltip != NULL)
-        free(SecurityTooltip);
+    // ThrobberTooltip and SecurityTooltip are std::string, auto-destroyed
     if (ToolBar != NULL)
     {
         if (ToolBar->HWindow != NULL)
@@ -432,13 +429,7 @@ void CStatusWindow::SetThrobber(BOOL show, int delay, BOOL calledFromDestroyWind
 
 void CStatusWindow::SetThrobberTooltip(const char* throbberTooltip)
 {
-    if (ThrobberTooltip != NULL)
-    {
-        free(ThrobberTooltip);
-        ThrobberTooltip = NULL;
-    }
-    if (throbberTooltip != NULL)
-        ThrobberTooltip = DupStr(throbberTooltip);
+    ThrobberTooltip = throbberTooltip ? throbberTooltip : "";
 }
 
 void CStatusWindow::SetSecurity(CSecurityIconState iconState)
@@ -457,13 +448,7 @@ void CStatusWindow::SetSecurity(CSecurityIconState iconState)
 
 void CStatusWindow::SetSecurityTooltip(const char* tooltip)
 {
-    if (SecurityTooltip != NULL)
-    {
-        free(SecurityTooltip);
-        SecurityTooltip = NULL;
-    }
-    if (tooltip != NULL)
-        SecurityTooltip = DupStr(tooltip);
+    SecurityTooltip = tooltip ? tooltip : "";
 }
 
 int CStatusWindow::ChangeThrobberID()
@@ -1719,13 +1704,13 @@ CStatusWindow::WindowProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
 
         case 8:
         {
-            lstrcpyn(text, ThrobberTooltip != NULL ? ThrobberTooltip : "", TOOLTIP_TEXT_MAX);
+            lstrcpyn(text, ThrobberTooltip.c_str(), TOOLTIP_TEXT_MAX);
             break;
         }
 
         case 9:
         {
-            lstrcpyn(text, SecurityTooltip != NULL ? SecurityTooltip : "", TOOLTIP_TEXT_MAX);
+            lstrcpyn(text, SecurityTooltip.c_str(), TOOLTIP_TEXT_MAX);
             break;
         }
 

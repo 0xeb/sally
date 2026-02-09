@@ -54,31 +54,25 @@ CMessageBox::CMessageBox(HWND parent, DWORD flags, const char* title, const char
     : CCommonDialog(HInstance, IDD_MSGBOX, parent, ooStandard)
 {
     Flags = flags;
-    if (title == NULL)
-        Title = DupStr(LoadStr(IDS_ERRORTITLE));
-    else
-        Title = DupStr(title);
+    Title = title ? title : LoadStr(IDS_ERRORTITLE);
     Text.Set(text, NULL);
     if (checkText != NULL)
     {
         if (check == NULL)
         {
             TRACE_E("CMessageBox::CMessageBox: check parameter is NULL.");
-            CheckText = NULL;
         }
         else
-            CheckText = DupStr(checkText);
+            CheckText = checkText;
     }
-    else
-        CheckText = NULL;
     Check = check;
     HOwnIcon = hOwnIcon;
     if (Flags & MSGBOXEX_HELP)
         SetHelpID(contextHelpId);
     HelpCallback = helpCallback;
-    AliasBtnNames = DupStr(aliasBtnNames);
-    URL = DupStr(url);
-    URLText = DupStr(urlText);
+    AliasBtnNames = aliasBtnNames ? aliasBtnNames : "";
+    URL = url ? url : "";
+    URLText = urlText ? urlText : "";
     BackgroundSeparator = 0;
 }
 
@@ -89,52 +83,37 @@ CMessageBox::CMessageBox(HWND parent, DWORD flags, const char* title, CTruncated
     : CCommonDialog(HInstance, IDD_MSGBOX, parent)
 {
     Flags = flags;
-    if (title == NULL)
-        Title = DupStr(LoadStr(IDS_ERRORTITLE));
-    else
-        Title = DupStr(title);
+    Title = title ? title : LoadStr(IDS_ERRORTITLE);
     Text.CopyFrom(text);
     if (checkText != NULL)
     {
         if (check == NULL)
         {
             TRACE_E("CMessageBox::CMessageBox: check parameter is NULL.");
-            CheckText = NULL;
         }
         else
-            CheckText = DupStr(checkText);
+            CheckText = checkText;
     }
-    else
-        CheckText = NULL;
     Check = check;
     HOwnIcon = hOwnIcon;
     if (Flags & MSGBOXEX_HELP)
         SetHelpID(contextHelpId);
     HelpCallback = helpCallback;
-    AliasBtnNames = DupStr(aliasBtnNames);
-    URL = DupStr(url);
-    URLText = DupStr(urlText);
+    AliasBtnNames = aliasBtnNames ? aliasBtnNames : "";
+    URL = url ? url : "";
+    URLText = urlText ? urlText : "";
     BackgroundSeparator = 0;
 }
 
 CMessageBox::~CMessageBox()
 {
-    if (Title != NULL)
-        free(Title);
-    if (CheckText != NULL)
-        free(CheckText);
-    if (AliasBtnNames != NULL)
-        free(AliasBtnNames);
-    if (URL != NULL)
-        free(URL);
-    if (URLText != NULL)
-        free(URLText);
+    // std::string members auto-destroyed
 }
 
 void CMessageBox::Transfer(CTransferInfo& ti)
 {
     CALL_STACK_MESSAGE1("CMessageBox::Transfer()");
-    if (CheckText != NULL && Check != NULL)
+    if (!CheckText.empty() && Check != NULL)
         ti.CheckBox(IDS_MSGBOX_CHECK, *Check);
 }
 
@@ -271,19 +250,19 @@ BOOL CMessageBox::CopyToClipboard()
     // compute the total buffer size
     const char* text = Text.Get();
     int urlTextLen = 0;
-    if (URL != NULL)
+    if (!URL.empty())
     {
-        urlTextLen += (int)strlen(URL) + 4;
-        if (URLText != NULL)
-            urlTextLen += (int)strlen(URLText) + 4;
+        urlTextLen += (int)URL.size() + 4;
+        if (!URLText.empty())
+            urlTextLen += (int)URLText.size() + 4;
     }
     int buffSize = 4 * (int)strlen(separator) +
-                   (int)strlen(Title) +
+                   (int)Title.size() +
                    2 * (int)strlen(text) + // every character may be '\n'; we'll convert them to "\r\n"
                    urlTextLen +
                    MESSAGEBOX_MAXBUTTONS * (100 + 2 + 4) + // max number of characters in a button we're willing to handle
                    50;                                     // extra space for "\r\n"
-    if (CheckText != NULL)
+    if (!CheckText.empty())
         buffSize += 300 + 2 + (int)strlen(separator);
 
     char* buff = (char*)malloc(buffSize);
@@ -293,7 +272,7 @@ BOOL CMessageBox::CopyToClipboard()
         return FALSE;
     }
 
-    DWORD written = wsprintf(buff, "%s%s\r\n%s", separator, Title, separator);
+    DWORD written = wsprintf(buff, "%s%s\r\n%s", separator, Title.c_str(), separator);
     char* ptr = buff + written;
 
     // convert '\n' -> "\r\n"
@@ -304,12 +283,12 @@ BOOL CMessageBox::CopyToClipboard()
         *ptr++ = *text++;
     }
 
-    if (URL != NULL)
+    if (!URL.empty())
     {
         ptr += wsprintf(ptr, "\r\n");
-        if (URLText != NULL)
-            ptr += wsprintf(ptr, "%s ", URLText);
-        ptr += wsprintf(ptr, "%s", URL);
+        if (!URLText.empty())
+            ptr += wsprintf(ptr, "%s ", URLText.c_str());
+        ptr += wsprintf(ptr, "%s", URL.c_str());
     }
 
     written = wsprintf(ptr, "\r\n%s", separator);
@@ -341,7 +320,7 @@ BOOL CMessageBox::CopyToClipboard()
     ptr += written;
 
     // if a checkbox exists, append its text (strip the '&')
-    if (CheckText != NULL)
+    if (!CheckText.empty())
     {
         char chkText[300];
         GetDlgItemText(HWindow, IDS_MSGBOX_CHECK, chkText, 300);
@@ -381,17 +360,17 @@ CMessageBox::DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
             EnableMenuItem(GetSystemMenu(HWindow, FALSE), SC_CLOSE, MF_BYCOMMAND | MF_GRAYED);
 
         // set the window title and body text
-        SetWindowText(HWindow, Title);
+        SetWindowText(HWindow, Title.c_str());
         if (Text.NeedTruncate())
             Text.TruncateText(GetDlgItem(HWindow, IDS_MSGBOX_TEXT), TRUE);
         SetDlgItemText(HWindow, IDS_MSGBOX_TEXT, Text.Get());
 
         const char* urlText = NULL;
-        if (URL != NULL)
+        if (!URL.empty())
         {
             CHyperLink* hl = new CHyperLink(HWindow, IDS_MSGBOX_URL);
-            hl->SetActionOpen(URL);
-            urlText = URLText != NULL ? URLText : URL;
+            hl->SetActionOpen(URL.c_str());
+            urlText = !URLText.empty() ? URLText.c_str() : URL.c_str();
             SetDlgItemText(HWindow, IDS_MSGBOX_URL, urlText);
         }
         else
@@ -408,14 +387,14 @@ CMessageBox::DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
         int checkLineH = 0;
         BOOL hintVisible = FALSE;
         char* hintLabel = NULL;
-        if (CheckText != NULL)
+        if (!CheckText.empty())
         {
             if (flagsEx & MSGBOXEX_HINT)
             {
                 // parse CheckText and locate two '\t' characters
                 // after the first '\t' is the "clickable" text, which we display next to the checkbox
                 // after the second '\t' is the actual hint, which is shown when the clickable text is clicked
-                hintLabel = CheckText;
+                hintLabel = &CheckText[0];
                 while (*hintLabel != '\t' && *hintLabel != 0)
                     hintLabel++;
                 char* hintText = hintLabel;
@@ -423,8 +402,8 @@ CMessageBox::DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
                     hintText++;
                 while (*hintText != '\t' && *hintText != 0)
                     hintText++;
-                if (hintLabel > CheckText && *hintLabel != 0 &&
-                    hintText > CheckText && *hintText != 0 &&
+                if (hintLabel > &CheckText[0] && *hintLabel != 0 &&
+                    hintText > &CheckText[0] && *hintText != 0 &&
                     hintText > hintLabel)
                 {
                     *hintLabel = 0;
@@ -446,7 +425,7 @@ CMessageBox::DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
             else
             {
                 // TAB has no place in a checkbox (W2K shows a vertical bar, XP shows nothing)
-                char* p = CheckText;
+                char* p = &CheckText[0];
                 while (*p != '\t' && *p != 0)
                     p++;
                 if (*p == '\t')
@@ -456,7 +435,7 @@ CMessageBox::DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
                 }
             }
 
-            SetDlgItemText(HWindow, IDS_MSGBOX_CHECK, CheckText);
+            SetDlgItemText(HWindow, IDS_MSGBOX_CHECK, CheckText.c_str());
         }
         else
         {
@@ -625,9 +604,9 @@ CMessageBox::DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
         }
 
         BOOL multiline = tR.bottom > textR.bottom;
-        if (CheckText != NULL)
+        if (!CheckText.empty())
         {
-            DrawText(hDC, CheckText, -1, &tRCheck, DT_SINGLELINE | DT_CALCRECT | DT_LEFT | DT_EXPANDTABS);
+            DrawText(hDC, CheckText.c_str(), -1, &tRCheck, DT_SINGLELINE | DT_CALCRECT | DT_LEFT | DT_EXPANDTABS);
             //tRCheck.right -= (3 * tRCheck.bottom) / 2;
         }
         else
@@ -790,13 +769,13 @@ CMessageBox::DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
 
                 // assign text
                 BOOL btnTextWasSet = FALSE;
-                if (AliasBtnNames != NULL) // alias button names
+                if (!AliasBtnNames.empty()) // alias button names
                 {
                     char tmpBuff[1000];
                     char seps[] = "\t";
-                    if (i == 0 && strlen(AliasBtnNames) > 999)
+                    if (i == 0 && AliasBtnNames.size() > 999)
                         TRACE_E("AliasBtnNames is too long");
-                    lstrcpyn(tmpBuff, AliasBtnNames, 1000);
+                    lstrcpyn(tmpBuff, AliasBtnNames.c_str(), 1000);
 
                     char* aliasID = strtok(tmpBuff, seps);
                     char* aliasName = strtok(NULL, seps);
@@ -942,7 +921,7 @@ CMessageBox::DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
         }
 
         // move the checkbox and line
-        if (CheckText != NULL)
+        if (!CheckText.empty())
         {
             OffsetChildWindow(HWindow, IDC_MSGBOX_LINE, 0, deltaY);
             OffsetChildWindow(HWindow, IDS_MSGBOX_CHECK, 0, deltaY);

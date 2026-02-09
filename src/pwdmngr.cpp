@@ -128,7 +128,7 @@ BOOL UnscramblePassword(char* password)
         InitUnscrambleTable = FALSE;
     }
 
-    char* backup = DupStr(password); // backup for TRACE_E
+    std::string backup = password; // backup for TRACE_E
 
     char* s = password;
     int last = 31;
@@ -160,10 +160,9 @@ BOOL UnscramblePassword(char* password)
     if (!ok)
     {
         password[0] = 0; // some error occured; clear the password
-        TRACE_E("Unable to unscramble password! scrambled=" << backup);
+        TRACE_E("Unable to unscramble password! scrambled=" << backup.c_str());
     }
-    memset(backup, 0, lstrlen(backup)); // wipe the memory that contained the password
-    free(backup);
+    memset(&backup[0], 0, backup.size()); // wipe the memory that contained the password
     return ok;
 }
 

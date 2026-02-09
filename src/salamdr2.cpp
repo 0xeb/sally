@@ -245,8 +245,8 @@ BOOL SalamanderActive()
 
 BOOL SafeWaitMessageThreadStarted = FALSE;
 DWORD SafeWaitMessageThreadID = 0;
-char* SafeWaitMessageText = NULL;
-char* SafeWaitMessageCaption = NULL;
+std::string SafeWaitMessageText;
+std::string SafeWaitMessageCaption;
 CRITICAL_SECTION SafeWaitMessageTextSection; // for synchronizing access to SafeWaitMessageText
 BOOL SafeWaitMessageCallerSet = FALSE;
 unsigned SafeWaitMessageCallerID = 0;
@@ -316,9 +316,9 @@ void ThreadSafeWaitWindowFBody(BOOL showCloseButton)
                 if (waitWnd.HWindow == NULL)
                 {
                     HANDLES(EnterCriticalSection(&SafeWaitMessageTextSection));
-                    if (SafeWaitMessageText != NULL)
-                        waitWnd.SetText(SafeWaitMessageText);
-                    waitWnd.SetCaption(SafeWaitMessageCaption);
+                    if (!SafeWaitMessageText.empty())
+                        waitWnd.SetText(SafeWaitMessageText.c_str());
+                    waitWnd.SetCaption(SafeWaitMessageCaption.c_str());
                     HANDLES(LeaveCriticalSection(&SafeWaitMessageTextSection));
                     waitWnd.Create(hForegroundWnd);
                 }
@@ -371,8 +371,8 @@ void ThreadSafeWaitWindowFBody(BOOL showCloseButton)
         case WM_USER_SETWAITMSG:
         {
             HANDLES(EnterCriticalSection(&SafeWaitMessageTextSection));
-            if (SafeWaitMessageText != NULL)
-                waitWnd.SetText(SafeWaitMessageText);
+            if (!SafeWaitMessageText.empty())
+                waitWnd.SetText(SafeWaitMessageText.c_str());
             HANDLES(LeaveCriticalSection(&SafeWaitMessageTextSection));
             break;
         }
@@ -432,16 +432,8 @@ void ThreadSafeWaitWindowFBody(BOOL showCloseButton)
 
     HANDLES(DeleteCriticalSection(&SafeWaitMessageTextSection));
     SafeWaitMessageThreadStarted = FALSE; // we have finished
-    if (SafeWaitMessageText != NULL)
-    {
-        free(SafeWaitMessageText);
-        SafeWaitMessageText = NULL;
-    }
-    if (SafeWaitMessageCaption != NULL)
-    {
-        free(SafeWaitMessageCaption);
-        SafeWaitMessageCaption = NULL;
-    }
+    SafeWaitMessageText.clear();
+    SafeWaitMessageCaption.clear();
     TRACE_I("End");
 }
 
@@ -498,12 +490,8 @@ void CreateSafeWaitWindow(const char* message, const char* caption,
         }
 
         HANDLES(EnterCriticalSection(&SafeWaitMessageTextSection));
-        if (SafeWaitMessageText != NULL)
-            free(SafeWaitMessageText);
-        SafeWaitMessageText = DupStr(message);
-        if (SafeWaitMessageCaption != NULL)
-            free(SafeWaitMessageCaption);
-        SafeWaitMessageCaption = DupStr(caption);
+        SafeWaitMessageText = message ? message : "";
+        SafeWaitMessageCaption = caption ? caption : "";
         HANDLES(LeaveCriticalSection(&SafeWaitMessageTextSection));
 
         while (PostThreadMessage(SafeWaitMessageThreadID, WM_USER_CREATEWAITWND, (WPARAM)hForegroundWnd, delay) == 0)
@@ -599,9 +587,7 @@ void SetSafeWaitWindowText(const char* message)
         if (SafeWaitMessageThreadStarted) // the thread is running; send a command to show or hide
         {
             HANDLES(EnterCriticalSection(&SafeWaitMessageTextSection));
-            if (SafeWaitMessageText != NULL)
-                free(SafeWaitMessageText);
-            SafeWaitMessageText = DupStr(message);
+            SafeWaitMessageText = message ? message : "";
             HANDLES(LeaveCriticalSection(&SafeWaitMessageTextSection));
             PostThreadMessage(SafeWaitMessageThreadID, WM_USER_SETWAITMSG, 0, 0);
         }

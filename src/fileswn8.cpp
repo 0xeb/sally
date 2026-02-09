@@ -966,7 +966,7 @@ void CFilesWindow::FilesAction(CActionType type, CFilesWindow* target, int count
                     }
                     else
                         sprintf(subject, LoadStr(type == atCopy ? IDS_COPYDLGTITLE : IDS_MOVEDLGTITLE), expanded);
-                    script = new COperations(1000, 500, DupStr(subject), DupStr(GetPath()), DupStr(path));
+                    script = new COperations(1000, 500, subject, GetPath(), path);
                 }
                 else
                     script = new COperations(1000, 500, NULL, NULL, NULL);

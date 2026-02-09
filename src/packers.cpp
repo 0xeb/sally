@@ -343,65 +343,57 @@ void CPackerConfig::AddDefault(int SalamVersion)
                 GetPackerCmdExecCopy(index) != NULL && GetPackerCmdExecMove(index) != NULL)
             {
                 // take the old commands
-                char* cmdC = DupStr(GetPackerCmdExecCopy(index));
-                char* cmdM = DupStr(GetPackerCmdExecMove(index));
+                std::string cmdC = GetPackerCmdExecCopy(index);
+                std::string cmdM = GetPackerCmdExecMove(index);
                 i = 0;
                 BOOL found = FALSE;
                 // and search the table with them
                 while (PackConversionTable[i].exe != NULL)
                 {
                     // compare with table entries
-                    if (!strcmp(cmdC, PackConversionTable[i].exe) || !strcmp(cmdM, PackConversionTable[i].exe))
+                    if (cmdC == PackConversionTable[i].exe || cmdM == PackConversionTable[i].exe)
                     {
                         // if we find it, replace it with the variable
-                        if (!strcmp(cmdC, PackConversionTable[i].exe))
+                        if (cmdC == PackConversionTable[i].exe)
                         {
-                            free(cmdC);
                             // an ugly hack because of RAR
                             if (i == 2)
                                 // if it's RAR we cannot tell whether it is 16-bit or 32-bit directly, only from long-name support
                                 if (GetPackerSupLongNames(index))
-                                    cmdC = DupStr(PackConversionTable[i].variable);
+                                    cmdC = PackConversionTable[i].variable;
                                 else
-                                    cmdC = DupStr("$(Rar16bitExecutable)");
+                                    cmdC = "$(Rar16bitExecutable)";
                             else
                                 // for others it's simple
-                                cmdC = DupStr(PackConversionTable[i].variable);
+                                cmdC = PackConversionTable[i].variable;
                         }
-                        if (!strcmp(cmdM, PackConversionTable[i].exe))
+                        if (cmdM == PackConversionTable[i].exe)
                         {
-                            free(cmdM);
                             // an ugly hack because of RAR
                             if (i == 2)
                                 // if it's RAR we cannot tell whether it is 16-bit or 32-bit directly, only from long-name support
                                 if (GetPackerSupLongNames(index))
-                                    cmdM = DupStr(PackConversionTable[i].variable);
+                                    cmdM = PackConversionTable[i].variable;
                                 else
-                                    cmdM = DupStr("$(Rar16bitExecutable)");
+                                    cmdM = "$(Rar16bitExecutable)";
                             else
                                 // for others it's simple
-                                cmdM = DupStr(PackConversionTable[i].variable);
+                                cmdM = PackConversionTable[i].variable;
                         }
                         found = TRUE;
                     }
                     i++;
                 }
                 // strings must be copied somewhere or we delete them before use
-                char* title = DupStr(GetPackerTitle(index));
-                char* ext = DupStr(GetPackerExt(index));
-                char* argsC = DupStr(GetPackerCmdArgsCopy(index));
-                char* argsM = DupStr(GetPackerCmdArgsMove(index));
+                std::string title = GetPackerTitle(index);
+                std::string ext = GetPackerExt(index);
+                std::string argsC = GetPackerCmdArgsCopy(index) ? GetPackerCmdArgsCopy(index) : "";
+                std::string argsM = GetPackerCmdArgsMove(index) ? GetPackerCmdArgsMove(index) : "";
 
                 if (found)
-                    SetPacker(index, GetPackerType(index), title, ext, GetPackerOldType(index),
+                    SetPacker(index, GetPackerType(index), title.c_str(), ext.c_str(), GetPackerOldType(index),
                               GetPackerSupLongNames(index), GetPackerSupMove(index),
-                              cmdC, argsC, cmdM, argsM, GetPackerNeedANSIListFile(index));
-                free(argsC);
-                free(argsM);
-                free(title);
-                free(ext);
-                free(cmdC);
-                free(cmdM);
+                              cmdC.c_str(), argsC.c_str(), cmdM.c_str(), argsM.c_str(), GetPackerNeedANSIListFile(index));
             }
     case 9: // 1.6b6 - due to switching from exe name to variable in custom packers
         // enable ANSI file list for ACE32 and PKZIP25
@@ -1113,43 +1105,38 @@ void CUnpackerConfig::AddDefault(int SalamVersion)
                 GetUnpackerCmdExecExtract(index) != NULL)
             {
                 // take the old commands
-                char* cmd = DupStr(GetUnpackerCmdExecExtract(index));
+                std::string cmd = GetUnpackerCmdExecExtract(index);
                 i = 0;
                 BOOL found = FALSE;
                 // and search the table with it
                 while (PackConversionTable[i].exe != NULL)
                 {
                     // compare with table entries
-                    if (!strcmp(cmd, PackConversionTable[i].exe))
+                    if (cmd == PackConversionTable[i].exe)
                     {
-                        free(cmd);
                         // an ugly hack because of RAR
                         if (i == 2)
                             // if it's RAR we cannot tell whether it is 16-bit or 32-bit directly, only from long-name support
                             if (GetUnpackerSupLongNames(index))
-                                cmd = DupStr(PackConversionTable[i].variable);
+                                cmd = PackConversionTable[i].variable;
                             else
-                                cmd = DupStr("$(Rar16bitExecutable)");
+                                cmd = "$(Rar16bitExecutable)";
                         else
                             // for others it's simple
-                            cmd = DupStr(PackConversionTable[i].variable);
+                            cmd = PackConversionTable[i].variable;
                         found = TRUE;
                     }
                     i++;
                 }
                 // strings must be copied somewhere or we delete them before use
-                char* title = DupStr(GetUnpackerTitle(index));
-                char* ext = DupStr(GetUnpackerExt(index));
-                char* args = DupStr(GetUnpackerCmdArgsExtract(index));
+                std::string title = GetUnpackerTitle(index);
+                std::string ext = GetUnpackerExt(index);
+                std::string args = GetUnpackerCmdArgsExtract(index) ? GetUnpackerCmdArgsExtract(index) : "";
 
                 if (found)
-                    SetUnpacker(index, GetUnpackerType(index), title, ext, GetUnpackerOldType(index),
-                                GetUnpackerSupLongNames(index), cmd, args,
+                    SetUnpacker(index, GetUnpackerType(index), title.c_str(), ext.c_str(), GetUnpackerOldType(index),
+                                GetUnpackerSupLongNames(index), cmd.c_str(), args.c_str(),
                                 GetUnpackerNeedANSIListFile(index));
-                free(args);
-                free(title);
-                free(ext);
-                free(cmd);
             }
     case 9: // 1.6b6 - due to switching from exe name to variable in custom packers
         // enable ANSI file list for ACE32 and PKZIP25
@@ -1430,22 +1417,19 @@ BOOL CUnpackerConfig::ExecuteUnpacker(HWND parent, CFilesWindow* panel, const ch
                 TRACE_E("CUnpackerConfig::ExecuteUnpacker(): delArchiveWhenDone is TRUE for external archiver (unsupported, ignoring)");
 
             char* tmpMask = DupStr(mask);
-            char* command = (char*)malloc(strlen(data->CmdExecExtract) +
-                                          strlen(data->CmdArgsExtract) + 2);
-            if (tmpMask == NULL || command == NULL)
+            std::string command = std::string(data->CmdExecExtract) + " " + data->CmdArgsExtract;
+            if (tmpMask == NULL)
             {
                 TRACE_E(LOW_MEMORY);
                 return FALSE;
             }
-            sprintf(command, "%s %s", data->CmdExecExtract, data->CmdArgsExtract);
 
             // we must store the pointer for deallocation; it will be destroyed
             char* tmpMask2 = tmpMask;
-            BOOL ret = PackUniversalUncompress(parent, command, NULL, targetDir, FALSE, panel,
+            BOOL ret = PackUniversalUncompress(parent, command.c_str(), NULL, targetDir, FALSE, panel,
                                                data->SupportLongNames, zipFile, targetDir,
                                                NULL, PackEnumMask, &tmpMask, data->NeedANSIListFile);
             free(tmpMask2);
-            free(command);
             return ret;
         }
         else

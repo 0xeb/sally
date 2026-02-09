@@ -4,6 +4,8 @@
 
 #pragma once
 
+#include <string>
+
 //
 // ****************************************************************************
 
@@ -140,15 +142,15 @@ class CMessageBox : public CCommonDialog
 {
 protected:
     DWORD Flags;
-    char* Title;
-    char* CheckText;
+    std::string Title;
+    std::string CheckText;
     CTruncatedString Text;
     BOOL* Check;
     HICON HOwnIcon;
     MSGBOXEX_CALLBACK HelpCallback;
-    char* AliasBtnNames;
-    char* URL;
-    char* URLText;
+    std::string AliasBtnNames;
+    std::string URL;
+    std::string URLText;
     // for WM_COPY:
     int ButtonsID[MESSAGEBOX_MAXBUTTONS]; // IDs of the buttons after remapping
     int BackgroundSeparator;              // Y offset dividing white/gray (Vista+)

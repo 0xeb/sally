@@ -520,7 +520,7 @@ void CProgressDialog::SetDlgTitle(BOOL minimized)
             sprintf(buf, "(%d %%) %s", (int)((min(1000, SummaryProgress) /*+ 5*/) / 10), Caption); // no rounding (100% must appear only at 100% and not at 99.5%)
         else
             sprintf(buf, "(%s) %s", LoadStr(AutoPaused ? IDS_PROGDLGQUEUEPAUSED : IDS_PROGDLGPAUSED),
-                    AutoPaused && Script != NULL && Script->WaitInQueueSubject != NULL ? Script->WaitInQueueSubject : Caption);
+                    AutoPaused && Script != NULL && !Script->WaitInQueueSubject.empty() ? Script->WaitInQueueSubject.c_str() : Caption);
         char oldCaption[200];
         ::GetWindowText(HWindow, oldCaption, 200);
         oldCaption[199] = 0;
@@ -660,15 +660,15 @@ CProgressDialog::DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
                 SetDlgItemText(HWindow, IDB_PAUSERESUME, LoadStr(ShowPause ? IDS_PROGDLGPAUSE : IDS_PROGDLGRESUME));
                 SetDlgTitle(IsIconic(RunningInOwnThread ? HWindow : MainWindow->HWindow));
 
-                if (Script->WaitInQueueFrom != NULL && Script->WaitInQueueTo != NULL)
+                if (!Script->WaitInQueueFrom.empty() && !Script->WaitInQueueTo.empty())
                 {
                     if (OperationText != NULL)
                         OperationText->SetText(LoadStr(IDS_COPYINGFROM));
                     if (Source != NULL)
-                        Source->SetTextToDblQuotesIfNeeded(Script->WaitInQueueFrom);
+                        Source->SetTextToDblQuotesIfNeeded(Script->WaitInQueueFrom.c_str());
                     SetWindowText(HPreposition, LoadStr(IDS_COPYINGTO));
                     if (Target != NULL)
-                        Target->SetTextToDblQuotesIfNeeded(Script->WaitInQueueTo);
+                        Target->SetTextToDblQuotesIfNeeded(Script->WaitInQueueTo.c_str());
                 }
             }
         }

@@ -4,6 +4,8 @@
 
 #pragma once
 
+#include <string>
+
 //
 // ****************************************************************************
 
@@ -83,11 +85,11 @@ protected:
     DWORD DelayedThrobberShowTime; // GetTickCount() value when delayed throbber should be shown (0 = not delayed)
     BOOL Throbber;                 // show 'progress' throbber after text/hidden filter? (TRUE only if window exists)
     int ThrobberFrame;             // index aktualniho policka animace
-    char* ThrobberTooltip;         // if NULL, it will not be shown
+    std::string ThrobberTooltip;   // if empty, it will not be shown
     int ThrobberID;                // throbber identification number (-1 = invalid)
 
     CSecurityIconState Security;
-    char* SecurityTooltip; // if NULL, it will not be shown
+    std::string SecurityTooltip; // if empty, it will not be shown
 
     int Allocated;
     int* AlpDX; // array of lengths (from 0th to Xth character in the string)

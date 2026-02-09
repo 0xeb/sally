@@ -811,8 +811,8 @@ DWORD COperation::WithPreservedFileTimeW(const wchar_t* path, DWORD attrs,
 // COperations
 //
 
-COperations::COperations(int base, int delta, char* waitInQueueSubject, char* waitInQueueFrom,
-                         char* waitInQueueTo) : Sizes(1, 400), Count(0)
+COperations::COperations(int base, int delta, const char* waitInQueueSubject, const char* waitInQueueFrom,
+                         const char* waitInQueueTo) : Sizes(1, 400), Count(0)
 {
     TotalSize = CQuadWord(0, 0);
     CompressedSize = CQuadWord(0, 0);
@@ -850,9 +850,9 @@ COperations::COperations(int base, int delta, char* waitInQueueSubject, char* wa
     WorkPath1InclSubDirs = FALSE;
     WorkPath2[0] = 0;
     WorkPath2InclSubDirs = FALSE;
-    WaitInQueueSubject = waitInQueueSubject; // released in FreeScript()
-    WaitInQueueFrom = waitInQueueFrom;       // released in FreeScript()
-    WaitInQueueTo = waitInQueueTo;           // released in FreeScript()
+    WaitInQueueSubject = waitInQueueSubject ? waitInQueueSubject : "";
+    WaitInQueueFrom = waitInQueueFrom ? waitInQueueFrom : "";
+    WaitInQueueTo = waitInQueueTo ? waitInQueueTo : "";
     HANDLES(InitializeCriticalSection(&StatusCS));
     TransferredFileSize = CQuadWord(0, 0);
     ProgressSize = CQuadWord(0, 0);
@@ -9142,12 +9142,7 @@ void FreeScript(COperations* script)
     // Note: COperation destructors now handle freeing SourceName/TargetName
     // based on ownership flags. The manual free loop is no longer needed.
     // delete script -> ~COperations -> ~vector -> ~COperation for each element
-    if (script->WaitInQueueSubject != NULL)
-        free(script->WaitInQueueSubject);
-    if (script->WaitInQueueFrom != NULL)
-        free(script->WaitInQueueFrom);
-    if (script->WaitInQueueTo != NULL)
-        free(script->WaitInQueueTo);
+    // WaitInQueue strings are now std::string members, auto-destroyed with the object.
     delete script;
 }
 
