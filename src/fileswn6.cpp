@@ -21,29 +21,16 @@
 #include "common/IEnvironment.h"
 #include "common/widepath.h"
 
-// helper variables for the dialogs in BuildScriptXXX()
-BOOL ConfirmADSLossAll = FALSE;
-BOOL ConfirmADSLossSkipAll = FALSE;
-BOOL ConfirmCopyLinkContentAll = FALSE;
-BOOL ConfirmCopyLinkContentSkipAll = FALSE;
-BOOL ErrReadingADSIgnoreAll = FALSE;
-BOOL ErrFileSkipAll = FALSE;
-BOOL ErrTooLongNameSkipAll = FALSE;
-BOOL ErrTooLongDirNameSkipAll = FALSE;
-BOOL ErrTooLongTgtNameSkipAll = FALSE;
-BOOL ErrTooLongTgtDirNameSkipAll = FALSE;
-BOOL ErrTooLongSrcDirNameSkipAll = FALSE;
-BOOL ErrListDirSkipAll = FALSE;
-BOOL ErrTooBigFileFAT32SkipAll = FALSE;
-BOOL ErrGetFileSizeOfLnkTgtIgnAll = FALSE;
+#include "common/CBuildScriptState.h"
+
+// Transient state for BuildScriptMain/Dir/File
+static CBuildScriptState bsState;
 
 //
 // ****************************************************************************
 // CFilesWindow
 //
 
-// helper variables for tests attempting to interrupt script building
-DWORD LastTickCount;
 
 void CFilesWindow::Activate(BOOL shares)
 {
@@ -247,20 +234,7 @@ BOOL CFilesWindow::MoveFiles(const char* source, const char* target, const char*
 
         EnvSetCurrentDirectoryA(gEnvironment, source); // for a faster move (the system prefers it)
 
-        ConfirmADSLossAll = FALSE;
-        ConfirmADSLossSkipAll = FALSE;
-        ConfirmCopyLinkContentAll = FALSE;
-        ConfirmCopyLinkContentSkipAll = FALSE;
-        ErrReadingADSIgnoreAll = FALSE;
-        ErrFileSkipAll = FALSE;
-        ErrTooLongNameSkipAll = FALSE;
-        ErrTooLongDirNameSkipAll = FALSE;
-        ErrTooLongTgtNameSkipAll = FALSE;
-        ErrTooLongTgtDirNameSkipAll = FALSE;
-        ErrTooLongSrcDirNameSkipAll = FALSE;
-        ErrListDirSkipAll = FALSE;
-        ErrTooBigFileFAT32SkipAll = FALSE;
-        ErrGetFileSizeOfLnkTgtIgnAll = FALSE;
+        bsState.Reset();
 
         //---  create the script object
         COperations* script = new COperations(100, 50, NULL, NULL, NULL);
@@ -302,7 +276,7 @@ BOOL CFilesWindow::MoveFiles(const char* source, const char* target, const char*
         }
 
         //---  initialize build interruption test
-        LastTickCount = GetTickCount();
+        bsState.LastTickCount = GetTickCount();
 
         //---  enumerate files/directories of the source directory
         CPathBuffer sourceDir;
@@ -511,27 +485,11 @@ BOOL CFilesWindow::BuildScriptMain2(COperations* script, BOOL copy, char* target
     script->OccupiedSpace = CQuadWord(0, 0);
     script->TotalFileSize = CQuadWord(0, 0);
 
-    ConfirmADSLossAll = FALSE;
-    ConfirmADSLossSkipAll = FALSE;
-    ConfirmCopyLinkContentAll = FALSE;
-    ConfirmCopyLinkContentSkipAll = FALSE;
-    ErrReadingADSIgnoreAll = FALSE;
-    ErrFileSkipAll = FALSE;
-    ErrTooLongNameSkipAll = FALSE;
-    ErrTooLongDirNameSkipAll = FALSE;
-    ErrTooLongTgtNameSkipAll = FALSE;
-    ErrTooLongTgtDirNameSkipAll = FALSE;
-    ErrTooLongSrcDirNameSkipAll = FALSE;
-    ErrListDirSkipAll = FALSE;
-    ErrTooBigFileFAT32SkipAll = FALSE;
-    ErrGetFileSizeOfLnkTgtIgnAll = FALSE;
+    bsState.Reset();
 
     CPathBuffer root;  // Heap-allocated for long path support (UNC roots can exceed MAX_PATH)
     CPathBuffer fsName;  // Filesystem names are short (NTFS, FAT32, etc.)
     DWORD dummy, flags;
-
-    //---  initialize the build interruption test
-    LastTickCount = GetTickCount();
 
     BOOL fastDirectoryMove = TRUE; // Configuration.FastDirectoryMove;
     if (data->Count > 0)
@@ -1133,26 +1091,10 @@ BOOL CFilesWindow::BuildScriptMain(COperations* script, CActionType type,
     script->OccupiedSpace = CQuadWord(0, 0);
     script->TotalFileSize = CQuadWord(0, 0);
 
-    ConfirmADSLossAll = FALSE;
-    ConfirmADSLossSkipAll = FALSE;
-    ConfirmCopyLinkContentAll = FALSE;
-    ConfirmCopyLinkContentSkipAll = FALSE;
-    ErrReadingADSIgnoreAll = FALSE;
-    ErrFileSkipAll = FALSE;
-    ErrTooLongNameSkipAll = FALSE;
-    ErrTooLongDirNameSkipAll = FALSE;
-    ErrTooLongTgtNameSkipAll = FALSE;
-    ErrTooLongTgtDirNameSkipAll = FALSE;
-    ErrTooLongSrcDirNameSkipAll = FALSE;
-    ErrListDirSkipAll = FALSE;
-    ErrTooBigFileFAT32SkipAll = FALSE;
-    ErrGetFileSizeOfLnkTgtIgnAll = FALSE;
+    bsState.Reset();
 
     CPathBuffer root;  // Heap-allocated for long path support (UNC roots can exceed MAX_PATH)
     CPathBuffer fsName;  // Filesystem names are short (NTFS, FAT32, etc.)
-
-    //---  initialize the build interruption test
-    LastTickCount = GetTickCount();
 
     //---  when copying/moving from CD, clear the read-only attribute
     //     and set CurrentDirectory to the slower medium
@@ -1370,7 +1312,7 @@ BOOL CFilesWindow::BuildScriptMain(COperations* script, CActionType type,
                         op.Attr = oneFile->Attr;
                         BOOL skip;
                         if ((op.SourceName = BuildName(sourcePath, oneFile->Name, NULL, &skip,
-                                                       &ErrTooLongDirNameSkipAll, sourcePath)) == NULL)
+                                                       &bsState.ErrTooLongDirNameSkipAll, sourcePath)) == NULL)
                         {
                             if (!skip)
                             {
@@ -1541,7 +1483,7 @@ BOOL CFilesWindow::BuildScriptDir(COperations* script, CActionType type, char* s
         *sourceEnd = 0; // restoring original sourcePath
         std::wstring msg = FormatStrW(LoadStrW(IDS_NAMEISTOOLONG), AnsiToWide(dirName).c_str(), AnsiToWide(sourcePath).c_str());
         BOOL skip = TRUE;
-        if (!ErrTooLongSrcDirNameSkipAll)
+        if (!bsState.ErrTooLongSrcDirNameSkipAll)
         {
             PromptResult res = gPrompter->AskSkipSkipAllFocus(LoadStrW(IDS_ERRORBUILDINGSCRIPT), msg.c_str());
             if (res.type == PromptResult::kFocus)
@@ -1551,7 +1493,7 @@ BOOL CFilesWindow::BuildScriptDir(COperations* script, CActionType type, char* s
             }
             else if (res.type == PromptResult::kSkipAll)
             {
-                ErrTooLongSrcDirNameSkipAll = TRUE;
+                bsState.ErrTooLongSrcDirNameSkipAll = TRUE;
             }
         }
         return skip;
@@ -1591,7 +1533,7 @@ BOOL CFilesWindow::BuildScriptDir(COperations* script, CActionType type, char* s
             *targetEnd = 0; // restoring targetPath
             std::wstring msg = FormatStrW(LoadStrW(IDS_TOOLONGNAME2), AnsiToWide(targetPath).c_str(), AnsiToWide(s2).c_str());
             BOOL skip = TRUE;
-            if (!ErrTooLongTgtDirNameSkipAll)
+            if (!bsState.ErrTooLongTgtDirNameSkipAll)
             {
                 PromptResult res = gPrompter->AskSkipSkipAllFocus(LoadStrW(IDS_ERRORBUILDINGSCRIPT), msg.c_str());
                 if (res.type == PromptResult::kFocus)
@@ -1601,7 +1543,7 @@ BOOL CFilesWindow::BuildScriptDir(COperations* script, CActionType type, char* s
                 }
                 else if (res.type == PromptResult::kSkipAll)
                 {
-                    ErrTooLongTgtDirNameSkipAll = TRUE;
+                    bsState.ErrTooLongTgtDirNameSkipAll = TRUE;
                 }
             }
             return skip;
@@ -1733,7 +1675,7 @@ BOOL CFilesWindow::BuildScriptDir(COperations* script, CActionType type, char* s
         if (sourcePathSupADS)
         {
             if ((targetPathState == tpsEncryptedNotExisting || targetPathState == tpsNotEncryptedNotExisting) && // target directory does not exist
-                (targetPathSupADS || !ConfirmADSLossAll))                                                        // if ADS should not be ignored
+                (targetPathSupADS || !bsState.ConfirmADSLossAll))                                                        // if ADS should not be ignored
             {
                 if (script->BytesPerCluster == 0)
                     TRACE_E("How is it possible that script->BytesPerCluster is not yet set???");
@@ -1787,11 +1729,11 @@ BOOL CFilesWindow::BuildScriptDir(COperations* script, CActionType type, char* s
                     else // copying to a non-NTFS filesystem (prompt to discard ADS)
                     {
                         int res;
-                        if (ConfirmADSLossAll)
+                        if (bsState.ConfirmADSLossAll)
                             res = IDYES;
                         else
                         {
-                            if (ConfirmADSLossSkipAll)
+                            if (bsState.ConfirmADSLossSkipAll)
                                 res = IDB_SKIP;
                             else
                             {
@@ -1807,12 +1749,12 @@ BOOL CFilesWindow::BuildScriptDir(COperations* script, CActionType type, char* s
                         switch (res)
                         {
                         case IDB_ALL:
-                            ConfirmADSLossAll = TRUE; // intentional fallthrough
+                            bsState.ConfirmADSLossAll = TRUE; // intentional fallthrough
                         case IDYES:
                             break; // we will ignore ADS, so they won't be copied/moved (and will be completely lost)
 
                         case IDB_SKIPALL:
-                            ConfirmADSLossSkipAll = TRUE; // intentional fallthrough
+                            bsState.ConfirmADSLossSkipAll = TRUE; // intentional fallthrough
                         case IDB_SKIP:
                         {
                             *sourceEnd = 0; // restoring sourcePath
@@ -1852,13 +1794,13 @@ BOOL CFilesWindow::BuildScriptDir(COperations* script, CActionType type, char* s
                                     {
                                         std::wstring msg = FormatStrW(LoadStrW(IDS_CANNOTREADDIR), AnsiToWide(sourcePath).c_str(), GetErrorTextW(err));
                                         BOOL skip = TRUE;
-                                        if (!ErrListDirSkipAll)
+                                        if (!bsState.ErrListDirSkipAll)
                                         {
                                             PromptResult res = gPrompter->AskSkipSkipAllCancel(LoadStrW(IDS_ERRORTITLE), msg.c_str());
                                             if (res.type == PromptResult::kCancel)
                                                 skip = FALSE;
                                             else if (res.type == PromptResult::kSkipAll)
-                                                ErrListDirSkipAll = TRUE;
+                                                bsState.ErrListDirSkipAll = TRUE;
                                         }
                                         *sourceEnd = 0; // restoring sourcePath
                                         *targetEnd = 0; // restoring targetPath
@@ -1872,7 +1814,7 @@ BOOL CFilesWindow::BuildScriptDir(COperations* script, CActionType type, char* s
 
                         // directory listing succeeded (or an unexpected error occurred), report an ADS error
                         int res;
-                        if (ErrReadingADSIgnoreAll)
+                        if (bsState.ErrReadingADSIgnoreAll)
                             res = IDB_IGNORE;
                         else
                         {
@@ -1884,7 +1826,7 @@ BOOL CFilesWindow::BuildScriptDir(COperations* script, CActionType type, char* s
                             goto READADS_AGAIN;
 
                         case IDB_IGNOREALL:
-                            ErrReadingADSIgnoreAll = TRUE; // intentional fallthrough
+                            bsState.ErrReadingADSIgnoreAll = TRUE; // intentional fallthrough
                         case IDB_IGNORE:
                             break;
 
@@ -1969,11 +1911,11 @@ BOOL CFilesWindow::BuildScriptDir(COperations* script, CActionType type, char* s
     {
         copyMoveDirIsLink = TRUE;
         int res;
-        if (ConfirmCopyLinkContentAll)
+        if (bsState.ConfirmCopyLinkContentAll)
             res = IDYES;
         else
         {
-            if (ConfirmCopyLinkContentSkipAll)
+            if (bsState.ConfirmCopyLinkContentSkipAll)
                 res = IDB_SKIP;
             else
             {
@@ -2004,12 +1946,12 @@ BOOL CFilesWindow::BuildScriptDir(COperations* script, CActionType type, char* s
         switch (res)
         {
         case IDB_ALL:
-            ConfirmCopyLinkContentAll = TRUE; // intentional fallthrough
+            bsState.ConfirmCopyLinkContentAll = TRUE; // intentional fallthrough
         case IDYES:
             break; // copy the link content to the target
 
         case IDB_SKIPALL:
-            ConfirmCopyLinkContentSkipAll = TRUE; // intentionalfallthrough
+            bsState.ConfirmCopyLinkContentSkipAll = TRUE; // intentionalfallthrough
         case IDB_SKIP:
             copyMoveSkipLinkContent = TRUE;
             break; // skip the link content (do not copy)
@@ -2057,13 +1999,13 @@ BOOL CFilesWindow::BuildScriptDir(COperations* script, CActionType type, char* s
                 if (targetEnd != NULL)
                     *targetEnd = 0; // restoring targetPath
                 BOOL skip = TRUE;
-                if (!ErrListDirSkipAll)
+                if (!bsState.ErrListDirSkipAll)
                 {
                     PromptResult res = gPrompter->AskSkipSkipAllCancel(LoadStrW(IDS_ERRORTITLE), msg.c_str());
                     if (res.type == PromptResult::kCancel)
                         skip = FALSE;
                     else if (res.type == PromptResult::kSkipAll)
-                        ErrListDirSkipAll = TRUE;
+                        bsState.ErrListDirSkipAll = TRUE;
                 }
                 if (!skip)
                     return FALSE;
@@ -2106,7 +2048,7 @@ BOOL CFilesWindow::BuildScriptDir(COperations* script, CActionType type, char* s
                     askDirDelete = FALSE;
                 }
                 //---  does anyone want to interrupt script building?
-                if (GetTickCount() - LastTickCount > BS_TIMEOUT)
+                if (GetTickCount() - bsState.LastTickCount > BS_TIMEOUT)
                 {
                     if (UserWantsToCancelSafeWaitWindow())
                     {
@@ -2122,7 +2064,7 @@ BOOL CFilesWindow::BuildScriptDir(COperations* script, CActionType type, char* s
                             goto BUILD_ERROR;
                     }
 
-                    LastTickCount = GetTickCount();
+                    bsState.LastTickCount = GetTickCount();
                 }
 
                 //---  build a directory or file
@@ -2172,13 +2114,13 @@ BOOL CFilesWindow::BuildScriptDir(COperations* script, CActionType type, char* s
             {
                 std::wstring msg = FormatStrW(LoadStrW(IDS_CANNOTREADDIR), AnsiToWide(sourcePath).c_str(), GetErrorTextW(err));
                 BOOL skip = TRUE;
-                if (!ErrListDirSkipAll)
+                if (!bsState.ErrListDirSkipAll)
                 {
                     PromptResult res = gPrompter->AskSkipSkipAllCancel(LoadStrW(IDS_ERRORTITLE), msg.c_str());
                     if (res.type == PromptResult::kCancel)
                         skip = FALSE;
                     else if (res.type == PromptResult::kSkipAll)
-                        ErrListDirSkipAll = TRUE;
+                        bsState.ErrListDirSkipAll = TRUE;
                 }
                 if (!skip)
                     return FALSE;
@@ -2201,7 +2143,7 @@ BOOL CFilesWindow::BuildScriptDir(COperations* script, CActionType type, char* s
         op.Attr = sourceDirAttr;
         BOOL skip;
         if ((op.SourceName = BuildName(sourcePath, dirName, NULL, &skip,
-                                       &ErrTooLongDirNameSkipAll, sourcePath)) == NULL)
+                                       &bsState.ErrTooLongDirNameSkipAll, sourcePath)) == NULL)
         {
             return skip;
         }
@@ -2298,7 +2240,7 @@ BOOL CFilesWindow::BuildScriptDir(COperations* script, CActionType type, char* s
             BOOL skip;
             BOOL skipTooLongSrcNameErr = FALSE;
             if ((op.SourceName = BuildName(sourcePath, dirName, NULL, &skip,
-                                           &ErrTooLongDirNameSkipAll, sourcePath)) == NULL)
+                                           &bsState.ErrTooLongDirNameSkipAll, sourcePath)) == NULL)
             {
                 if (skip)
                     skipTooLongSrcNameErr = TRUE; // we also want to add a flag to skip directory creation
@@ -2431,7 +2373,7 @@ BOOL CFilesWindow::BuildScriptFile(COperations* script, CActionType type, char* 
         op.Attr = sourceFileAttr;
         BOOL skip;
         if ((op.SourceName = BuildName(sourcePath, fileName, fileDOSName, &skip,
-                                       &ErrTooLongNameSkipAll, sourcePath)) == NULL)
+                                       &bsState.ErrTooLongNameSkipAll, sourcePath)) == NULL)
         {
             return skip;
         }
@@ -2441,13 +2383,13 @@ BOOL CFilesWindow::BuildScriptFile(COperations* script, CActionType type, char* 
         FAT_TOO_BIG_FILE:
 
             PromptResult::Type resType = PromptResult::kSkip;
-            if (!ErrTooBigFileFAT32SkipAll)
+            if (!bsState.ErrTooBigFileFAT32SkipAll)
             {
                 std::wstring msg = FormatStrW(LoadStrW(IDS_FILEISTOOBIGFORFAT32), AnsiToWide(op.SourceName).c_str());
                 PromptResult res = gPrompter->AskSkipSkipAllCancel(LoadStrW(IDS_ERRORTITLE), msg.c_str());
                 resType = res.type;
                 if (res.type == PromptResult::kSkipAll)
-                    ErrTooBigFileFAT32SkipAll = TRUE;
+                    bsState.ErrTooBigFileFAT32SkipAll = TRUE;
             }
             free(op.SourceName);
             op.SourceName = NULL;
@@ -2462,7 +2404,7 @@ BOOL CFilesWindow::BuildScriptFile(COperations* script, CActionType type, char* 
             char* opMask = mask != NULL && strcmp(mask, "*.*") == 0 ? NULL : mask;
             if ((op.TargetName = BuildName(targetPath,
                                            MaskName(finalName, 2 * MAX_PATH + 200, fileName, opMask),
-                                           NULL, &skip, &ErrTooLongTgtNameSkipAll, sourcePath)) == NULL)
+                                           NULL, &skip, &bsState.ErrTooLongTgtNameSkipAll, sourcePath)) == NULL)
             {
                 free(op.SourceName);
                 op.SourceName = NULL;
@@ -2472,7 +2414,7 @@ BOOL CFilesWindow::BuildScriptFile(COperations* script, CActionType type, char* 
         else
         {
             if ((op.TargetName = BuildName(targetPath, mapName, NULL, &skip,
-                                           &ErrTooLongTgtNameSkipAll, sourcePath)) == NULL)
+                                           &bsState.ErrTooLongTgtNameSkipAll, sourcePath)) == NULL)
             {
                 free(op.SourceName);
                 op.SourceName = NULL;
@@ -2559,7 +2501,7 @@ BOOL CFilesWindow::BuildScriptFile(COperations* script, CActionType type, char* 
             {
                 BOOL cancel;
                 CQuadWord size;
-                if (GetLinkTgtFileSize(HWindow, NULL, &op, &size, &cancel, &ErrGetFileSizeOfLnkTgtIgnAll))
+                if (GetLinkTgtFileSize(HWindow, NULL, &op, &size, &cancel, &bsState.ErrGetFileSizeOfLnkTgtIgnAll))
                 {
                     fileSizeLoc = size;
                     op.FileSize = fileSizeLoc;
@@ -2588,7 +2530,7 @@ BOOL CFilesWindow::BuildScriptFile(COperations* script, CActionType type, char* 
             // TODO: Add CheckFileOrDirADSW for wide path support in the future.
             if (fileNameW == NULL &&                          // skip ADS for Unicode filenames (ANSI path is invalid)
                 sourcePathSupADS &&                           // if there's a chance that ADS will be found and
-                (targetPathSupADS || !ConfirmADSLossAll))     // if ADS should not be ignored
+                (targetPathSupADS || !bsState.ConfirmADSLossAll))     // if ADS should not be ignored
             {
                 CQuadWord adsSize;
                 CQuadWord adsOccupiedSpace;
@@ -2612,11 +2554,11 @@ BOOL CFilesWindow::BuildScriptFile(COperations* script, CActionType type, char* 
                     else // copying to a non-NTFS filesystem (prompt about discarding ADS)
                     {
                         int res;
-                        if (ConfirmADSLossAll || onlyDiscardableStreams)
+                        if (bsState.ConfirmADSLossAll || onlyDiscardableStreams)
                             res = IDYES;
                         else
                         {
-                            if (ConfirmADSLossSkipAll)
+                            if (bsState.ConfirmADSLossSkipAll)
                                 res = IDB_SKIP;
                             else
                             {
@@ -2632,12 +2574,12 @@ BOOL CFilesWindow::BuildScriptFile(COperations* script, CActionType type, char* 
                         switch (res)
                         {
                         case IDB_ALL:
-                            ConfirmADSLossAll = TRUE; // intentional fallthrough
+                            bsState.ConfirmADSLossAll = TRUE; // intentional fallthrough
                         case IDYES:
                             break; // we will ignore ADS, so they won't be copied/moved (and will be completely lost)
 
                         case IDB_SKIPALL:
-                            ConfirmADSLossSkipAll = TRUE; // intentional fallthrough
+                            bsState.ConfirmADSLossSkipAll = TRUE; // intentional fallthrough
                         case IDB_SKIP:
                         {
                             free(op.SourceName);
@@ -2683,7 +2625,7 @@ BOOL CFilesWindow::BuildScriptFile(COperations* script, CActionType type, char* 
                             HANDLES(CloseHandle(in));
 
                             int res;
-                            if (ErrReadingADSIgnoreAll)
+                            if (bsState.ErrReadingADSIgnoreAll)
                                 res = IDB_IGNORE;
                             else
                             {
@@ -2695,7 +2637,7 @@ BOOL CFilesWindow::BuildScriptFile(COperations* script, CActionType type, char* 
                                 goto READFILEADS_AGAIN;
 
                             case IDB_IGNOREALL:
-                                ErrReadingADSIgnoreAll = TRUE; // intentional fallthrough
+                                bsState.ErrReadingADSIgnoreAll = TRUE; // intentional fallthrough
                             case IDB_IGNORE:
                                 break;
 
@@ -2715,7 +2657,7 @@ BOOL CFilesWindow::BuildScriptFile(COperations* script, CActionType type, char* 
                             if (invalidSrcName)
                                 err = ERROR_INVALID_NAME;
                             int res;
-                            if (ErrFileSkipAll)
+                            if (bsState.ErrFileSkipAll)
                                 res = IDB_SKIP;
                             else
                             {
@@ -2729,7 +2671,7 @@ BOOL CFilesWindow::BuildScriptFile(COperations* script, CActionType type, char* 
                                 goto READFILEADS_AGAIN;
 
                             case IDB_SKIPALL:
-                                ErrFileSkipAll = TRUE; // intentional fallthrough
+                                bsState.ErrFileSkipAll = TRUE; // intentional fallthrough
                             case IDB_SKIP:
                             {
                                 free(op.SourceName);
@@ -2791,7 +2733,7 @@ BOOL CFilesWindow::BuildScriptFile(COperations* script, CActionType type, char* 
         op.Attr = sourceFileAttr;
         BOOL skip;
         if ((op.SourceName = BuildName(sourcePath, fileName, fileDOSName, &skip,
-                                       &ErrTooLongNameSkipAll, sourcePath)) == NULL)
+                                       &bsState.ErrTooLongNameSkipAll, sourcePath)) == NULL)
         {
             return skip;
         }
@@ -2884,7 +2826,7 @@ BOOL CFilesWindow::BuildScriptFile(COperations* script, CActionType type, char* 
         op.Attr = sourceFileAttr;
         BOOL skip;
         if ((op.SourceName = BuildName(sourcePath, fileName, NULL, &skip,
-                                       &ErrTooLongNameSkipAll, sourcePath)) == NULL)
+                                       &bsState.ErrTooLongNameSkipAll, sourcePath)) == NULL)
         {
             return skip;
         }
@@ -2895,7 +2837,7 @@ BOOL CFilesWindow::BuildScriptFile(COperations* script, CActionType type, char* 
         {
             BOOL cancel;
             CQuadWord size;
-            if (GetLinkTgtFileSize(HWindow, NULL, &op, &size, &cancel, &ErrGetFileSizeOfLnkTgtIgnAll))
+            if (GetLinkTgtFileSize(HWindow, NULL, &op, &size, &cancel, &bsState.ErrGetFileSizeOfLnkTgtIgnAll))
                 fileSizeLoc = size;
             if (cancel)
                 return FALSE;
@@ -2928,7 +2870,7 @@ BOOL CFilesWindow::BuildScriptFile(COperations* script, CActionType type, char* 
         op.Size = (attrsData->ChangeCompression || attrsData->ChangeEncryption) ? max(fileSizeLoc, COMPRESS_ENCRYPT_MIN_FILE_SIZE) : CHATTRS_FILE_SIZE;
         BOOL skip;
         if ((op.SourceName = BuildName(sourcePath, fileName, NULL, &skip,
-                                       &ErrTooLongNameSkipAll, sourcePath)) == NULL)
+                                       &bsState.ErrTooLongNameSkipAll, sourcePath)) == NULL)
         {
             return skip;
         }
@@ -2957,7 +2899,7 @@ BOOL CFilesWindow::BuildScriptFile(COperations* script, CActionType type, char* 
         op.Attr = sourceFileAttr;
         BOOL skip;
         if ((op.SourceName = BuildName(sourcePath, fileName, NULL, &skip,
-                                       &ErrTooLongNameSkipAll, sourcePath)) == NULL)
+                                       &bsState.ErrTooLongNameSkipAll, sourcePath)) == NULL)
         {
             return skip;
         }
