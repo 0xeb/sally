@@ -757,6 +757,55 @@ DWORD COperation::GetSourceAttributes() const
         return SalLPGetFileAttributes(SourceName);
     }
 }
+
+// Wraps CreateFileW + DeviceIoControl(FSCTL_SET_COMPRESSION) for platform abstraction.
+DWORD COperation::SetCompressionW(const wchar_t* path, USHORT compressionFormat)
+{
+    HANDLE file = CreateFileW(path, FILE_READ_DATA | FILE_WRITE_DATA,
+                              FILE_SHARE_READ | FILE_SHARE_WRITE, NULL,
+                              OPEN_EXISTING, FILE_FLAG_BACKUP_SEMANTICS, NULL);
+    if (file == INVALID_HANDLE_VALUE)
+        return GetLastError();
+
+    DWORD ret = ERROR_SUCCESS;
+    ULONG length;
+    if (!DeviceIoControl(file, FSCTL_SET_COMPRESSION, &compressionFormat,
+                         sizeof(USHORT), NULL, 0, &length, FALSE))
+        ret = GetLastError();
+    HANDLES(CloseHandle(file));
+    return ret;
+}
+
+// Saves file times, invokes operationFn, then restores times.
+DWORD COperation::WithPreservedFileTimeW(const wchar_t* path, DWORD attrs,
+                                         DWORD (*operationFn)(const wchar_t* path))
+{
+    DWORD flags = (attrs & FILE_ATTRIBUTE_DIRECTORY) ? FILE_FLAG_BACKUP_SEMANTICS : 0;
+
+    HANDLE file = CreateFileW(path, GENERIC_READ,
+                              FILE_SHARE_READ | FILE_SHARE_WRITE,
+                              NULL, OPEN_EXISTING, flags, NULL);
+    if (file == INVALID_HANDLE_VALUE)
+        return GetLastError();
+
+    FILETIME ftCreated, ftModified;
+    GetFileTime(file, &ftCreated, NULL, &ftModified);
+    HANDLES(CloseHandle(file));
+
+    DWORD ret = operationFn(path);
+
+    // Restore file times regardless of operationFn result
+    file = CreateFileW(path, GENERIC_WRITE,
+                       FILE_SHARE_READ | FILE_SHARE_WRITE,
+                       NULL, OPEN_EXISTING, flags, NULL);
+    if (file != INVALID_HANDLE_VALUE)
+    {
+        SetFileTime(file, &ftCreated, NULL, &ftModified);
+        HANDLES(CloseHandle(file));
+    }
+    return ret;
+}
+
 //
 // ****************************************************************************
 // COperations
@@ -2192,20 +2241,7 @@ DWORD CompressFileW(const wchar_t* fileName, DWORD attrs)
         attrsChange = TRUE;
         SetFileAttributesW(fileNameCrFile.c_str(), attrs & ~FILE_ATTRIBUTE_READONLY);
     }
-    HANDLE file = CreateFileW(fileNameCrFile.c_str(), FILE_READ_DATA | FILE_WRITE_DATA,
-                              FILE_SHARE_READ | FILE_SHARE_WRITE, NULL,
-                              OPEN_EXISTING, FILE_FLAG_BACKUP_SEMANTICS, NULL);
-    if (file == INVALID_HANDLE_VALUE)
-        ret = GetLastError();
-    else
-    {
-        USHORT state = COMPRESSION_FORMAT_DEFAULT;
-        ULONG length;
-        if (!DeviceIoControl(file, FSCTL_SET_COMPRESSION, &state,
-                             sizeof(USHORT), NULL, 0, &length, FALSE))
-            ret = GetLastError();
-        HANDLES(CloseHandle(file));
-    }
+    ret = COperation::SetCompressionW(fileNameCrFile.c_str(), COMPRESSION_FORMAT_DEFAULT);
     if (attrsChange)
         SetFileAttributesW(fileNameCrFile.c_str(), attrs);
     return ret;
@@ -2225,24 +2261,21 @@ DWORD UncompressFileW(const wchar_t* fileName, DWORD attrs)
         attrsChange = TRUE;
         SetFileAttributesW(fileNameCrFile.c_str(), attrs & ~FILE_ATTRIBUTE_READONLY);
     }
-
-    HANDLE file = CreateFileW(fileNameCrFile.c_str(), FILE_READ_DATA | FILE_WRITE_DATA,
-                              FILE_SHARE_READ | FILE_SHARE_WRITE,
-                              NULL, OPEN_EXISTING, FILE_FLAG_BACKUP_SEMANTICS, NULL);
-    if (file == INVALID_HANDLE_VALUE)
-        ret = GetLastError();
-    else
-    {
-        USHORT state = COMPRESSION_FORMAT_NONE;
-        ULONG length;
-        if (!DeviceIoControl(file, FSCTL_SET_COMPRESSION, &state,
-                             sizeof(USHORT), NULL, 0, &length, FALSE))
-            ret = GetLastError();
-        HANDLES(CloseHandle(file));
-    }
+    ret = COperation::SetCompressionW(fileNameCrFile.c_str(), COMPRESSION_FORMAT_NONE);
     if (attrsChange)
         SetFileAttributesW(fileNameCrFile.c_str(), attrs);
     return ret;
+}
+
+// Wrappers for use with COperation::WithPreservedFileTimeW
+static DWORD DecryptFileOp(const wchar_t* path)
+{
+    return DecryptFileW(path, 0) ? ERROR_SUCCESS : GetLastError();
+}
+
+static DWORD EncryptFileOp(const wchar_t* path)
+{
+    return EncryptFileW(path) ? ERROR_SUCCESS : GetLastError();
 }
 
 DWORD MyDecryptFileW(const wchar_t* fileName, DWORD attrs, BOOL preserveDate)
@@ -2261,32 +2294,7 @@ DWORD MyDecryptFileW(const wchar_t* fileName, DWORD attrs, BOOL preserveDate)
     }
     if (preserveDate)
     {
-        HANDLE file;
-        file = CreateFileW(fileNameCrFile.c_str(), GENERIC_READ,
-                           FILE_SHARE_READ | FILE_SHARE_WRITE,
-                           NULL, OPEN_EXISTING,
-                           (attrs & FILE_ATTRIBUTE_DIRECTORY) ? FILE_FLAG_BACKUP_SEMANTICS : 0, NULL);
-        if (file != INVALID_HANDLE_VALUE)
-        {
-            FILETIME ftCreated, ftModified;
-            GetFileTime(file, &ftCreated, NULL, &ftModified);
-            HANDLES(CloseHandle(file));
-
-            if (!DecryptFileW(fileNameCrFile.c_str(), 0))
-                ret = GetLastError();
-
-            file = CreateFileW(fileNameCrFile.c_str(), GENERIC_WRITE,
-                               FILE_SHARE_READ | FILE_SHARE_WRITE,
-                               NULL, OPEN_EXISTING,
-                               (attrs & FILE_ATTRIBUTE_DIRECTORY) ? FILE_FLAG_BACKUP_SEMANTICS : 0, NULL);
-            if (file != INVALID_HANDLE_VALUE)
-            {
-                SetFileTime(file, &ftCreated, NULL, &ftModified);
-                HANDLES(CloseHandle(file));
-            }
-        }
-        else
-            ret = GetLastError();
+        ret = COperation::WithPreservedFileTimeW(fileNameCrFile.c_str(), attrs, DecryptFileOp);
     }
     else
     {
@@ -2352,32 +2360,7 @@ DWORD MyEncryptFileW(IWorkerObserver& observer, const wchar_t* fileName, const c
     }
     if (preserveDate)
     {
-        HANDLE file;
-        file = CreateFileW(fileNameCrFile.c_str(), GENERIC_READ,
-                           FILE_SHARE_READ | FILE_SHARE_WRITE,
-                           NULL, OPEN_EXISTING,
-                           (attrs & FILE_ATTRIBUTE_DIRECTORY) ? FILE_FLAG_BACKUP_SEMANTICS : 0, NULL);
-        if (file != INVALID_HANDLE_VALUE)
-        {
-            FILETIME ftCreated, ftModified;
-            GetFileTime(file, &ftCreated, NULL, &ftModified);
-            HANDLES(CloseHandle(file));
-
-            if (!EncryptFileW(fileNameCrFile.c_str()))
-                retEnc = GetLastError();
-
-            file = CreateFileW(fileNameCrFile.c_str(), GENERIC_WRITE,
-                               FILE_SHARE_READ | FILE_SHARE_WRITE,
-                               NULL, OPEN_EXISTING,
-                               (attrs & FILE_ATTRIBUTE_DIRECTORY) ? FILE_FLAG_BACKUP_SEMANTICS : 0, NULL);
-            if (file != INVALID_HANDLE_VALUE)
-            {
-                SetFileTime(file, &ftCreated, NULL, &ftModified);
-                HANDLES(CloseHandle(file));
-            }
-        }
-        else
-            retEnc = GetLastError();
+        retEnc = COperation::WithPreservedFileTimeW(fileNameCrFile.c_str(), attrs, EncryptFileOp);
     }
     else
     {
@@ -2673,6 +2656,8 @@ void CheckTailOfOutFileShowErr(const char* txt)
 BOOL CheckTailOfOutFile(CAsyncCopyParams* asyncPar, HANDLE in, HANDLE out, const CQuadWord& offset,
                         const CQuadWord& curInOffset, BOOL ignoreReadErrOnOut)
 {
+    // Direct Win32: all calls here (ReadFile, SetFilePointer, GetOverlappedResult) operate on
+    // open HANDLEs for data verification — performance-sensitive, wrapping not needed
     char* bufIn = (char*)malloc(ASYNC_COPY_BUF_SIZE);
     char* bufOut = (char*)malloc(ASYNC_COPY_BUF_SIZE);
 
@@ -2849,6 +2834,9 @@ BOOL CheckTailOfOutFile(CAsyncCopyParams* asyncPar, HANDLE in, HANDLE out, const
 // copies ADS into the newly created file/directory
 // returns FALSE only when cancelled; success + Skip both return TRUE; Skip sets 'skip'
 // (when not NULL) to TRUE
+// Direct Win32: all CreateFileW calls open ADS streams (path:streamname), not main files;
+// all ReadFile/WriteFile/GetFileSize/SetFilePointer/SetEndOfFile/CloseHandle calls operate on
+// open HANDLEs — COperation wrapping not applicable here
 BOOL DoCopyADS(IWorkerObserver& observer, const char* sourceName, BOOL isDir, const char* targetName,
                CQuadWord const& totalDone, CQuadWord& operDone, CQuadWord const& operTotal,
                CWorkerState& workerState, COperations* script, BOOL* skip, void* buffer)
@@ -2908,6 +2896,7 @@ COPY_ADS_AGAIN:
             BOOL doNextFile = FALSE;
             while (1)
             {
+                // Direct Win32: opens ADS stream (path:streamname), not the main file — COperation wrapping N/A
                 HANDLE in = CreateFileW(srcName, GENERIC_READ, FILE_SHARE_READ | FILE_SHARE_WRITE, NULL,
                                         OPEN_EXISTING, FILE_FLAG_SEQUENTIAL_SCAN, NULL);
                 HANDLES_ADD_EX(__otQuiet, in != INVALID_HANDLE_VALUE, __htFile,
@@ -2925,6 +2914,7 @@ COPY_ADS_AGAIN:
 
                     while (1)
                     {
+                        // Direct Win32: opens ADS stream for writing — COperation wrapping N/A
                         HANDLE out = CreateFileW(tgtName, GENERIC_WRITE, 0, NULL, CREATE_NEW, FILE_FLAG_SEQUENTIAL_SCAN, NULL);
                         HANDLES_ADD_EX(__otQuiet, out != INVALID_HANDLE_VALUE, __htFile,
                                        __hoCreateFile, out, GetLastError(), TRUE);
@@ -2989,6 +2979,7 @@ COPY_ADS_AGAIN:
 
                             DWORD read;
                             DWORD written;
+                            // Direct Win32: performance-critical ADS copy loop (ReadFile/WriteFile on open HANDLEs)
                             while (1)
                             {
                                 if (ReadFile(in, buffer, limitBufferSize, &read, NULL))
@@ -3527,6 +3518,7 @@ HANDLE SalCreateFileEx(const char* fileName, DWORD desiredAccess,
     return out;
 }
 
+// Direct Win32: handle-based DeviceIoControl for compression/decompression — wrapping not needed
 BOOL SyncOrAsyncDeviceIoControl(CAsyncCopyParams* asyncPar, HANDLE hDevice, DWORD dwIoControlCode,
                                 LPVOID lpInBuffer, DWORD nInBufferSize, LPVOID lpOutBuffer,
                                 DWORD nOutBufferSize, LPDWORD lpBytesReturned, DWORD* err)
@@ -3555,6 +3547,10 @@ BOOL SyncOrAsyncDeviceIoControl(CAsyncCopyParams* asyncPar, HANDLE hDevice, DWOR
     return TRUE;
 }
 
+// Sets compression/encryption attributes on the target file.
+// DeviceIoControl (FSCTL_SET_COMPRESSION) operates on open HANDLE — handle-based, wrapping not needed.
+// SalGetFileAttributes, SalCreateFileH, EncryptFile, DecryptFile use ANSI paths with Sal* long-path wrappers.
+// TODO: migrate to wide paths when COperation wrapping is extended to SetCompressAndEncryptedAttrs callers.
 void SetCompressAndEncryptedAttrs(const char* name, DWORD attr, HANDLE* out, BOOL openAlsoForRead,
                                   BOOL* encryptionNotSupported, CAsyncCopyParams* asyncPar)
 {
@@ -3656,6 +3652,8 @@ void SetTFSandPSforSkippedFile(COperation* op, CQuadWord& lastTransferredFileSiz
     script->SetTFSandProgressSize(lastTransferredFileSize, pSize);
 }
 
+// Synchronous copy loop. All Win32 calls (ReadFile, WriteFile, GetFileSize, SetFilePointer,
+// SetEndOfFile, CloseHandle) operate on open HANDLEs — handle-based, no path wrapping needed.
 void DoCopyFileLoopOrig(HANDLE& in, HANDLE& out, void* buffer, int& limitBufferSize,
                         COperations* script, CWorkerState& workerState, BOOL wholeFileAllocated,
                         COperation* op, const CQuadWord& totalDone, BOOL& copyError, BOOL& skipCopy,
@@ -3665,6 +3663,7 @@ void DoCopyFileLoopOrig(HANDLE& in, HANDLE& out, void* buffer, int& limitBufferS
     int autoRetryAttemptsSNAP = 0;
     DWORD read;
     DWORD written;
+    // Direct Win32: performance-critical synchronous copy loop (ReadFile/WriteFile on open HANDLEs)
     while (1)
     {
         if (ReadFile(in, buffer, limitBufferSize, &read, NULL))
@@ -4036,6 +4035,7 @@ struct CCopy_Context
 
 BOOL DisableLocalBuffering(CAsyncCopyParams* asyncPar, HANDLE file, DWORD* err)
 {
+    // Direct Win32: handle-based NT IOCTL for network buffering optimization — wrapping not needed
     CALL_STACK_MESSAGE1("DisableLocalBuffering()");
     if (DynNtFsControlFile != NULL) // "always true"
     {
@@ -4067,6 +4067,7 @@ BOOL CCopy_Context::StartReading(int blkIndex, DWORD readSize, DWORD* err, BOOL 
     TRACE_I(sss);
 #endif // ASYNC_COPY_DEBUG_MSG
 
+    // Direct Win32: performance-critical async copy loop (overlapped ReadFile on open HANDLE)
     if (!ReadFile(*In, AsyncPar->Buffers[blkIndex], readSize, NULL,
                   AsyncPar->InitOverlappedWithOffset(blkIndex, ReadOffset)) &&
         GetLastError() != ERROR_IO_PENDING)
@@ -4117,6 +4118,7 @@ BOOL CCopy_Context::StartWriting(int blkIndex, DWORD* err)
     TRACE_I(sss);
 #endif // ASYNC_COPY_DEBUG_MSG
 
+    // Direct Win32: performance-critical async copy loop (overlapped WriteFile on open HANDLE)
     if (!WriteFile(*Out, AsyncPar->Buffers[blkIndex], BlockDataLen[blkIndex], NULL,
                    AsyncPar->InitOverlappedWithOffset(blkIndex, WriteOffset)) &&
         GetLastError() != ERROR_IO_PENDING)
@@ -4557,6 +4559,8 @@ BOOL CCopy_Context::HandleSuspModeAndCancel(BOOL* copyError)
     return FALSE;
 }
 
+// Asynchronous copy loop. All Win32 calls (ReadFile, WriteFile, GetOverlappedResult, GetFileSize,
+// SetFilePointer, SetEndOfFile, CloseHandle) operate on open HANDLEs — handle-based, no path wrapping needed.
 void DoCopyFileLoopAsync(CAsyncCopyParams* asyncPar, HANDLE& in, HANDLE& out, void* buffer, int& limitBufferSize,
                          COperations* script, CWorkerState& workerState, BOOL wholeFileAllocated, COperation* op,
                          const CQuadWord& totalDone, BOOL& copyError, BOOL& skipCopy, IWorkerObserver& observer,
@@ -4891,6 +4895,16 @@ void DoCopyFileLoopAsync(CAsyncCopyParams* asyncPar, HANDLE& in, HANDLE& out, vo
     }
 }
 
+// Copy I/O wrapping assessment:
+// - Path-based calls (open, delete, set attrs): wrapped via COperation methods (OpenSourceFile,
+//   OpenTargetFile, CreateTargetFileEx, DeleteTargetFile, SetTargetAttributes, GetTargetAttributes)
+// - Handle-based calls (GetFileSize, SetFilePointer, SetEndOfFile, GetFileTime, SetFileTime):
+//   operate on open HANDLEs, no path involved — wrapping provides no Unicode/long-path benefit
+// - Inner loop I/O (ReadFile, WriteFile, GetOverlappedResult): performance-critical hot path,
+//   must stay as direct Win32 calls to avoid virtual dispatch overhead per block
+// - ADS stream I/O (DoCopyADS): uses wide paths with ":streamname" suffix, not main-file paths —
+//   COperation wrapping not applicable
+// - DeviceIoControl (compression, network buffering): handle-based, wrapping not needed
 BOOL DoCopyFile(COperation* op, IWorkerObserver& observer, void* buffer,
                 COperations* script, CQuadWord& totalDone,
                 DWORD clearReadonlyMask, BOOL* skip, BOOL lantasticCheck,
@@ -5276,6 +5290,7 @@ COPY_AGAIN:
 
                     FILETIME /*creation, lastAccess,*/ lastWrite;
                     BOOL ignoreGetFileTimeErr = FALSE;
+                    // Direct Win32: handle-based GetFileTime — no path involved, wrapping not needed
                     while (!ignoreGetFileTimeErr &&
                            !GetFileTime(in, NULL /*&creation*/, NULL /*&lastAccess*/, &lastWrite))
                     {
@@ -5357,6 +5372,7 @@ COPY_AGAIN:
                         if (!ignoreGetFileTimeErr) // only if we did not ignore the error while reading the file time (nothing to set otherwise)
                         {
                             BOOL ignoreSetFileTimeErr = FALSE;
+                            // Direct Win32: handle-based SetFileTime — no path involved, wrapping not needed
                             while (!ignoreSetFileTimeErr &&
                                    !SetFileTime(out, NULL /*&creation*/, NULL /*&lastAccess*/, &lastWrite))
                             {

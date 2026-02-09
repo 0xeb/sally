@@ -328,6 +328,20 @@ struct COperation
     BOOL SetSourceAttributes(DWORD attrs) const;
     DWORD GetTargetAttributes() const;
     DWORD GetSourceAttributes() const;
+
+    // Platform-abstracted helpers for compression and file time preservation.
+    // Static because they operate on arbitrary paths, not on SourceName/TargetName.
+
+    // Wraps CreateFileW + DeviceIoControl(FSCTL_SET_COMPRESSION).
+    // Returns ERROR_SUCCESS on success, or Win32 error code.
+    static DWORD SetCompressionW(const wchar_t* path, USHORT compressionFormat);
+
+    // Saves file times, invokes a caller-supplied operation, then restores times.
+    // 'attrs' is used to determine FILE_FLAG_BACKUP_SEMANTICS for directories.
+    // 'operationFn' receives the path and should return ERROR_SUCCESS or an error code.
+    // Returns ERROR_SUCCESS on success, or the first Win32 error encountered.
+    static DWORD WithPreservedFileTimeW(const wchar_t* path, DWORD attrs,
+                                        DWORD (*operationFn)(const wchar_t* path));
 };
 
 class COperations
