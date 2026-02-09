@@ -1158,7 +1158,7 @@ public:
     }
 
     // returns a directory or a file (there must be exactly one)
-    BOOL GetNameFromDataObject(IDataObject* pDataObject, char* path)
+    BOOL GetNameFromDataObject(IDataObject* pDataObject, char* path, int pathSize)
     {
         FORMATETC formatEtc;
         formatEtc.cfFormat = RegisterClipboardFormat(SALCF_FAKE_REALPATH);
@@ -1184,7 +1184,7 @@ public:
                 {
                     havePath = data[0] != 0 && data[1] != 0;
                     if (data[0] != 0 && path != NULL)
-                        lstrcpyn(path, data + 1, MAX_PATH);
+                        lstrcpyn(path, data + 1, pathSize);
                     HANDLES(GlobalUnlock(stgMedium.hGlobal));
                 }
             }
@@ -1214,12 +1214,12 @@ public:
                     {
                         const wchar_t* fileW = (wchar_t*)(((char*)data) + data->pFiles);
                         int l = lstrlenW(fileW);
-                        if (l < MAX_PATH && *(fileW + l + 1) == 0)
+                        if (l < pathSize && *(fileW + l + 1) == 0)
                         {
                             if (path != NULL)
                             {
-                                WideCharToMultiByte(CP_ACP, 0, fileW, l + 1, path, MAX_PATH, NULL, NULL);
-                                path[MAX_PATH - 1] = 0;
+                                WideCharToMultiByte(CP_ACP, 0, fileW, l + 1, path, pathSize, NULL, NULL);
+                                path[pathSize - 1] = 0;
                             }
                             ret = TRUE;
                         }
@@ -1228,10 +1228,10 @@ public:
                     {
                         const char* fileA = ((char*)data) + data->pFiles;
                         int l = (int)strlen(fileA);
-                        if (l < MAX_PATH && *(fileA + l + 1) == 0)
+                        if (l < pathSize && *(fileA + l + 1) == 0)
                         {
                             if (path != NULL)
-                                lstrcpyn(path, fileA, MAX_PATH);
+                                lstrcpyn(path, fileA, pathSize);
                             ret = TRUE;
                         }
                     }
@@ -1333,7 +1333,7 @@ public:
             UseUnicode = FALSE;
             textRes = pDataObject->QueryGetData(&formatEtc);
         }
-        if (textRes == S_OK || GetNameFromDataObject(DataObject, NULL))
+        if (textRes == S_OK || GetNameFromDataObject(DataObject, NULL, 0))
         {
             *pdwEffect = DROPEFFECT_COPY;
             return S_OK;
@@ -1362,7 +1362,7 @@ public:
             formatEtc.dwAspect = DVASPECT_CONTENT;
             formatEtc.lindex = -1;
             formatEtc.tymed = TYMED_HGLOBAL;
-            if (DataObject->QueryGetData(&formatEtc) == S_OK || GetNameFromDataObject(DataObject, NULL))
+            if (DataObject->QueryGetData(&formatEtc) == S_OK || GetNameFromDataObject(DataObject, NULL, 0))
             {
                 int xPosDummy;
                 if (HitTest(pt, TRUE, &xPosDummy))
@@ -1435,7 +1435,7 @@ public:
         else
         {
             CPathBuffer path;
-            if (GetNameFromDataObject(pDataObject, path)) // at most MAX_PATH characters are placed into 'path'
+            if (GetNameFromDataObject(pDataObject, path, path.Size())) // path buffer supports long paths
             {
                 // change the path
                 if (!IsPluginFSPath(path))

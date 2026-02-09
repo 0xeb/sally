@@ -512,7 +512,7 @@ BOOL GetResolvedPathMountPointAndGUID(const char* path, char* mountPoint, char* 
         BOOL cutPathIsPossible = TRUE;
         CPathBuffer netPath; // Heap-allocated for long path support
         netPath[0] = 0;
-        ResolveLocalPathWithReparsePoints(resolvedPath, path, &cutPathIsPossible, NULL, NULL, NULL, NULL, netPath);
+        ResolveLocalPathWithReparsePoints(resolvedPath, resolvedPath.Size(), path, &cutPathIsPossible, NULL, NULL, NULL, NULL, netPath);
         remotePath = netPath[0] != 0;
 
         // for GetVolumeNameForVolumeMountPoint we need root

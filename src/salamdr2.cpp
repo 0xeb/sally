@@ -1167,13 +1167,13 @@ BOOL ResolveSubstsW(wchar_t* resPath, int resPathSize)
     return ret;
 }
 
-void ResolveLocalPathWithReparsePoints(char* resPath, const char* path, BOOL* cutResPathIsPossible,
+void ResolveLocalPathWithReparsePoints(char* resPath, int resPathSize, const char* path, BOOL* cutResPathIsPossible,
                                        BOOL* rootOrCurReparsePointSet, char* rootOrCurReparsePoint,
                                        char* junctionOrSymlinkTgt, int* linkType, char* netPath)
 {
-    lstrcpyn(resPath, path, MAX_PATH);
-    ResolveSubsts(resPath);
-    if (!SalPathAddBackslash(resPath, MAX_PATH))
+    lstrcpyn(resPath, path, resPathSize);
+    ResolveSubsts(resPath, resPathSize);
+    if (!SalPathAddBackslash(resPath, resPathSize))
         TRACE_E("ResolveLocalPathWithReparsePoints(): too long path");
     else
     {
@@ -1187,7 +1187,7 @@ void ResolveLocalPathWithReparsePoints(char* resPath, const char* path, BOOL* cu
                 if (rootOrCurReparsePointSet != NULL && !*rootOrCurReparsePointSet && rootOrCurReparsePoint != NULL)
                 {
                     GetRootPath(resPath, path);
-                    ResolveSubsts(resPath);
+                    ResolveSubsts(resPath, resPathSize);
                     GetRootPath(rootOrCurReparsePoint, path);
                     if (strlen(resPath) < strlen(repPointPath)) // if the path to the current reparse point is longer than the path obtained by resolving the subst, we must append this part of the path after the subst root
                     {
@@ -1209,8 +1209,8 @@ void ResolveLocalPathWithReparsePoints(char* resPath, const char* path, BOOL* cu
                     }
                     *rootOrCurReparsePointSet = TRUE;
                 }
-                lstrcpyn(resPath, repPointPath, MAX_PATH);
-                if (!SalPathAddBackslash(resPath, MAX_PATH))
+                lstrcpyn(resPath, repPointPath, resPathSize);
+                if (!SalPathAddBackslash(resPath, resPathSize))
                     TRACE_E("ResolveLocalPathWithReparsePoints(): too long path");
                 int repPointType;
                 BOOL getRepPointDestRes = GetReparsePointDestination(repPointPath, repPointPath, repPointPath.Size(), &repPointType, TRUE);
@@ -1241,9 +1241,9 @@ void ResolveLocalPathWithReparsePoints(char* resPath, const char* path, BOOL* cu
                 }
                 if (allowedDepth-- == 0) // looks like an endless loop
                 {
-                    lstrcpyn(resPath, path, MAX_PATH); // let the system handle it on its own
-                    ResolveSubsts(resPath);
-                    if (!SalPathAddBackslash(resPath, MAX_PATH))
+                    lstrcpyn(resPath, path, resPathSize); // let the system handle it on its own
+                    ResolveSubsts(resPath, resPathSize);
+                    if (!SalPathAddBackslash(resPath, resPathSize))
                         TRACE_E("ResolveLocalPathWithReparsePoints(): too long path");
                     if (rootOrCurReparsePointSet != NULL)
                         *rootOrCurReparsePointSet = FALSE;
@@ -1253,8 +1253,8 @@ void ResolveLocalPathWithReparsePoints(char* resPath, const char* path, BOOL* cu
                         *linkType = 0 /* UNKNOWN */;
                     break;
                 }
-                lstrcpyn(resPath, repPointPath, MAX_PATH);
-                if (!SalPathAddBackslash(resPath, MAX_PATH))
+                lstrcpyn(resPath, repPointPath, resPathSize);
+                if (!SalPathAddBackslash(resPath, resPathSize))
                 {
                     TRACE_E("ResolveLocalPathWithReparsePoints(): too long path");
                     break;
@@ -1264,6 +1264,15 @@ void ResolveLocalPathWithReparsePoints(char* resPath, const char* path, BOOL* cu
             }
         }
     }
+}
+
+void ResolveLocalPathWithReparsePoints(char* resPath, const char* path, BOOL* cutResPathIsPossible,
+                                       BOOL* rootOrCurReparsePointSet, char* rootOrCurReparsePoint,
+                                       char* junctionOrSymlinkTgt, int* linkType, char* netPath)
+{
+    ResolveLocalPathWithReparsePoints(resPath, MAX_PATH, path, cutResPathIsPossible,
+                                     rootOrCurReparsePointSet, rootOrCurReparsePoint,
+                                     junctionOrSymlinkTgt, linkType, netPath);
 }
 
 BOOL MyGetDiskFreeSpace(const char* path, LPDWORD lpSectorsPerCluster,
@@ -1280,7 +1289,7 @@ BOOL MyGetDiskFreeSpace(const char* path, LPDWORD lpSectorsPerCluster,
     {                                                                // gradually try shortening the path; on a mounted directory it can return the mounted disk parameters
         // if it is not a root path, try traversing the reparse points as well
         BOOL cutPathIsPossible = TRUE;
-        ResolveLocalPathWithReparsePoints(ourPath, path, &cutPathIsPossible, NULL, NULL, NULL, NULL, NULL);
+        ResolveLocalPathWithReparsePoints(ourPath, ourPath.Size(), path, &cutPathIsPossible, NULL, NULL, NULL, NULL, NULL);
 
         while (!GetDiskFreeSpace(ourPath, lpSectorsPerCluster, lpBytesPerSector,
                                  lpNumberOfFreeClusters, lpTotalNumberOfClusters))
@@ -1318,7 +1327,7 @@ BOOL MyGetVolumeInformation(const char* path, char* rootOrCurReparsePoint, char*
         // if it is not a root path, try traversing the reparse points as well
         BOOL rootOrCurReparsePointSet = FALSE;
         BOOL cutPathIsPossible = TRUE;
-        ResolveLocalPathWithReparsePoints(ourPath, path, &cutPathIsPossible, &rootOrCurReparsePointSet,
+        ResolveLocalPathWithReparsePoints(ourPath, ourPath.Size(), path, &cutPathIsPossible, &rootOrCurReparsePointSet,
                                           rootOrCurReparsePoint, junctionOrSymlinkTgt, linkType, NULL);
 
         while (!GetVolumeInformation(ourPath, lpVolumeNameBuffer, nVolumeNameSize,
@@ -1592,7 +1601,7 @@ UINT MyGetDriveType(const char* path)
         {                           // gradually try shortening the path; on a mounted directory it can return the mounted disk parameters
             // if it is not a root path, try traversing the reparse points as well
             BOOL cutPathIsPossible = TRUE;
-            ResolveLocalPathWithReparsePoints(ourPath, path, &cutPathIsPossible, NULL, NULL, NULL, NULL, NULL);
+            ResolveLocalPathWithReparsePoints(ourPath, ourPath.Size(), path, &cutPathIsPossible, NULL, NULL, NULL, NULL, NULL);
 
             while ((ret = GetDriveType(ourPath)) == DRIVE_UNKNOWN)
             { // NOTE: differs from MyGetVolumeInformation because GetDriveType returns success for any path (not just root + mounted volume)

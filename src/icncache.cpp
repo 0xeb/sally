@@ -732,7 +732,7 @@ BOOL ReadDirectoryIconAndTypeAux(CIconList* iconList, int index, CIconSizeEnum i
 }
 
 BOOL GetIconFromAssocAux(BOOL initFlagAndIndexes, HKEY root, const char* keyName, LONG size,
-                         CAssociationData& data, char* iconLocation, char* type)
+                         CAssociationData& data, char* iconLocation, int iconLocationSize, char* type, int typeSize)
 {
     BOOL found = FALSE;
     if (initFlagAndIndexes)
@@ -752,8 +752,8 @@ BOOL GetIconFromAssocAux(BOOL initFlagAndIndexes, HKEY root, const char* keyName
         // file-type string obtained as value "" of subkey keyName
         if (HANDLES_Q(RegOpenKey(root, keyNameBuf, &openKey)) == ERROR_SUCCESS)
         {
-            LONG typeSize = MAX_PATH;
-            if (SalRegQueryValue(openKey, "", type, &typeSize) != ERROR_SUCCESS)
+            LONG tSize = typeSize;
+            if (SalRegQueryValue(openKey, "", type, &tSize) != ERROR_SUCCESS)
                 type[0] = 0;
             HANDLES(RegCloseKey(openKey));
         }
@@ -804,15 +804,15 @@ BOOL GetIconFromAssocAux(BOOL initFlagAndIndexes, HKEY root, const char* keyName
 
                 if (type2 == REG_EXPAND_SZ)
                 {
-                    DWORD auxRes = ExpandEnvironmentStrings(buf, iconLocation, MAX_PATH + 10);
-                    if (auxRes == 0 || auxRes > MAX_PATH + 10)
+                    DWORD auxRes = ExpandEnvironmentStrings(buf, iconLocation, iconLocationSize);
+                    if (auxRes == 0 || (int)auxRes > iconLocationSize)
                     {
                         TRACE_E("ExpandEnvironmentStrings failed.");
-                        strcpy(iconLocation, buf);
+                        lstrcpyn(iconLocation, buf, iconLocationSize);
                     }
                 }
                 else
-                    strcpy(iconLocation, buf);
+                    lstrcpyn(iconLocation, buf, iconLocationSize);
 
                 // remove quotes in case "\"filename\",icon_number" (e.g. "\"C:\\Program Files\\VideoLAN\\VLC\\vlc.exe\",0")
                 char* num = strrchr(iconLocation, ',');
@@ -1202,14 +1202,14 @@ void CAssociations::ReadAssociations(BOOL showWaitWnd)
                 if (addExt)
                 {
                     // test for icon type (static/dynamic see .h)
-                    tryPerceivedType = !GetIconFromAssocAux(FALSE, HKEY_CLASSES_ROOT, extType, size, data, iconLocation, type);
+                    tryPerceivedType = !GetIconFromAssocAux(FALSE, HKEY_CLASSES_ROOT, extType, size, data, iconLocation, iconLocation.Size(), type, type.Size());
                 }
                 else
                     tryPerceivedType = TRUE;
                 if (tryPerceivedType && systemFileAssoc != NULL)
                 {
                     // first try to find 'ext' under the SystemFileAssociations key
-                    if (GetIconFromAssocAux(FALSE, systemFileAssoc, ext, (LONG)strlen(ext) + 1, data, iconLocation, NULL))
+                    if (GetIconFromAssocAux(FALSE, systemFileAssoc, ext, (LONG)strlen(ext) + 1, data, iconLocation, iconLocation.Size(), NULL, 0))
                         addExt = TRUE;
                     else
                     { // also try the key from the PerceivedType value (if defined)
@@ -1217,7 +1217,7 @@ void CAssociations::ReadAssociations(BOOL showWaitWnd)
                         if (SalRegQueryValueEx(extKey, "PerceivedType", NULL, NULL, (BYTE*)extType.Get(), (DWORD*)&size) == ERROR_SUCCESS && size > 1)
                         {
                             extType[extType.Size() - 1] = 0; // just to be sure (value may not be string type, then null-terminator may be missing)
-                            if (GetIconFromAssocAux(FALSE, systemFileAssoc, extType, (LONG)strlen(extType) + 1, data, iconLocation, NULL))
+                            if (GetIconFromAssocAux(FALSE, systemFileAssoc, extType, (LONG)strlen(extType) + 1, data, iconLocation, iconLocation.Size(), NULL, 0))
                                 addExt = TRUE;
                         }
                     }
@@ -1278,7 +1278,7 @@ void CAssociations::ReadAssociations(BOOL showWaitWnd)
                     int index;
                     if (!GetIndex(e, index)) // not found, makes sense to examine + possibly add
                     {
-                        if (GetIconFromAssocAux(TRUE, systemFileAssoc, ext, (LONG)strlen(ext) + 1, data, iconLocation, NULL))
+                        if (GetIconFromAssocAux(TRUE, systemFileAssoc, ext, (LONG)strlen(ext) + 1, data, iconLocation, iconLocation.Size(), NULL, 0))
                         {
                             InsertData("SystemFileAssociations: ", index, FALSE, e, s, data, size, iconLocation, "");
                         }
@@ -1328,7 +1328,7 @@ void CAssociations::ReadAssociations(BOOL showWaitWnd)
                         {
                             extType[extType.Size() - 1] = 0; // just to be sure (value may not be string type, then null-terminator may be missing)
 
-                            if (GetIconFromAssocAux(TRUE, HKEY_CLASSES_ROOT, extType, (LONG)strlen(extType) + 1, data, iconLocation, type))
+                            if (GetIconFromAssocAux(TRUE, HKEY_CLASSES_ROOT, extType, (LONG)strlen(extType) + 1, data, iconLocation, iconLocation.Size(), type, type.Size()))
                             {
                                 InsertData("UserChoice: ", index, found, e, s, data, size, iconLocation, type); // found==TRUE means overwrite found association with the one from UserChoice
                                 found = TRUE;
@@ -1348,7 +1348,7 @@ void CAssociations::ReadAssociations(BOOL showWaitWnd)
                                 {
                                     extType[extType.Size() - 1] = 0; // just to be sure (value may not be string type, then null-terminator may be missing)
 
-                                    if (GetIconFromAssocAux(TRUE, HKEY_CLASSES_ROOT, extType, (LONG)strlen(extType) + 1, data, iconLocation, type))
+                                    if (GetIconFromAssocAux(TRUE, HKEY_CLASSES_ROOT, extType, (LONG)strlen(extType) + 1, data, iconLocation, iconLocation.Size(), type, type.Size()))
                                     {
                                         InsertData("OpenWithProgids: ", index, FALSE, e, s, data, size, iconLocation, type);
                                         found = TRUE;

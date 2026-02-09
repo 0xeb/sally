@@ -980,9 +980,12 @@ BOOL GetCurrentLocalReparsePoint(const char* path, char* currentReparsePoint, BO
 // junction or symlink) is returned in 'junctionOrSymlinkTgt' (if not NULL) + type is returned in 'linkType':
 // 2 (JUNCTION POINT), 3 (SYMBOLIC LINK); in 'netPath' (if not NULL) we return network path to which
 // current (last) local symlink in path leads - in this situation network path root is returned in 'resPath'
-void ResolveLocalPathWithReparsePoints(char* resPath, const char* path, BOOL* cutResPathIsPossible,
+void ResolveLocalPathWithReparsePoints(char* resPath, int resPathSize, const char* path, BOOL* cutResPathIsPossible,
                                        BOOL* rootOrCurReparsePointSet, char* rootOrCurReparsePoint,
                                        char* junctionOrSymlinkTgt, int* linkType, char* netPath);
+void ResolveLocalPathWithReparsePoints(char* resPath, const char* path, BOOL* cutResPathIsPossible,
+                                       BOOL* rootOrCurReparsePointSet, char* rootOrCurReparsePoint,
+                                       char* junctionOrSymlinkTgt, int* linkType, char* netPath); // backward compat — uses MAX_PATH
 
 // Improved GetDriveType: works with path (traverses reparse points and substs)
 UINT MyGetDriveType(const char* path);

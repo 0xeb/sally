@@ -1245,7 +1245,7 @@ BOOL HasTheSameRootPathAndVolume(const char* p1, const char* p2)
             BOOL cutPathIsPossible = TRUE;
             CPathBuffer p1NetPath;  // Heap-allocated for long path support
             p1NetPath[0] = 0;
-            ResolveLocalPathWithReparsePoints(ourPath, p1, &cutPathIsPossible, NULL, NULL, NULL, NULL, p1NetPath);
+            ResolveLocalPathWithReparsePoints(ourPath, ourPath.Size(), p1, &cutPathIsPossible, NULL, NULL, NULL, NULL, p1NetPath);
 
             if (p1NetPath[0] == 0) // cannot get volume from network path, won't even try
             {
@@ -1264,7 +1264,7 @@ BOOL HasTheSameRootPathAndVolume(const char* p1, const char* p2)
             cutPathIsPossible = TRUE;
             CPathBuffer p2NetPath; // Heap-allocated for long path support
             p2NetPath[0] = 0;
-            ResolveLocalPathWithReparsePoints(ourPath, p2, &cutPathIsPossible, NULL, NULL, NULL, NULL, p2NetPath);
+            ResolveLocalPathWithReparsePoints(ourPath, ourPath.Size(), p2, &cutPathIsPossible, NULL, NULL, NULL, NULL, p2NetPath);
 
             if ((p1NetPath[0] == 0) != (p2NetPath[0] == 0) || // if only one of the paths is network or
                 p1NetPath[0] != 0 && !HasTheSameRootPath(p1NetPath, p2NetPath))
@@ -1321,7 +1321,7 @@ BOOL PathsAreOnTheSameVolume(const char* path1, const char* path2, BOOL* resIsOn
             if (drvType1 == DRIVE_FIXED) // reparse points only make sense to look for on fixed disks
             {
                 // if we're on W2K and it's not a root path, we'll try to traverse through reparse points
-                ResolveLocalPathWithReparsePoints(ourPath, path1, &cutPathIsPossible, NULL, NULL, NULL, NULL, path1NetPath);
+                ResolveLocalPathWithReparsePoints(ourPath, ourPath.Size(), path1, &cutPathIsPossible, NULL, NULL, NULL, NULL, path1NetPath);
             }
             else
                 lstrcpyn(ourPath, root1, ourPath.Size());
@@ -1344,7 +1344,7 @@ BOOL PathsAreOnTheSameVolume(const char* path1, const char* path2, BOOL* resIsOn
             if (drvType2 == DRIVE_FIXED) // reparse points only make sense to look for on fixed disks
             {
                 // if we're on W2K and it's not a root path, we'll try to traverse through reparse points
-                ResolveLocalPathWithReparsePoints(ourPath, path2, &cutPathIsPossible, NULL, NULL, NULL, NULL, path2NetPath);
+                ResolveLocalPathWithReparsePoints(ourPath, ourPath.Size(), path2, &cutPathIsPossible, NULL, NULL, NULL, NULL, path2NetPath);
             }
             else
                 lstrcpyn(ourPath, root2, ourPath.Size());
