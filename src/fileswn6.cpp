@@ -2216,7 +2216,15 @@ BOOL CFilesWindow::BuildScriptDir(COperations* script, CActionType type, char* s
                       chCaseData->FileNameFormat, chCaseData->Change, TRUE);
         BOOL sameName = strcmp(op.SourceName + offset, op.TargetName + offset) == 0;
         if (!sameName)
+        {
+            if (dirNameW != NULL)
+            {
+                op.SetSourceNameW(sourcePath, dirNameW);
+                std::wstring alteredW = AlterFileNameW(dirNameW, chCaseData->FileNameFormat, chCaseData->Change, TRUE);
+                op.SetTargetNameW(sourcePath, alteredW);
+            }
             script->Add(op);
+        }
         if (sameName || !script->IsGood())
         {
             free(op.SourceName);
@@ -2300,6 +2308,8 @@ BOOL CFilesWindow::BuildScriptDir(COperations* script, CActionType type, char* s
             if (!skipTooLongSrcNameErr)
             {
                 op.TargetName = NULL;
+                if (dirNameW != NULL)
+                    op.SetSourceNameW(sourcePath, dirNameW);
                 script->Add(op);
                 if (!script->IsGood())
                 {
