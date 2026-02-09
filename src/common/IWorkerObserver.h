@@ -49,6 +49,12 @@ public:
     // Check if the user has requested cancellation.
     virtual bool IsCancelled() const = 0;
 
+    // Signal that the worker is done (error or success).
+    virtual void SetError(bool error) = 0;
+
+    // Signal that the worker has finished — dialog can close.
+    virtual void NotifyDone() = 0;
+
     // --- Error dialogs (WM_USER_DIALOG message ID 0) ---
     // Generic file error with retry/skip/cancel options.
     // Returns IDRETRY, IDB_SKIP, IDB_SKIPALL, IDCANCEL, or IDB_IGNORE.

@@ -68,6 +68,16 @@ public:
         return *m_cancelWorker != FALSE;
     }
 
+    void SetError(bool error) override
+    {
+        *m_cancelWorker = error ? TRUE : FALSE;
+    }
+
+    void NotifyDone() override
+    {
+        SendMessage(m_hProgressDlg, WM_COMMAND, IDOK, 0);
+    }
+
     int AskFileError(const char* title, const char* fileName, const char* errorText) override
     {
         int ret = IDCANCEL;

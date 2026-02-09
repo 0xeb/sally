@@ -2007,7 +2007,7 @@ DWORD MyEncryptFile(HWND hProgressDlg, IWorkerObserver& observer, char* fileName
             data[1] = LoadStr(IDS_CONFIRMSFILEENCRYPT);
             data[2] = fileName;
             data[3] = LoadStr(IDS_ENCRYPTSFILE);
-            SendMessage(hProgressDlg, WM_USER_DIALOG, 2, (LPARAM)data);
+            ret = observer.AskHiddenOrSystem(data[1], data[2], data[3]);
             switch (ret)
             {
             case IDB_ALL:
@@ -2786,7 +2786,7 @@ COPY_ADS_AGAIN:
                                         if (err == NO_ERROR && read != written)
                                             err = ERROR_DISK_FULL;
                                         data[3] = GetErrorText(err);
-                                        SendMessage(hProgressDlg, WM_USER_DIALOG, 0, (LPARAM)data);
+                                        ret = observer.AskFileError(data[1], data[2], data[3]);
                                         switch (ret)
                                         {
                                         case IDRETRY: // on a network we must reopen the handle; local access would not allow sharing
@@ -2899,7 +2899,7 @@ COPY_ADS_AGAIN:
                                     CutADSNameSuffix(nameBuf);
                                     data[2] = nameBuf;
                                     data[3] = GetErrorText(err);
-                                    SendMessage(hProgressDlg, WM_USER_DIALOG, 0, (LPARAM)data);
+                                    ret = observer.AskFileError(data[1], data[2], data[3]);
                                     switch (ret)
                                     {
                                     case IDRETRY:
@@ -3021,7 +3021,7 @@ COPY_ADS_AGAIN:
                             CutADSNameSuffix(nameBuf);
                             data[2] = nameBuf;
                             data[3] = GetErrorText(err);
-                            SendMessage(hProgressDlg, WM_USER_DIALOG, 8, (LPARAM)data);
+                            ret = observer.AskADSOpenError(data[1], data[2], data[3]);
                             switch (ret)
                             {
                             case IDRETRY:
@@ -3094,7 +3094,7 @@ COPY_ADS_AGAIN:
                     CutADSNameSuffix(nameBuf);
                     data[2] = nameBuf;
                     data[3] = GetErrorText(err);
-                    SendMessage(hProgressDlg, WM_USER_DIALOG, 0, (LPARAM)data);
+                    ret = observer.AskFileError(data[1], data[2], data[3]);
                     switch (ret)
                     {
                     case IDRETRY:
@@ -3149,7 +3149,7 @@ COPY_ADS_AGAIN:
             data[0] = (char*)&ret;
             data[1] = (char*)sourceName;
             data[2] = GetErrorText(adsWinError);
-            SendMessage(hProgressDlg, WM_USER_DIALOG, 6, (LPARAM)data);
+            ret = observer.AskADSReadError(data[1], data[2]);
             switch (ret)
             {
             case IDRETRY:
@@ -3481,7 +3481,7 @@ void DoCopyFileLoopOrig(HANDLE& in, HANDLE& out, void* buffer, int& limitBufferS
                 if (err == NO_ERROR && read != written)
                     err = ERROR_DISK_FULL;
                 data[3] = GetErrorText(err);
-                SendMessage(hProgressDlg, WM_USER_DIALOG, 0, (LPARAM)data);
+                ret = observer.AskFileError(data[1], data[2], data[3]);
                 switch (ret)
                 {
                 case IDRETRY: // on a network we must reopen the handle; local access forbids it due to sharing
@@ -3587,7 +3587,7 @@ void DoCopyFileLoopOrig(HANDLE& in, HANDLE& out, void* buffer, int& limitBufferS
             data[1] = LoadStr(IDS_ERRORREADINGFILE);
             data[2] = op->SourceName;
             data[3] = GetErrorText(err);
-            SendMessage(hProgressDlg, WM_USER_DIALOG, 0, (LPARAM)data);
+            ret = observer.AskFileError(data[1], data[2], data[3]);
             switch (ret)
             {
             case IDRETRY:
@@ -4167,7 +4167,7 @@ BOOL CCopy_Context::HandleReadingErr(int blkIndex, DWORD err, BOOL* copyError, B
             data[1] = LoadStr(IDS_ERRORREADINGFILE);
             data[2] = Op->SourceName;
             data[3] = GetErrorText(err);
-            SendMessage(HProgressDlg, WM_USER_DIALOG, 0, (LPARAM)data);
+            ret = Observer->AskFileError(data[1], data[2], data[3]);
         }
         CancelOpPhase2(blkIndex);
         BOOL errAgain = FALSE;
@@ -4293,7 +4293,7 @@ BOOL CCopy_Context::HandleWritingErr(int blkIndex, DWORD err, BOOL* copyError, B
         data[1] = LoadStr(IDS_ERRORWRITINGFILE);
         data[2] = Op->TargetName;
         data[3] = GetErrorText(err);
-        SendMessage(HProgressDlg, WM_USER_DIALOG, 0, (LPARAM)data);
+        ret = Observer->AskFileError(data[1], data[2], data[3]);
         CancelOpPhase2(blkIndex);
         BOOL errAgain = FALSE;
         switch (ret)
@@ -4874,7 +4874,7 @@ COPY_AGAIN:
                                 data[1] = (char*)TRUE;
                                 data[2] = op->TargetName;
                                 data[3] = (char*)(INT_PTR)isMove;
-                                SendMessage(hProgressDlg, WM_USER_DIALOG, 12, (LPARAM)data);
+                                ret = observer.AskEncryptionLoss((DWORD)(DWORD_PTR)data[1] != 0, data[2], (DWORD)(DWORD_PTR)data[3] != 0);
                                 switch (ret)
                                 {
                                 case IDB_ALL:
@@ -5047,7 +5047,7 @@ COPY_AGAIN:
                             data[1] = LoadStr(IDS_ERRORWRITINGFILE);
                             data[2] = op->TargetName;
                             data[3] = GetErrorText(ERROR_DISK_FULL);
-                            SendMessage(hProgressDlg, WM_USER_DIALOG, 0, (LPARAM)data);
+                            ret = observer.AskFileError(data[1], data[2], data[3]);
                             switch (ret)
                             {
                             case IDRETRY:
@@ -5096,7 +5096,7 @@ COPY_AGAIN:
                         data[1] = LoadStr(IDS_ERRORGETTINGFILETIME);
                         data[2] = op->SourceName;
                         data[3] = GetErrorText(err);
-                        SendMessage(hProgressDlg, WM_USER_DIALOG, 8, (LPARAM)data);
+                        ret = observer.AskADSOpenError(data[1], data[2], data[3]);
                         switch (ret)
                         {
                         case IDRETRY:
@@ -5182,7 +5182,7 @@ COPY_AGAIN:
                                 data[1] = LoadStr(IDS_ERRORSETTINGFILETIME);
                                 data[2] = op->TargetName;
                                 data[3] = GetErrorText(err);
-                                SendMessage(hProgressDlg, WM_USER_DIALOG, 8, (LPARAM)data);
+                                ret = observer.AskADSOpenError(data[1], data[2], data[3]);
                                 switch (ret)
                                 {
                                 case IDRETRY:
@@ -5225,7 +5225,7 @@ COPY_AGAIN:
                             data[1] = LoadStr(IDS_ERRORWRITINGFILE);
                             data[2] = op->TargetName;
                             data[3] = GetErrorText(err);
-                            SendMessage(hProgressDlg, WM_USER_DIALOG, 0, (LPARAM)data);
+                            ret = observer.AskFileError(data[1], data[2], data[3]);
                             switch (ret)
                             {
                             case IDRETRY:
@@ -5272,7 +5272,7 @@ COPY_AGAIN:
                                 data[1] = op->TargetName;
                                 data[2] = (char*)(DWORD_PTR)(attr & DISPLAYED_ATTRIBUTES);
                                 data[3] = (char*)(DWORD_PTR)(curAttrs == INVALID_FILE_ATTRIBUTES ? 0 : (curAttrs & DISPLAYED_ATTRIBUTES));
-                                SendMessage(hProgressDlg, WM_USER_DIALOG, 9, (LPARAM)data);
+                                ret = observer.AskSetAttrsError(data[1], (DWORD)(DWORD_PTR)data[2], (DWORD)(DWORD_PTR)data[3]);
                             }
                             switch (ret)
                             {
@@ -5313,7 +5313,7 @@ COPY_AGAIN:
                                 data[1] = op->SourceName;
                                 data[2] = op->TargetName;
                                 data[3] = (char*)(DWORD_PTR)err;
-                                SendMessage(hProgressDlg, WM_USER_DIALOG, 10, (LPARAM)data);
+                                ret = observer.AskCopyPermError(data[1], data[2], data[3]);
                             }
                             switch (ret)
                             {
@@ -5350,7 +5350,7 @@ COPY_AGAIN:
                         data[1] = (char*)TRUE;
                         data[2] = op->TargetName;
                         data[3] = (char*)(INT_PTR)isMove;
-                        SendMessage(hProgressDlg, WM_USER_DIALOG, 12, (LPARAM)data);
+                        ret = observer.AskEncryptionLoss((DWORD)(DWORD_PTR)data[1] != 0, data[2], (DWORD)(DWORD_PTR)data[3] != 0);
                         switch (ret)
                         {
                         case IDB_ALL:
@@ -5447,7 +5447,7 @@ COPY_AGAIN:
                                     data[2] = tAttr;
                                     data[3] = op->SourceName;
                                     data[4] = sAttr;
-                                    SendMessage(hProgressDlg, WM_USER_DIALOG, 1, (LPARAM)data);
+                                    ret = observer.AskOverwrite(data[1], data[2], data[3], data[4]);
                                 }
                                 switch (ret)
                                 {
@@ -5507,7 +5507,7 @@ COPY_AGAIN:
                                     data[1] = LoadStr(IDS_CONFIRMFILEOVERWRITING);
                                     data[2] = op->TargetName;
                                     data[3] = LoadStr(IDS_WANTOVERWRITESHFILE);
-                                    SendMessage(hProgressDlg, WM_USER_DIALOG, 2, (LPARAM)data);
+                                    ret = observer.AskHiddenOrSystem(data[1], data[2], data[3]);
                                     switch (ret)
                                     {
                                     case IDB_ALL:
@@ -5674,7 +5674,7 @@ COPY_AGAIN:
                                                 data[1] = (char*)TRUE;
                                                 data[2] = op->TargetName;
                                                 data[3] = (char*)(INT_PTR)isMove;
-                                                SendMessage(hProgressDlg, WM_USER_DIALOG, 12, (LPARAM)data);
+                                                ret = observer.AskEncryptionLoss((DWORD)(DWORD_PTR)data[1] != 0, data[2], (DWORD)(DWORD_PTR)data[3] != 0);
                                                 switch (ret)
                                                 {
                                                 case IDB_ALL:
@@ -5718,7 +5718,7 @@ COPY_AGAIN:
                             data[1] = LoadStr(errDeletingFile ? IDS_ERRORDELETINGFILE : IDS_ERROROPENINGFILE);
                             data[2] = op->TargetName;
                             data[3] = GetErrorText(err);
-                            SendMessage(hProgressDlg, WM_USER_DIALOG, 0, (LPARAM)data);
+                            ret = observer.AskFileError(data[1], data[2], data[3]);
                             switch (ret)
                             {
                             case IDRETRY:
@@ -5760,7 +5760,7 @@ COPY_AGAIN:
             data[1] = LoadStr(IDS_ERROROPENINGFILE);
             data[2] = op->SourceName;
             data[3] = GetErrorText(err);
-            SendMessage(hProgressDlg, WM_USER_DIALOG, 0, (LPARAM)data);
+            ret = observer.AskFileError(data[1], data[2], data[3]);
             switch (ret)
             {
             case IDRETRY:
@@ -5849,7 +5849,7 @@ BOOL DoMoveFile(COperation* op, HWND hProgressDlg, IWorkerObserver& observer, vo
                     data[1] = op->SourceName;
                     data[2] = op->TargetName;
                     data[3] = (char*)(DWORD_PTR)srcSecurity.SrcError;
-                    SendMessage(hProgressDlg, WM_USER_DIALOG, 10, (LPARAM)data);
+                    ret = observer.AskCopyPermError(data[1], data[2], data[3]);
                 }
                 switch (ret)
                 {
@@ -5897,7 +5897,7 @@ BOOL DoMoveFile(COperation* op, HWND hProgressDlg, IWorkerObserver& observer, vo
                             data[1] = op->TargetName;
                             data[2] = (char*)(DWORD_PTR)(op->Attr & DISPLAYED_ATTRIBUTES);
                             data[3] = (char*)(DWORD_PTR)(curAttrs == INVALID_FILE_ATTRIBUTES ? 0 : (curAttrs & DISPLAYED_ATTRIBUTES));
-                            SendMessage(hProgressDlg, WM_USER_DIALOG, 9, (LPARAM)data);
+                            ret = observer.AskSetAttrsError(data[1], (DWORD)(DWORD_PTR)data[2], (DWORD)(DWORD_PTR)data[3]);
                         }
                         switch (ret)
                         {
@@ -5936,7 +5936,7 @@ BOOL DoMoveFile(COperation* op, HWND hProgressDlg, IWorkerObserver& observer, vo
                             data[1] = op->SourceName;
                             data[2] = op->TargetName;
                             data[3] = (char*)(DWORD_PTR)err;
-                            SendMessage(hProgressDlg, WM_USER_DIALOG, 10, (LPARAM)data);
+                            ret = observer.AskCopyPermError(data[1], data[2], data[3]);
                         }
                         switch (ret)
                         {
@@ -6134,7 +6134,7 @@ BOOL DoMoveFile(COperation* op, HWND hProgressDlg, IWorkerObserver& observer, vo
                             data[2] = tAttr;
                             data[3] = op->SourceName;
                             data[4] = sAttr;
-                            SendMessage(hProgressDlg, WM_USER_DIALOG, 1, (LPARAM)data);
+                            ret = observer.AskOverwrite(data[1], data[2], data[3], data[4]);
                         }
                         switch (ret)
                         {
@@ -6190,7 +6190,7 @@ BOOL DoMoveFile(COperation* op, HWND hProgressDlg, IWorkerObserver& observer, vo
                             data[1] = LoadStr(IDS_CONFIRMFILEOVERWRITING);
                             data[2] = op->TargetName;
                             data[3] = LoadStr(IDS_WANTOVERWRITESHFILE);
-                            SendMessage(hProgressDlg, WM_USER_DIALOG, 2, (LPARAM)data);
+                            ret = observer.AskHiddenOrSystem(data[1], data[2], data[3]);
                             switch (ret)
                             {
                             case IDB_ALL:
@@ -6238,7 +6238,7 @@ BOOL DoMoveFile(COperation* op, HWND hProgressDlg, IWorkerObserver& observer, vo
                             data[1] = LoadStr(IDS_ERROROVERWRITINGFILE);
                             data[2] = op->TargetName;
                             data[3] = GetErrorText(err2);
-                            SendMessage(hProgressDlg, WM_USER_DIALOG, 0, (LPARAM)data);
+                            ret = observer.AskFileError(data[1], data[2], data[3]);
                             switch (ret)
                             {
                             case IDRETRY:
@@ -6286,7 +6286,7 @@ BOOL DoMoveFile(COperation* op, HWND hProgressDlg, IWorkerObserver& observer, vo
                         data[1] = op->SourceName;
                         data[2] = op->TargetName;
                         data[3] = GetErrorText(err);
-                        SendMessage(hProgressDlg, WM_USER_DIALOG, dir ? 4 : 3, (LPARAM)data);
+                        ret = observer.AskCannotMove(data[1], data[2], data[3], dir != FALSE);
                         switch (ret)
                         {
                         case IDRETRY:
@@ -6348,7 +6348,7 @@ BOOL DoMoveFile(COperation* op, HWND hProgressDlg, IWorkerObserver& observer, vo
                     data[1] = LoadStr(IDS_ERRORDELETINGFILE);
                     data[2] = op->SourceName;
                     data[3] = GetErrorText(err);
-                    SendMessage(hProgressDlg, WM_USER_DIALOG, 0, (LPARAM)data);
+                    ret = observer.AskFileError(data[1], data[2], data[3]);
                     switch (ret)
                     {
                     case IDRETRY:
@@ -6397,7 +6397,7 @@ BOOL DoDeleteFile(HWND hProgressDlg, IWorkerObserver& observer, char* name, cons
                     data[1] = LoadStr(IDS_CONFIRMSHFILEDELETE);
                     data[2] = name;
                     data[3] = LoadStr(IDS_DELETESHFILE);
-                    SendMessage(hProgressDlg, WM_USER_DIALOG, 2, (LPARAM)data);
+                    ret = observer.AskHiddenOrSystem(data[1], data[2], data[3]);
                     switch (ret)
                     {
                     case IDB_ALL:
@@ -6515,7 +6515,7 @@ BOOL DoDeleteFile(HWND hProgressDlg, IWorkerObserver& observer, char* name, cons
             data[1] = LoadStr(IDS_ERRORDELETINGFILE);
             data[2] = name;
             data[3] = GetErrorText(err);
-            SendMessage(hProgressDlg, WM_USER_DIALOG, 0, (LPARAM)data);
+            ret = observer.AskFileError(data[1], data[2], data[3]);
             switch (ret)
             {
             case IDRETRY:
@@ -6699,7 +6699,7 @@ BOOL DoCopyDirTime(HWND hProgressDlg, IWorkerObserver& observer, const char* tar
             data[0] = (char*)&ret;
             data[1] = (char*)targetNameCrFile;
             data[2] = (char*)(DWORD_PTR)error;
-            SendMessage(hProgressDlg, WM_USER_DIALOG, 11, (LPARAM)data);
+            ret = observer.AskCopyDirTimeError(data[1], data[2]);
         }
         switch (ret)
         {
@@ -6814,7 +6814,7 @@ BOOL DoCreateDir(HWND hProgressDlg, IWorkerObserver& observer, char* name, DWORD
                                         data[1] = (char*)FALSE;
                                         data[2] = name;
                                         data[3] = (char*)(!script->IsCopyOperation);
-                                        SendMessage(hProgressDlg, WM_USER_DIALOG, 12, (LPARAM)data);
+                                        ret = observer.AskEncryptionLoss((DWORD)(DWORD_PTR)data[1] != 0, data[2], (DWORD)(DWORD_PTR)data[3] != 0);
                                     }
                                     switch (ret)
                                     {
@@ -6879,7 +6879,7 @@ BOOL DoCreateDir(HWND hProgressDlg, IWorkerObserver& observer, char* name, DWORD
                             data[1] = name;
                             data[2] = (char*)(DWORD_PTR)(newAttr & DISPLAYED_ATTRIBUTES);
                             data[3] = (char*)(DWORD_PTR)(curAttrs == INVALID_FILE_ATTRIBUTES ? 0 : (curAttrs & DISPLAYED_ATTRIBUTES));
-                            SendMessage(hProgressDlg, WM_USER_DIALOG, 9, (LPARAM)data);
+                            ret = observer.AskSetAttrsError(data[1], (DWORD)(DWORD_PTR)data[2], (DWORD)(DWORD_PTR)data[3]);
                         }
                         switch (ret)
                         {
@@ -6920,7 +6920,7 @@ BOOL DoCreateDir(HWND hProgressDlg, IWorkerObserver& observer, char* name, DWORD
                             data[1] = (char*)sourceDir;
                             data[2] = name;
                             data[3] = (char*)(DWORD_PTR)err2;
-                            SendMessage(hProgressDlg, WM_USER_DIALOG, 10, (LPARAM)data);
+                            ret = observer.AskCopyPermError(data[1], data[2], data[3]);
                         }
                         switch (ret)
                         {
@@ -6967,7 +6967,7 @@ BOOL DoCreateDir(HWND hProgressDlg, IWorkerObserver& observer, char* name, DWORD
                         data[2] = tAttr;
                         data[3] = (char*)sourceDir;
                         data[4] = sAttr;
-                        SendMessage(hProgressDlg, WM_USER_DIALOG, 7, (LPARAM)data);
+                        ret = observer.AskADSOverwrite(data[1], data[2], data[3], data[4]);
                         switch (ret)
                         {
                         case IDB_ALL:
@@ -7001,7 +7001,7 @@ BOOL DoCreateDir(HWND hProgressDlg, IWorkerObserver& observer, char* name, DWORD
                 data[1] = LoadStr(IDS_ERRORCREATINGDIR);
                 data[2] = name;
                 data[3] = LoadStr(IDS_NAMEALREADYUSED);
-                SendMessage(hProgressDlg, WM_USER_DIALOG, 0, (LPARAM)data);
+                ret = observer.AskFileError(data[1], data[2], data[3]);
                 switch (ret)
                 {
                 case IDRETRY:
@@ -7032,7 +7032,7 @@ BOOL DoCreateDir(HWND hProgressDlg, IWorkerObserver& observer, char* name, DWORD
             data[1] = LoadStr(IDS_ERRORCREATINGDIR);
             data[2] = name;
             data[3] = GetErrorText(err);
-            SendMessage(hProgressDlg, WM_USER_DIALOG, 0, (LPARAM)data);
+            ret = observer.AskFileError(data[1], data[2], data[3]);
             switch (ret)
             {
             case IDRETRY:
@@ -7140,7 +7140,7 @@ BOOL DoDeleteDir(HWND hProgressDlg, IWorkerObserver& observer, char* name, const
                 data[1] = LoadStr(IDS_ERRORDELETINGDIR);
                 data[2] = (char*)nameRmDir;
                 data[3] = GetErrorText(err);
-                SendMessage(hProgressDlg, WM_USER_DIALOG, 0, (LPARAM)data);
+                ret = observer.AskFileError(data[1], data[2], data[3]);
                 switch (ret)
                 {
                 case IDRETRY:
@@ -7356,7 +7356,7 @@ BOOL DoDeleteDirLink(HWND hProgressDlg, IWorkerObserver& observer, char* name, c
             data[1] = LoadStr(IDS_ERRORDELETINGDIRLINK);
             data[2] = (char*)nameDelLink;
             data[3] = GetErrorText(err);
-            SendMessage(hProgressDlg, WM_USER_DIALOG, 0, (LPARAM)data);
+            ret = observer.AskFileError(data[1], data[2], data[3]);
             switch (ret)
             {
             case IDRETRY:
@@ -7595,7 +7595,7 @@ CONVERT_AGAIN:
                                     if (hTarget != NULL && err == NO_ERROR && targetIterator - targetBuffer != (int)written)
                                         err = ERROR_DISK_FULL;
                                     data[3] = GetErrorText(err);
-                                    SendMessage(hProgressDlg, WM_USER_DIALOG, 0, (LPARAM)data);
+                                    ret = observer.AskFileError(data[1], data[2], data[3]);
                                     switch (ret)
                                     {
                                     case IDRETRY:
@@ -7656,7 +7656,7 @@ CONVERT_AGAIN:
                                 data[1] = LoadStr(IDS_ERRORREADINGFILE);
                                 data[2] = name;
                                 data[3] = GetErrorText(err);
-                                SendMessage(hProgressDlg, WM_USER_DIALOG, 0, (LPARAM)data);
+                                ret = observer.AskFileError(data[1], data[2], data[3]);
                                 switch (ret)
                                 {
                                 case IDRETRY:
@@ -7709,7 +7709,7 @@ CONVERT_AGAIN:
                                         data[1] = tmpFileName;
                                         data[2] = name;
                                         data[3] = GetErrorText(err);
-                                        SendMessage(hProgressDlg, WM_USER_DIALOG, 3, (LPARAM)data);
+                                        ret = observer.AskCannotMove(data[1], data[2], data[3], false);
                                         switch (ret)
                                         {
                                         case IDRETRY:
@@ -7750,7 +7750,7 @@ CONVERT_AGAIN:
                                 data[1] = LoadStr(IDS_ERROROVERWRITINGFILE);
                                 data[2] = name;
                                 data[3] = GetErrorText(err);
-                                SendMessage(hProgressDlg, WM_USER_DIALOG, 0, (LPARAM)data);
+                                ret = observer.AskFileError(data[1], data[2], data[3]);
                                 switch (ret)
                                 {
                                 case IDRETRY:
@@ -7814,7 +7814,7 @@ CONVERT_AGAIN:
                     data[1] = LoadStr(IDS_ERRORCREATINGTMPFILE);
                     data[2] = fakeName;
                     data[3] = GetErrorText(err);
-                    SendMessage(hProgressDlg, WM_USER_DIALOG, 0, (LPARAM)data);
+                    ret = observer.AskFileError(data[1], data[2], data[3]);
                     switch (ret)
                     {
                     case IDRETRY:
@@ -7862,7 +7862,7 @@ CONVERT_AGAIN:
             data[1] = LoadStr(IDS_ERROROPENINGFILE);
             data[2] = name;
             data[3] = GetErrorText(err);
-            SendMessage(hProgressDlg, WM_USER_DIALOG, 0, (LPARAM)data);
+            ret = observer.AskFileError(data[1], data[2], data[3]);
             switch (ret)
             {
             case IDRETRY:
@@ -7962,7 +7962,7 @@ BOOL DoChangeAttrs(HWND hProgressDlg, IWorkerObserver& observer, char* name, con
             data[0] = LoadStr((showCompressErr && (attrs & FILE_ATTRIBUTE_COMPRESSED) || !showEncryptErr) ? IDS_ERRORCOMPRESSING : IDS_ERRORENCRYPTING);
             data[1] = name;
             data[2] = LoadStr((showCompressErr && (attrs & FILE_ATTRIBUTE_COMPRESSED) || !showEncryptErr) ? IDS_COMPRNOTSUPPORTED : IDS_ENCRYPNOTSUPPORTED);
-            SendMessage(hProgressDlg, WM_USER_DIALOG, 5, (LPARAM)data);
+            observer.NotifyError(data[0], data[1], data[2]);
             error = ERROR_SUCCESS;
         }
         if (error == ERROR_SUCCESS && SalLPSetFileAttributes(nameSetAttrs, attrs))
@@ -8026,7 +8026,7 @@ BOOL DoChangeAttrs(HWND hProgressDlg, IWorkerObserver& observer, char* name, con
             data[1] = errTitle;
             data[2] = name;
             data[3] = GetErrorText(error);
-            SendMessage(hProgressDlg, WM_USER_DIALOG, 0, (LPARAM)data);
+            ret = observer.AskFileError(data[1], data[2], data[3]);
             switch (ret)
             {
             case IDRETRY:
@@ -8447,8 +8447,8 @@ unsigned ThreadWorkerBody(void* parameter)
         free(tgtBuffer);
     if (bufferIsAllocated)
         free(buffer);
-    *dlgData.CancelWorker = Error;                  // if this was triggered by Cancel, make that obvious ...
-    SendMessage(hProgressDlg, WM_COMMAND, IDOK, 0); // we're done ...
+    observer.SetError(Error != FALSE);  // if this was triggered by Cancel, make that obvious ...
+    observer.NotifyDone();              // we're done ...
     WaitForSingleObject(wContinue, INFINITE);       // we need to stop the main thread
 
     FreeScript(script); // calls delete, so the main thread cannot be running
