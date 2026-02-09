@@ -7906,6 +7906,7 @@ unsigned ThreadWorkerBody(void* parameter)
         char opChangAttrs[50];
         lstrcpyn(opChangAttrs, LoadStr(IDS_CHANGINGATTRS), 50);
 
+        TRACE_I("Worker: script->Count=" << script->Count << ", IsCancelled=" << observer.IsCancelled());
         int i;
         for (i = 0; !observer.IsCancelled() && i < script->Count; i++)
         {
@@ -8081,6 +8082,7 @@ unsigned ThreadWorkerBody(void* parameter)
             case ocDeleteDir:
             case ocDeleteDirLink:
             {
+                TRACE_I("Worker: delete op=" << op->Opcode << " src=" << (op->SourceName ? op->SourceName : "(null)"));
                 pd.Operation = opStrDeleting;
                 pd.Source = op->SourceName;
                 pd.Preposition = "";

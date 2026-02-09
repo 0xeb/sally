@@ -251,24 +251,8 @@ struct COperation
         // std::wstring members are automatically destructed
     }
 
-    // Copy constructor - deep copy of owned pointers
-    COperation(const COperation& other)
-        : Opcode(other.Opcode), Size(other.Size), FileSize(other.FileSize),
-          SourceNameW(other.SourceNameW), TargetNameW(other.TargetNameW),
-          Attr(other.Attr), OpFlags(other.OpFlags),
-          OwnsSourceName(other.OwnsSourceName), OwnsTargetName(other.OwnsTargetName)
-    {
-        // Deep copy owned pointers, shallow copy non-owned (they store non-pointer data)
-        if (OwnsSourceName && other.SourceName != NULL)
-            SourceName = _strdup(other.SourceName);
-        else
-            SourceName = other.SourceName;
-
-        if (OwnsTargetName && other.TargetName != NULL)
-            TargetName = _strdup(other.TargetName);
-        else
-            TargetName = other.TargetName;
-    }
+    // No copy — ownership of malloc'd pointers transfers via move only
+    COperation(const COperation&) = delete;
 
     // Move constructor - transfer ownership
     COperation(COperation&& other) noexcept
@@ -283,41 +267,8 @@ struct COperation
         other.TargetName = NULL;
     }
 
-    // Copy assignment - deep copy with proper cleanup
-    COperation& operator=(const COperation& other)
-    {
-        if (this != &other)
-        {
-            // Free existing owned pointers
-            if (OwnsSourceName && SourceName != NULL)
-                free(SourceName);
-            if (OwnsTargetName && TargetName != NULL)
-                free(TargetName);
-
-            // Copy all members
-            Opcode = other.Opcode;
-            Size = other.Size;
-            FileSize = other.FileSize;
-            SourceNameW = other.SourceNameW;
-            TargetNameW = other.TargetNameW;
-            Attr = other.Attr;
-            OpFlags = other.OpFlags;
-            OwnsSourceName = other.OwnsSourceName;
-            OwnsTargetName = other.OwnsTargetName;
-
-            // Deep copy owned pointers
-            if (OwnsSourceName && other.SourceName != NULL)
-                SourceName = _strdup(other.SourceName);
-            else
-                SourceName = other.SourceName;
-
-            if (OwnsTargetName && other.TargetName != NULL)
-                TargetName = _strdup(other.TargetName);
-            else
-                TargetName = other.TargetName;
-        }
-        return *this;
-    }
+    // No copy assignment — use move
+    COperation& operator=(const COperation&) = delete;
 
     // Move assignment - transfer ownership with proper cleanup
     COperation& operator=(COperation&& other) noexcept
@@ -389,8 +340,8 @@ public:
     COperation& At(int index) { return m_ops[index]; }
     const COperation& At(int index) const { return m_ops[index]; }
 
-    int Add(const COperation& op) {
-        m_ops.push_back(op);
+    int Add(COperation& op) {
+        m_ops.push_back(std::move(op));
         // Automatically populate wide paths for long path support
         m_ops.back().PopulateWidePathsFromAnsi();
         Count = (int)m_ops.size();
