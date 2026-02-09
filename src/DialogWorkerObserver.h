@@ -78,6 +78,11 @@ public:
         SendMessage(m_hProgressDlg, WM_COMMAND, IDOK, 0);
     }
 
+    HWND GetParentWindow() const override
+    {
+        return m_hProgressDlg;
+    }
+
     int AskFileError(const char* title, const char* fileName, const char* errorText) override
     {
         int ret = IDCANCEL;

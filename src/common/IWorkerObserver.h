@@ -55,6 +55,10 @@ public:
     // Signal that the worker has finished — dialog can close.
     virtual void NotifyDone() = 0;
 
+    // Get a parent HWND for shell operations (e.g. SHFileOperation for Recycle Bin).
+    // Returns NULL in headless/test mode. The shell API handles NULL gracefully.
+    virtual HWND GetParentWindow() const = 0;
+
     // --- Error dialogs (WM_USER_DIALOG message ID 0) ---
     // Generic file error with retry/skip/cancel options.
     // Returns IDRETRY, IDB_SKIP, IDB_SKIPALL, IDCANCEL, or IDB_IGNORE.

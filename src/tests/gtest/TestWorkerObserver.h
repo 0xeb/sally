@@ -216,6 +216,11 @@ public:
         SetEvent(m_completionEvent);
     }
 
+    HWND GetParentWindow() const override
+    {
+        return NULL; // headless — no parent window
+    }
+
     int AskFileError(const char* title, const char* fileName, const char* errorText) override
     {
         int ret = PolicyToReturnValue(m_fileErrorPolicy);

@@ -6204,7 +6204,7 @@ BOOL DoMoveFile(COperation* op, IWorkerObserver& observer, void* buffer,
     }
 }
 
-BOOL DoDeleteFile(HWND hProgressDlg, IWorkerObserver& observer, char* name, const CQuadWord& size, COperations* script,
+BOOL DoDeleteFile(IWorkerObserver& observer, char* name, const CQuadWord& size, COperations* script,
                   CQuadWord& totalDone, DWORD attr, CWorkerState& dlgData,
                   const std::wstring& nameW = std::wstring())
 {
@@ -6306,7 +6306,7 @@ BOOL DoDeleteFile(HWND hProgressDlg, IWorkerObserver& observer, char* name, cons
                     SHFILEOPSTRUCT opCode;
                     memset(&opCode, 0, sizeof(opCode));
 
-                    opCode.hwnd = shellExecuteWnd.Create(hProgressDlg, "SEW: DoDeleteFile");
+                    opCode.hwnd = shellExecuteWnd.Create(observer.GetParentWindow(), "SEW: DoDeleteFile");
 
                     opCode.wFunc = FO_DELETE;
                     opCode.pFrom = nameList;
@@ -6846,7 +6846,7 @@ BOOL DoCreateDir(IWorkerObserver& observer, char* name, DWORD attr,
     }
 }
 
-BOOL DoDeleteDir(HWND hProgressDlg, IWorkerObserver& observer, char* name, const CQuadWord& size, COperations* script,
+BOOL DoDeleteDir(IWorkerObserver& observer, char* name, const CQuadWord& size, COperations* script,
                  CQuadWord& totalDone, DWORD attr, BOOL dontUseRecycleBin, CWorkerState& dlgData)
 {
     DWORD err;
@@ -6883,7 +6883,7 @@ BOOL DoDeleteDir(HWND hProgressDlg, IWorkerObserver& observer, char* name, const
                 SHFILEOPSTRUCT opCode;
                 memset(&opCode, 0, sizeof(opCode));
 
-                opCode.hwnd = shellExecuteWnd.Create(hProgressDlg, "SEW: DoDeleteDir");
+                opCode.hwnd = shellExecuteWnd.Create(observer.GetParentWindow(), "SEW: DoDeleteDir");
 
                 opCode.wFunc = FO_DELETE;
                 opCode.pFrom = nameList;
@@ -8082,7 +8082,7 @@ unsigned ThreadWorkerBody(void* parameter)
 
                 if (op->Opcode == ocDeleteFile)
                 {
-                    Error = !DoDeleteFile(hProgressDlg, observer, op->SourceName, op->Size,
+                    Error = !DoDeleteFile(observer, op->SourceName, op->Size,
                                           script, totalDone, op->Attr, dlgData,
                                           op->SourceNameW);
                 }
@@ -8090,7 +8090,7 @@ unsigned ThreadWorkerBody(void* parameter)
                 {
                     if (op->Opcode == ocDeleteDir)
                     {
-                        Error = !DoDeleteDir(hProgressDlg, observer, op->SourceName, op->Size,
+                        Error = !DoDeleteDir(observer, op->SourceName, op->Size,
                                              script, totalDone, op->Attr, (DWORD)(DWORD_PTR)op->TargetName != -1,
                                              dlgData);
                     }
