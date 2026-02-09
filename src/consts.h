@@ -139,6 +139,8 @@ DWORD SalGetFileAttributes(const char* fileName);
 // unnecessarily large attribute change on remaining hardlinks of the file (attributes
 // are shared by all hardlinks)
 BOOL ClearReadOnlyAttr(const char* name, DWORD attr = -1);
+// Wide version of ClearReadOnlyAttr for Unicode paths
+BOOL ClearReadOnlyAttrW(const wchar_t* name, DWORD attr = -1);
 
 // Deletes a directory link (junction point, symbolic link, mount point); on success
 // returns TRUE; on error returns FALSE and if 'err' is not NULL, returns error code in 'err'
@@ -221,6 +223,8 @@ BOOL NameEndsWithBackslashW(const wchar_t* name);
 // If 'name' ends with space/dot or contains ':' (collision with ADS), returns TRUE, otherwise FALSE,
 // if 'ignInvalidName' is TRUE, returns TRUE only if 'name' contains ':' (collision with ADS)
 BOOL FileNameIsInvalid(const char* name, BOOL isFullName, BOOL ignInvalidName = FALSE);
+// Wide version of FileNameIsInvalid for Unicode paths
+BOOL FileNameIsInvalidW(const wchar_t* name, BOOL isFullName, BOOL ignInvalidName = FALSE);
 
 // Returns FALSE if contained path components end with space/dot
 // and if 'cutPath' is TRUE, also shortens path to the first invalid component
