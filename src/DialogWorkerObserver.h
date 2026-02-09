@@ -202,13 +202,13 @@ public:
         return ret;
     }
 
-    int AskCopyDirTimeError(const char* dirName, const char* errorText) override
+    int AskCopyDirTimeError(const char* dirName, DWORD errorCode) override
     {
         int ret = IDCANCEL;
         char* data[3];
         data[0] = (char*)&ret;
         data[1] = const_cast<char*>(dirName);
-        data[2] = const_cast<char*>(errorText);
+        data[2] = (char*)(DWORD_PTR)errorCode;
         SendMessage(m_hProgressDlg, WM_USER_DIALOG, 11, (LPARAM)data);
         return ret;
     }

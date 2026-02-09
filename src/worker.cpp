@@ -2002,12 +2002,7 @@ DWORD MyEncryptFile(HWND hProgressDlg, IWorkerObserver& observer, char* fileName
                 return retEnc;
 
             int ret = IDCANCEL;
-            char* data[4];
-            data[0] = (char*)&ret;
-            data[1] = LoadStr(IDS_CONFIRMSFILEENCRYPT);
-            data[2] = fileName;
-            data[3] = LoadStr(IDS_ENCRYPTSFILE);
-            ret = observer.AskHiddenOrSystem(data[1], data[2], data[3]);
+            ret = observer.AskHiddenOrSystem(LoadStr(IDS_CONFIRMSFILEENCRYPT), fileName, LoadStr(IDS_ENCRYPTSFILE));
             switch (ret)
             {
             case IDB_ALL:
@@ -2776,17 +2771,12 @@ COPY_ADS_AGAIN:
 
                                         int ret;
                                         ret = IDCANCEL;
-                                        char* data[4];
-                                        data[0] = (char*)&ret;
-                                        data[1] = LoadStr(IDS_ERRORWRITINGADS);
                                         WideCharToMultiByte(CP_ACP, 0, tgtName, -1, nameBuf, nameBuf.Size(), NULL, NULL);
                                         nameBuf[nameBuf.Size() - 1] = 0;
                                         CutADSNameSuffix(nameBuf);
-                                        data[2] = nameBuf;
                                         if (err == NO_ERROR && read != written)
                                             err = ERROR_DISK_FULL;
-                                        data[3] = GetErrorText(err);
-                                        ret = observer.AskFileError(data[1], data[2], data[3]);
+                                        ret = observer.AskFileError(LoadStr(IDS_ERRORWRITINGADS), nameBuf, GetErrorText(err));
                                         switch (ret)
                                         {
                                         case IDRETRY: // on a network we must reopen the handle; local access would not allow sharing
@@ -2891,15 +2881,10 @@ COPY_ADS_AGAIN:
                                         goto SKIP_COPY_ADS;
 
                                     int ret = IDCANCEL;
-                                    char* data[4];
-                                    data[0] = (char*)&ret;
-                                    data[1] = LoadStr(IDS_ERRORREADINGADS);
                                     WideCharToMultiByte(CP_ACP, 0, srcName, -1, nameBuf, nameBuf.Size(), NULL, NULL);
                                     nameBuf[nameBuf.Size() - 1] = 0;
                                     CutADSNameSuffix(nameBuf);
-                                    data[2] = nameBuf;
-                                    data[3] = GetErrorText(err);
-                                    ret = observer.AskFileError(data[1], data[2], data[3]);
+                                    ret = observer.AskFileError(LoadStr(IDS_ERRORREADINGADS), nameBuf, GetErrorText(err));
                                     switch (ret)
                                     {
                                     case IDRETRY:
@@ -3013,15 +2998,10 @@ COPY_ADS_AGAIN:
 
                             int ret;
                             ret = IDCANCEL;
-                            char* data[4];
-                            data[0] = (char*)&ret;
-                            data[1] = LoadStr(IDS_ERROROPENINGADS);
                             WideCharToMultiByte(CP_ACP, 0, tgtName, -1, nameBuf, nameBuf.Size(), NULL, NULL);
                             nameBuf[nameBuf.Size() - 1] = 0;
                             CutADSNameSuffix(nameBuf);
-                            data[2] = nameBuf;
-                            data[3] = GetErrorText(err);
-                            ret = observer.AskADSOpenError(data[1], data[2], data[3]);
+                            ret = observer.AskADSOpenError(LoadStr(IDS_ERROROPENINGADS), nameBuf, GetErrorText(err));
                             switch (ret)
                             {
                             case IDRETRY:
@@ -3086,15 +3066,10 @@ COPY_ADS_AGAIN:
 
                     int ret;
                     ret = IDCANCEL;
-                    char* data[4];
-                    data[0] = (char*)&ret;
-                    data[1] = LoadStr(IDS_ERROROPENINGADS);
                     WideCharToMultiByte(CP_ACP, 0, srcName, -1, nameBuf, nameBuf.Size(), NULL, NULL);
                     nameBuf[nameBuf.Size() - 1] = 0;
                     CutADSNameSuffix(nameBuf);
-                    data[2] = nameBuf;
-                    data[3] = GetErrorText(err);
-                    ret = observer.AskFileError(data[1], data[2], data[3]);
+                    ret = observer.AskFileError(LoadStr(IDS_ERROROPENINGADS), nameBuf, GetErrorText(err));
                     switch (ret)
                     {
                     case IDRETRY:
@@ -3145,11 +3120,7 @@ COPY_ADS_AGAIN:
 
             int ret;
             ret = IDCANCEL;
-            char* data[3];
-            data[0] = (char*)&ret;
-            data[1] = (char*)sourceName;
-            data[2] = GetErrorText(adsWinError);
-            ret = observer.AskADSReadError(data[1], data[2]);
+            ret = observer.AskADSReadError((char*)sourceName, GetErrorText(adsWinError));
             switch (ret)
             {
             case IDRETRY:
@@ -3474,14 +3445,9 @@ void DoCopyFileLoopOrig(HANDLE& in, HANDLE& out, void* buffer, int& limitBufferS
 
                 int ret;
                 ret = IDCANCEL;
-                char* data[4];
-                data[0] = (char*)&ret;
-                data[1] = LoadStr(IDS_ERRORWRITINGFILE);
-                data[2] = op->TargetName;
                 if (err == NO_ERROR && read != written)
                     err = ERROR_DISK_FULL;
-                data[3] = GetErrorText(err);
-                ret = observer.AskFileError(data[1], data[2], data[3]);
+                ret = observer.AskFileError(LoadStr(IDS_ERRORWRITINGFILE), op->TargetName, GetErrorText(err));
                 switch (ret)
                 {
                 case IDRETRY: // on a network we must reopen the handle; local access forbids it due to sharing
@@ -3582,12 +3548,7 @@ void DoCopyFileLoopOrig(HANDLE& in, HANDLE& out, void* buffer, int& limitBufferS
 
             int ret;
             ret = IDCANCEL;
-            char* data[4];
-            data[0] = (char*)&ret;
-            data[1] = LoadStr(IDS_ERRORREADINGFILE);
-            data[2] = op->SourceName;
-            data[3] = GetErrorText(err);
-            ret = observer.AskFileError(data[1], data[2], data[3]);
+            ret = observer.AskFileError(LoadStr(IDS_ERRORREADINGFILE), op->SourceName, GetErrorText(err));
             switch (ret)
             {
             case IDRETRY:
@@ -4162,12 +4123,7 @@ BOOL CCopy_Context::HandleReadingErr(int blkIndex, DWORD err, BOOL* copyError, B
         }
         else
         {
-            char* data[4];
-            data[0] = (char*)&ret;
-            data[1] = LoadStr(IDS_ERRORREADINGFILE);
-            data[2] = Op->SourceName;
-            data[3] = GetErrorText(err);
-            ret = Observer->AskFileError(data[1], data[2], data[3]);
+            ret = Observer->AskFileError(LoadStr(IDS_ERRORREADINGFILE), Op->SourceName, GetErrorText(err));
         }
         CancelOpPhase2(blkIndex);
         BOOL errAgain = FALSE;
@@ -4288,12 +4244,7 @@ BOOL CCopy_Context::HandleWritingErr(int blkIndex, DWORD err, BOOL* copyError, B
         }
 
         int ret = IDCANCEL;
-        char* data[4];
-        data[0] = (char*)&ret;
-        data[1] = LoadStr(IDS_ERRORWRITINGFILE);
-        data[2] = Op->TargetName;
-        data[3] = GetErrorText(err);
-        ret = Observer->AskFileError(data[1], data[2], data[3]);
+        ret = Observer->AskFileError(LoadStr(IDS_ERRORWRITINGFILE), Op->TargetName, GetErrorText(err));
         CancelOpPhase2(blkIndex);
         BOOL errAgain = FALSE;
         switch (ret)
@@ -4869,12 +4820,7 @@ COPY_AGAIN:
 
                                 int ret;
                                 ret = IDCANCEL;
-                                char* data[4];
-                                data[0] = (char*)&ret;
-                                data[1] = (char*)TRUE;
-                                data[2] = op->TargetName;
-                                data[3] = (char*)(INT_PTR)isMove;
-                                ret = observer.AskEncryptionLoss((DWORD)(DWORD_PTR)data[1] != 0, data[2], (DWORD)(DWORD_PTR)data[3] != 0);
+                                ret = observer.AskEncryptionLoss((DWORD)(DWORD_PTR)(char*)TRUE != 0, op->TargetName, (DWORD)(DWORD_PTR)(char*)(INT_PTR)isMove != 0);
                                 switch (ret)
                                 {
                                 case IDB_ALL:
@@ -5042,12 +4988,7 @@ COPY_AGAIN:
                                 goto SKIP_COPY;
 
                             int ret = IDCANCEL;
-                            char* data[4];
-                            data[0] = (char*)&ret;
-                            data[1] = LoadStr(IDS_ERRORWRITINGFILE);
-                            data[2] = op->TargetName;
-                            data[3] = GetErrorText(ERROR_DISK_FULL);
-                            ret = observer.AskFileError(data[1], data[2], data[3]);
+                            ret = observer.AskFileError(LoadStr(IDS_ERRORWRITINGFILE), op->TargetName, GetErrorText(ERROR_DISK_FULL));
                             switch (ret)
                             {
                             case IDRETRY:
@@ -5091,12 +5032,7 @@ COPY_AGAIN:
 
                         int ret;
                         ret = IDCANCEL;
-                        char* data[4];
-                        data[0] = (char*)&ret;
-                        data[1] = LoadStr(IDS_ERRORGETTINGFILETIME);
-                        data[2] = op->SourceName;
-                        data[3] = GetErrorText(err);
-                        ret = observer.AskADSOpenError(data[1], data[2], data[3]);
+                        ret = observer.AskADSOpenError(LoadStr(IDS_ERRORGETTINGFILETIME), op->SourceName, GetErrorText(err));
                         switch (ret)
                         {
                         case IDRETRY:
@@ -5177,12 +5113,7 @@ COPY_AGAIN:
 
                                 int ret;
                                 ret = IDCANCEL;
-                                char* data[4];
-                                data[0] = (char*)&ret;
-                                data[1] = LoadStr(IDS_ERRORSETTINGFILETIME);
-                                data[2] = op->TargetName;
-                                data[3] = GetErrorText(err);
-                                ret = observer.AskADSOpenError(data[1], data[2], data[3]);
+                                ret = observer.AskADSOpenError(LoadStr(IDS_ERRORSETTINGFILETIME), op->TargetName, GetErrorText(err));
                                 switch (ret)
                                 {
                                 case IDRETRY:
@@ -5220,12 +5151,7 @@ COPY_AGAIN:
                                 goto SKIP_COPY;
 
                             int ret = IDCANCEL;
-                            char* data[4];
-                            data[0] = (char*)&ret;
-                            data[1] = LoadStr(IDS_ERRORWRITINGFILE);
-                            data[2] = op->TargetName;
-                            data[3] = GetErrorText(err);
-                            ret = observer.AskFileError(data[1], data[2], data[3]);
+                            ret = observer.AskFileError(LoadStr(IDS_ERRORWRITINGFILE), op->TargetName, GetErrorText(err));
                             switch (ret)
                             {
                             case IDRETRY:
@@ -5267,12 +5193,7 @@ COPY_AGAIN:
                                 ret = IDB_IGNORE;
                             else
                             {
-                                char* data[4];
-                                data[0] = (char*)&ret;
-                                data[1] = op->TargetName;
-                                data[2] = (char*)(DWORD_PTR)(attr & DISPLAYED_ATTRIBUTES);
-                                data[3] = (char*)(DWORD_PTR)(curAttrs == INVALID_FILE_ATTRIBUTES ? 0 : (curAttrs & DISPLAYED_ATTRIBUTES));
-                                ret = observer.AskSetAttrsError(data[1], (DWORD)(DWORD_PTR)data[2], (DWORD)(DWORD_PTR)data[3]);
+                                ret = observer.AskSetAttrsError(op->TargetName, (DWORD)(DWORD_PTR)(char*)(DWORD_PTR)(attr & DISPLAYED_ATTRIBUTES), (DWORD)(DWORD_PTR)(char*)(DWORD_PTR)(curAttrs == INVALID_FILE_ATTRIBUTES ? 0 : (curAttrs & DISPLAYED_ATTRIBUTES)));
                             }
                             switch (ret)
                             {
@@ -5308,12 +5229,7 @@ COPY_AGAIN:
                                 ret = IDB_IGNORE;
                             else
                             {
-                                char* data[4];
-                                data[0] = (char*)&ret;
-                                data[1] = op->SourceName;
-                                data[2] = op->TargetName;
-                                data[3] = (char*)(DWORD_PTR)err;
-                                ret = observer.AskCopyPermError(data[1], data[2], data[3]);
+                                ret = observer.AskCopyPermError(op->SourceName, op->TargetName, (char*)(DWORD_PTR)err);
                             }
                             switch (ret)
                             {
@@ -5345,12 +5261,7 @@ COPY_AGAIN:
 
                         int ret;
                         ret = IDCANCEL;
-                        char* data[4];
-                        data[0] = (char*)&ret;
-                        data[1] = (char*)TRUE;
-                        data[2] = op->TargetName;
-                        data[3] = (char*)(INT_PTR)isMove;
-                        ret = observer.AskEncryptionLoss((DWORD)(DWORD_PTR)data[1] != 0, data[2], (DWORD)(DWORD_PTR)data[3] != 0);
+                        ret = observer.AskEncryptionLoss((DWORD)(DWORD_PTR)(char*)TRUE != 0, op->TargetName, (DWORD)(DWORD_PTR)(char*)(INT_PTR)isMove != 0);
                         switch (ret)
                         {
                         case IDB_ALL:
@@ -5441,13 +5352,7 @@ COPY_AGAIN:
                                 else
                                 {
                                     // show the prompt
-                                    char* data[5];
-                                    data[0] = (char*)&ret;
-                                    data[1] = op->TargetName;
-                                    data[2] = tAttr;
-                                    data[3] = op->SourceName;
-                                    data[4] = sAttr;
-                                    ret = observer.AskOverwrite(data[1], data[2], data[3], data[4]);
+                                    ret = observer.AskOverwrite(op->TargetName, tAttr, op->SourceName, sAttr);
                                 }
                                 switch (ret)
                                 {
@@ -5502,12 +5407,7 @@ COPY_AGAIN:
                                         goto SKIP_OPEN;
 
                                     int ret = IDCANCEL;
-                                    char* data[4];
-                                    data[0] = (char*)&ret;
-                                    data[1] = LoadStr(IDS_CONFIRMFILEOVERWRITING);
-                                    data[2] = op->TargetName;
-                                    data[3] = LoadStr(IDS_WANTOVERWRITESHFILE);
-                                    ret = observer.AskHiddenOrSystem(data[1], data[2], data[3]);
+                                    ret = observer.AskHiddenOrSystem(LoadStr(IDS_CONFIRMFILEOVERWRITING), op->TargetName, LoadStr(IDS_WANTOVERWRITESHFILE));
                                     switch (ret)
                                     {
                                     case IDB_ALL:
@@ -5669,12 +5569,7 @@ COPY_AGAIN:
 
                                                 int ret;
                                                 ret = IDCANCEL;
-                                                char* data[4];
-                                                data[0] = (char*)&ret;
-                                                data[1] = (char*)TRUE;
-                                                data[2] = op->TargetName;
-                                                data[3] = (char*)(INT_PTR)isMove;
-                                                ret = observer.AskEncryptionLoss((DWORD)(DWORD_PTR)data[1] != 0, data[2], (DWORD)(DWORD_PTR)data[3] != 0);
+                                                ret = observer.AskEncryptionLoss((DWORD)(DWORD_PTR)(char*)TRUE != 0, op->TargetName, (DWORD)(DWORD_PTR)(char*)(INT_PTR)isMove != 0);
                                                 switch (ret)
                                                 {
                                                 case IDB_ALL:
@@ -5713,12 +5608,7 @@ COPY_AGAIN:
 
                             int ret;
                             ret = IDCANCEL;
-                            char* data[4];
-                            data[0] = (char*)&ret;
-                            data[1] = LoadStr(errDeletingFile ? IDS_ERRORDELETINGFILE : IDS_ERROROPENINGFILE);
-                            data[2] = op->TargetName;
-                            data[3] = GetErrorText(err);
-                            ret = observer.AskFileError(data[1], data[2], data[3]);
+                            ret = observer.AskFileError(LoadStr(errDeletingFile ? IDS_ERRORDELETINGFILE : IDS_ERROROPENINGFILE), op->TargetName, GetErrorText(err));
                             switch (ret)
                             {
                             case IDRETRY:
@@ -5755,12 +5645,7 @@ COPY_AGAIN:
 
             int ret;
             ret = IDCANCEL;
-            char* data[4];
-            data[0] = (char*)&ret;
-            data[1] = LoadStr(IDS_ERROROPENINGFILE);
-            data[2] = op->SourceName;
-            data[3] = GetErrorText(err);
-            ret = observer.AskFileError(data[1], data[2], data[3]);
+            ret = observer.AskFileError(LoadStr(IDS_ERROROPENINGFILE), op->SourceName, GetErrorText(err));
             switch (ret)
             {
             case IDRETRY:
@@ -5844,12 +5729,7 @@ BOOL DoMoveFile(COperation* op, HWND hProgressDlg, IWorkerObserver& observer, vo
                     ret = IDB_IGNORE;
                 else
                 {
-                    char* data[4];
-                    data[0] = (char*)&ret;
-                    data[1] = op->SourceName;
-                    data[2] = op->TargetName;
-                    data[3] = (char*)(DWORD_PTR)srcSecurity.SrcError;
-                    ret = observer.AskCopyPermError(data[1], data[2], data[3]);
+                    ret = observer.AskCopyPermError(op->SourceName, op->TargetName, (char*)(DWORD_PTR)srcSecurity.SrcError);
                 }
                 switch (ret)
                 {
@@ -5892,12 +5772,7 @@ BOOL DoMoveFile(COperation* op, HWND hProgressDlg, IWorkerObserver& observer, vo
                             ret = IDB_IGNORE;
                         else
                         {
-                            char* data[4];
-                            data[0] = (char*)&ret;
-                            data[1] = op->TargetName;
-                            data[2] = (char*)(DWORD_PTR)(op->Attr & DISPLAYED_ATTRIBUTES);
-                            data[3] = (char*)(DWORD_PTR)(curAttrs == INVALID_FILE_ATTRIBUTES ? 0 : (curAttrs & DISPLAYED_ATTRIBUTES));
-                            ret = observer.AskSetAttrsError(data[1], (DWORD)(DWORD_PTR)data[2], (DWORD)(DWORD_PTR)data[3]);
+                            ret = observer.AskSetAttrsError(op->TargetName, (DWORD)(DWORD_PTR)(char*)(DWORD_PTR)(op->Attr & DISPLAYED_ATTRIBUTES), (DWORD)(DWORD_PTR)(char*)(DWORD_PTR)(curAttrs == INVALID_FILE_ATTRIBUTES ? 0 : (curAttrs & DISPLAYED_ATTRIBUTES)));
                         }
                         switch (ret)
                         {
@@ -5931,12 +5806,7 @@ BOOL DoMoveFile(COperation* op, HWND hProgressDlg, IWorkerObserver& observer, vo
                             ret = IDB_IGNORE;
                         else
                         {
-                            char* data[4];
-                            data[0] = (char*)&ret;
-                            data[1] = op->SourceName;
-                            data[2] = op->TargetName;
-                            data[3] = (char*)(DWORD_PTR)err;
-                            ret = observer.AskCopyPermError(data[1], data[2], data[3]);
+                            ret = observer.AskCopyPermError(op->SourceName, op->TargetName, (char*)(DWORD_PTR)err);
                         }
                         switch (ret)
                         {
@@ -6128,13 +5998,7 @@ BOOL DoMoveFile(COperation* op, HWND hProgressDlg, IWorkerObserver& observer, vo
                         else
                         {
                             // display the prompt
-                            char* data[5];
-                            data[0] = (char*)&ret;
-                            data[1] = op->TargetName;
-                            data[2] = tAttr;
-                            data[3] = op->SourceName;
-                            data[4] = sAttr;
-                            ret = observer.AskOverwrite(data[1], data[2], data[3], data[4]);
+                            ret = observer.AskOverwrite(op->TargetName, tAttr, op->SourceName, sAttr);
                         }
                         switch (ret)
                         {
@@ -6185,12 +6049,7 @@ BOOL DoMoveFile(COperation* op, HWND hProgressDlg, IWorkerObserver& observer, vo
                                 goto SKIP_OPEN;
 
                             int ret = IDCANCEL;
-                            char* data[4];
-                            data[0] = (char*)&ret;
-                            data[1] = LoadStr(IDS_CONFIRMFILEOVERWRITING);
-                            data[2] = op->TargetName;
-                            data[3] = LoadStr(IDS_WANTOVERWRITESHFILE);
-                            ret = observer.AskHiddenOrSystem(data[1], data[2], data[3]);
+                            ret = observer.AskHiddenOrSystem(LoadStr(IDS_CONFIRMFILEOVERWRITING), op->TargetName, LoadStr(IDS_WANTOVERWRITESHFILE));
                             switch (ret)
                             {
                             case IDB_ALL:
@@ -6233,12 +6092,7 @@ BOOL DoMoveFile(COperation* op, HWND hProgressDlg, IWorkerObserver& observer, vo
 
                             int ret;
                             ret = IDCANCEL;
-                            char* data[4];
-                            data[0] = (char*)&ret;
-                            data[1] = LoadStr(IDS_ERROROVERWRITINGFILE);
-                            data[2] = op->TargetName;
-                            data[3] = GetErrorText(err2);
-                            ret = observer.AskFileError(data[1], data[2], data[3]);
+                            ret = observer.AskFileError(LoadStr(IDS_ERROROVERWRITINGFILE), op->TargetName, GetErrorText(err2));
                             switch (ret)
                             {
                             case IDRETRY:
@@ -6281,12 +6135,7 @@ BOOL DoMoveFile(COperation* op, HWND hProgressDlg, IWorkerObserver& observer, vo
                     {
                         int ret;
                         ret = IDCANCEL;
-                        char* data[4];
-                        data[0] = (char*)&ret;
-                        data[1] = op->SourceName;
-                        data[2] = op->TargetName;
-                        data[3] = GetErrorText(err);
-                        ret = observer.AskCannotMove(data[1], data[2], data[3], dir != FALSE);
+                        ret = observer.AskCannotMove(op->SourceName, op->TargetName, GetErrorText(err), dir != FALSE);
                         switch (ret)
                         {
                         case IDRETRY:
@@ -6343,12 +6192,7 @@ BOOL DoMoveFile(COperation* op, HWND hProgressDlg, IWorkerObserver& observer, vo
                         return TRUE;
 
                     int ret = IDCANCEL;
-                    char* data[4];
-                    data[0] = (char*)&ret;
-                    data[1] = LoadStr(IDS_ERRORDELETINGFILE);
-                    data[2] = op->SourceName;
-                    data[3] = GetErrorText(err);
-                    ret = observer.AskFileError(data[1], data[2], data[3]);
+                    ret = observer.AskFileError(LoadStr(IDS_ERRORDELETINGFILE), op->SourceName, GetErrorText(err));
                     switch (ret)
                     {
                     case IDRETRY:
@@ -6392,12 +6236,7 @@ BOOL DoDeleteFile(HWND hProgressDlg, IWorkerObserver& observer, char* name, cons
                         goto SKIP_DELETE;
 
                     int ret = IDCANCEL;
-                    char* data[4];
-                    data[0] = (char*)&ret;
-                    data[1] = LoadStr(IDS_CONFIRMSHFILEDELETE);
-                    data[2] = name;
-                    data[3] = LoadStr(IDS_DELETESHFILE);
-                    ret = observer.AskHiddenOrSystem(data[1], data[2], data[3]);
+                    ret = observer.AskHiddenOrSystem(LoadStr(IDS_CONFIRMSHFILEDELETE), name, LoadStr(IDS_DELETESHFILE));
                     switch (ret)
                     {
                     case IDB_ALL:
@@ -6510,12 +6349,7 @@ BOOL DoDeleteFile(HWND hProgressDlg, IWorkerObserver& observer, char* name, cons
 
             int ret;
             ret = IDCANCEL;
-            char* data[4];
-            data[0] = (char*)&ret;
-            data[1] = LoadStr(IDS_ERRORDELETINGFILE);
-            data[2] = name;
-            data[3] = GetErrorText(err);
-            ret = observer.AskFileError(data[1], data[2], data[3]);
+            ret = observer.AskFileError(LoadStr(IDS_ERRORDELETINGFILE), name, GetErrorText(err));
             switch (ret)
             {
             case IDRETRY:
@@ -6695,11 +6529,7 @@ BOOL DoCopyDirTime(HWND hProgressDlg, IWorkerObserver& observer, const char* tar
             ret = IDB_IGNORE;
         else
         {
-            char* data[4];
-            data[0] = (char*)&ret;
-            data[1] = (char*)targetNameCrFile;
-            data[2] = (char*)(DWORD_PTR)error;
-            ret = observer.AskCopyDirTimeError(data[1], data[2]);
+            ret = observer.AskCopyDirTimeError(targetNameCrFile, error);
         }
         switch (ret)
         {
@@ -6809,12 +6639,7 @@ BOOL DoCreateDir(HWND hProgressDlg, IWorkerObserver& observer, char* name, DWORD
                                     else
                                     {
                                         ret = IDCANCEL;
-                                        char* data[4];
-                                        data[0] = (char*)&ret;
-                                        data[1] = (char*)FALSE;
-                                        data[2] = name;
-                                        data[3] = (char*)(!script->IsCopyOperation);
-                                        ret = observer.AskEncryptionLoss((DWORD)(DWORD_PTR)data[1] != 0, data[2], (DWORD)(DWORD_PTR)data[3] != 0);
+                                        ret = observer.AskEncryptionLoss((DWORD)(DWORD_PTR)(char*)FALSE != 0, name, (DWORD)(DWORD_PTR)(char*)(!script->IsCopyOperation) != 0);
                                     }
                                     switch (ret)
                                     {
@@ -6874,12 +6699,7 @@ BOOL DoCreateDir(HWND hProgressDlg, IWorkerObserver& observer, char* name, DWORD
                             ret = IDB_IGNORE;
                         else
                         {
-                            char* data[4];
-                            data[0] = (char*)&ret;
-                            data[1] = name;
-                            data[2] = (char*)(DWORD_PTR)(newAttr & DISPLAYED_ATTRIBUTES);
-                            data[3] = (char*)(DWORD_PTR)(curAttrs == INVALID_FILE_ATTRIBUTES ? 0 : (curAttrs & DISPLAYED_ATTRIBUTES));
-                            ret = observer.AskSetAttrsError(data[1], (DWORD)(DWORD_PTR)data[2], (DWORD)(DWORD_PTR)data[3]);
+                            ret = observer.AskSetAttrsError(name, (DWORD)(DWORD_PTR)(char*)(DWORD_PTR)(newAttr & DISPLAYED_ATTRIBUTES), (DWORD)(DWORD_PTR)(char*)(DWORD_PTR)(curAttrs == INVALID_FILE_ATTRIBUTES ? 0 : (curAttrs & DISPLAYED_ATTRIBUTES)));
                         }
                         switch (ret)
                         {
@@ -6915,12 +6735,7 @@ BOOL DoCreateDir(HWND hProgressDlg, IWorkerObserver& observer, char* name, DWORD
                             ret = IDB_IGNORE;
                         else
                         {
-                            char* data[4];
-                            data[0] = (char*)&ret;
-                            data[1] = (char*)sourceDir;
-                            data[2] = name;
-                            data[3] = (char*)(DWORD_PTR)err2;
-                            ret = observer.AskCopyPermError(data[1], data[2], data[3]);
+                            ret = observer.AskCopyPermError((char*)sourceDir, name, (char*)(DWORD_PTR)err2);
                         }
                         switch (ret)
                         {
@@ -6961,13 +6776,7 @@ BOOL DoCreateDir(HWND hProgressDlg, IWorkerObserver& observer, char* name, DWORD
                             goto SKIP_CREATE_ERROR;
 
                         int ret = IDCANCEL;
-                        char* data[5];
-                        data[0] = (char*)&ret;
-                        data[1] = name;
-                        data[2] = tAttr;
-                        data[3] = (char*)sourceDir;
-                        data[4] = sAttr;
-                        ret = observer.AskADSOverwrite(data[1], data[2], data[3], data[4]);
+                        ret = observer.AskADSOverwrite(name, tAttr, (char*)sourceDir, sAttr);
                         switch (ret)
                         {
                         case IDB_ALL:
@@ -6996,12 +6805,7 @@ BOOL DoCreateDir(HWND hProgressDlg, IWorkerObserver& observer, char* name, DWORD
                     goto SKIP_CREATE_ERROR;
 
                 int ret = IDCANCEL;
-                char* data[4];
-                data[0] = (char*)&ret;
-                data[1] = LoadStr(IDS_ERRORCREATINGDIR);
-                data[2] = name;
-                data[3] = LoadStr(IDS_NAMEALREADYUSED);
-                ret = observer.AskFileError(data[1], data[2], data[3]);
+                ret = observer.AskFileError(LoadStr(IDS_ERRORCREATINGDIR), name, LoadStr(IDS_NAMEALREADYUSED));
                 switch (ret)
                 {
                 case IDRETRY:
@@ -7027,12 +6831,7 @@ BOOL DoCreateDir(HWND hProgressDlg, IWorkerObserver& observer, char* name, DWORD
 
             int ret;
             ret = IDCANCEL;
-            char* data[4];
-            data[0] = (char*)&ret;
-            data[1] = LoadStr(IDS_ERRORCREATINGDIR);
-            data[2] = name;
-            data[3] = GetErrorText(err);
-            ret = observer.AskFileError(data[1], data[2], data[3]);
+            ret = observer.AskFileError(LoadStr(IDS_ERRORCREATINGDIR), name, GetErrorText(err));
             switch (ret)
             {
             case IDRETRY:
@@ -7135,12 +6934,7 @@ BOOL DoDeleteDir(HWND hProgressDlg, IWorkerObserver& observer, char* name, const
             {
                 int ret;
                 ret = IDCANCEL;
-                char* data[4];
-                data[0] = (char*)&ret;
-                data[1] = LoadStr(IDS_ERRORDELETINGDIR);
-                data[2] = (char*)nameRmDir;
-                data[3] = GetErrorText(err);
-                ret = observer.AskFileError(data[1], data[2], data[3]);
+                ret = observer.AskFileError(LoadStr(IDS_ERRORDELETINGDIR), (char*)nameRmDir, GetErrorText(err));
                 switch (ret)
                 {
                 case IDRETRY:
@@ -7351,12 +7145,7 @@ BOOL DoDeleteDirLink(HWND hProgressDlg, IWorkerObserver& observer, char* name, c
 
             int ret;
             ret = IDCANCEL;
-            char* data[4];
-            data[0] = (char*)&ret;
-            data[1] = LoadStr(IDS_ERRORDELETINGDIRLINK);
-            data[2] = (char*)nameDelLink;
-            data[3] = GetErrorText(err);
-            ret = observer.AskFileError(data[1], data[2], data[3]);
+            ret = observer.AskFileError(LoadStr(IDS_ERRORDELETINGDIRLINK), (char*)nameDelLink, GetErrorText(err));
             switch (ret)
             {
             case IDRETRY:
@@ -7588,14 +7377,9 @@ CONVERT_AGAIN:
 
                                     int ret;
                                     ret = IDCANCEL;
-                                    char* data[4];
-                                    data[0] = (char*)&ret;
-                                    data[1] = LoadStr(IDS_ERRORWRITINGFILE);
-                                    data[2] = tmpFileName;
                                     if (hTarget != NULL && err == NO_ERROR && targetIterator - targetBuffer != (int)written)
                                         err = ERROR_DISK_FULL;
-                                    data[3] = GetErrorText(err);
-                                    ret = observer.AskFileError(data[1], data[2], data[3]);
+                                    ret = observer.AskFileError(LoadStr(IDS_ERRORWRITINGFILE), tmpFileName, GetErrorText(err));
                                     switch (ret)
                                     {
                                     case IDRETRY:
@@ -7651,12 +7435,7 @@ CONVERT_AGAIN:
                                     goto SKIP_CONVERT;
 
                                 int ret = IDCANCEL;
-                                char* data[4];
-                                data[0] = (char*)&ret;
-                                data[1] = LoadStr(IDS_ERRORREADINGFILE);
-                                data[2] = name;
-                                data[3] = GetErrorText(err);
-                                ret = observer.AskFileError(data[1], data[2], data[3]);
+                                ret = observer.AskFileError(LoadStr(IDS_ERRORREADINGFILE), name, GetErrorText(err));
                                 switch (ret)
                                 {
                                 case IDRETRY:
@@ -7704,12 +7483,7 @@ CONVERT_AGAIN:
                                             return TRUE;
 
                                         int ret = IDCANCEL;
-                                        char* data[4];
-                                        data[0] = (char*)&ret;
-                                        data[1] = tmpFileName;
-                                        data[2] = name;
-                                        data[3] = GetErrorText(err);
-                                        ret = observer.AskCannotMove(data[1], data[2], data[3], false);
+                                        ret = observer.AskCannotMove(tmpFileName, name, GetErrorText(err), false);
                                         switch (ret)
                                         {
                                         case IDRETRY:
@@ -7745,12 +7519,7 @@ CONVERT_AGAIN:
 
                                 int ret;
                                 ret = IDCANCEL;
-                                char* data[4];
-                                data[0] = (char*)&ret;
-                                data[1] = LoadStr(IDS_ERROROVERWRITINGFILE);
-                                data[2] = name;
-                                data[3] = GetErrorText(err);
-                                ret = observer.AskFileError(data[1], data[2], data[3]);
+                                ret = observer.AskFileError(LoadStr(IDS_ERROROVERWRITINGFILE), name, GetErrorText(err));
                                 switch (ret)
                                 {
                                 case IDRETRY:
@@ -7809,12 +7578,7 @@ CONVERT_AGAIN:
 
                     int ret;
                     ret = IDCANCEL;
-                    char* data[4];
-                    data[0] = (char*)&ret;
-                    data[1] = LoadStr(IDS_ERRORCREATINGTMPFILE);
-                    data[2] = fakeName;
-                    data[3] = GetErrorText(err);
-                    ret = observer.AskFileError(data[1], data[2], data[3]);
+                    ret = observer.AskFileError(LoadStr(IDS_ERRORCREATINGTMPFILE), fakeName, GetErrorText(err));
                     switch (ret)
                     {
                     case IDRETRY:
@@ -7857,12 +7621,7 @@ CONVERT_AGAIN:
 
             int ret;
             ret = IDCANCEL;
-            char* data[4];
-            data[0] = (char*)&ret;
-            data[1] = LoadStr(IDS_ERROROPENINGFILE);
-            data[2] = name;
-            data[3] = GetErrorText(err);
-            ret = observer.AskFileError(data[1], data[2], data[3]);
+            ret = observer.AskFileError(LoadStr(IDS_ERROROPENINGFILE), name, GetErrorText(err));
             switch (ret)
             {
             case IDRETRY:
@@ -7958,11 +7717,7 @@ BOOL DoChangeAttrs(HWND hProgressDlg, IWorkerObserver& observer, char* name, con
                 changeCompression = FALSE;
             if (showEncryptErr)
                 changeEncryption = FALSE;
-            char* data[3];
-            data[0] = LoadStr((showCompressErr && (attrs & FILE_ATTRIBUTE_COMPRESSED) || !showEncryptErr) ? IDS_ERRORCOMPRESSING : IDS_ERRORENCRYPTING);
-            data[1] = name;
-            data[2] = LoadStr((showCompressErr && (attrs & FILE_ATTRIBUTE_COMPRESSED) || !showEncryptErr) ? IDS_COMPRNOTSUPPORTED : IDS_ENCRYPNOTSUPPORTED);
-            observer.NotifyError(data[0], data[1], data[2]);
+            observer.NotifyError(LoadStr((showCompressErr && (attrs & FILE_ATTRIBUTE_COMPRESSED) || !showEncryptErr) ? IDS_ERRORCOMPRESSING : IDS_ERRORENCRYPTING), name, LoadStr((showCompressErr && (attrs & FILE_ATTRIBUTE_COMPRESSED) || !showEncryptErr) ? IDS_COMPRNOTSUPPORTED : IDS_ENCRYPNOTSUPPORTED));
             error = ERROR_SUCCESS;
         }
         if (error == ERROR_SUCCESS && SalLPSetFileAttributes(nameSetAttrs, attrs))
@@ -8021,12 +7776,7 @@ BOOL DoChangeAttrs(HWND hProgressDlg, IWorkerObserver& observer, char* name, con
 
             int ret;
             ret = IDCANCEL;
-            char* data[4];
-            data[0] = (char*)&ret;
-            data[1] = errTitle;
-            data[2] = name;
-            data[3] = GetErrorText(error);
-            ret = observer.AskFileError(data[1], data[2], data[3]);
+            ret = observer.AskFileError(errTitle, name, GetErrorText(error));
             switch (ret)
             {
             case IDRETRY:

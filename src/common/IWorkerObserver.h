@@ -107,7 +107,7 @@ public:
 
     // --- Error copying directory time (message ID 11) ---
     // Returns IDRETRY, IDB_IGNORE, IDB_ALL (ignore all), IDCANCEL.
-    virtual int AskCopyDirTimeError(const char* dirName, const char* errorText) = 0;
+    virtual int AskCopyDirTimeError(const char* dirName, DWORD errorCode) = 0;
 
     // --- Confirm encryption loss (message ID 12) ---
     // Returns IDYES, IDB_ALL (yes to all), IDB_SKIP, IDB_SKIPALL, IDCANCEL.
