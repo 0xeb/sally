@@ -17,14 +17,14 @@
 #endif //INSIDE_SETUP
 
 extern HINSTANCE HInstance;
-extern char ModulePath[MAX_PATH];
+extern char ModulePath[SETUP_MAX_PATH];
 
-char ModuleName[MAX_PATH] = {0};
+char ModuleName[SETUP_MAX_PATH] = {0};
 #ifndef INSIDE_SETUP
 HINSTANCE HInstance = NULL;
-char ModulePath[MAX_PATH] = {0};
+char ModulePath[SETUP_MAX_PATH] = {0};
 #endif //INSIDE_SETUP
-char RemoveInfFileName[MAX_PATH] = {0};
+char RemoveInfFileName[SETUP_MAX_PATH] = {0};
 char RemoveAppName[1024] = {0};
 char RemoveRunProgramQuiet[1024] = {0};
 //char       CheckRunningApps[1024] = {0};
@@ -1233,11 +1233,11 @@ BOOL LookupForRunningApps(const char* apps)
     EnumProcesses();
     while (*line != 0)
     {
-        char shortName[MAX_PATH];
+        char shortName[SETUP_MAX_PATH];
         int len = lstrlen(line);
 
         // when conversion to short name fails, ignore item
-        if (GetShortPathName(line, shortName, MAX_PATH) != 0)
+        if (GetShortPathName(line, shortName, SETUP_MAX_PATH) != 0)
         {
             BOOL again;
             do
@@ -1421,8 +1421,8 @@ BOOL DoRemove(BOOL* needRestart)
 BOOL CleanUp()
 {
     HANDLE hFile;
-    char tempPath[MAX_PATH];
-    char fileName[MAX_PATH];
+    char tempPath[SETUP_MAX_PATH];
+    char fileName[SETUP_MAX_PATH];
     const char* nameOnly;
     DWORD written;
     STARTUPINFO si = {0};
@@ -1432,7 +1432,7 @@ BOOL CleanUp()
     int ret, i;
     BOOL ok = TRUE;
 
-    if (GetTempPath(MAX_PATH, tempPath) == 0)
+    if (GetTempPath(SETUP_MAX_PATH, tempPath) == 0)
         return FALSE;
 
     if (GetTempFileName(tempPath, "rmb", 1, fileName) == 0)
@@ -1655,15 +1655,15 @@ void RunRemoveExeAsAdminIfNeeded()
     if (!IsUserAdmin())
     {
         {
-            char removeExe[MAX_PATH];
-            char params[MAX_PATH];
+            char removeExe[SETUP_MAX_PATH];
+            char params[SETUP_MAX_PATH];
             DWORD exitCode;
             char* p;
             BOOL runAsForbidden;
             int len;
 
             char* cmdline = SkipExeName(GetCommandLine());
-            lstrcpyn(params, cmdline, MAX_PATH - 3);
+            lstrcpyn(params, cmdline, SETUP_MAX_PATH - 3);
             len = lstrlen(params);
             while (len > 0 && (params[len - 1] == ' ' || params[len - 1] == '\t'))
                 len--;
@@ -1685,7 +1685,7 @@ void RunRemoveExeAsAdminIfNeeded()
             }
 
             exitCode = 0;
-            if (!runAsForbidden && GetModuleFileName(NULL, removeExe, MAX_PATH))
+            if (!runAsForbidden && GetModuleFileName(NULL, removeExe, SETUP_MAX_PATH))
             {
                 MessageBox(NULL, LoadStr(IDS_REMOVE_XPRUNASADMIN), LoadStr(IDS_REMOVE_TITLE), MB_OK | MB_ICONINFORMATION);
                 if (RunAsAdminAndWait(NULL, removeExe, params, &exitCode))
@@ -1758,7 +1758,7 @@ WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int nCmdS
 
     OleInitialize(NULL);
 
-    GetModuleFileName(NULL, ModuleName, MAX_PATH);
+    GetModuleFileName(NULL, ModuleName, SETUP_MAX_PATH);
 
     lstrcpy(ModulePath, ModuleName);
     *(strrchr(ModulePath, '\\')) = '\0'; // Strip setup.exe off path

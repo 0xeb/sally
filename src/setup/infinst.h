@@ -116,19 +116,19 @@ extern HINSTANCE HInstance;   // current instance
 extern INSTALLINFO SetupInfo; // a structure containing the review information
 extern HWND HWizardDialog;
 extern HWND HProgressDialog;
-extern char InfFileName[MAX_PATH];
-extern char ModulePath[MAX_PATH];
-extern char WindowsDirectory[MAX_PATH];
-extern char SystemDirectory[MAX_PATH];
-extern char ProgramFilesDirectory[MAX_PATH];
+extern char InfFileName[SETUP_MAX_PATH];
+extern char ModulePath[SETUP_MAX_PATH];
+extern char WindowsDirectory[SETUP_MAX_PATH];
+extern char SystemDirectory[SETUP_MAX_PATH];
+extern char ProgramFilesDirectory[SETUP_MAX_PATH];
 
-extern char DesktopDirectory[MAX_PATH];
-extern char StartMenuDirectory[MAX_PATH];
-extern char StartMenuProgramDirectory[MAX_PATH];
-extern char QuickLaunchDirectory[MAX_PATH];
+extern char DesktopDirectory[SETUP_MAX_PATH];
+extern char StartMenuDirectory[SETUP_MAX_PATH];
+extern char StartMenuProgramDirectory[SETUP_MAX_PATH];
+extern char QuickLaunchDirectory[SETUP_MAX_PATH];
 
 extern BOOL SfxDirectoriesValid;
-extern char SfxDirectories[7][MAX_PATH];
+extern char SfxDirectories[7][SETUP_MAX_PATH];
 
 extern HWND SfxDlg;   // SFX7ZIP window that launched this setup.exe (before setup.exe exits we show and activate it so the installed readme and Salam can be launched from it)
 extern BOOL RunBySfx; // TRUE if setup.exe was started with the /runbysfx parameter
@@ -149,7 +149,7 @@ extern DWORD CCMajorVerNeed;
 extern DWORD CCMinorVerNeed;
 
 // options from the command line
-extern char CmdLineDestination[MAX_PATH]; // if the string is not empty, it specifies the target directory (otherwise the default is used)
+extern char CmdLineDestination[SETUP_MAX_PATH]; // if the string is not empty, it specifies the target directory (otherwise the default is used)
 
 extern char PreviousVerOfFileToIncrementContent[10000]; // contents of the just-uninstalled plugins.ver
 

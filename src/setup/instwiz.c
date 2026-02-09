@@ -582,10 +582,10 @@ DestinationDlgProc(HWND hDlg, UINT uMsg, WPARAM wParam, LPARAM lParam)
     {
         if (LOWORD(wParam == IDC_CDL_BROWSE))
         {
-            char buff[MAX_PATH];
+            char buff[SETUP_MAX_PATH];
             char* s;
-            GetDlgItemText(hDlg, IDC_CDL_PATH, buff, MAX_PATH);
-            SendDlgItemMessage(hDlg, IDC_CDL_PATH, WM_GETTEXT, MAX_PATH, (LPARAM)buff);
+            GetDlgItemText(hDlg, IDC_CDL_PATH, buff, SETUP_MAX_PATH);
+            SendDlgItemMessage(hDlg, IDC_CDL_PATH, WM_GETTEXT, SETUP_MAX_PATH, (LPARAM)buff);
 
             s = LoadStr(IDS_CHOOSEDIR);
             if (GetTargetDirectory(hDlg, s, s, buff, FALSE, buff))
@@ -618,11 +618,11 @@ DestinationDlgProc(HWND hDlg, UINT uMsg, WPARAM wParam, LPARAM lParam)
                 BOOL exist;
                 //            BOOL bResult;
                 int ret;
-                char buff[MAX_PATH];
-                char curDir[MAX_PATH];
-                char driveSpec[MAX_PATH];
-                char backupDefaultDirectory[MAX_PATH];
-                char backupCreateDirectory[MAX_PATH];
+                char buff[SETUP_MAX_PATH];
+                char curDir[SETUP_MAX_PATH];
+                char driveSpec[SETUP_MAX_PATH];
+                char backupDefaultDirectory[SETUP_MAX_PATH];
+                char backupCreateDirectory[SETUP_MAX_PATH];
 
                 DWORD bytesPerSector;
                 DWORD sectorsPerCluster;
@@ -632,11 +632,11 @@ DestinationDlgProc(HWND hDlg, UINT uMsg, WPARAM wParam, LPARAM lParam)
                 unsigned __int64 requiredSpace;
 
                 // grab the path from the edit box
-                SendDlgItemMessage(hDlg, IDC_CDL_PATH, WM_GETTEXT, MAX_PATH, (LPARAM)buff);
+                SendDlgItemMessage(hDlg, IDC_CDL_PATH, WM_GETTEXT, SETUP_MAX_PATH, (LPARAM)buff);
 
                 if (SetupInfo.EnsureSalamander25Dir[0] != 0)
                 {
-                    char langPath[MAX_PATH];
+                    char langPath[SETUP_MAX_PATH];
                     char* end;
                     lstrcpy(langPath, buff);
                     end = langPath + lstrlen(langPath);
@@ -647,7 +647,7 @@ DestinationDlgProc(HWND hDlg, UINT uMsg, WPARAM wParam, LPARAM lParam)
                     }
                     lstrcpy(end, "lang");
 
-                    GetCurrentDirectory(MAX_PATH, curDir);
+                    GetCurrentDirectory(SETUP_MAX_PATH, curDir);
                     exist = SetCurrentDirectory(langPath);
                     SetCurrentDirectory(curDir);
 
@@ -661,7 +661,7 @@ DestinationDlgProc(HWND hDlg, UINT uMsg, WPARAM wParam, LPARAM lParam)
 
                 if (lstrcmp(SetupInfo.CreateDirectory, buff) != 0)
                 {
-                    GetCurrentDirectory(MAX_PATH, curDir);
+                    GetCurrentDirectory(SETUP_MAX_PATH, curDir);
                     exist = SetCurrentDirectory(buff);
                     SetCurrentDirectory(curDir);
 
@@ -769,10 +769,10 @@ void GetFoldersPaths()
 {
     if (SfxDirectoriesValid) // Vista or later: take the paths stored in the non-elevated process (SFX); when elevating we might switch to the admin user and the paths would differ from what we need
     {
-        lstrcpyn(DesktopDirectory, SetupInfo.CommonFolders ? SfxDirectories[0] : SfxDirectories[1], MAX_PATH);
-        lstrcpyn(StartMenuDirectory, SetupInfo.CommonFolders ? SfxDirectories[2] : SfxDirectories[3], MAX_PATH);
-        lstrcpyn(StartMenuProgramDirectory, SetupInfo.CommonFolders ? SfxDirectories[4] : SfxDirectories[5], MAX_PATH);
-        lstrcpyn(QuickLaunchDirectory, SfxDirectories[6], MAX_PATH);
+        lstrcpyn(DesktopDirectory, SetupInfo.CommonFolders ? SfxDirectories[0] : SfxDirectories[1], SETUP_MAX_PATH);
+        lstrcpyn(StartMenuDirectory, SetupInfo.CommonFolders ? SfxDirectories[2] : SfxDirectories[3], SETUP_MAX_PATH);
+        lstrcpyn(StartMenuProgramDirectory, SetupInfo.CommonFolders ? SfxDirectories[4] : SfxDirectories[5], SETUP_MAX_PATH);
+        lstrcpyn(QuickLaunchDirectory, SfxDirectories[6], SETUP_MAX_PATH);
     }
     else
     {

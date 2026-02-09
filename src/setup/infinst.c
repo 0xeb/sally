@@ -19,7 +19,7 @@ INSTALLINFO SetupInfo = {0}; // a structure containing the review information
 HINSTANCE HInstance = NULL;
 
 BOOL SfxDirectoriesValid = FALSE;
-char SfxDirectories[7][MAX_PATH];
+char SfxDirectories[7][SETUP_MAX_PATH];
 
 HWND SfxDlg = NULL;    // SFX7ZIP window that launched this setup.exe (before setup.exe exits we show and activate it so the installed readme and Salam can be launched from it)
 BOOL RunBySfx = FALSE; // TRUE if setup.exe was started with the /runbysfx parameter
@@ -235,7 +235,7 @@ BOOL GetStringFromDLL(const char* dllName, int resID, char* buff, int buffSize)
 
 void ExpandPath(char* path)
 {
-    char buff[MAX_PATH];
+    char buff[SETUP_MAX_PATH];
     char* src;
     char* dst;
     const char* mui = NULL;
@@ -387,13 +387,13 @@ BOOL GetCmdLine(char* buf, int size, char* argv[], int* argCount, const char* cm
 
 BOOL LoadSfxDirectories(HANDLE* fileOut, BOOL openAndPrepareForWrite)
 {
-    char name[MAX_PATH];
+    char name[SETUP_MAX_PATH];
     HANDLE file;
 
     if (!openAndPrepareForWrite)
         SfxDirectoriesValid = FALSE;
 
-    GetModuleFileName(NULL, name, MAX_PATH);
+    GetModuleFileName(NULL, name, SETUP_MAX_PATH);
     lstrcpy(strrchr(name, '\\'), "\\params.txt");
 
     file = CreateFile(name, GENERIC_READ | (openAndPrepareForWrite ? GENERIC_WRITE : 0),
@@ -439,7 +439,7 @@ BOOL LoadSfxDirectories(HANDLE* fileOut, BOOL openAndPrepareForWrite)
                         break;
                     }
                     if (index < 7 && !openAndPrepareForWrite)
-                        lstrcpyn(SfxDirectories[index], line, MAX_PATH);
+                        lstrcpyn(SfxDirectories[index], line, SETUP_MAX_PATH);
                     index++;
 
                     while (s < end && (*s == '\r' || *s == '\n'))
@@ -506,11 +506,11 @@ DWORD Hex2DWORD(const char* s)
 
 BOOL GetCmdLineOptions(const char* cmdLine)
 {
-    char buf[MAX_PATH];
+    char buf[SETUP_MAX_PATH];
     char* argv[30];
     int p = 30; // number of elements in the argv array
     BOOL ret = TRUE;
-    if (GetCmdLine(buf, MAX_PATH, argv, &p, cmdLine))
+    if (GetCmdLine(buf, SETUP_MAX_PATH, argv, &p, cmdLine))
     {
         int i;
         for (i = 0; i < p; i++)
@@ -538,7 +538,7 @@ BOOL GetCmdLineOptions(const char* cmdLine)
             {
                 if (i + 1 < p)
                 {
-                    lstrcpyn(CmdLineDestination, argv[i + 1], MAX_PATH);
+                    lstrcpyn(CmdLineDestination, argv[i + 1], SETUP_MAX_PATH);
                     i++;
                     continue;
                 }
@@ -624,7 +624,7 @@ WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int nCmdS
     SetupInfo.ViewReadme = FALSE;
     SetupInfo.Silent = FALSE;
 
-    GetModuleFileName(NULL, ModulePath, MAX_PATH);
+    GetModuleFileName(NULL, ModulePath, SETUP_MAX_PATH);
     *(strrchr(ModulePath, '\\')) = '\0'; // Strip setup.exe off path
     GetFolderPath(CSIDL_WINDOWS, WindowsDirectory);
     GetFolderPath(CSIDL_SYSTEM, SystemDirectory);

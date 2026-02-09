@@ -192,7 +192,11 @@ extern "C"
 #define SALSHEXT_COPY 1
 #define SALSHEXT_MOVE 2
 
-// shared-memory structure
+// Shared-memory structure exchanged between Salamander (any bitness) and
+// the shell-extension DLL loaded into Explorer.  Both sides map the same
+// named section, so every field MUST have a fixed, compile-time size.
+// Do NOT replace char[N] members with std::string, std::wstring, or any
+// other dynamically-sized type — that would corrupt the shared mapping.
 #pragma pack(push)
 #pragma pack(4)
     struct CSalShExtSharedMem
@@ -201,13 +205,13 @@ extern "C"
 
         // drag-and-drop section
         BOOL DoDragDropFromSalamander;      // TRUE when drag & drop originated in Salamander (only with the "fake" directory)
-        char DragDropFakeDirName[MAX_PATH]; // full name of the "fake" directory used for drag & drop
+        char DragDropFakeDirName[MAX_PATH]; // full name of the "fake" directory used for drag & drop (fixed-size: shared memory)
         BOOL DropDone;                      // TRUE once the drop occurred; TargetPath and Operation contain valid values
 
         // copy/cut + paste section
         BOOL DoPasteFromSalamander;       // TRUE when the clipboard data object comes from Salamander (only with the "fake" directory)
         DWORD ClipDataObjLastGetDataTime; // timestamp of the last GetData call on the clipboard data object
-        char PasteFakeDirName[MAX_PATH];  // full name of the "fake" directory used for paste
+        char PasteFakeDirName[MAX_PATH];  // full name of the "fake" directory used for paste (fixed-size: shared memory)
         DWORD SalamanderMainWndPID;       // process ID of Salamander's main window that placed the data object on the clipboard (SalamExt must request the paste operation from it)
         DWORD SalamanderMainWndTID;       // thread ID of the same main window (SalamExt must request the paste operation from it)
         UINT64 SalamanderMainWnd;         // handle of the main window that placed the data object on the clipboard; HWND is 64-bit on x64 (even if only the lower 32 bits are used), and the x86 build zeroes the upper 32 bits
@@ -220,7 +224,7 @@ extern "C"
         char ArcUnableToPaste2[300];      // prepared copy-hook message for a paste failure (see IDS_ARCUNABLETOPASTE2)
 
         // resulting operation
-        char TargetPath[2 * MAX_PATH]; // destination path (where to unpack files/directories from an archive or copy them from the filesystem)
+        char TargetPath[2 * MAX_PATH]; // destination path (fixed-size: shared memory)
         int Operation;                 // SALSHEXT_COPY or SALSHEXT_MOVE (or SALSHEXT_NONE immediately after the structure is initialized)
     };
     typedef struct CSalShExtSharedMem CSalShExtSharedMem;

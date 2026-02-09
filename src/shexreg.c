@@ -446,27 +446,27 @@ BOOL CheckVersionOfDLL(const char* name)
 BOOL SECRegisterToRegistry(const char* shellExtensionPath, BOOL doNotLoadDLL, REGSAM regView)
 {
     HKEY hKey;
-    char key[MAX_PATH];
-    char shellExtIID[MAX_PATH];
-    char shellExtPath[MAX_PATH];
+    char key[32768];
+    char shellExtIID[32768];
+    char shellExtPath[32768];
     char* str;
-    WCHAR buff2[MAX_PATH];
+    WCHAR buff2[32768];
     BOOL registered;
     HKEY classesKey;
 
     if (!doNotLoadDLL && !CheckVersionOfDLL(shellExtensionPath))
         return FALSE;
 
-    StringFromGUID2(&CLSID_ShellExtension, buff2, MAX_PATH);
+    StringFromGUID2(&CLSID_ShellExtension, buff2, 32768);
     WideCharToMultiByte(CP_ACP,
                         0,
                         buff2,
                         -1,
                         shellExtIID,
-                        MAX_PATH,
+                        32768,
                         NULL,
                         NULL);
-    shellExtIID[MAX_PATH - 1] = 0;
+    shellExtIID[32768 - 1] = 0;
 
     // zjistime jestli uz je nase shell extensiona registrovana, pripadne kde je jeji DLL a jestli je to spravna verze
     registered = FALSE;
@@ -475,7 +475,7 @@ BOOL SECRegisterToRegistry(const char* shellExtensionPath, BOOL doNotLoadDLL, RE
     lstrcat(key, "\\InProcServer32");
     if (NOHANDLES(RegOpenKeyEx(HKEY_CLASSES_ROOT, key, 0, KEY_READ | regView, &hKey)) == ERROR_SUCCESS)
     {
-        if (MyGetValue(hKey, NULL /* default value */, REG_SZ, shellExtPath, MAX_PATH))
+        if (MyGetValue(hKey, NULL /* default value */, REG_SZ, shellExtPath, 32768))
         {
             if (doNotLoadDLL && FileExists(shellExtPath) ||       // kdyz ho nemuzu loadit, aspon overim, ze existuje
                 !doNotLoadDLL && CheckVersionOfDLL(shellExtPath)) // jinak ho naloadim a zjistim od nej jeho verzi
@@ -592,7 +592,7 @@ BOOL SECRegisterToRegistry(const char* shellExtensionPath, BOOL doNotLoadDLL, RE
 BOOL SECSaveRegistry()
 {
     HKEY hKey;
-    char key[MAX_PATH];
+    char key[32768];
     DWORD bufferSize;
     DWORD gettedType;
 

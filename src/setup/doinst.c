@@ -62,24 +62,24 @@ const char* INF_WERLOCALDUMPS = "WERLocalDumps";
 
 const char* INF_FILENAME = "\\setup.inf";
 
-char ModulePath[MAX_PATH] = {0};
-char WindowsDirectory[MAX_PATH] = {0};
-char SystemDirectory[MAX_PATH] = {0};
-char ProgramFilesDirectory[MAX_PATH] = {0};
+char ModulePath[SETUP_MAX_PATH] = {0};
+char WindowsDirectory[SETUP_MAX_PATH] = {0};
+char SystemDirectory[SETUP_MAX_PATH] = {0};
+char ProgramFilesDirectory[SETUP_MAX_PATH] = {0};
 
-char DesktopDirectory[MAX_PATH] = {0};
-char StartMenuDirectory[MAX_PATH] = {0};
-char StartMenuProgramDirectory[MAX_PATH] = {0};
-char QuickLaunchDirectory[MAX_PATH] = {0};
+char DesktopDirectory[SETUP_MAX_PATH] = {0};
+char StartMenuDirectory[SETUP_MAX_PATH] = {0};
+char StartMenuProgramDirectory[SETUP_MAX_PATH] = {0};
+char QuickLaunchDirectory[SETUP_MAX_PATH] = {0};
 
-char InfFileName[MAX_PATH];
+char InfFileName[SETUP_MAX_PATH];
 
 DWORD CCMajorVer = 0;
 DWORD CCMinorVer = 0;
 DWORD CCMajorVerNeed = 0;
 DWORD CCMinorVerNeed = 0;
 
-char CmdLineDestination[MAX_PATH] = {0};
+char CmdLineDestination[SETUP_MAX_PATH] = {0};
 
 BOOL ContainsPathUpgradableVersion(const char* path);
 BOOL IncrementFileContent();
@@ -1406,9 +1406,8 @@ int GetSLGNameLen(const char* buff)
 void ExtractCopySection()
 {
     char* line;
-    char src[MAX_PATH];
-    char dst[MAX_PATH];
-    //char size[100];
+    char src[SETUP_MAX_PATH];
+    char dst[SETUP_MAX_PATH];
     char flags[100];
     char* from;
     char* to;
@@ -1602,9 +1601,9 @@ BOOL CreateShortcuts()
 {
     HRESULT hres;
     char* line;
-    char src[MAX_PATH];
-    char dst[MAX_PATH];
-    char des[MAX_PATH];
+    char src[SETUP_MAX_PATH];
+    char dst[SETUP_MAX_PATH];
+    char des[SETUP_MAX_PATH];
 
     if (!SetupInfo.DesktopPresent && !SetupInfo.StartMenuPresent)
         return TRUE;
@@ -1644,7 +1643,7 @@ BOOL CreateShortcuts()
             if (*end == ',')
                 end++;
 
-            lstrcpyn(des, end, MAX_PATH);
+            lstrcpyn(des, end, SETUP_MAX_PATH);
 
             ExpandPath(src);
             ExpandPath(dst);
@@ -1694,7 +1693,7 @@ void ExtractCreateDirsSection()
 BOOL CreateDirs()
 {
     char* line;
-    char dir[MAX_PATH];
+    char dir[SETUP_MAX_PATH];
 
     line = SetupInfo.CreateDirsSection;
     while (*line != 0)
@@ -1931,8 +1930,8 @@ BOOL DelFiles()
         int len = lstrlen(line);
         if (len > 0)
         {
-            char buff[MAX_PATH];
-            lstrcpyn(buff, line, MAX_PATH);
+            char buff[SETUP_MAX_PATH];
+            lstrcpyn(buff, line, SETUP_MAX_PATH);
             ExpandPath(buff);
             DeleteFile(buff);
         }
@@ -1957,8 +1956,8 @@ BOOL DelEmptyDirs()
         int len = lstrlen(line);
         if (len > 0)
         {
-            char buff[MAX_PATH];
-            lstrcpyn(buff, line, MAX_PATH);
+            char buff[SETUP_MAX_PATH];
+            lstrcpyn(buff, line, SETUP_MAX_PATH);
             ExpandPath(buff);
             RemoveDirectory(buff);
         }
@@ -1997,7 +1996,7 @@ BOOL AddRegistryValues()
     char valueName[MAX_PATH];
     char type[100];
     DWORD typeNum;
-    char value[MAX_PATH];
+    char value[SETUP_MAX_PATH];
     char log[1024];
 
     SetupInfo.TmpSection[0] = 0;
@@ -2207,7 +2206,7 @@ BOOL SaveLastDirectory()
 {
     char root[MAX_PATH];
     char key[MAX_PATH];
-    char value[MAX_PATH];
+    char value[SETUP_MAX_PATH];
     HKEY hRoot;
     HKEY hKey;
     char* begin;
@@ -2259,7 +2258,7 @@ BOOL LoadLastDirectory()
     char root[MAX_PATH];
     char key[MAX_PATH];
     char* keyLastComponent;
-    char value[MAX_PATH];
+    char value[SETUP_MAX_PATH];
     HKEY hRoot;
     HKEY hKey;
     char* begin;
@@ -2312,7 +2311,7 @@ BOOL LoadLastDirectory()
         {
             // and try to read the REG_SZ string "LastDirectory"
             dwType = REG_SZ; // we support only type 1
-            dwDataSize = MAX_PATH;
+            dwDataSize = SETUP_MAX_PATH;
             ret = RegQueryValueEx(hKey, VALUE_LAST_DIRECTORY, 0, &dwType, value, &dwDataSize);
             RegCloseKey(hKey);
             if (ret == ERROR_SUCCESS && dwType == REG_SZ && value[0] != 0)
@@ -2558,7 +2557,7 @@ BOOL DoGetRegistryVarSectionLine(char* line)
     char root[MAX_PATH];
     char key[MAX_PATH];
     char valueName[MAX_PATH];
-    char value[MAX_PATH];
+    char value[SETUP_MAX_PATH];
     char error[1024];
     char* begin;
     char* end;
@@ -2614,7 +2613,7 @@ BOOL DoGetRegistryVarSectionLine(char* line)
     if (ret == ERROR_SUCCESS)
     {
         dwType = REG_SZ; // we support only type 1
-        dwDataSize = MAX_PATH;
+        dwDataSize = SETUP_MAX_PATH;
         ret = RegQueryValueEx(hKey, valueName, 0, &dwType, value, &dwDataSize);
         RegCloseKey(hKey);
         if (ret == ERROR_SUCCESS)
@@ -2665,8 +2664,8 @@ BOOL DoGetRegistryVarSection()
 BOOL FindConflictWithAnotherVersion(BOOL* sameOrOlderVersion, BOOL* sameVersion, /*BOOL *sameOrOlderVersionIgnoringBuild, BOOL *sameVersionIgnoringBuild, */ BOOL* foundRemoveLog)
 {
     int i;
-    char src[MAX_PATH];
-    char dst[MAX_PATH];
+    char src[SETUP_MAX_PATH];
+    char dst[SETUP_MAX_PATH];
     char* from;
     char* to;
 
@@ -2730,7 +2729,7 @@ BOOL FindConflictWithAnotherVersion(BOOL* sameOrOlderVersion, BOOL* sameVersion,
 
                     if (foundRemoveLog != NULL)
                     {
-                        char removeLog[MAX_PATH];
+                        char removeLog[SETUP_MAX_PATH];
                         DWORD attrs;
                         lstrcpy(removeLog, SetupInfo.SaveRemoveLog);
                         ExpandPath(removeLog);
@@ -2756,7 +2755,7 @@ BOOL FindConflictWithAnotherVersion(BOOL* sameOrOlderVersion, BOOL* sameVersion,
 // checks the given path for "salamand.exe" and "remove.rlg" -- two files required for a potential upgrade
 BOOL ContainsPathUpgradableVersion(const char* path)
 {
-    char backupDefaultDirectory[MAX_PATH];
+    char backupDefaultDirectory[SETUP_MAX_PATH];
     BOOL foundAnotherEXEVersion;
     BOOL foundRemoveLog;
     BOOL sameOrOlderVersion;
@@ -2796,8 +2795,8 @@ BOOL DoInstallation()
 {
     int progress = 0;
     int i;
-    char src[MAX_PATH];
-    char dst[MAX_PATH];
+    char src[SETUP_MAX_PATH];
+    char dst[SETUP_MAX_PATH];
     char* from;
     char* to;
     int options;
@@ -2840,7 +2839,7 @@ BOOL DoInstallation()
 
     for (i = 0; i < SetupInfo.CopyCount; i++)
     {
-        char dir[MAX_PATH];
+        char dir[SETUP_MAX_PATH];
         char* iter;
         DWORD flags;
 

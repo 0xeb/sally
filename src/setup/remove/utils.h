@@ -4,6 +4,9 @@
 
 #pragma once
 
+// Long-path-safe buffer size for path variables (replaces MAX_PATH where safe)
+#define SETUP_MAX_PATH 32768
+
 void InitUtils();
 
 int StrICmp(const char* s1, const char* s2);
