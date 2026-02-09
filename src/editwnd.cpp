@@ -1014,7 +1014,7 @@ private:
     CEditLine* EditLine;              // edit line we operate on
     int EditWidth;
     int EditHeight;
-    char* TextBuff;
+    std::string TextBuff;
     int TextLen;
     int OldIsertMarkX;
 
@@ -1026,17 +1026,15 @@ public:
         ForbiddenDataObject = NULL;
         EditLine = editLine;
         OldIsertMarkX = -1;
-        TextBuff = NULL;
         UseUnicode = TRUE;
     }
 
     virtual ~CEditDropTarget()
     {
-        if (TextBuff != NULL)
+        if (!TextBuff.empty())
         {
             TRACE_E("~CEditDropTarget(): unexpected situation: TextBuff != NULL");
-            free(TextBuff);
-            TextBuff = NULL;
+            TextBuff.clear();
         }
         if (RefCount != 0)
             TRACE_E("Preliminary destruction of object!");
@@ -1078,7 +1076,7 @@ public:
         p.x = pt.x;
         p.y = pt.y;
         ScreenToClient(EditLine->HWindow, &p);
-        if (TextBuff != NULL && p.x >= 0 && p.x <= EditWidth && p.y >= 0 && p.y <= EditHeight)
+        if (!TextBuff.empty() && p.x >= 0 && p.x <= EditWidth && p.y >= 0 && p.y <= EditHeight)
         {
             // the EM_POSFROMCHAR message is unreliable - work around it
             LRESULT pos = SendMessage(EditLine->HWindow, EM_CHARFROMPOS, 0, MAKELPARAM(p.x, p.y));
@@ -1101,7 +1099,7 @@ public:
                 HDC hDC = HANDLES(GetDC(EditLine->HWindow));
                 HFONT hOldFont = (HFONT)SelectObject(hDC, hFont);
                 SIZE sz;
-                GetTextExtentPoint32(hDC, TextBuff + TextLen - 1, 1, &sz);
+                GetTextExtentPoint32(hDC, TextBuff.c_str() + TextLen - 1, 1, &sz);
                 SelectObject(hDC, hOldFont);
                 HANDLES(ReleaseDC(EditLine->HWindow, hDC));
                 x += (short)sz.cx;
@@ -1306,17 +1304,15 @@ public:
         EditWidth = r.right;
         EditHeight = r.bottom;
 
-        if (TextBuff != NULL)
+        if (!TextBuff.empty())
         {
             TRACE_E("CEditDropTarget::DragEnter: Unexpected situation: TextBuff != NULL");
-            free(TextBuff);
+            TextBuff.clear();
         }
         TextLen = GetWindowTextLength(EditLine->HWindow);
-        TextBuff = (char*)malloc(TextLen + 1);
-        if (TextBuff != NULL)
-            TextLen = GetWindowText(EditLine->HWindow, TextBuff, TextLen + 1);
-        else
-            TextLen = 0;
+        TextBuff.resize(TextLen + 1);
+        TextLen = GetWindowText(EditLine->HWindow, TextBuff.data(), TextLen + 1);
+        TextBuff.resize(TextLen);
 
         // check whether there is text on the clipboard
         FORMATETC formatEtc;
@@ -1387,11 +1383,7 @@ public:
             DataObject = NULL;
         }
         SetInsertMark(-1);
-        if (TextBuff != NULL)
-        {
-            free(TextBuff);
-            TextBuff = NULL;
-        }
+        TextBuff.clear();
         return S_OK;
     }
 
@@ -1462,11 +1454,7 @@ public:
             DataObject = NULL;
         }
         *pdwEffect = DROPEFFECT_NONE;
-        if (TextBuff != NULL)
-        {
-            free(TextBuff);
-            TextBuff = NULL;
-        }
+        TextBuff.clear();
         return S_OK;
     }
 };
@@ -1500,8 +1488,6 @@ void CEditLine::RevokeDragDrop()
 CInnerText::CInnerText(CEditWindow* editWindow)
     : CWindow(ooStatic)
 {
-    Allocated = 0;
-    Message = NULL;
     Width = 0;
     Height = 0;
     EditWindow = editWindow;
@@ -1509,8 +1495,6 @@ CInnerText::CInnerText(CEditWindow* editWindow)
 
 CInnerText::~CInnerText()
 {
-    if (Message != NULL)
-        free(Message);
 }
 
 LRESULT
@@ -1534,7 +1518,7 @@ CInnerText::WindowProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
 
         HDC dc = ItemBitmap.HMemDC;
 
-        if (Message != NULL)
+        if (!Message.empty())
         {
             COLORREF sysBkColor = EditWindow->Enabled ? COLOR_WINDOW : COLOR_BTNFACE;
             COLORREF sysTxColor = EditWindow->Enabled ? COLOR_WINDOWTEXT : COLOR_BTNSHADOW;
@@ -1548,7 +1532,7 @@ CInnerText::WindowProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
 
             // PathCompactPath() works better than combining DT_PATH_ELLIPSIS with DT_END_ELLIPSIS (because the last character misbehaves)
             CPathBuffer buff;
-            strncpy_s(buff, buff.Size(), Message, _TRUNCATE);
+            strncpy_s(buff, buff.Size(), Message.c_str(), _TRUNCATE);
             PathCompactPath(dc, buff, r.right - r.left);
 
             DrawText(dc, buff, -1, &r,
@@ -1578,31 +1562,17 @@ BOOL CInnerText::SetText(const char* txt)
     if (txt == NULL)
         txt = ">";
     int l = (int)strlen(txt);
-    int lm = (Message == NULL) ? 0 : ((int)strlen(Message) - 1);
-    if (Allocated < l + 2)
-    {
-        if (Message != NULL)
-            free(Message);
-        Message = (char*)malloc(l + 2);
-        if (Message == NULL)
-        {
-            TRACE_E(LOW_MEMORY);
-            Allocated = 0;
-            return FALSE;
-        }
-        Allocated = l + 2;
-    }
-    if (lm == l && strncmp(Message, txt, l) == 0)
+    int lm = Message.empty() ? 0 : ((int)Message.size() - 1);
+    if (lm == l && Message.compare(0, l, txt) == 0)
         return FALSE;
-    memmove(Message, txt, l);
-    Message[l] = '>';
-    Message[l + 1] = 0;
+    Message = txt;
+    Message += '>';
     return TRUE;
 }
 
 int CInnerText::GetNeededWidth()
 {
-    if (Message == NULL)
+    if (Message.empty())
         return 0;
 
     HDC dc = HANDLES(GetDC(NULL));
@@ -1610,7 +1580,7 @@ int CInnerText::GetNeededWidth()
     {
         HFONT old = (HFONT)SelectObject(dc, EnvFont);
         SIZE s;
-        GetTextExtentPoint32(dc, Message, (int)strlen(Message), &s);
+        GetTextExtentPoint32(dc, Message.c_str(), (int)Message.size(), &s);
         SelectObject(dc, old);
         HANDLES(ReleaseDC(NULL, dc));
         return s.cx + TXEL_SPACE;
@@ -1628,7 +1598,6 @@ CEditWindow::CEditWindow()
 {
     EditLine = new CEditLine();
     Text = new CInnerText(this);
-    LastText = NULL;
     Enabled = TRUE;
     Tracking = FALSE;
 }
@@ -1965,30 +1934,24 @@ void CEditWindow::StoreContent()
     int textLen = GetWindowTextLength(EditLine->HWindow);
     if (textLen > 0)
     {
-        LastText = (char*)malloc(textLen + 1);
-        if (LastText != NULL)
-        {
-            GetWindowText(EditLine->HWindow, LastText, textLen + 1);
-            SendMessage(EditLine->HWindow, EM_GETSEL, (WPARAM)&LastSelStart, (LPARAM)&LastSelEnd);
-        }
+        LastText.resize(textLen + 1);
+        GetWindowText(EditLine->HWindow, LastText.data(), textLen + 1);
+        LastText.resize(textLen);
+        SendMessage(EditLine->HWindow, EM_GETSEL, (WPARAM)&LastSelStart, (LPARAM)&LastSelEnd);
     }
 }
 
 void CEditWindow::RestoreContent()
 {
-    if (Enabled && LastText != NULL)
+    if (Enabled && !LastText.empty())
     {
         // if the old window state (contents and selection) was saved, we restore it
-        SetWindowText(HWindow, LastText);
+        SetWindowText(HWindow, LastText.c_str());
         SendMessage(EditLine->HWindow, EM_SETSEL, (WPARAM)LastSelStart, (LPARAM)LastSelEnd);
     }
 }
 
 void CEditWindow::ResetStoredContent()
 {
-    if (LastText != NULL)
-    {
-        free(LastText);
-        LastText = NULL;
-    }
+    LastText.clear();
 }

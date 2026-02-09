@@ -1,4 +1,4 @@
-﻿// SPDX-FileCopyrightText: 2023 Open Salamander Authors
+// SPDX-FileCopyrightText: 2023 Open Salamander Authors
 // SPDX-License-Identifier: GPL-2.0-or-later
 // CommentsTranslationProject: TRANSLATED
 
@@ -26,16 +26,16 @@ BOOL ViewerActive(HWND hwnd)
 void CViewerWindow::SetViewerCaption()
 {
     CPathBuffer caption;
-    if (Caption == NULL)
+    if (Caption.empty())
     {
-        if (FileName != NULL)
-            lstrcpyn(caption, FileName, caption.Size()); // caption according to the file
+        if (!FileName.empty())
+            lstrcpyn(caption, FileName.c_str(), caption.Size()); // caption according to the file
         else
             caption[0] = 0;
     }
     else
-        lstrcpyn(caption, Caption, caption.Size()); // caption according to the plug-in request
-    if (Caption == NULL || !WholeCaption)
+        lstrcpyn(caption, Caption.c_str(), caption.Size()); // caption according to the plug-in request
+    if (Caption.empty() || !WholeCaption)
     {
         if (caption[0] != 0)
             strcat(caption, " - ");
@@ -344,7 +344,7 @@ CViewerWindow::WindowProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
             WaitForViewerRefresh = FALSE;
             ExitTextMode = FALSE;
             ForceTextMode = FALSE;
-            if (FileName != NULL)
+            if (!FileName.empty())
             {
                 BOOL fatalErr = FALSE;
                 FileChanged(NULL, FALSE, fatalErr, FALSE);
@@ -361,12 +361,12 @@ CViewerWindow::WindowProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
                 {
                     FatalFileErrorOccured();
                     //    // I commented out this block because otherwise the "Retry" button in the message box with the error opened from LoadBehind() and LoadBefore() does not work
-                    //            if (Caption != NULL)
+                    //            if (!Caption.empty())
                     //            {
                     //              free(Caption);
                     //              Caption = NULL;
                     //            }
-                    //            if (FileName != NULL) free(FileName);
+                    //            if (!FileName.empty()) free(FileName);
                     //            if (Lock != NULL)
                     //            {
                     //              SetEvent(Lock);
@@ -538,7 +538,7 @@ CViewerWindow::WindowProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
 
         FindDialog.SetParent(HWindow);
         EraseBkgnd = TRUE;
-        if (FileName != NULL)
+        if (!FileName.empty())
             SetViewerCaption();
 
         HToolTip = CreateWindowEx(0, TOOLTIPS_CLASS, NULL, TTS_NOPREFIX,
@@ -659,7 +659,7 @@ CViewerWindow::WindowProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
             }
             else
             {
-                if (FileName != NULL)
+                if (!FileName.empty())
                 {
                     // limit movement according to the longest visible line
                     __int64 maxOX = GetMaxOriginX();
@@ -703,7 +703,7 @@ CViewerWindow::WindowProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
 
     case WM_VSCROLL:
     {
-        if (FileName != NULL)
+        if (!FileName.empty())
         {
             ResetMouseWheelAccumulator();
             switch ((int)LOWORD(wParam))
@@ -758,7 +758,7 @@ CViewerWindow::WindowProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
 
     case WM_HSCROLL:
     {
-        if (FileName != NULL)
+        if (!FileName.empty())
         {
             ResetMouseWheelAccumulator();
             switch ((int)LOWORD(wParam))
@@ -896,7 +896,7 @@ CViewerWindow::WindowProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
                     enumFileNamesLastFileIndex = -1;
                 ok = GetPreviousFileNameForViewer(EnumFileNamesSourceUID,
                                                   &enumFileNamesLastFileIndex,
-                                                  FileName, LOWORD(wParam) == CM_PREVSELFILE, TRUE,
+                                                  FileName.c_str(), LOWORD(wParam) == CM_PREVSELFILE, TRUE,
                                                   fileName, &noMoreFiles,
                                                   &srcBusy, NULL);
                 if (ok && LOWORD(wParam) == CM_PREVSELFILE) // take only selected files
@@ -914,7 +914,7 @@ CViewerWindow::WindowProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
                     enumFileNamesLastFileIndex = -1;
                 ok = GetNextFileNameForViewer(EnumFileNamesSourceUID,
                                               &enumFileNamesLastFileIndex,
-                                              FileName, LOWORD(wParam) == CM_NEXTSELFILE, TRUE,
+                                              FileName.c_str(), LOWORD(wParam) == CM_NEXTSELFILE, TRUE,
                                               fileName, &noMoreFiles,
                                               &srcBusy, NULL);
                 if (ok && LOWORD(wParam) == CM_NEXTSELFILE) // take only selected files
@@ -1513,7 +1513,7 @@ CViewerWindow::WindowProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
         {
             if (MouseDrag)
                 return 0;
-            if (FileName != NULL)
+            if (!FileName.empty())
             {
                 __int64 start = min(StartSelection, EndSelection);
                 // if (startSel == -1) startSel = 0; // no need to deal with it; handled a few lines below
@@ -1528,7 +1528,7 @@ CViewerWindow::WindowProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
             ENTER_AGAIN:
 
                 CPathBuffer fileName; // Heap-allocated for long path support
-                strcpy(fileName, FileName);
+                strcpy(fileName, FileName.c_str());
                 OPENFILENAME ofn;
                 memset(&ofn, 0, sizeof(OPENFILENAME));
                 ofn.lStructSize = sizeof(OPENFILENAME);
@@ -1698,7 +1698,7 @@ CViewerWindow::WindowProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
                 return 0;
             ExitTextMode = FALSE;
             ForceTextMode = FALSE;
-            if (FileName != NULL)
+            if (!FileName.empty())
             {
                 if (Type != vtHex)
                 {
@@ -1717,7 +1717,7 @@ CViewerWindow::WindowProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
                 return 0;
             ExitTextMode = FALSE;
             ForceTextMode = FALSE;
-            if (FileName != NULL)
+            if (!FileName.empty())
             {
                 if (Type != vtText)
                 {
@@ -1757,7 +1757,7 @@ CViewerWindow::WindowProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
         {
             if (MouseDrag)
                 return 0;
-            if (FileName != NULL)
+            if (!FileName.empty())
             {
                 if (Type == vtText)
                 {
@@ -1771,7 +1771,7 @@ CViewerWindow::WindowProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
 
         case CM_GOTOOFFSET:
         {
-            if (MouseDrag || FileName == NULL)
+            if (MouseDrag || FileName.empty())
                 return 0;
             __int64 offset = SeekY;
             if (CViewerGoToOffsetDialog(HWindow, &offset).Execute() == IDOK)
@@ -1826,7 +1826,7 @@ CViewerWindow::WindowProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
                 return 0;
             ExitTextMode = FALSE;
             ForceTextMode = FALSE;
-            if (FileName != NULL)
+            if (!FileName.empty())
             {
                 OriginX = 0;
                 ChangeType(Type);
@@ -1892,7 +1892,7 @@ CViewerWindow::WindowProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
         }
         }
 
-        if (FileName != NULL)
+        if (!FileName.empty())
         {
             BOOL extSelCh = FALSE;
             BOOL updateView = TRUE;
@@ -2794,13 +2794,13 @@ CViewerWindow::WindowProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
             HMENU subMenu = GetSubMenu(main, 0);
             if (subMenu != NULL)
             {
-                BOOL enable = (FileName != NULL && StartSelection != EndSelection);
+                BOOL enable = (!FileName.empty() && StartSelection != EndSelection);
                 EnableMenuItem(subMenu, CM_COPYTOCLIP, MF_BYCOMMAND | (enable ? MF_ENABLED : MF_GRAYED));
-                EnableMenuItem(subMenu, CM_COPYTOFILE, MF_BYCOMMAND | (FileName != NULL ? MF_ENABLED : MF_GRAYED));
+                EnableMenuItem(subMenu, CM_COPYTOFILE, MF_BYCOMMAND | (!FileName.empty() ? MF_ENABLED : MF_GRAYED));
                 CheckMenuRadioItem(subMenu, CM_TO_HEX, CM_TO_TEXT,
                                    (Type == vtHex) ? CM_TO_HEX : CM_TO_TEXT, MF_BYCOMMAND);
                 CheckMenuItem(subMenu, CM_WRAPED, MF_BYCOMMAND | (WrapText ? MF_CHECKED : MF_UNCHECKED));
-                EnableMenuItem(subMenu, CM_GOTOOFFSET, MF_BYCOMMAND | (FileName != NULL ? MF_ENABLED : MF_GRAYED));
+                EnableMenuItem(subMenu, CM_GOTOOFFSET, MF_BYCOMMAND | (!FileName.empty() ? MF_ENABLED : MF_GRAYED));
                 EnableMenuItem(subMenu, CM_WRAPED, MF_BYCOMMAND | ((Type == vtText) ? MF_ENABLED : MF_GRAYED));
 
                 POINT p;
@@ -3056,7 +3056,7 @@ CViewerWindow::WindowProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
                     int enumFileNamesLastFileIndex = EnumFileNamesLastFileIndex;
                     ok = GetPreviousFileNameForViewer(EnumFileNamesSourceUID,
                                                       &enumFileNamesLastFileIndex,
-                                                      FileName, FALSE, TRUE,
+                                                      FileName.c_str(), FALSE, TRUE,
                                                       fileName, &noMoreFiles,
                                                       &srcBusy, NULL);
 
@@ -3067,7 +3067,7 @@ CViewerWindow::WindowProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
                         enumFileNamesLastFileIndex = EnumFileNamesLastFileIndex;
                         ok = GetPreviousFileNameForViewer(EnumFileNamesSourceUID,
                                                           &enumFileNamesLastFileIndex,
-                                                          FileName, TRUE /* prefer selected */, TRUE,
+                                                          FileName.c_str(), TRUE /* prefer selected */, TRUE,
                                                           fileName, &noMoreFiles,
                                                           &srcBusy, NULL);
                         BOOL isSrcFileSel = FALSE;
@@ -3081,7 +3081,7 @@ CViewerWindow::WindowProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
                         enumFileNamesLastFileIndex = EnumFileNamesLastFileIndex;
                         ok = GetNextFileNameForViewer(EnumFileNamesSourceUID,
                                                       &enumFileNamesLastFileIndex,
-                                                      FileName, FALSE, TRUE,
+                                                      FileName.c_str(), FALSE, TRUE,
                                                       fileName, &noMoreFiles,
                                                       &srcBusy, NULL);
                         nextFile = ok || srcBusy; // only if another file exists (or Salamander is busy, then the user must try again later)
@@ -3089,7 +3089,7 @@ CViewerWindow::WindowProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
                         enumFileNamesLastFileIndex = EnumFileNamesLastFileIndex;
                         ok = GetNextFileNameForViewer(EnumFileNamesSourceUID,
                                                       &enumFileNamesLastFileIndex,
-                                                      FileName, TRUE /* prefer selected */, TRUE,
+                                                      FileName.c_str(), TRUE /* prefer selected */, TRUE,
                                                       fileName, &noMoreFiles,
                                                       &srcBusy, NULL);
                         isSrcFileSel = FALSE;
@@ -3125,14 +3125,14 @@ CViewerWindow::WindowProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
                 EnableMenuItem(subMenu, CM_WRAPED, MF_BYCOMMAND | ((Type == vtText) ? MF_ENABLED : MF_GRAYED));
                 BOOL zoomed = IsZoomed(HWindow);
                 CheckMenuItem(subMenu, CM_VIEW_FULLSCREEN, MF_BYCOMMAND | (zoomed ? MF_CHECKED : MF_UNCHECKED));
-                EnableMenuItem(subMenu, CM_GOTOOFFSET, MF_BYCOMMAND | (FileName != NULL ? MF_ENABLED : MF_GRAYED));
+                EnableMenuItem(subMenu, CM_GOTOOFFSET, MF_BYCOMMAND | (!FileName.empty() ? MF_ENABLED : MF_GRAYED));
             }
             subMenu = GetSubMenu(main, VIEWER_EDIT_MENU_INDEX);
             if (subMenu != NULL)
             {
-                BOOL enable = (FileName != NULL && StartSelection != EndSelection);
+                BOOL enable = (!FileName.empty() && StartSelection != EndSelection);
                 EnableMenuItem(subMenu, CM_COPYTOCLIP, MF_BYCOMMAND | (enable ? MF_ENABLED : MF_GRAYED));
-                EnableMenuItem(subMenu, CM_COPYTOFILE, MF_BYCOMMAND | (FileName != NULL ? MF_ENABLED : MF_GRAYED));
+                EnableMenuItem(subMenu, CM_COPYTOFILE, MF_BYCOMMAND | (!FileName.empty() ? MF_ENABLED : MF_GRAYED));
             }
             subMenu = GetSubMenu(main, OPTIONS_MENU_INDEX);
             if (subMenu != NULL)

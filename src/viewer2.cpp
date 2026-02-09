@@ -352,13 +352,13 @@ void CViewerWindow::CodeCharacters(unsigned char* start, unsigned char* end)
 BOOL CViewerWindow::LoadBefore(HANDLE* hFile)
 {
     CALL_STACK_MESSAGE1("CViewerWindow::LoadBefore()");
-    if (FileName == NULL)
+    if (FileName.empty())
         return FALSE;
 
     HANDLE file;
     if (hFile == NULL || *hFile == NULL)
     {
-        file = SalCreateFileH(FileName, GENERIC_READ, FILE_SHARE_READ | FILE_SHARE_WRITE, NULL,
+        file = SalCreateFileH(FileName.c_str(), GENERIC_READ, FILE_SHARE_READ | FILE_SHARE_WRITE, NULL,
                               OPEN_EXISTING, FILE_FLAG_SEQUENTIAL_SCAN, NULL);
         if (hFile != NULL && file != INVALID_HANDLE_VALUE)
             *hFile = file;
@@ -453,12 +453,12 @@ BOOL CViewerWindow::LoadBefore(HANDLE* hFile)
 
         if (!ret && kill) // possibly end working with this file
         {
-            free(FileName);
-            FileName = NULL;
-            if (Caption != NULL)
+            FileName.clear();
+            FileName.clear();
+            if (!Caption.empty())
             {
-                free(Caption);
-                Caption = NULL;
+                Caption.clear();
+                Caption.clear();
             }
             if (Lock != NULL)
             {
@@ -475,12 +475,12 @@ BOOL CViewerWindow::LoadBefore(HANDLE* hFile)
     {
         DWORD err = GetLastError();
         Seek = Loaded = 0;
-        free(FileName);
-        FileName = NULL;
-        if (Caption != NULL)
+        FileName.clear();
+        FileName.clear();
+        if (!Caption.empty())
         {
-            free(Caption);
-            Caption = NULL;
+            Caption.clear();
+            Caption.clear();
         }
         if (Lock != NULL)
         {
@@ -497,13 +497,13 @@ BOOL CViewerWindow::LoadBefore(HANDLE* hFile)
 BOOL CViewerWindow::LoadBehind(HANDLE* hFile)
 {
     CALL_STACK_MESSAGE1("CViewerWindow::LoadBehind()");
-    if (FileName == NULL)
+    if (FileName.empty())
         return FALSE;
 
     HANDLE file;
     if (hFile == NULL || *hFile == NULL)
     {
-        file = SalCreateFileH(FileName, GENERIC_READ, FILE_SHARE_READ | FILE_SHARE_WRITE, NULL, OPEN_EXISTING,
+        file = SalCreateFileH(FileName.c_str(), GENERIC_READ, FILE_SHARE_READ | FILE_SHARE_WRITE, NULL, OPEN_EXISTING,
                               FILE_FLAG_SEQUENTIAL_SCAN, NULL);
         if (hFile != NULL && file != INVALID_HANDLE_VALUE)
             *hFile = file;
@@ -607,12 +607,12 @@ BOOL CViewerWindow::LoadBehind(HANDLE* hFile)
 
         if (!ret && kill) // possibly end working with this file
         {
-            free(FileName);
-            FileName = NULL;
-            if (Caption != NULL)
+            FileName.clear();
+            FileName.clear();
+            if (!Caption.empty())
             {
-                free(Caption);
-                Caption = NULL;
+                Caption.clear();
+                Caption.clear();
             }
             if (Lock != NULL)
             {
@@ -629,12 +629,12 @@ BOOL CViewerWindow::LoadBehind(HANDLE* hFile)
     {
         DWORD err = GetLastError();
         Seek = Loaded = 0;
-        free(FileName);
-        FileName = NULL;
-        if (Caption != NULL)
+        FileName.clear();
+        FileName.clear();
+        if (!Caption.empty())
         {
-            free(Caption);
-            Caption = NULL;
+            Caption.clear();
+            Caption.clear();
         }
         if (Lock != NULL)
         {
@@ -674,23 +674,15 @@ void CViewerWindow::OpenFile(const char* file, const char* caption, BOOL wholeCa
     CPathBuffer fileName;
     strcpy(fileName, file);
 
-    if (Caption != NULL)
-    {
-        free(Caption);
-        Caption = NULL;
-    }
+    Caption.clear();
     if (caption != NULL)
     {
-        Caption = DupStr(caption);
+        Caption = caption;
         WholeCaption = wholeCaption;
     }
     else
         WholeCaption = FALSE;
-    if (FileName != NULL)
-        free(FileName);
-    FileName = (char*)malloc(strlen(fileName) + 1);
-    if (FileName != NULL)
-        strcpy(FileName, fileName);
+    FileName = (const char*)fileName;
     TooBigSelAction = 0;
     CanSwitchToHex = TRUE;
     CanSwitchQuietlyToHex = TRUE;
@@ -709,7 +701,7 @@ void CViewerWindow::OpenFile(const char* file, const char* caption, BOOL wholeCa
         CanSwitchQuietlyToHex = FALSE;
         return;
     }
-    if (FileName == NULL)
+    if (FileName.empty())
         SetWindowText(HWindow, LoadStr(IDS_VIEWERTITLE));
     else
         SetViewerCaption();
@@ -780,16 +772,16 @@ void CViewerWindow::FileChanged(HANDLE file, BOOL testOnlyFileSize, BOOL& fatalE
     fatalErr = FALSE;
     if (calledHeightChanged != NULL)
         *calledHeightChanged = FALSE;
-    if (FileName == NULL)
+    if (FileName.empty())
         return;
 
-    char* s = strrchr(FileName, '\\');
-    char* namePart = FileName;
+    const char* s = strrchr(FileName.c_str(), '\\');
+    const char* namePart = FileName.c_str();
     if (s != NULL)
     {
         namePart = s + 1;
-        memcpy(CurrentDir, FileName, (s - FileName) + 1);
-        CurrentDir[(s - FileName) + 1] = 0;
+        memcpy(CurrentDir, FileName.c_str(), (s - FileName.c_str()) + 1);
+        CurrentDir[(s - FileName.c_str()) + 1] = 0;
     }
     else
         CurrentDir[0] = 0;
@@ -797,7 +789,7 @@ void CViewerWindow::FileChanged(HANDLE file, BOOL testOnlyFileSize, BOOL& fatalE
     BOOL close;
     if (file == NULL)
     {
-        file = SalCreateFileH(FileName, GENERIC_READ, FILE_SHARE_READ | FILE_SHARE_WRITE, NULL, OPEN_EXISTING,
+        file = SalCreateFileH(FileName.c_str(), GENERIC_READ, FILE_SHARE_READ | FILE_SHARE_WRITE, NULL, OPEN_EXISTING,
                               FILE_FLAG_SEQUENTIAL_SCAN, NULL);
         close = TRUE;
     }
@@ -822,12 +814,12 @@ void CViewerWindow::FileChanged(HANDLE file, BOOL testOnlyFileSize, BOOL& fatalE
             ReleaseMouseDrag();
             FirstLineSize = LastLineSize = ViewSize = 0;
             LastFindSeekY = -1;
-            free(FileName);
-            FileName = NULL;
-            if (Caption != NULL)
+            FileName.clear();
+            FileName.clear();
+            if (!Caption.empty())
             {
-                free(Caption);
-                Caption = NULL;
+                Caption.clear();
+                Caption.clear();
             }
             if (Lock != NULL)
             {
@@ -965,12 +957,12 @@ void CViewerWindow::FileChanged(HANDLE file, BOOL testOnlyFileSize, BOOL& fatalE
         ReleaseMouseDrag();
         FirstLineSize = LastLineSize = ViewSize = 0;
         LastFindSeekY = -1;
-        free(FileName);
-        FileName = NULL;
-        if (Caption != NULL)
+        FileName.clear();
+        FileName.clear();
+        if (!Caption.empty())
         {
-            free(Caption);
-            Caption = NULL;
+            Caption.clear();
+            Caption.clear();
         }
         if (Lock != NULL)
         {

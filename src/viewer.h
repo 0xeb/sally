@@ -307,7 +307,7 @@ protected:
     int SalMessageBoxViewerPaintBlocked(HWND hParent, LPCTSTR lpText, LPCTSTR lpCaption, UINT uType);
 
     unsigned char* Buffer; // buffer with size VIEW_BUFFER_SIZE
-    char* FileName;        // currently viewed file
+    std::string FileName;  // currently viewed file
     __int64 Seek,          // offset of byte 0 in Buffer within the file
         Loaded,            // number of valid bytes in Buffer
         OriginX,           // first displayed column (in characters)
@@ -379,8 +379,8 @@ protected:
     __int64 LastOriginX;         // OriginX before the error
     DWORD RepeatCmdAfterRefresh; // command to repeat after refresh (-1 = no command)
 
-    char* Caption;     // if not NULL, contains the proposed viewer window caption
-    BOOL WholeCaption; // meaningful if Caption != NULL. TRUE -> only
+    std::string Caption;   // if not empty, contains the proposed viewer window caption
+    BOOL WholeCaption; // meaningful if Caption is not empty. TRUE -> only
                        // Caption is displayed in the viewer title; FALSE -> append
                        // the standard " - Viewer" to Caption.
 

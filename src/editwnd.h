@@ -40,8 +40,7 @@ protected:
 class CInnerText : public CWindow
 {
 protected:
-    char* Message;
-    int Allocated;
+    std::string Message;
     int Height, Width;
     CEditWindow* EditWindow;
 
@@ -68,8 +67,8 @@ protected:
     BOOL Enabled;
     BOOL Tracking;
 
-    char* LastText; // when the window was temporarily hidden, its contents were stored here
-    // the following two variables are relevant only when LastText != NULL
+    std::string LastText; // when the window was temporarily hidden, its contents were stored here
+    // the following two variables are relevant only when LastText is not empty
     int LastSelStart; // selection position
     int LastSelEnd;
 

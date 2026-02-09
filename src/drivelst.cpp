@@ -1216,22 +1216,21 @@ void SortPluginFSTimes(CPluginFSInterfaceEncapsulation** list, int left, int rig
         SortPluginFSTimes(list, i, right);
 }
 
-char* CreateIndexedDrvText(const char* driveText, int index)
+std::string CreateIndexedDrvText(const char* driveText, int index)
 {
-    char* newText = (char*)malloc(strlen(driveText) + 15); // we will keep a reserve of 14 characters (" [-1234567890]")
-    if (newText != NULL)
-    {
-        const char* s = driveText;
-        while (*s != 0 && *s != '\t')
-            s++;
-        if (*s == '\t')
-            s++;
-        while (*s != 0 && *s != '\t')
-            s++;
-        memcpy(newText, driveText, s - driveText);
-        sprintf(newText + (s - driveText), " [%d]%s", index, s);
-    }
-    return newText;
+    const char* s = driveText;
+    while (*s != 0 && *s != '\t')
+        s++;
+    if (*s == '\t')
+        s++;
+    while (*s != 0 && *s != '\t')
+        s++;
+    std::string result(driveText, s - driveText);
+    char indexBuf[20];
+    sprintf(indexBuf, " [%d]", index);
+    result += indexBuf;
+    result += s;
+    return result;
 }
 
 int GetIndexForDrvText(CPluginFSInterfaceEncapsulation** fsList, int count,
@@ -1561,13 +1560,12 @@ void CDrivesList::AddToDrives(CDriveData& drv, int textResId, char hotkey, CDriv
 {
     const char* s = itemText != NULL ? itemText : LoadStr(textResId);
     // WARNING: for drvtOneDriveBus, DisplayName is later taken from drv.DriveText, when changing the text format, change it !!!
-    char* txt = (char*)malloc(1 + (hotkey == 0 ? 0 : 1) + strlen(s) + 1);
-    strcpy(txt, hotkey == 0 ? "\t" : " \t");
+    std::string txt = hotkey == 0 ? "\t" : " \t";
     if (hotkey != 0)
-        *txt = hotkey;
-    strcat(txt, s);
+        txt[0] = hotkey;
+    txt += s;
     drv.DriveType = driveType;
-    drv.DriveText = txt;
+    drv.DriveText = std::move(txt);
     drv.Param = 0;
     drv.Accessible = TRUE;
     drv.DestroyIcon = destroyIcon;
@@ -1632,7 +1630,7 @@ BOOL CDrivesList::BuildData(BOOL noTimeout, TDirectArray<CDriveData>* copyDrives
             else
             {
                 drv.DriveType = driveData->DriveType;
-                drv.DriveText = DupStr(driveData->DriveText);
+                drv.DriveText = driveData->DriveText;
                 drv.Param = driveData->Param;
                 drv.Accessible = driveData->Accessible;
                 drv.Shared = driveData->Shared;
@@ -1820,25 +1818,13 @@ BOOL CDrivesList::BuildData(BOOL noTimeout, TDirectArray<CDriveData>* copyDrives
                 }
                 if (volumeName[0] != 0)
                 { // 'c: ' + volume + 0
-                    drv.DriveText = (char*)malloc(2 + strlen(volumeName) + 1);
-                    if (drv.DriveText == NULL)
-                    {
-                        TRACE_E(LOW_MEMORY);
-                        return FALSE;
-                    }
-                    strcpy(drv.DriveText, " \t");
+                    drv.DriveText = " \t";
                     drv.DriveText[0] = drive;
-                    strcat(drv.DriveText, volumeName);
+                    drv.DriveText += volumeName;
                 }
                 else
                 {
-                    drv.DriveText = (char*)malloc(2);
-                    if (drv.DriveText == NULL)
-                    {
-                        TRACE_E(LOW_MEMORY);
-                        return FALSE;
-                    }
-                    strcpy(drv.DriveText, " ");
+                    drv.DriveText = " ";
                     drv.DriveText[0] = drive;
                 }
                 drv.HIcon = GetDriveIcon(root, driveType, drv.Accessible);
@@ -1906,6 +1892,7 @@ BOOL CDrivesList::BuildData(BOOL noTimeout, TDirectArray<CDriveData>* copyDrives
                 if (fs->GetChangeDriveOrDisconnectItem(fs->GetPluginFSName(), txt, icon, destroyIcon))
                 {
                     drv.DriveText = txt;
+                    free(txt);
                     drv.HIcon = icon;
                     drv.HGrayIcon = NULL;
                     drv.DestroyIcon = destroyIcon;
@@ -1919,34 +1906,22 @@ BOOL CDrivesList::BuildData(BOOL noTimeout, TDirectArray<CDriveData>* copyDrives
             // we will check the uniqueness of the text of the items, possibly duplicate items will be indexed
             for (i = firstFSIndex; i < Drives->Count; i++)
             {
-                BOOL freeDriveText = FALSE;
-                char* driveText = Drives->At(i).DriveText;
+                std::string origText = Drives->At(i).DriveText;
                 int currentIndex = 1;
                 int x;
                 for (x = i + 1; x < Drives->Count; x++)
                 {
-                    char* testedDrvText = Drives->At(x).DriveText;
-                    if (StrICmp(driveText, testedDrvText) == 0) // a match -> we have to index the item
+                    if (StrICmp(origText.c_str(), Drives->At(x).DriveText.c_str()) == 0) // a match -> we have to index the item
                     {
-                        if (!freeDriveText) // first match found, we have to index the first occurrence of a duplicate item as well
+                        if (Drives->At(i).DriveText == origText) // first match found, we have to index the first occurrence of a duplicate item as well
                         {
                             currentIndex = GetIndexForDrvText(fsList, count, Drives->At(i).PluginFS, currentIndex);
-                            Drives->At(i).DriveText = CreateIndexedDrvText(driveText, currentIndex++);
-                            if (Drives->At(i).DriveText == NULL)
-                                Drives->At(i).DriveText = driveText;
-                            else
-                                freeDriveText = TRUE;
+                            Drives->At(i).DriveText = CreateIndexedDrvText(origText.c_str(), currentIndex++);
                         }
                         currentIndex = GetIndexForDrvText(fsList, count, Drives->At(x).PluginFS, currentIndex);
-                        Drives->At(x).DriveText = CreateIndexedDrvText(testedDrvText, currentIndex++);
-                        if (Drives->At(x).DriveText == NULL)
-                            Drives->At(x).DriveText = testedDrvText;
-                        else
-                            free(testedDrvText);
+                        Drives->At(x).DriveText = CreateIndexedDrvText(Drives->At(x).DriveText.c_str(), currentIndex++);
                     }
                 }
-                if (freeDriveText)
-                    free(driveText);
             }
         }
         free(fsList);
@@ -2086,13 +2061,11 @@ BOOL CDrivesList::BuildData(BOOL noTimeout, TDirectArray<CDriveData>* copyDrives
     {
         // a variant with a string 'Another Panel Path' ('As Another Panel'?)
         char* s = LoadStr(IDS_ANOTHERPANEL);
-        char* txt = (char*)malloc(2 + strlen(s) + 1);
-        if (txt != NULL)
+        std::string txt = ".\t";
+        txt += s;
         {
-            strcpy(txt, ".\t");
-            strcat(txt, s);
             drv.DriveType = drvtOtherPanel;
-            drv.DriveText = txt;
+            drv.DriveText = std::move(txt);
             drv.Accessible = TRUE;
 
             CFilesWindow* panel = MainWindow->GetNonActivePanel();
@@ -2137,11 +2110,6 @@ BOOL CDrivesList::BuildData(BOOL noTimeout, TDirectArray<CDriveData>* copyDrives
             drv.Shared = FALSE;
             Drives->Add(drv);
         }
-        else
-        {
-            TRACE_E(LOW_MEMORY);
-            return FALSE;
-        }
     }
 
     // loading hot paths
@@ -2171,22 +2139,13 @@ BOOL CDrivesList::BuildData(BOOL noTimeout, TDirectArray<CDriveData>* copyDrives
                 // double '&' so that it is not displayed as an underline
                 DuplicateAmpersands(text + 2, text.Size() - 2);
 
-                char* alloc = DupStr(text);
-                if (alloc != NULL)
-                {
-                    drv.DriveType = drvtHotPath;
-                    drv.Param = i;
-                    drv.DriveText = alloc;
-                    drv.Accessible = TRUE;
-                    drv.Shared = FALSE;
-                    Drives->Add(drv);
-                    drv.DestroyIcon = FALSE; // I won't clean up other icons anymore
-                }
-                else
-                {
-                    TRACE_E(LOW_MEMORY);
-                    return FALSE;
-                }
+                drv.DriveType = drvtHotPath;
+                drv.Param = i;
+                drv.DriveText = (const char*)text;
+                drv.Accessible = TRUE;
+                drv.Shared = FALSE;
+                Drives->Add(drv);
+                drv.DestroyIcon = FALSE; // I won't clean up other icons anymore
             }
         }
     }
@@ -2210,8 +2169,7 @@ void CDrivesList::DestroyDrives(TDirectArray<CDriveData>* drives)
     {
         if (drives->At(i).DriveType != drvtSeparator)
         {
-            if (drives->At(i).DriveText != NULL)
-                free(drives->At(i).DriveText);
+            drives->At(i).DriveText.clear();
             if (drives->At(i).DestroyIcon && drives->At(i).HIcon != NULL)
             {
                 HANDLES(DestroyIcon(drives->At(i).HIcon)); // via GetDriveIcon
@@ -2255,7 +2213,7 @@ BOOL CDrivesList::LoadMenuFromData()
             mii.HOverlay = NULL;
             if (item->Shared)
                 mii.HOverlay = HSharedOverlays[ICONSIZE_16];
-            mii.String = item->DriveText;
+            mii.String = const_cast<char*>(item->DriveText.c_str());
             mii.State = 0;
             if (i == FocusIndex) // if FocusIndex==-1, nothing is marked
                 mii.State = MENU_STATE_CHECKED;
@@ -2287,7 +2245,7 @@ BOOL CDrivesList::ExecuteItem(int index, HWND hwnd, const RECT* exclude, BOOL* f
     case drvtOneDriveBus:
     {
         // WARNING: for drvtOneDriveBus, DisplayName is taken from drv.DriveText here, when changing the text format, change it !!!
-        const char* s = item->DriveText;
+        const char* s = item->DriveText.c_str();
         const char* end = s + strlen(s);
         if (*s != '\t' && *s != 0)
             s++; // hot key
@@ -2388,7 +2346,7 @@ BOOL CDrivesList::ExecuteItem(int index, HWND hwnd, const RECT* exclude, BOOL* f
         {
             char name[3] = " :";
             CPathBuffer remoteName; // Heap-allocated for long path support
-            strcpy(remoteName, item->DriveText + 2);
+            strcpy(remoteName, item->DriveText.c_str() + 2);
             name[0] = item->DriveText[0];
 
             if (!RestoreNetworkConnection(FilesWindow->HWindow, name, remoteName))
@@ -2658,9 +2616,9 @@ BOOL CDrivesList::GetDriveBarToolTip(int index, char* text)
 
     case drvtRemote:
     {
-        if (strlen(item->DriveText) > 2)
+        if (item->DriveText.size() > 2)
         {
-            strcpy(text, item->DriveText + 2);
+            strcpy(text, item->DriveText.c_str() + 2);
             RemoveAmpersands(text);
         }
         break;
@@ -2685,7 +2643,7 @@ BOOL CDrivesList::GetDriveBarToolTip(int index, char* text)
 
     case drvtOneDriveBus:
     {
-        const char* s = item->DriveText;
+        const char* s = item->DriveText.c_str();
         if (*s != '\t' && *s != 0)
             s++; // hot key
         if (*s == '\t')
@@ -2697,7 +2655,7 @@ BOOL CDrivesList::GetDriveBarToolTip(int index, char* text)
     case drvtPluginCmd:
     {
         // trim the first column in the item name
-        const char* p = item->DriveText;
+        const char* p = item->DriveText.c_str();
         while (*p != 0 && *p != '\t')
             p++;
         if (*p == '\t')

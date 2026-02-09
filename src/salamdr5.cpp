@@ -1474,6 +1474,21 @@ BOOL FileNameIsInvalid(const char* name, BOOL isFullName, BOOL ignInvalidName)
     return nameLen > 0 && (name[nameLen - 1] <= ' ' || name[nameLen - 1] == '.');
 }
 
+BOOL FileNameIsInvalidW(const wchar_t* name, BOOL isFullName, BOOL ignInvalidName)
+{
+    const wchar_t* s = name;
+    if (isFullName && (*s >= L'a' && *s <= L'z' || *s >= L'A' && *s <= L'Z') && *(s + 1) == L':')
+        s += 2;
+    while (*s != 0 && *s != L':')
+        s++;
+    if (*s == L':')
+        return TRUE;
+    if (ignInvalidName)
+        return FALSE;
+    int nameLen = (int)(s - name);
+    return nameLen > 0 && (name[nameLen - 1] <= L' ' || name[nameLen - 1] == L'.');
+}
+
 BOOL SalMoveFile(const char* srcName, const char* destName)
 {
     // if name ends with space/dot, we must append '\\', otherwise MoveFile
@@ -1778,6 +1793,29 @@ BOOL ClearReadOnlyAttr(const char* name, DWORD attr)
         TRACE_E("ClearReadOnlyAttr(): error getting attrs: " << name);
         if (!SalLPSetFileAttributes(name, FILE_ATTRIBUTE_ARCHIVE)) // cannot read attributes, try at least writing (don't care if it's needed)
             TRACE_E("ClearReadOnlyAttr(): error setting attrs (FILE_ATTRIBUTE_ARCHIVE): " << name);
+        return TRUE;
+    }
+    return FALSE;
+}
+
+BOOL ClearReadOnlyAttrW(const wchar_t* name, DWORD attr)
+{
+    if (attr == -1)
+        attr = GetFileAttributesW(name);
+    if (attr != INVALID_FILE_ATTRIBUTES)
+    {
+        if ((attr & FILE_ATTRIBUTE_READONLY) != 0)
+        {
+            if (!SetFileAttributesW(name, attr & ~FILE_ATTRIBUTE_READONLY))
+                TRACE_E("ClearReadOnlyAttrW(): error setting attrs");
+            return TRUE;
+        }
+    }
+    else
+    {
+        TRACE_E("ClearReadOnlyAttrW(): error getting attrs");
+        if (!SetFileAttributesW(name, FILE_ATTRIBUTE_ARCHIVE))
+            TRACE_E("ClearReadOnlyAttrW(): error setting attrs (FILE_ATTRIBUTE_ARCHIVE)");
         return TRUE;
     }
     return FALSE;

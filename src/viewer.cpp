@@ -552,19 +552,15 @@ CViewerWindow::CViewerWindow(const char* fileName, CViewType type, const char* c
     CodeTables.Init(MainWindow->HWindow);
     UseCodeTable = FALSE;
     if (fileName == NULL)
-        FileName = NULL; // error
+        FileName.clear(); // error
     else
     {
         CPathBuffer name; // Heap-allocated for long path support
         lstrcpyn(name, fileName, name.Size());
         if (SalGetFullName(name, NULL, NULL, NULL, NULL, name.Size()))
-        {
-            FileName = (char*)malloc(strlen(name) + 1);
-            if (FileName != NULL)
-                strcpy(FileName, name);
-        }
+            FileName = (const char*)name;
         else
-            FileName = NULL;
+            FileName.clear();
     }
     Buffer = (unsigned char*)malloc(VIEW_BUFFER_SIZE);
     Seek = 0;
@@ -601,12 +597,12 @@ CViewerWindow::CViewerWindow(const char* fileName, CViewType type, const char* c
 
     if (caption != NULL)
     {
-        Caption = DupStr(caption);
+        Caption = caption;
         WholeCaption = wholeCaption;
     }
     else
     {
-        Caption = NULL;
+        Caption.clear();
         WholeCaption = FALSE;
     }
     EnumFileNamesSourceUID = enumFileNamesSourceUID;
@@ -628,10 +624,6 @@ CViewerWindow::~CViewerWindow()
     }
     if (Buffer != NULL)
         free(Buffer);
-    if (FileName != NULL)
-        free(FileName);
-    if (Caption != NULL)
-        free(Caption);
 }
 
 HANDLE
@@ -764,7 +756,7 @@ void MyTextOut(HDC hdc, int nXStart, int nYStart, LPCTSTR lpString, int cbString
 void CViewerWindow::Paint(HDC dc)
 {
     CALL_STACK_MESSAGE1("CViewerWindow::Paint()");
-    if (EnablePaint && !ExitTextMode && FileName != NULL && Width > 0 && Height > 0)
+    if (EnablePaint && !ExitTextMode && !FileName.empty() && Width > 0 && Height > 0)
     {
         //    HCURSOR oldCursor = GetCursor();
         //    SetCursor(LoadCursor(NULL, IDC_WAIT));
