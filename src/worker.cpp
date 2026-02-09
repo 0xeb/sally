@@ -1,4 +1,4 @@
-// SPDX-FileCopyrightText: 2023 Open Salamander Authors
+﻿// SPDX-FileCopyrightText: 2023 Open Salamander Authors
 // SPDX-License-Identifier: GPL-2.0-or-later
 // CommentsTranslationProject: TRANSLATED
 
@@ -1367,7 +1367,7 @@ int CaclProg(const CQuadWord& progressCurrent, const CQuadWord& progressTotal)
 }
 
 BOOL GetDirTime(const char* dirName, FILETIME* ftModified);
-BOOL DoCopyDirTime(IWorkerObserver& observer, const char* targetName, FILETIME* modified, CWorkerState& dlgData, BOOL quiet);
+BOOL DoCopyDirTime(IWorkerObserver& observer, const char* targetName, FILETIME* modified, CWorkerState& workerState, BOOL quiet);
 
 void GetFileOverwriteInfo(char* buff, int buffLen, HANDLE file, const char* fileName, FILETIME* fileTime, BOOL* getTimeFailed)
 {
@@ -2006,7 +2006,7 @@ DWORD UncompressFile(char* fileName, DWORD attrs)
 }
 
 DWORD MyEncryptFile(IWorkerObserver& observer, char* fileName, DWORD attrs, DWORD finalAttrs,
-                    CWorkerState& dlgData, BOOL& cancelOper, BOOL preserveDate)
+                    CWorkerState& workerState, BOOL& cancelOper, BOOL preserveDate)
 {
     DWORD retEnc = ERROR_SUCCESS;
     cancelOper = FALSE;
@@ -2022,13 +2022,13 @@ DWORD MyEncryptFile(IWorkerObserver& observer, char* fileName, DWORD attrs, DWOR
     // if the file has the SYSTEM attribute, the EncryptFile API function reports "access denied"; handle it:
     if ((attrs & FILE_ATTRIBUTE_SYSTEM) && (finalAttrs & FILE_ATTRIBUTE_SYSTEM))
     { // if it has and will keep the SYSTEM attribute, ask the user whether they really mean it
-        if (!dlgData.EncryptSystemAll)
+        if (!workerState.EncryptSystemAll)
         {
             observer.WaitIfSuspended(); // if we should be in suspend mode, wait ...
             if (observer.IsCancelled())
                 return retEnc;
 
-            if (dlgData.SkipAllEncryptSystem)
+            if (workerState.SkipAllEncryptSystem)
                 return retEnc;
 
             int ret = IDCANCEL;
@@ -2036,12 +2036,12 @@ DWORD MyEncryptFile(IWorkerObserver& observer, char* fileName, DWORD attrs, DWOR
             switch (ret)
             {
             case IDB_ALL:
-                dlgData.EncryptSystemAll = TRUE;
+                workerState.EncryptSystemAll = TRUE;
             case IDYES:
                 break;
 
             case IDB_SKIPALL:
-                dlgData.SkipAllEncryptSystem = TRUE;
+                workerState.SkipAllEncryptSystem = TRUE;
             case IDB_SKIP:
                 return retEnc;
 
@@ -2282,7 +2282,7 @@ DWORD MyDecryptFileW(const wchar_t* fileName, DWORD attrs, BOOL preserveDate)
 
 DWORD MyEncryptFileW(IWorkerObserver& observer, const wchar_t* fileName, const char* fileNameA,
                      DWORD attrs, DWORD finalAttrs,
-                     CWorkerState& dlgData, BOOL& cancelOper, BOOL preserveDate)
+                     CWorkerState& workerState, BOOL& cancelOper, BOOL preserveDate)
 {
     DWORD retEnc = ERROR_SUCCESS;
     cancelOper = FALSE;
@@ -2294,13 +2294,13 @@ DWORD MyEncryptFileW(IWorkerObserver& observer, const wchar_t* fileName, const c
     // SYSTEM attribute check — EncryptFile reports "access denied" for SYSTEM files
     if ((attrs & FILE_ATTRIBUTE_SYSTEM) && (finalAttrs & FILE_ATTRIBUTE_SYSTEM))
     {
-        if (!dlgData.EncryptSystemAll)
+        if (!workerState.EncryptSystemAll)
         {
             observer.WaitIfSuspended();
             if (observer.IsCancelled())
                 return retEnc;
 
-            if (dlgData.SkipAllEncryptSystem)
+            if (workerState.SkipAllEncryptSystem)
                 return retEnc;
 
             int ret = IDCANCEL;
@@ -2308,12 +2308,12 @@ DWORD MyEncryptFileW(IWorkerObserver& observer, const wchar_t* fileName, const c
             switch (ret)
             {
             case IDB_ALL:
-                dlgData.EncryptSystemAll = TRUE;
+                workerState.EncryptSystemAll = TRUE;
             case IDYES:
                 break;
 
             case IDB_SKIPALL:
-                dlgData.SkipAllEncryptSystem = TRUE;
+                workerState.SkipAllEncryptSystem = TRUE;
             case IDB_SKIP:
                 return retEnc;
 
@@ -2833,7 +2833,7 @@ BOOL CheckTailOfOutFile(CAsyncCopyParams* asyncPar, HANDLE in, HANDLE out, const
 // (when not NULL) to TRUE
 BOOL DoCopyADS(IWorkerObserver& observer, const char* sourceName, BOOL isDir, const char* targetName,
                CQuadWord const& totalDone, CQuadWord& operDone, CQuadWord const& operTotal,
-               CWorkerState& dlgData, COperations* script, BOOL* skip, void* buffer)
+               CWorkerState& workerState, COperations* script, BOOL* skip, void* buffer)
 {
     BOOL doCopyADSRet = TRUE;
     BOOL lowMemory;
@@ -3011,7 +3011,7 @@ COPY_ADS_AGAIN:
                                         if (observer.IsCancelled())
                                             goto COPY_ERROR_ADS;
 
-                                        if (dlgData.SkipAllFileADSWrite)
+                                        if (workerState.SkipAllFileADSWrite)
                                             goto SKIP_COPY_ADS;
 
                                         int ret;
@@ -3064,7 +3064,7 @@ COPY_ADS_AGAIN:
                                         }
 
                                         case IDB_SKIPALL:
-                                            dlgData.SkipAllFileADSWrite = TRUE;
+                                            workerState.SkipAllFileADSWrite = TRUE;
                                         case IDB_SKIP:
                                         {
                                         SKIP_COPY_ADS:
@@ -3122,7 +3122,7 @@ COPY_ADS_AGAIN:
                                     if (observer.IsCancelled())
                                         goto COPY_ERROR_ADS;
 
-                                    if (dlgData.SkipAllFileADSRead)
+                                    if (workerState.SkipAllFileADSRead)
                                         goto SKIP_COPY_ADS;
 
                                     int ret = IDCANCEL;
@@ -3165,7 +3165,7 @@ COPY_ADS_AGAIN:
                                         break;
                                     }
                                     case IDB_SKIPALL:
-                                        dlgData.SkipAllFileADSRead = TRUE;
+                                        workerState.SkipAllFileADSRead = TRUE;
                                     case IDB_SKIP:
                                         goto SKIP_COPY_ADS;
                                     case IDCANCEL:
@@ -3235,10 +3235,10 @@ COPY_ADS_AGAIN:
                             if (observer.IsCancelled())
                                 goto CANCEL_OPEN2_ADS;
 
-                            if (dlgData.SkipAllFileADSOpenOut)
+                            if (workerState.SkipAllFileADSOpenOut)
                                 goto SKIP_OPEN_OUT_ADS;
 
-                            if (dlgData.IgnoreAllADSOpenOutErr)
+                            if (workerState.IgnoreAllADSOpenOutErr)
                                 goto IGNORE_OPENOUTADS;
 
                             int ret;
@@ -3253,7 +3253,7 @@ COPY_ADS_AGAIN:
                                 break;
 
                             case IDB_IGNOREALL:
-                                dlgData.IgnoreAllADSOpenOutErr = TRUE; // break is intentionally omitted here
+                                workerState.IgnoreAllADSOpenOutErr = TRUE; // break is intentionally omitted here
                             case IDB_IGNORE:
                             {
                             IGNORE_OPENOUTADS:
@@ -3267,7 +3267,7 @@ COPY_ADS_AGAIN:
                             }
 
                             case IDB_SKIPALL:
-                                dlgData.SkipAllFileADSOpenOut = TRUE;
+                                workerState.SkipAllFileADSOpenOut = TRUE;
                             case IDB_SKIP:
                             {
                             SKIP_OPEN_OUT_ADS:
@@ -3306,7 +3306,7 @@ COPY_ADS_AGAIN:
                         break;
                     }
 
-                    if (dlgData.SkipAllFileADSOpenIn)
+                    if (workerState.SkipAllFileADSOpenIn)
                         goto SKIP_OPEN_IN_ADS;
 
                     int ret;
@@ -3321,7 +3321,7 @@ COPY_ADS_AGAIN:
                         break;
 
                     case IDB_SKIPALL:
-                        dlgData.SkipAllFileADSOpenIn = TRUE;
+                        workerState.SkipAllFileADSOpenIn = TRUE;
                     case IDB_SKIP:
                     {
                     SKIP_OPEN_IN_ADS:
@@ -3360,7 +3360,7 @@ COPY_ADS_AGAIN:
             if (observer.IsCancelled())
                 return FALSE;
 
-            if (dlgData.IgnoreAllADSReadErr)
+            if (workerState.IgnoreAllADSReadErr)
                 goto IGNORE_ADS;
 
             int ret;
@@ -3372,7 +3372,7 @@ COPY_ADS_AGAIN:
                 goto COPY_ADS_AGAIN;
 
             case IDB_IGNOREALL:
-                dlgData.IgnoreAllADSReadErr = TRUE; // break is intentionally omitted here
+                workerState.IgnoreAllADSReadErr = TRUE; // break is intentionally omitted here
             case IDB_IGNORE:
             {
             IGNORE_ADS:
@@ -3639,7 +3639,7 @@ void SetTFSandPSforSkippedFile(COperation* op, CQuadWord& lastTransferredFileSiz
 }
 
 void DoCopyFileLoopOrig(HANDLE& in, HANDLE& out, void* buffer, int& limitBufferSize,
-                        COperations* script, CWorkerState& dlgData, BOOL wholeFileAllocated,
+                        COperations* script, CWorkerState& workerState, BOOL wholeFileAllocated,
                         COperation* op, const CQuadWord& totalDone, BOOL& copyError, BOOL& skipCopy,
                         IWorkerObserver& observer, CQuadWord& operationDone, CQuadWord& fileSize,
                         int bufferSize, int& allocWholeFileOnStart, BOOL& copyAgain)
@@ -3682,7 +3682,7 @@ void DoCopyFileLoopOrig(HANDLE& in, HANDLE& out, void* buffer, int& limitBufferS
                     return;
                 }
 
-                if (dlgData.SkipAllFileWrite)
+                if (workerState.SkipAllFileWrite)
                 {
                     skipCopy = TRUE; // goto SKIP_COPY
                     return;
@@ -3730,7 +3730,7 @@ void DoCopyFileLoopOrig(HANDLE& in, HANDLE& out, void* buffer, int& limitBufferS
                 }
 
                 case IDB_SKIPALL:
-                    dlgData.SkipAllFileWrite = TRUE;
+                    workerState.SkipAllFileWrite = TRUE;
                 case IDB_SKIP:
                 {
                     skipCopy = TRUE; // goto SKIP_COPY
@@ -3779,7 +3779,7 @@ void DoCopyFileLoopOrig(HANDLE& in, HANDLE& out, void* buffer, int& limitBufferS
                 return;
             }
 
-            if (dlgData.SkipAllFileRead)
+            if (workerState.SkipAllFileRead)
             {
                 skipCopy = TRUE; // goto SKIP_COPY
                 return;
@@ -3829,7 +3829,7 @@ void DoCopyFileLoopOrig(HANDLE& in, HANDLE& out, void* buffer, int& limitBufferS
             }
 
             case IDB_SKIPALL:
-                dlgData.SkipAllFileRead = TRUE;
+                workerState.SkipAllFileRead = TRUE;
             case IDB_SKIP:
             {
                 skipCopy = TRUE; // goto SKIP_COPY
@@ -3954,7 +3954,7 @@ struct CCopy_Context
     const CQuadWord* TotalDone;
     const CQuadWord* LastTransferredFileSize;
 
-    CCopy_Context(CAsyncCopyParams* asyncPar, int numOfBlocks, CWorkerState* dlgData, COperation* op,
+    CCopy_Context(CAsyncCopyParams* asyncPar, int numOfBlocks, CWorkerState* workerState, COperation* op,
                   IWorkerObserver& observer, HANDLE* in, HANDLE* out, BOOL wholeFileAllocated, COperations* script,
                   CQuadWord* operationDone, const CQuadWord* totalDone, const CQuadWord* lastTransferredFileSize)
     {
@@ -3975,7 +3975,7 @@ struct CCopy_Context
         WriteOffset.SetUI64(0);
         AutoRetryAttemptsSNAP = 0;
 
-        DlgData = dlgData;
+        DlgData = workerState;
         Op = op;
         Observer = &observer;
         In = in;
@@ -4540,7 +4540,7 @@ BOOL CCopy_Context::HandleSuspModeAndCancel(BOOL* copyError)
 }
 
 void DoCopyFileLoopAsync(CAsyncCopyParams* asyncPar, HANDLE& in, HANDLE& out, void* buffer, int& limitBufferSize,
-                         COperations* script, CWorkerState& dlgData, BOOL wholeFileAllocated, COperation* op,
+                         COperations* script, CWorkerState& workerState, BOOL wholeFileAllocated, COperation* op,
                          const CQuadWord& totalDone, BOOL& copyError, BOOL& skipCopy, IWorkerObserver& observer,
                          CQuadWord& operationDone, CQuadWord& fileSize, int bufferSize,
                          int& allocWholeFileOnStart, BOOL& copyAgain, const CQuadWord& lastTransferredFileSize)
@@ -4560,7 +4560,7 @@ void DoCopyFileLoopAsync(CAsyncCopyParams* asyncPar, HANDLE& in, HANDLE& out, vo
     int numOfBlocks = 8;
 
     // Copy operation context (prevents passing heaps of parameters to helper functions, now context methods)
-    CCopy_Context ctx(asyncPar, numOfBlocks, &dlgData, op, observer, &in, &out, wholeFileAllocated, script,
+    CCopy_Context ctx(asyncPar, numOfBlocks, &workerState, op, observer, &in, &out, wholeFileAllocated, script,
                       &operationDone, &totalDone, &lastTransferredFileSize);
     BOOL doCopy = TRUE;
     while (doCopy)
@@ -4877,7 +4877,7 @@ BOOL DoCopyFile(COperation* op, IWorkerObserver& observer, void* buffer,
                 COperations* script, CQuadWord& totalDone,
                 DWORD clearReadonlyMask, BOOL* skip, BOOL lantasticCheck,
                 int& mustDeleteFileBeforeOverwrite, int& allocWholeFileOnStart,
-                CWorkerState& dlgData, BOOL copyADS, BOOL copyAsEncrypted,
+                CWorkerState& workerState, BOOL copyADS, BOOL copyAsEncrypted,
                 BOOL isMove, CAsyncCopyParams*& asyncPar)
 {
     if (script->CopyAttrs && copyAsEncrypted)
@@ -4950,7 +4950,7 @@ BOOL DoCopyFile(COperation* op, IWorkerObserver& observer, void* buffer,
     // - the asynchronous algorithm makes sense only over the network + when source/target is fast or network-based
     // - with the old algorithm, copying on Win7 over the network is easily 2x-3x slower for downloads,
     //   almost 2x slower for uploads, and about 30% slower for network-to-network copies
-    BOOL useAsyncAlg = dlgData.UseAsyncCopyAlg &&
+    BOOL useAsyncAlg = workerState.UseAsyncCopyAlg &&
                        op->FileSize.Value > 0 && // empty files are copied synchronously (no data)
                        ((op->OpFlags & OPFL_SRCPATH_IS_NET) && ((op->OpFlags & OPFL_TGTPATH_IS_NET) ||
                                                                 (op->OpFlags & OPFL_TGTPATH_IS_FAST)) ||
@@ -5031,7 +5031,7 @@ COPY_AGAIN:
                     if (!encryptionNotSupported && script->CopyAttrs && out == INVALID_HANDLE_VALUE) // in case read access to the directory is not allowed (we added it only for setting the Compressed attribute), try creating a write-only file
                         out = op->CreateTargetFileEx(GENERIC_WRITE, 0, fileAttrs, &encryptionNotSupported);
 
-                    if (out == INVALID_HANDLE_VALUE && encryptionNotSupported && dlgData.FileOutLossEncrAll && !lossEncryptionAttr)
+                    if (out == INVALID_HANDLE_VALUE && encryptionNotSupported && workerState.FileOutLossEncrAll && !lossEncryptionAttr)
                     { // the user agreed to lose the Encrypted attribute for all problematic files, so make that happen here
                         lossEncryptionAttr = TRUE;
                         continue;
@@ -5050,7 +5050,7 @@ COPY_AGAIN:
                         attrs = op->GetTargetAttributes();
                         if (attrs != INVALID_FILE_ATTRIBUTES && (attrs & FILE_ATTRIBUTE_ENCRYPTED) == 0)
                         { // unable to apply the Encrypted attribute, ask the user what to do...
-                            if (dlgData.FileOutLossEncrAll)
+                            if (workerState.FileOutLossEncrAll)
                                 lossEncryptionAttr = TRUE;
                             else
                             {
@@ -5058,7 +5058,7 @@ COPY_AGAIN:
                                 if (observer.IsCancelled())
                                     goto CANCEL_ENCNOTSUP;
 
-                                if (dlgData.SkipAllFileOutLossEncr)
+                                if (workerState.SkipAllFileOutLossEncr)
                                     goto SKIP_ENCNOTSUP;
 
                                 int ret;
@@ -5067,13 +5067,13 @@ COPY_AGAIN:
                                 switch (ret)
                                 {
                                 case IDB_ALL:
-                                    dlgData.FileOutLossEncrAll = TRUE; // the break; is intentionally missing here
+                                    workerState.FileOutLossEncrAll = TRUE; // the break; is intentionally missing here
                                 case IDYES:
                                     lossEncryptionAttr = TRUE;
                                     break;
 
                                 case IDB_SKIPALL:
-                                    dlgData.SkipAllFileOutLossEncr = TRUE;
+                                    workerState.SkipAllFileOutLossEncr = TRUE;
                                 case IDB_SKIP:
                                 {
                                 SKIP_ENCNOTSUP:
@@ -5164,7 +5164,7 @@ COPY_AGAIN:
                     BOOL copyAgain = FALSE;
                     if (useAsyncAlg)
                     {
-                        DoCopyFileLoopAsync(asyncPar, in, out, buffer, limitBufferSize, script, dlgData, wholeFileAllocated, op,
+                        DoCopyFileLoopAsync(asyncPar, in, out, buffer, limitBufferSize, script, workerState, wholeFileAllocated, op,
                                             totalDone, copyError, skipCopy, observer, operationDone, fileSize,
                                             bufferSize, allocWholeFileOnStart, copyAgain, lastTransferredFileSize);
                         // NOTE: neither 'in' nor 'out' has the file pointer (SetFilePointer) positioned at the end of the file,
@@ -5172,7 +5172,7 @@ COPY_AGAIN:
                     }
                     else
                     {
-                        DoCopyFileLoopOrig(in, out, buffer, limitBufferSize, script, dlgData, wholeFileAllocated, op,
+                        DoCopyFileLoopOrig(in, out, buffer, limitBufferSize, script, workerState, wholeFileAllocated, op,
                                            totalDone, copyError, skipCopy, observer, operationDone, fileSize,
                                            bufferSize, allocWholeFileOnStart, copyAgain);
                     }
@@ -5227,7 +5227,7 @@ COPY_AGAIN:
                             if (observer.IsCancelled())
                                 goto COPY_ERROR;
 
-                            if (dlgData.SkipAllFileWrite)
+                            if (workerState.SkipAllFileWrite)
                                 goto SKIP_COPY;
 
                             int ret = IDCANCEL;
@@ -5246,7 +5246,7 @@ COPY_AGAIN:
                             }
 
                             case IDB_SKIPALL:
-                                dlgData.SkipAllFileWrite = TRUE;
+                                workerState.SkipAllFileWrite = TRUE;
                             case IDB_SKIP:
                                 goto SKIP_COPY;
 
@@ -5267,10 +5267,10 @@ COPY_AGAIN:
                         if (observer.IsCancelled())
                             goto COPY_ERROR;
 
-                        if (dlgData.SkipAllGetFileTime)
+                        if (workerState.SkipAllGetFileTime)
                             goto SKIP_COPY;
 
-                        if (dlgData.IgnoreAllGetFileTimeErr)
+                        if (workerState.IgnoreAllGetFileTimeErr)
                             goto IGNORE_GETFILETIME;
 
                         int ret;
@@ -5282,7 +5282,7 @@ COPY_AGAIN:
                             break;
 
                         case IDB_IGNOREALL:
-                            dlgData.IgnoreAllGetFileTimeErr = TRUE; // the break; is intentionally missing here
+                            workerState.IgnoreAllGetFileTimeErr = TRUE; // the break; is intentionally missing here
                         case IDB_IGNORE:
                         {
                         IGNORE_GETFILETIME:
@@ -5292,7 +5292,7 @@ COPY_AGAIN:
                         }
 
                         case IDB_SKIPALL:
-                            dlgData.SkipAllGetFileTime = TRUE;
+                            workerState.SkipAllGetFileTime = TRUE;
                         case IDB_SKIP:
                             goto SKIP_COPY;
 
@@ -5316,7 +5316,7 @@ COPY_AGAIN:
                             operDone = COPY_MIN_FILE_SIZE; // zero/small files take at least as long as files of size COPY_MIN_FILE_SIZE
                         BOOL adsSkip = FALSE;
                         if (!DoCopyADS(observer, op->SourceName, FALSE, op->TargetName, totalDone,
-                                       operDone, op->Size, dlgData, script, &adsSkip, buffer) ||
+                                       operDone, op->Size, workerState, script, &adsSkip, buffer) ||
                             adsSkip) // user hit cancel or skipped at least one ADS
                         {
                             if (out != NULL)
@@ -5348,10 +5348,10 @@ COPY_AGAIN:
                                 if (observer.IsCancelled())
                                     goto COPY_ERROR;
 
-                                if (dlgData.SkipAllSetFileTime)
+                                if (workerState.SkipAllSetFileTime)
                                     goto SKIP_COPY;
 
-                                if (dlgData.IgnoreAllSetFileTimeErr)
+                                if (workerState.IgnoreAllSetFileTimeErr)
                                     goto IGNORE_SETFILETIME;
 
                                 int ret;
@@ -5363,7 +5363,7 @@ COPY_AGAIN:
                                     break;
 
                                 case IDB_IGNOREALL:
-                                    dlgData.IgnoreAllSetFileTimeErr = TRUE; // the break; is intentionally missing here
+                                    workerState.IgnoreAllSetFileTimeErr = TRUE; // the break; is intentionally missing here
                                 case IDB_IGNORE:
                                 {
                                 IGNORE_SETFILETIME:
@@ -5373,7 +5373,7 @@ COPY_AGAIN:
                                 }
 
                                 case IDB_SKIPALL:
-                                    dlgData.SkipAllSetFileTime = TRUE;
+                                    workerState.SkipAllSetFileTime = TRUE;
                                 case IDB_SKIP:
                                     goto SKIP_COPY;
 
@@ -5390,7 +5390,7 @@ COPY_AGAIN:
                             if (observer.IsCancelled())
                                 goto COPY_ERROR;
 
-                            if (dlgData.SkipAllFileWrite)
+                            if (workerState.SkipAllFileWrite)
                                 goto SKIP_COPY;
 
                             int ret = IDCANCEL;
@@ -5408,7 +5408,7 @@ COPY_AGAIN:
                             }
 
                             case IDB_SKIPALL:
-                                dlgData.SkipAllFileWrite = TRUE;
+                                workerState.SkipAllFileWrite = TRUE;
                             case IDB_SKIP:
                                 goto SKIP_COPY;
 
@@ -5432,7 +5432,7 @@ COPY_AGAIN:
 
                             int ret;
                             ret = IDCANCEL;
-                            if (dlgData.IgnoreAllSetAttrsErr)
+                            if (workerState.IgnoreAllSetAttrsErr)
                                 ret = IDB_IGNORE;
                             else
                             {
@@ -5441,7 +5441,7 @@ COPY_AGAIN:
                             switch (ret)
                             {
                             case IDB_IGNOREALL:
-                                dlgData.IgnoreAllSetAttrsErr = TRUE; // break is intentional here; nothing is missing
+                                workerState.IgnoreAllSetAttrsErr = TRUE; // break is intentional here; nothing is missing
                             case IDB_IGNORE:
                                 break;
 
@@ -5468,7 +5468,7 @@ COPY_AGAIN:
 
                             int ret;
                             ret = IDCANCEL;
-                            if (dlgData.IgnoreAllCopyPermErr)
+                            if (workerState.IgnoreAllCopyPermErr)
                                 ret = IDB_IGNORE;
                             else
                             {
@@ -5477,7 +5477,7 @@ COPY_AGAIN:
                             switch (ret)
                             {
                             case IDB_IGNOREALL:
-                                dlgData.IgnoreAllCopyPermErr = TRUE; // the break; is intentionally missing here
+                                workerState.IgnoreAllCopyPermErr = TRUE; // the break; is intentionally missing here
                             case IDB_IGNORE:
                                 break;
 
@@ -5499,7 +5499,7 @@ COPY_AGAIN:
                         if (observer.IsCancelled())
                             goto CANCEL_OPEN2;
 
-                        if (dlgData.SkipAllFileOutLossEncr)
+                        if (workerState.SkipAllFileOutLossEncr)
                             goto SKIP_OPEN_OUT;
 
                         int ret;
@@ -5508,13 +5508,13 @@ COPY_AGAIN:
                         switch (ret)
                         {
                         case IDB_ALL:
-                            dlgData.FileOutLossEncrAll = TRUE; // the break; is intentionally missing here
+                            workerState.FileOutLossEncrAll = TRUE; // the break; is intentionally missing here
                         case IDYES:
                             lossEncryptionAttr = TRUE;
                             break;
 
                         case IDB_SKIPALL:
-                            dlgData.SkipAllFileOutLossEncr = TRUE;
+                            workerState.SkipAllFileOutLossEncr = TRUE;
                         case IDB_SKIP:
                         {
                         SKIP_OPEN_OUT:
@@ -5549,7 +5549,7 @@ COPY_AGAIN:
                         if (err == ERROR_FILE_EXISTS || // overwrite the file?
                             err == ERROR_ALREADY_EXISTS)
                         {
-                            if (!dlgData.OverwriteAll && (dlgData.CnfrmFileOver || script->OverwriteOlder))
+                            if (!workerState.OverwriteAll && (workerState.CnfrmFileOver || script->OverwriteOlder))
                             {
                                 char sAttr[101], tAttr[101];
                                 BOOL getTimeFailed;
@@ -5575,7 +5575,7 @@ COPY_AGAIN:
                                 if (observer.IsCancelled())
                                     goto CANCEL_OPEN;
 
-                                if (dlgData.SkipAllOverwrite)
+                                if (workerState.SkipAllOverwrite)
                                     goto SKIP_OPEN;
 
                                 int ret;
@@ -5600,7 +5600,7 @@ COPY_AGAIN:
                                 switch (ret)
                                 {
                                 case IDB_ALL:
-                                    dlgData.OverwriteAll = TRUE;
+                                    workerState.OverwriteAll = TRUE;
                                 case IDYES:
                                 default: // for safety (to prevent exiting this block with the 'in' handle closed)
                                 {
@@ -5611,7 +5611,7 @@ COPY_AGAIN:
                                 }
 
                                 case IDB_SKIPALL:
-                                    dlgData.SkipAllOverwrite = TRUE;
+                                    workerState.SkipAllOverwrite = TRUE;
                                 case IDB_SKIP:
                                 {
                                 SKIP_OPEN:
@@ -5637,7 +5637,7 @@ COPY_AGAIN:
                             DWORD attr = op->GetTargetAttributes();
                             if (attr != INVALID_FILE_ATTRIBUTES && (attr & (FILE_ATTRIBUTE_HIDDEN | FILE_ATTRIBUTE_SYSTEM)))
                             {
-                                if (!dlgData.OverwriteHiddenAll && dlgData.CnfrmSHFileOver) // ignore script->OverwriteOlder here; user wants to see that this is a SYSTEM or HIDDEN file even with the option enabled
+                                if (!workerState.OverwriteHiddenAll && workerState.CnfrmSHFileOver) // ignore script->OverwriteOlder here; user wants to see that this is a SYSTEM or HIDDEN file even with the option enabled
                                 {
                                     HANDLES(CloseHandle(in));
                                     in = NULL;
@@ -5646,7 +5646,7 @@ COPY_AGAIN:
                                     if (observer.IsCancelled())
                                         goto CANCEL_OPEN;
 
-                                    if (dlgData.SkipAllSystemOrHidden)
+                                    if (workerState.SkipAllSystemOrHidden)
                                         goto SKIP_OPEN;
 
                                     int ret = IDCANCEL;
@@ -5654,7 +5654,7 @@ COPY_AGAIN:
                                     switch (ret)
                                     {
                                     case IDB_ALL:
-                                        dlgData.OverwriteHiddenAll = TRUE;
+                                        workerState.OverwriteHiddenAll = TRUE;
                                     case IDYES:
                                     default: // for safety (to prevent exiting this block with the 'in' handle closed)
                                     {
@@ -5666,7 +5666,7 @@ COPY_AGAIN:
                                     }
 
                                     case IDB_SKIPALL:
-                                        dlgData.SkipAllSystemOrHidden = TRUE;
+                                        workerState.SkipAllSystemOrHidden = TRUE;
                                     case IDB_SKIP:
                                         goto SKIP_OPEN;
 
@@ -5799,7 +5799,7 @@ COPY_AGAIN:
                                                                      &out, script->CopyAttrs, &encryptionNotSupported, asyncPar);
                                         if (encryptionNotSupported) // unable to apply the Encrypted attribute, ask the user what to do...
                                         {
-                                            if (dlgData.FileOutLossEncrAll)
+                                            if (workerState.FileOutLossEncrAll)
                                                 lossEncryptionAttr = TRUE;
                                             else
                                             {
@@ -5807,7 +5807,7 @@ COPY_AGAIN:
                                                 if (observer.IsCancelled())
                                                     goto CANCEL_ENCNOTSUP;
 
-                                                if (dlgData.SkipAllFileOutLossEncr)
+                                                if (workerState.SkipAllFileOutLossEncr)
                                                     goto SKIP_ENCNOTSUP;
 
                                                 int ret;
@@ -5816,13 +5816,13 @@ COPY_AGAIN:
                                                 switch (ret)
                                                 {
                                                 case IDB_ALL:
-                                                    dlgData.FileOutLossEncrAll = TRUE; // the break; is intentionally missing here
+                                                    workerState.FileOutLossEncrAll = TRUE; // the break; is intentionally missing here
                                                 case IDYES:
                                                     lossEncryptionAttr = TRUE;
                                                     break;
 
                                                 case IDB_SKIPALL:
-                                                    dlgData.SkipAllFileOutLossEncr = TRUE;
+                                                    workerState.SkipAllFileOutLossEncr = TRUE;
                                                 case IDB_SKIP:
                                                     goto SKIP_ENCNOTSUP;
 
@@ -5846,7 +5846,7 @@ COPY_AGAIN:
                             if (observer.IsCancelled())
                                 goto CANCEL_OPEN2;
 
-                            if (dlgData.SkipAllFileOpenOut)
+                            if (workerState.SkipAllFileOpenOut)
                                 goto SKIP_OPEN_OUT;
 
                             int ret;
@@ -5858,7 +5858,7 @@ COPY_AGAIN:
                                 break;
 
                             case IDB_SKIPALL:
-                                dlgData.SkipAllFileOpenOut = TRUE;
+                                workerState.SkipAllFileOpenOut = TRUE;
                             case IDB_SKIP:
                                 goto SKIP_OPEN_OUT;
 
@@ -5883,7 +5883,7 @@ COPY_AGAIN:
             if (observer.IsCancelled())
                 return FALSE;
 
-            if (dlgData.SkipAllFileOpenIn)
+            if (workerState.SkipAllFileOpenIn)
                 goto SKIP_OPEN_IN;
 
             int ret;
@@ -5895,7 +5895,7 @@ COPY_AGAIN:
                 break;
 
             case IDB_SKIPALL:
-                dlgData.SkipAllFileOpenIn = TRUE;
+                workerState.SkipAllFileOpenIn = TRUE;
             case IDB_SKIP:
             {
             SKIP_OPEN_IN:
@@ -5920,7 +5920,7 @@ BOOL DoMoveFile(COperation* op, IWorkerObserver& observer, void* buffer,
                 COperations* script, CQuadWord& totalDone, BOOL dir,
                 DWORD clearReadonlyMask, BOOL* novellRenamePatch, BOOL lantasticCheck,
                 int& mustDeleteFileBeforeOverwrite, int& allocWholeFileOnStart,
-                CWorkerState& dlgData, BOOL copyADS, BOOL copyAsEncrypted,
+                CWorkerState& workerState, BOOL copyADS, BOOL copyAsEncrypted,
                 BOOL* setDirTimeAfterMove, CAsyncCopyParams*& asyncPar,
                 BOOL ignInvalidName)
 {
@@ -5968,7 +5968,7 @@ BOOL DoMoveFile(COperation* op, IWorkerObserver& observer, void* buffer,
 
                 int ret;
                 ret = IDCANCEL;
-                if (dlgData.IgnoreAllCopyPermErr)
+                if (workerState.IgnoreAllCopyPermErr)
                     ret = IDB_IGNORE;
                 else
                 {
@@ -5977,7 +5977,7 @@ BOOL DoMoveFile(COperation* op, IWorkerObserver& observer, void* buffer,
                 switch (ret)
                 {
                 case IDB_IGNOREALL:
-                    dlgData.IgnoreAllCopyPermErr = TRUE; // the break; is intentionally missing here
+                    workerState.IgnoreAllCopyPermErr = TRUE; // the break; is intentionally missing here
                 case IDB_IGNORE:
                     break;
 
@@ -6011,7 +6011,7 @@ BOOL DoMoveFile(COperation* op, IWorkerObserver& observer, void* buffer,
 
                         int ret;
                         ret = IDCANCEL;
-                        if (dlgData.IgnoreAllSetAttrsErr)
+                        if (workerState.IgnoreAllSetAttrsErr)
                             ret = IDB_IGNORE;
                         else
                         {
@@ -6020,7 +6020,7 @@ BOOL DoMoveFile(COperation* op, IWorkerObserver& observer, void* buffer,
                         switch (ret)
                         {
                         case IDB_IGNOREALL:
-                            dlgData.IgnoreAllSetAttrsErr = TRUE; // the break; is intentionally missing here
+                            workerState.IgnoreAllSetAttrsErr = TRUE; // the break; is intentionally missing here
                         case IDB_IGNORE:
                             break;
 
@@ -6045,7 +6045,7 @@ BOOL DoMoveFile(COperation* op, IWorkerObserver& observer, void* buffer,
 
                         int ret;
                         ret = IDCANCEL;
-                        if (dlgData.IgnoreAllCopyPermErr)
+                        if (workerState.IgnoreAllCopyPermErr)
                             ret = IDB_IGNORE;
                         else
                         {
@@ -6054,7 +6054,7 @@ BOOL DoMoveFile(COperation* op, IWorkerObserver& observer, void* buffer,
                         switch (ret)
                         {
                         case IDB_IGNOREALL:
-                            dlgData.IgnoreAllCopyPermErr = TRUE; // the break; is intentionally missing here
+                            workerState.IgnoreAllCopyPermErr = TRUE; // the break; is intentionally missing here
                         case IDB_IGNORE:
                             break;
 
@@ -6078,7 +6078,7 @@ BOOL DoMoveFile(COperation* op, IWorkerObserver& observer, void* buffer,
                         {
                             if (*setDirTimeAfterMove == 0 /* need test */)
                                 *setDirTimeAfterMove = 1 /* yes */;
-                            DoCopyDirTime(observer, targetNameMvDir, &dirTimeModified, dlgData, TRUE); // ignore any failure, this is just a hack (we already ignore time read errors from the directory); MoveFile should not change times
+                            DoCopyDirTime(observer, targetNameMvDir, &dirTimeModified, workerState, TRUE); // ignore any failure, this is just a hack (we already ignore time read errors from the directory); MoveFile should not change times
                         }
                     }
                 }
@@ -6203,7 +6203,7 @@ BOOL DoMoveFile(COperation* op, IWorkerObserver& observer, void* buffer,
                         goto NORMAL_ERROR;
                     }
 
-                    if (!dlgData.OverwriteAll && (dlgData.CnfrmFileOver || script->OverwriteOlder))
+                    if (!workerState.OverwriteAll && (workerState.CnfrmFileOver || script->OverwriteOlder))
                     {
                         char sAttr[101], tAttr[101];
                         BOOL getTimeFailed;
@@ -6221,7 +6221,7 @@ BOOL DoMoveFile(COperation* op, IWorkerObserver& observer, void* buffer,
                         if (dir)
                             TRACE_E("Error in script.");
 
-                        if (dlgData.SkipAllOverwrite)
+                        if (workerState.SkipAllOverwrite)
                             goto SKIP_OPEN;
 
                         int ret;
@@ -6246,12 +6246,12 @@ BOOL DoMoveFile(COperation* op, IWorkerObserver& observer, void* buffer,
                         switch (ret)
                         {
                         case IDB_ALL:
-                            dlgData.OverwriteAll = TRUE;
+                            workerState.OverwriteAll = TRUE;
                         case IDYES:
                             break;
 
                         case IDB_SKIPALL:
-                            dlgData.SkipAllOverwrite = TRUE;
+                            workerState.SkipAllOverwrite = TRUE;
                         case IDB_SKIP:
                         {
                         SKIP_OPEN:
@@ -6279,7 +6279,7 @@ BOOL DoMoveFile(COperation* op, IWorkerObserver& observer, void* buffer,
                     DWORD attr = op->GetTargetAttributes();
                     if (attr != INVALID_FILE_ATTRIBUTES && (attr & (FILE_ATTRIBUTE_HIDDEN | FILE_ATTRIBUTE_SYSTEM)))
                     {
-                        if (!dlgData.OverwriteHiddenAll && dlgData.CnfrmSHFileOver) // ignore script->OverwriteOlder here; user wants to see that this is a SYSTEM or HIDDEN file even with the option enabled
+                        if (!workerState.OverwriteHiddenAll && workerState.CnfrmSHFileOver) // ignore script->OverwriteOlder here; user wants to see that this is a SYSTEM or HIDDEN file even with the option enabled
                         {
                             observer.WaitIfSuspended(); // if we should be in suspend mode, wait ...
                             if (observer.IsCancelled())
@@ -6288,7 +6288,7 @@ BOOL DoMoveFile(COperation* op, IWorkerObserver& observer, void* buffer,
                             if (dir)
                                 TRACE_E("Error in script.");
 
-                            if (dlgData.SkipAllSystemOrHidden)
+                            if (workerState.SkipAllSystemOrHidden)
                                 goto SKIP_OPEN;
 
                             int ret = IDCANCEL;
@@ -6296,12 +6296,12 @@ BOOL DoMoveFile(COperation* op, IWorkerObserver& observer, void* buffer,
                             switch (ret)
                             {
                             case IDB_ALL:
-                                dlgData.OverwriteHiddenAll = TRUE;
+                                workerState.OverwriteHiddenAll = TRUE;
                             case IDYES:
                                 break;
 
                             case IDB_SKIPALL:
-                                dlgData.SkipAllSystemOrHidden = TRUE;
+                                workerState.SkipAllSystemOrHidden = TRUE;
                             case IDB_SKIP:
                                 goto SKIP_OPEN;
 
@@ -6330,7 +6330,7 @@ BOOL DoMoveFile(COperation* op, IWorkerObserver& observer, void* buffer,
                             if (dir)
                                 TRACE_E("Error in script.");
 
-                            if (dlgData.SkipAllOverwriteErr)
+                            if (workerState.SkipAllOverwriteErr)
                                 goto SKIP_OVERWRITE_ERROR;
 
                             int ret;
@@ -6342,7 +6342,7 @@ BOOL DoMoveFile(COperation* op, IWorkerObserver& observer, void* buffer,
                                 break;
 
                             case IDB_SKIPALL:
-                                dlgData.SkipAllOverwriteErr = TRUE;
+                                workerState.SkipAllOverwriteErr = TRUE;
                             case IDB_SKIP:
                             {
                             SKIP_OVERWRITE_ERROR:
@@ -6367,7 +6367,7 @@ BOOL DoMoveFile(COperation* op, IWorkerObserver& observer, void* buffer,
                     if (observer.IsCancelled())
                         return FALSE;
 
-                    if (dlgData.SkipAllMoveErrors)
+                    if (workerState.SkipAllMoveErrors)
                         goto SKIP_MOVE_ERROR;
 
                     if (err == ERROR_SHARING_VIOLATION && ++autoRetryAttempts <= 2)
@@ -6385,7 +6385,7 @@ BOOL DoMoveFile(COperation* op, IWorkerObserver& observer, void* buffer,
                             break;
 
                         case IDB_SKIPALL:
-                            dlgData.SkipAllMoveErrors = TRUE;
+                            workerState.SkipAllMoveErrors = TRUE;
                         case IDB_SKIP:
                         {
                         SKIP_MOVE_ERROR:
@@ -6416,7 +6416,7 @@ BOOL DoMoveFile(COperation* op, IWorkerObserver& observer, void* buffer,
         BOOL notError = DoCopyFile(op, observer, buffer, script, totalDone,
                                    clearReadonlyMask, &skip, lantasticCheck,
                                    mustDeleteFileBeforeOverwrite, allocWholeFileOnStart,
-                                   dlgData, copyADS, copyAsEncrypted, TRUE, asyncPar);
+                                   workerState, copyADS, copyAsEncrypted, TRUE, asyncPar);
         if (notError && !skip) // still need to clean up the file from the source
         {
             ClearReadOnlyAttr(op->SourceName); // ensure it can be deleted
@@ -6431,7 +6431,7 @@ BOOL DoMoveFile(COperation* op, IWorkerObserver& observer, void* buffer,
                     if (observer.IsCancelled())
                         return FALSE;
 
-                    if (dlgData.SkipAllDeleteErr)
+                    if (workerState.SkipAllDeleteErr)
                         return TRUE;
 
                     int ret = IDCANCEL;
@@ -6441,7 +6441,7 @@ BOOL DoMoveFile(COperation* op, IWorkerObserver& observer, void* buffer,
                     case IDRETRY:
                         break;
                     case IDB_SKIPALL:
-                        dlgData.SkipAllDeleteErr = TRUE;
+                        workerState.SkipAllDeleteErr = TRUE;
                     case IDB_SKIP:
                         return TRUE;
                     case IDCANCEL:
@@ -6455,7 +6455,7 @@ BOOL DoMoveFile(COperation* op, IWorkerObserver& observer, void* buffer,
 }
 
 BOOL DoDeleteFile(IWorkerObserver& observer, char* name, const CQuadWord& size, COperations* script,
-                  CQuadWord& totalDone, DWORD attr, CWorkerState& dlgData,
+                  CQuadWord& totalDone, DWORD attr, CWorkerState& workerState,
                   const std::wstring& nameW = std::wstring())
 {
     // if the path ends with a space/dot it is invalid and we must not delete it,
@@ -6469,13 +6469,13 @@ BOOL DoDeleteFile(IWorkerObserver& observer, char* name, const CQuadWord& size, 
         {
             if (attr & (FILE_ATTRIBUTE_HIDDEN | FILE_ATTRIBUTE_SYSTEM))
             {
-                if (!dlgData.DeleteHiddenAll && dlgData.CnfrmSHFileDel)
+                if (!workerState.DeleteHiddenAll && workerState.CnfrmSHFileDel)
                 {
                     observer.WaitIfSuspended(); // if we should be in suspend mode, wait ...
                     if (observer.IsCancelled())
                         return FALSE;
 
-                    if (dlgData.SkipAllSystemOrHidden)
+                    if (workerState.SkipAllSystemOrHidden)
                         goto SKIP_DELETE;
 
                     int ret = IDCANCEL;
@@ -6483,12 +6483,12 @@ BOOL DoDeleteFile(IWorkerObserver& observer, char* name, const CQuadWord& size, 
                     switch (ret)
                     {
                     case IDB_ALL:
-                        dlgData.DeleteHiddenAll = TRUE;
+                        workerState.DeleteHiddenAll = TRUE;
                     case IDYES:
                         break;
 
                     case IDB_SKIPALL:
-                        dlgData.SkipAllSystemOrHidden = TRUE;
+                        workerState.SkipAllSystemOrHidden = TRUE;
                     case IDB_SKIP:
                         goto SKIP_DELETE;
 
@@ -6501,7 +6501,7 @@ BOOL DoDeleteFile(IWorkerObserver& observer, char* name, const CQuadWord& size, 
 
             err = ERROR_SUCCESS;
             BOOL useRecycleBin;
-            switch (dlgData.UseRecycleBin)
+            switch (workerState.UseRecycleBin)
             {
             case 0:
                 useRecycleBin = script->CanUseRecycleBin && script->InvertRecycleBin;
@@ -6529,7 +6529,7 @@ BOOL DoDeleteFile(IWorkerObserver& observer, char* name, const CQuadWord& size, 
                             ext = fileName + tmpLen;
                         else
                             ext++;
-                        useRecycleBin = dlgData.AgreeRecycleMasks(fileName, ext);
+                        useRecycleBin = workerState.AgreeRecycleMasks(fileName, ext);
                     }
                     else
                     {
@@ -6587,7 +6587,7 @@ BOOL DoDeleteFile(IWorkerObserver& observer, char* name, const CQuadWord& size, 
             if (observer.IsCancelled())
                 return FALSE;
 
-            if (dlgData.SkipAllDeleteErr)
+            if (workerState.SkipAllDeleteErr)
                 goto SKIP_DELETE;
 
             int ret;
@@ -6599,7 +6599,7 @@ BOOL DoDeleteFile(IWorkerObserver& observer, char* name, const CQuadWord& size, 
                 break;
 
             case IDB_SKIPALL:
-                dlgData.SkipAllDeleteErr = TRUE;
+                workerState.SkipAllDeleteErr = TRUE;
             case IDB_SKIP:
             {
             SKIP_DELETE:
@@ -6725,7 +6725,7 @@ BOOL GetDirTime(const char* dirName, FILETIME* ftModified)
     return FALSE;
 }
 
-BOOL DoCopyDirTime(IWorkerObserver& observer, const char* targetName, FILETIME* modified, CWorkerState& dlgData, BOOL quiet)
+BOOL DoCopyDirTime(IWorkerObserver& observer, const char* targetName, FILETIME* modified, CWorkerState& workerState, BOOL quiet)
 {
     // if the path ends with a space/dot, we must append '\\', otherwise CreateFile
     // trims the spaces/dots and works with a different path
@@ -6768,7 +6768,7 @@ BOOL DoCopyDirTime(IWorkerObserver& observer, const char* targetName, FILETIME* 
 
         int ret;
         ret = IDCANCEL;
-        if (dlgData.IgnoreAllCopyDirTimeErr)
+        if (workerState.IgnoreAllCopyDirTimeErr)
             ret = IDB_IGNORE;
         else
         {
@@ -6777,7 +6777,7 @@ BOOL DoCopyDirTime(IWorkerObserver& observer, const char* targetName, FILETIME* 
         switch (ret)
         {
         case IDB_IGNOREALL:
-            dlgData.IgnoreAllCopyDirTimeErr = TRUE; // break intentionally omitted here
+            workerState.IgnoreAllCopyDirTimeErr = TRUE; // break intentionally omitted here
         case IDB_IGNORE:
             break;
 
@@ -6789,7 +6789,7 @@ BOOL DoCopyDirTime(IWorkerObserver& observer, const char* targetName, FILETIME* 
 }
 
 BOOL DoCreateDir(IWorkerObserver& observer, char* name, DWORD attr,
-                 DWORD clearReadonlyMask, CWorkerState& dlgData,
+                 DWORD clearReadonlyMask, CWorkerState& workerState,
                  CQuadWord& totalDone, CQuadWord& operTotal,
                  const char* sourceDir, BOOL adsCopy, COperations* script,
                  void* buffer, BOOL& skip, BOOL& alreadyExisted,
@@ -6828,7 +6828,7 @@ BOOL DoCreateDir(IWorkerObserver& observer, char* name, DWORD attr,
                 CQuadWord operDone = CREATE_DIR_SIZE; // directory already created
                 BOOL adsSkip = FALSE;
                 if (!DoCopyADS(observer, sourceDir, TRUE, name, totalDone,
-                               operDone, operTotal, dlgData, script, &adsSkip, buffer) ||
+                               operDone, operTotal, workerState, script, &adsSkip, buffer) ||
                     adsSkip) // user cancelled or skipped at least one ADS
                 {
                     if (SalLPRemoveDirectory(nameCrDir) == 0)
@@ -6867,17 +6867,17 @@ BOOL DoCreateDir(IWorkerObserver& observer, char* name, DWORD attr,
                             if (newAttr & FILE_ATTRIBUTE_ENCRYPTED)
                             {
                                 changeAttrErr = MyEncryptFile(observer, name, currentAttrs, 0 /* allow encrypting directories with the SYSTEM attribute */,
-                                                              dlgData, dummyCancelOper, FALSE);
+                                                              workerState, dummyCancelOper, FALSE);
 
                                 if ( //(WindowsVistaAndLater || script->TargetPathSupEFS) &&  // complain regardless of OS version and EFS support; originally directories on FAT could not be encrypted before Vista, we behave the same (to match Explorer, the Encrypted attribute is not that important)
-                                    !dlgData.DirCrLossEncrAll && changeAttrErr != ERROR_SUCCESS)
+                                    !workerState.DirCrLossEncrAll && changeAttrErr != ERROR_SUCCESS)
                                 {                                                              // failed to set the Encrypted attribute on the directory, ask the user what to do
                                     observer.WaitIfSuspended(); // if we should be in suspend mode, wait ...
                                     if (observer.IsCancelled())
                                         goto CANCEL_CRDIR;
 
                                     int ret;
-                                    if (dlgData.SkipAllDirCrLossEncr)
+                                    if (workerState.SkipAllDirCrLossEncr)
                                         ret = IDB_SKIP;
                                     else
                                     {
@@ -6887,12 +6887,12 @@ BOOL DoCreateDir(IWorkerObserver& observer, char* name, DWORD attr,
                                     switch (ret)
                                     {
                                     case IDB_ALL:
-                                        dlgData.DirCrLossEncrAll = TRUE; // break intentionally omitted here
+                                        workerState.DirCrLossEncrAll = TRUE; // break intentionally omitted here
                                     case IDYES:
                                         break;
 
                                     case IDB_SKIPALL:
-                                        dlgData.SkipAllDirCrLossEncr = TRUE;
+                                        workerState.SkipAllDirCrLossEncr = TRUE;
                                     case IDB_SKIP:
                                     {
                                         ClearReadOnlyAttr(nameCrDir); // remove read-only attribute so the file can be deleted
@@ -6938,7 +6938,7 @@ BOOL DoCreateDir(IWorkerObserver& observer, char* name, DWORD attr,
 
                         int ret;
                         ret = IDCANCEL;
-                        if (dlgData.IgnoreAllSetAttrsErr)
+                        if (workerState.IgnoreAllSetAttrsErr)
                             ret = IDB_IGNORE;
                         else
                         {
@@ -6947,7 +6947,7 @@ BOOL DoCreateDir(IWorkerObserver& observer, char* name, DWORD attr,
                         switch (ret)
                         {
                         case IDB_IGNOREALL:
-                            dlgData.IgnoreAllSetAttrsErr = TRUE; // break intentionally omitted here
+                            workerState.IgnoreAllSetAttrsErr = TRUE; // break intentionally omitted here
                         case IDB_IGNORE:
                             break;
 
@@ -6974,7 +6974,7 @@ BOOL DoCreateDir(IWorkerObserver& observer, char* name, DWORD attr,
 
                         int ret;
                         ret = IDCANCEL;
-                        if (dlgData.IgnoreAllCopyPermErr)
+                        if (workerState.IgnoreAllCopyPermErr)
                             ret = IDB_IGNORE;
                         else
                         {
@@ -6983,7 +6983,7 @@ BOOL DoCreateDir(IWorkerObserver& observer, char* name, DWORD attr,
                         switch (ret)
                         {
                         case IDB_IGNOREALL:
-                            dlgData.IgnoreAllCopyPermErr = TRUE; // break intentionally omitted here
+                            workerState.IgnoreAllCopyPermErr = TRUE; // break intentionally omitted here
                         case IDB_IGNORE:
                             break;
 
@@ -7005,7 +7005,7 @@ BOOL DoCreateDir(IWorkerObserver& observer, char* name, DWORD attr,
                 DWORD attr2 = SalGetFileAttributes(name);
                 if (attr2 & FILE_ATTRIBUTE_DIRECTORY) // "directory overwrite"
                 {
-                    if (dlgData.CnfrmDirOver && !dlgData.DirOverwriteAll) // should we ask the user about overwriting the directory?
+                    if (workerState.CnfrmDirOver && !workerState.DirOverwriteAll) // should we ask the user about overwriting the directory?
                     {
                         char sAttr[101], tAttr[101];
                         GetDirInfo(sAttr, sourceDir);
@@ -7015,7 +7015,7 @@ BOOL DoCreateDir(IWorkerObserver& observer, char* name, DWORD attr,
                         if (observer.IsCancelled())
                             return FALSE;
 
-                        if (dlgData.SkipAllDirOver)
+                        if (workerState.SkipAllDirOver)
                             goto SKIP_CREATE_ERROR;
 
                         int ret = IDCANCEL;
@@ -7023,12 +7023,12 @@ BOOL DoCreateDir(IWorkerObserver& observer, char* name, DWORD attr,
                         switch (ret)
                         {
                         case IDB_ALL:
-                            dlgData.DirOverwriteAll = TRUE;
+                            workerState.DirOverwriteAll = TRUE;
                         case IDYES:
                             break;
 
                         case IDB_SKIPALL:
-                            dlgData.SkipAllDirOver = TRUE;
+                            workerState.SkipAllDirOver = TRUE;
                         case IDB_SKIP:
                             goto SKIP_CREATE_ERROR;
 
@@ -7044,7 +7044,7 @@ BOOL DoCreateDir(IWorkerObserver& observer, char* name, DWORD attr,
                 if (observer.IsCancelled())
                     return FALSE;
 
-                if (dlgData.SkipAllDirCreate)
+                if (workerState.SkipAllDirCreate)
                     goto SKIP_CREATE_ERROR;
 
                 int ret = IDCANCEL;
@@ -7055,7 +7055,7 @@ BOOL DoCreateDir(IWorkerObserver& observer, char* name, DWORD attr,
                     break;
 
                 case IDB_SKIPALL:
-                    dlgData.SkipAllDirCreate = TRUE;
+                    workerState.SkipAllDirCreate = TRUE;
                 case IDB_SKIP:
                     goto SKIP_CREATE_ERROR;
 
@@ -7069,7 +7069,7 @@ BOOL DoCreateDir(IWorkerObserver& observer, char* name, DWORD attr,
             if (observer.IsCancelled())
                 return FALSE;
 
-            if (dlgData.SkipAllDirCreateErr)
+            if (workerState.SkipAllDirCreateErr)
                 goto SKIP_CREATE_ERROR;
 
             int ret;
@@ -7081,7 +7081,7 @@ BOOL DoCreateDir(IWorkerObserver& observer, char* name, DWORD attr,
                 break;
 
             case IDB_SKIPALL:
-                dlgData.SkipAllDirCreateErr = TRUE;
+                workerState.SkipAllDirCreateErr = TRUE;
             case IDB_SKIP:
             {
             SKIP_CREATE_ERROR:
@@ -7097,7 +7097,7 @@ BOOL DoCreateDir(IWorkerObserver& observer, char* name, DWORD attr,
 }
 
 BOOL DoDeleteDir(IWorkerObserver& observer, char* name, const CQuadWord& size, COperations* script,
-                 CQuadWord& totalDone, DWORD attr, BOOL dontUseRecycleBin, CWorkerState& dlgData)
+                 CQuadWord& totalDone, DWORD attr, BOOL dontUseRecycleBin, CWorkerState& workerState)
 {
     DWORD err;
     int AutoRetryCounter = 0;
@@ -7115,8 +7115,8 @@ BOOL DoDeleteDir(IWorkerObserver& observer, char* name, const CQuadWord& size, C
 
         err = ERROR_SUCCESS;
         if (script->CanUseRecycleBin && !dontUseRecycleBin &&
-            (script->InvertRecycleBin && dlgData.UseRecycleBin == 0 ||
-             !script->InvertRecycleBin && dlgData.UseRecycleBin == 1) &&
+            (script->InvertRecycleBin && workerState.UseRecycleBin == 0 ||
+             !script->InvertRecycleBin && workerState.UseRecycleBin == 1) &&
             IsDirectoryEmpty(name)) // subdirectory must not contain any files!!!
         {
             CPathBuffer nameList;
@@ -7162,7 +7162,7 @@ BOOL DoDeleteDir(IWorkerObserver& observer, char* name, const CQuadWord& size, C
             if (observer.IsCancelled())
                 return FALSE;
 
-            if (dlgData.SkipAllDeleteErr)
+            if (workerState.SkipAllDeleteErr)
                 goto SKIP_DELETE;
 
             if (AutoRetryCounter < 4 && GetTickCount() - startTime + (AutoRetryCounter + 1) * 100 <= 2000 &&
@@ -7184,7 +7184,7 @@ BOOL DoDeleteDir(IWorkerObserver& observer, char* name, const CQuadWord& size, C
                     break;
 
                 case IDB_SKIPALL:
-                    dlgData.SkipAllDeleteErr = TRUE;
+                    workerState.SkipAllDeleteErr = TRUE;
                 case IDB_SKIP:
                 {
                 SKIP_DELETE:
@@ -7356,7 +7356,7 @@ BOOL DeleteDirLink(const char* name, DWORD* err)
 }
 
 BOOL DoDeleteDirLink(IWorkerObserver& observer, char* name, const CQuadWord& size, COperations* script,
-                     CQuadWord& totalDone, CWorkerState& dlgData)
+                     CQuadWord& totalDone, CWorkerState& workerState)
 {
     // if the path ends with a space/dot, we must append '\\'; otherwise CreateFile
     // and RemoveDirectory trim the spaces/dots and operate on a different path
@@ -7383,7 +7383,7 @@ BOOL DoDeleteDirLink(IWorkerObserver& observer, char* name, const CQuadWord& siz
             if (observer.IsCancelled())
                 return FALSE;
 
-            if (dlgData.SkipAllDeleteErr)
+            if (workerState.SkipAllDeleteErr)
                 goto SKIP_DELETE_LINK;
 
             int ret;
@@ -7395,7 +7395,7 @@ BOOL DoDeleteDirLink(IWorkerObserver& observer, char* name, const CQuadWord& siz
                 break;
 
             case IDB_SKIPALL:
-                dlgData.SkipAllDeleteErr = TRUE;
+                workerState.SkipAllDeleteErr = TRUE;
             case IDB_SKIP:
             {
             SKIP_DELETE_LINK:
@@ -7426,7 +7426,7 @@ BOOL DoDeleteDirLink(IWorkerObserver& observer, char* name, const CQuadWord& siz
 //            3: replace line endings with CR (MAC)
 BOOL DoConvert(IWorkerObserver& observer, char* name, char* sourceBuffer, char* targetBuffer,
                const CQuadWord& size, COperations* script, CQuadWord& totalDone,
-               CConvertData& convertData, CWorkerState& dlgData)
+               CConvertData& convertData, CWorkerState& workerState)
 {
     // if the path ends with a space/dot it is invalid and we must not run the conversion,
     // CreateFile would trim the spaces/dots and convert a different file
@@ -7493,7 +7493,7 @@ CONVERT_AGAIN:
                             if (srcAttrs & FILE_ATTRIBUTE_ENCRYPTED)
                             {
                                 MyEncryptFile(observer, tmpFileName, tgtAttrs, 0 /* allow encrypting files with the SYSTEM attribute */,
-                                              dlgData, cancelOper, FALSE);
+                                              workerState, cancelOper, FALSE);
                             }
                             else
                                 MyDecryptFile(tmpFileName, tgtAttrs, FALSE);
@@ -7615,7 +7615,7 @@ CONVERT_AGAIN:
                                     if (observer.IsCancelled())
                                         goto CONVERT_ERROR;
 
-                                    if (dlgData.SkipAllFileWrite)
+                                    if (workerState.SkipAllFileWrite)
                                         goto SKIP_CONVERT;
 
                                     int ret;
@@ -7638,7 +7638,7 @@ CONVERT_AGAIN:
                                     }
 
                                     case IDB_SKIPALL:
-                                        dlgData.SkipAllFileWrite = TRUE;
+                                        workerState.SkipAllFileWrite = TRUE;
                                     case IDB_SKIP:
                                     {
                                     SKIP_CONVERT:
@@ -7674,7 +7674,7 @@ CONVERT_AGAIN:
                                 if (observer.IsCancelled())
                                     goto CONVERT_ERROR;
 
-                                if (dlgData.SkipAllFileRead)
+                                if (workerState.SkipAllFileRead)
                                     goto SKIP_CONVERT;
 
                                 int ret = IDCANCEL;
@@ -7684,7 +7684,7 @@ CONVERT_AGAIN:
                                 case IDRETRY:
                                     break;
                                 case IDB_SKIPALL:
-                                    dlgData.SkipAllFileRead = TRUE;
+                                    workerState.SkipAllFileRead = TRUE;
                                 case IDB_SKIP:
                                     goto SKIP_CONVERT;
                                 case IDCANCEL:
@@ -7722,7 +7722,7 @@ CONVERT_AGAIN:
                                         if (observer.IsCancelled())
                                             return FALSE;
 
-                                        if (dlgData.SkipAllMoveErrors)
+                                        if (workerState.SkipAllMoveErrors)
                                             return TRUE;
 
                                         int ret = IDCANCEL;
@@ -7733,7 +7733,7 @@ CONVERT_AGAIN:
                                             break;
 
                                         case IDB_SKIPALL:
-                                            dlgData.SkipAllMoveErrors = TRUE;
+                                            workerState.SkipAllMoveErrors = TRUE;
                                         case IDB_SKIP:
                                             return TRUE;
 
@@ -7757,7 +7757,7 @@ CONVERT_AGAIN:
                                     return FALSE;
                                 }
 
-                                if (dlgData.SkipAllOverwriteErr)
+                                if (workerState.SkipAllOverwriteErr)
                                     goto SKIP_OVERWRITE_ERROR;
 
                                 int ret;
@@ -7769,7 +7769,7 @@ CONVERT_AGAIN:
                                     break;
 
                                 case IDB_SKIPALL:
-                                    dlgData.SkipAllOverwriteErr = TRUE;
+                                    workerState.SkipAllOverwriteErr = TRUE;
                                 case IDB_SKIP:
                                 {
                                 SKIP_OVERWRITE_ERROR:
@@ -7816,7 +7816,7 @@ CONVERT_AGAIN:
                     if (observer.IsCancelled())
                         goto CANCEL_OPEN2;
 
-                    if (dlgData.SkipAllFileOpenOut)
+                    if (workerState.SkipAllFileOpenOut)
                         goto SKIP_OPEN_OUT;
 
                     int ret;
@@ -7828,7 +7828,7 @@ CONVERT_AGAIN:
                         break;
 
                     case IDB_SKIPALL:
-                        dlgData.SkipAllFileOpenOut = TRUE;
+                        workerState.SkipAllFileOpenOut = TRUE;
                     case IDB_SKIP:
                     {
                     SKIP_OPEN_OUT:
@@ -7859,7 +7859,7 @@ CONVERT_AGAIN:
             if (observer.IsCancelled())
                 return FALSE;
 
-            if (dlgData.SkipAllFileOpenIn)
+            if (workerState.SkipAllFileOpenIn)
                 goto SKIP_OPEN_IN;
 
             int ret;
@@ -7871,7 +7871,7 @@ CONVERT_AGAIN:
                 break;
 
             case IDB_SKIPALL:
-                dlgData.SkipAllFileOpenIn = TRUE;
+                workerState.SkipAllFileOpenIn = TRUE;
             case IDB_SKIP:
             {
             SKIP_OPEN_IN:
@@ -7892,7 +7892,7 @@ BOOL DoChangeAttrs(IWorkerObserver& observer, char* name, const CQuadWord& size,
                    COperations* script, CQuadWord& totalDone,
                    FILETIME* timeModified, FILETIME* timeCreated, FILETIME* timeAccessed,
                    BOOL& changeCompression, BOOL& changeEncryption, DWORD fileAttr,
-                   CWorkerState& dlgData,
+                   CWorkerState& workerState,
                    const std::wstring& nameW = std::wstring())
 {
     // if the path ends with a space/dot, we must append '\\'; otherwise
@@ -7949,8 +7949,8 @@ BOOL DoChangeAttrs(IWorkerObserver& observer, char* name, const CQuadWord& size,
         if (error == ERROR_SUCCESS && changeEncryption && (attrs & FILE_ATTRIBUTE_ENCRYPTED))
         {
             BOOL cancelOper = FALSE;
-            error = !nameW.empty() ? MyEncryptFileW(observer, nameW.c_str(), name, fileAttr, attrs, dlgData, cancelOper, TRUE)
-                                   : MyEncryptFile(observer, name, fileAttr, attrs, dlgData, cancelOper, TRUE);
+            error = !nameW.empty() ? MyEncryptFileW(observer, nameW.c_str(), name, fileAttr, attrs, workerState, cancelOper, TRUE)
+                                   : MyEncryptFile(observer, name, fileAttr, attrs, workerState, cancelOper, TRUE);
             if (observer.IsCancelled() || cancelOper)
                 return FALSE;
             if (error != ERROR_SUCCESS)
@@ -8045,7 +8045,7 @@ BOOL DoChangeAttrs(IWorkerObserver& observer, char* name, const CQuadWord& size,
             if (observer.IsCancelled())
                 return FALSE;
 
-            if (dlgData.SkipAllChangeAttrs)
+            if (workerState.SkipAllChangeAttrs)
                 goto SKIP_ATTRS_ERROR;
 
             int ret;
@@ -8057,7 +8057,7 @@ BOOL DoChangeAttrs(IWorkerObserver& observer, char* name, const CQuadWord& size,
                 break;
 
             case IDB_SKIPALL:
-                dlgData.SkipAllChangeAttrs = TRUE;
+                workerState.SkipAllChangeAttrs = TRUE;
             case IDB_SKIP:
             {
             SKIP_ATTRS_ERROR:
@@ -8083,8 +8083,8 @@ unsigned ThreadWorkerBody(void* parameter)
     CWorkerData* data = (CWorkerData*)parameter;
     //--- create a local copy of the data
     HANDLE wContinue = data->WContinue;
-    CWorkerState dlgData;
-    dlgData.Init();
+    CWorkerState workerState;
+    workerState.Init();
     COperations* script = data->Script;
     if (script->TotalSize == CQuadWord(0, 0))
     {
@@ -8169,7 +8169,7 @@ unsigned ThreadWorkerBody(void* parameter)
 
                 Error = !DoCopyFile(op, observer, buffer, script, totalDone,
                                     clearReadonlyMask, NULL, lantasticCheck, mustDeleteFileBeforeOverwrite,
-                                    allocWholeFileOnStart, dlgData,
+                                    allocWholeFileOnStart, workerState,
                                     (op->OpFlags & OPFL_COPY_ADS) != 0,
                                     (op->OpFlags & OPFL_AS_ENCRYPTED) != 0,
                                     FALSE, asyncPar);
@@ -8193,7 +8193,7 @@ unsigned ThreadWorkerBody(void* parameter)
                 Error = !DoMoveFile(op, observer, buffer, script, totalDone,
                                     op->Opcode == ocMoveDir, clearReadonlyMask, &novellRenamePatch,
                                     lantasticCheck, mustDeleteFileBeforeOverwrite,
-                                    allocWholeFileOnStart, dlgData,
+                                    allocWholeFileOnStart, workerState,
                                     (op->OpFlags & OPFL_COPY_ADS) != 0,
                                     (op->OpFlags & OPFL_AS_ENCRYPTED) != 0,
                                     &setDirTimeAfterMove, asyncPar, ignInvalidName);
@@ -8214,7 +8214,7 @@ unsigned ThreadWorkerBody(void* parameter)
                 observer.SetProgress(0, CaclProg(totalDone, script->TotalSize));
 
                 BOOL skip, alreadyExisted;
-                Error = !DoCreateDir(observer, op->TargetName, op->Attr, clearReadonlyMask, dlgData,
+                Error = !DoCreateDir(observer, op->TargetName, op->Attr, clearReadonlyMask, workerState,
                                      totalDone, op->Size, op->SourceName, copyADS, script, buffer, skip,
                                      alreadyExisted, crAsEncrypted, ignInvalidName);
                 if (!Error)
@@ -8307,7 +8307,7 @@ unsigned ThreadWorkerBody(void* parameter)
                     FILETIME modified;
                     modified.dwLowDateTime = (DWORD)(DWORD_PTR)op->SourceName;
                     modified.dwHighDateTime = op->Attr;
-                    Error = !DoCopyDirTime(observer, op->TargetName, &modified, dlgData, FALSE);
+                    Error = !DoCopyDirTime(observer, op->TargetName, &modified, workerState, FALSE);
                 }
                 if (!Error)
                 {
@@ -8335,7 +8335,7 @@ unsigned ThreadWorkerBody(void* parameter)
                 if (op->Opcode == ocDeleteFile)
                 {
                     Error = !DoDeleteFile(observer, op->SourceName, op->Size,
-                                          script, totalDone, op->Attr, dlgData,
+                                          script, totalDone, op->Attr, workerState,
                                           op->SourceNameW);
                 }
                 else
@@ -8344,12 +8344,12 @@ unsigned ThreadWorkerBody(void* parameter)
                     {
                         Error = !DoDeleteDir(observer, op->SourceName, op->Size,
                                              script, totalDone, op->Attr, (DWORD)(DWORD_PTR)op->TargetName != -1,
-                                             dlgData);
+                                             workerState);
                     }
                     else
                     {
                         Error = !DoDeleteDirLink(observer, op->SourceName, op->Size,
-                                                 script, totalDone, dlgData);
+                                                 script, totalDone, workerState);
                     }
                 }
                 break;
@@ -8380,7 +8380,7 @@ unsigned ThreadWorkerBody(void* parameter)
                 observer.SetProgress(0, CaclProg(totalDone, script->TotalSize));
 
                 Error = !DoConvert(observer, op->SourceName, (char*)buffer, tgtBuffer, op->Size, script,
-                                   totalDone, convertData, dlgData);
+                                   totalDone, convertData, workerState);
                 break;
             }
 
@@ -8400,7 +8400,7 @@ unsigned ThreadWorkerBody(void* parameter)
                                        attrsData->ChangeTimeCreated ? &attrsData->TimeCreated : NULL,
                                        attrsData->ChangeTimeAccessed ? &attrsData->TimeAccessed : NULL,
                                        attrsData->ChangeCompression, attrsData->ChangeEncryption,
-                                       op->Attr, dlgData,
+                                       op->Attr, workerState,
                                        op->SourceNameW);
                 break;
             }
