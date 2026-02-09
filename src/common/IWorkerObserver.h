@@ -64,6 +64,10 @@ public:
     // Returns IDRETRY, IDB_SKIP, IDB_SKIPALL, IDCANCEL, or IDB_IGNORE.
     virtual int AskFileError(const char* title, const char* fileName, const char* errorText) = 0;
 
+    // ID-based variant — worker passes IDS_* constant + Win32 error code,
+    // observer handles localization (LoadStr / GetErrorText).
+    virtual int AskFileErrorById(int titleId, const char* fileName, DWORD win32Error) = 0;
+
     // --- Overwrite confirmation (message ID 1) ---
     // Ask whether to overwrite a file. Shows source and target info.
     // Returns IDYES, IDB_ALL (yes to all), IDB_SKIP, IDB_SKIPALL, IDCANCEL.

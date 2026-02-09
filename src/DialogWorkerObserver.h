@@ -95,6 +95,11 @@ public:
         return ret;
     }
 
+    int AskFileErrorById(int titleId, const char* fileName, DWORD win32Error) override
+    {
+        return AskFileError(LoadStr(titleId), fileName, GetErrorText(win32Error));
+    }
+
     int AskOverwrite(const char* sourceName, const char* sourceInfo,
                      const char* targetName, const char* targetInfo) override
     {

@@ -1357,6 +1357,15 @@ struct CWorkerState
         int errorPos;
         if (UseRecycleBin == 2 && !PrepareRecycleMasks(errorPos))
             TRACE_E("Error in recycle-bin group mask.");
+
+        lstrcpyn(OpStrCopying, LoadStr(IDS_COPYING), 50);
+        lstrcpyn(OpStrCopyingPrep, LoadStr(IDS_COPYINGPREP), 50);
+        lstrcpyn(OpStrMoving, LoadStr(IDS_MOVING), 50);
+        lstrcpyn(OpStrMovingPrep, LoadStr(IDS_MOVINGPREP), 50);
+        lstrcpyn(OpStrCreatingDir, LoadStr(IDS_CREATINGDIR), 50);
+        lstrcpyn(OpStrDeleting, LoadStr(IDS_DELETING), 50);
+        lstrcpyn(OpStrConverting, LoadStr(IDS_CONVERTING), 50);
+        lstrcpyn(OpStrChangingAttrs, LoadStr(IDS_CHANGINGATTRS), 50);
     }
 
     BOOL PrepareRecycleMasks(int& errorPos)
@@ -3030,7 +3039,7 @@ COPY_ADS_AGAIN:
                                         CutADSNameSuffix(nameBuf);
                                         if (err == NO_ERROR && read != written)
                                             err = ERROR_DISK_FULL;
-                                        ret = observer.AskFileError(LoadStr(IDS_ERRORWRITINGADS), nameBuf, GetErrorText(err));
+                                        ret = observer.AskFileErrorById(IDS_ERRORWRITINGADS, nameBuf, err);
                                         switch (ret)
                                         {
                                         case IDRETRY: // on a network we must reopen the handle; local access would not allow sharing
@@ -3138,7 +3147,7 @@ COPY_ADS_AGAIN:
                                     WideCharToMultiByte(CP_ACP, 0, srcName, -1, nameBuf, nameBuf.Size(), NULL, NULL);
                                     nameBuf[nameBuf.Size() - 1] = 0;
                                     CutADSNameSuffix(nameBuf);
-                                    ret = observer.AskFileError(LoadStr(IDS_ERRORREADINGADS), nameBuf, GetErrorText(err));
+                                    ret = observer.AskFileErrorById(IDS_ERRORREADINGADS, nameBuf, err);
                                     switch (ret)
                                     {
                                     case IDRETRY:
@@ -3323,7 +3332,7 @@ COPY_ADS_AGAIN:
                     WideCharToMultiByte(CP_ACP, 0, srcName, -1, nameBuf, nameBuf.Size(), NULL, NULL);
                     nameBuf[nameBuf.Size() - 1] = 0;
                     CutADSNameSuffix(nameBuf);
-                    ret = observer.AskFileError(LoadStr(IDS_ERROROPENINGADS), nameBuf, GetErrorText(err));
+                    ret = observer.AskFileErrorById(IDS_ERROROPENINGADS, nameBuf, err);
                     switch (ret)
                     {
                     case IDRETRY:
@@ -3701,7 +3710,7 @@ void DoCopyFileLoopOrig(HANDLE& in, HANDLE& out, void* buffer, int& limitBufferS
                 ret = IDCANCEL;
                 if (err == NO_ERROR && read != written)
                     err = ERROR_DISK_FULL;
-                ret = observer.AskFileError(LoadStr(IDS_ERRORWRITINGFILE), op->TargetName, GetErrorText(err));
+                ret = observer.AskFileErrorById(IDS_ERRORWRITINGFILE, op->TargetName, err);
                 switch (ret)
                 {
                 case IDRETRY: // on a network we must reopen the handle; local access forbids it due to sharing
@@ -3802,7 +3811,7 @@ void DoCopyFileLoopOrig(HANDLE& in, HANDLE& out, void* buffer, int& limitBufferS
 
             int ret;
             ret = IDCANCEL;
-            ret = observer.AskFileError(LoadStr(IDS_ERRORREADINGFILE), op->SourceName, GetErrorText(err));
+            ret = observer.AskFileErrorById(IDS_ERRORREADINGFILE, op->SourceName, err);
             switch (ret)
             {
             case IDRETRY:
@@ -5240,7 +5249,7 @@ COPY_AGAIN:
                                 goto SKIP_COPY;
 
                             int ret = IDCANCEL;
-                            ret = observer.AskFileError(LoadStr(IDS_ERRORWRITINGFILE), op->TargetName, GetErrorText(ERROR_DISK_FULL));
+                            ret = observer.AskFileErrorById(IDS_ERRORWRITINGFILE, op->TargetName, ERROR_DISK_FULL);
                             switch (ret)
                             {
                             case IDRETRY:
@@ -5403,7 +5412,7 @@ COPY_AGAIN:
                                 goto SKIP_COPY;
 
                             int ret = IDCANCEL;
-                            ret = observer.AskFileError(LoadStr(IDS_ERRORWRITINGFILE), op->TargetName, GetErrorText(err));
+                            ret = observer.AskFileErrorById(IDS_ERRORWRITINGFILE, op->TargetName, err);
                             switch (ret)
                             {
                             case IDRETRY:
@@ -5897,7 +5906,7 @@ COPY_AGAIN:
 
             int ret;
             ret = IDCANCEL;
-            ret = observer.AskFileError(LoadStr(IDS_ERROROPENINGFILE), op->SourceName, GetErrorText(err));
+            ret = observer.AskFileErrorById(IDS_ERROROPENINGFILE, op->SourceName, err);
             switch (ret)
             {
             case IDRETRY:
@@ -6344,7 +6353,7 @@ BOOL DoMoveFile(COperation* op, IWorkerObserver& observer, void* buffer,
 
                             int ret;
                             ret = IDCANCEL;
-                            ret = observer.AskFileError(LoadStr(IDS_ERROROVERWRITINGFILE), op->TargetName, GetErrorText(err2));
+                            ret = observer.AskFileErrorById(IDS_ERROROVERWRITINGFILE, op->TargetName, err2);
                             switch (ret)
                             {
                             case IDRETRY:
@@ -6444,7 +6453,7 @@ BOOL DoMoveFile(COperation* op, IWorkerObserver& observer, void* buffer,
                         return TRUE;
 
                     int ret = IDCANCEL;
-                    ret = observer.AskFileError(LoadStr(IDS_ERRORDELETINGFILE), op->SourceName, GetErrorText(err));
+                    ret = observer.AskFileErrorById(IDS_ERRORDELETINGFILE, op->SourceName, err);
                     switch (ret)
                     {
                     case IDRETRY:
@@ -6601,7 +6610,7 @@ BOOL DoDeleteFile(IWorkerObserver& observer, char* name, const CQuadWord& size, 
 
             int ret;
             ret = IDCANCEL;
-            ret = observer.AskFileError(LoadStr(IDS_ERRORDELETINGFILE), name, GetErrorText(err));
+            ret = observer.AskFileErrorById(IDS_ERRORDELETINGFILE, name, err);
             switch (ret)
             {
             case IDRETRY:
@@ -7083,7 +7092,7 @@ BOOL DoCreateDir(IWorkerObserver& observer, char* name, DWORD attr,
 
             int ret;
             ret = IDCANCEL;
-            ret = observer.AskFileError(LoadStr(IDS_ERRORCREATINGDIR), name, GetErrorText(err));
+            ret = observer.AskFileErrorById(IDS_ERRORCREATINGDIR, name, err);
             switch (ret)
             {
             case IDRETRY:
@@ -7186,7 +7195,7 @@ BOOL DoDeleteDir(IWorkerObserver& observer, char* name, const CQuadWord& size, C
             {
                 int ret;
                 ret = IDCANCEL;
-                ret = observer.AskFileError(LoadStr(IDS_ERRORDELETINGDIR), (char*)nameRmDir, GetErrorText(err));
+                ret = observer.AskFileErrorById(IDS_ERRORDELETINGDIR, (char*)nameRmDir, err);
                 switch (ret)
                 {
                 case IDRETRY:
@@ -7397,7 +7406,7 @@ BOOL DoDeleteDirLink(IWorkerObserver& observer, char* name, const CQuadWord& siz
 
             int ret;
             ret = IDCANCEL;
-            ret = observer.AskFileError(LoadStr(IDS_ERRORDELETINGDIRLINK), (char*)nameDelLink, GetErrorText(err));
+            ret = observer.AskFileErrorById(IDS_ERRORDELETINGDIRLINK, (char*)nameDelLink, err);
             switch (ret)
             {
             case IDRETRY:
@@ -8138,23 +8147,7 @@ unsigned ThreadWorkerBody(void* parameter)
     CAsyncCopyParams* asyncPar = NULL;
     if (buffer != NULL)
     {
-        // prefetch strings so we do not load them for every operation individually (fills the LoadStr buffer quickly + throttles)
-        char opStrCopying[50];
-        lstrcpyn(opStrCopying, LoadStr(IDS_COPYING), 50);
-        char opStrCopyingPrep[50];
-        lstrcpyn(opStrCopyingPrep, LoadStr(IDS_COPYINGPREP), 50);
-        char opStrMoving[50];
-        lstrcpyn(opStrMoving, LoadStr(IDS_MOVING), 50);
-        char opStrMovingPrep[50];
-        lstrcpyn(opStrMovingPrep, LoadStr(IDS_MOVINGPREP), 50);
-        char opStrCreatingDir[50];
-        lstrcpyn(opStrCreatingDir, LoadStr(IDS_CREATINGDIR), 50);
-        char opStrDeleting[50];
-        lstrcpyn(opStrDeleting, LoadStr(IDS_DELETING), 50);
-        char opStrConverting[50];
-        lstrcpyn(opStrConverting, LoadStr(IDS_CONVERTING), 50);
-        char opChangAttrs[50];
-        lstrcpyn(opChangAttrs, LoadStr(IDS_CHANGINGATTRS), 50);
+        // operation label strings are loaded in workerState.Init()
 
         TRACE_I("Worker: script->Count=" << script->Count << ", IsCancelled=" << observer.IsCancelled());
         int i;
@@ -8166,9 +8159,9 @@ unsigned ThreadWorkerBody(void* parameter)
             {
             case ocCopyFile:
             {
-                pd.Operation = opStrCopying;
+                pd.Operation = workerState.OpStrCopying;
                 pd.Source = op->SourceName;
-                pd.Preposition = opStrCopyingPrep;
+                pd.Preposition = workerState.OpStrCopyingPrep;
                 pd.Target = op->TargetName;
                 observer.SetOperationInfo(&pd);
 
@@ -8188,9 +8181,9 @@ unsigned ThreadWorkerBody(void* parameter)
             case ocMoveDir:
             case ocMoveFile:
             {
-                pd.Operation = opStrMoving;
+                pd.Operation = workerState.OpStrMoving;
                 pd.Source = op->SourceName;
-                pd.Preposition = opStrMovingPrep;
+                pd.Preposition = workerState.OpStrMovingPrep;
                 pd.Target = op->TargetName;
                 observer.SetOperationInfo(&pd);
 
@@ -8214,7 +8207,7 @@ unsigned ThreadWorkerBody(void* parameter)
                 BOOL copyADS = (op->OpFlags & OPFL_COPY_ADS) != 0;
                 BOOL crAsEncrypted = (op->OpFlags & OPFL_AS_ENCRYPTED) != 0;
                 BOOL ignInvalidName = (op->OpFlags & OPFL_IGNORE_INVALID_NAME) != 0;
-                pd.Operation = opStrCreatingDir;
+                pd.Operation = workerState.OpStrCreatingDir;
                 pd.Source = op->TargetName;
                 pd.Preposition = "";
                 pd.Target = "";
@@ -8305,7 +8298,7 @@ unsigned ThreadWorkerBody(void* parameter)
 
                 if (!skipSetDirTime)
                 {
-                    pd.Operation = opChangAttrs;
+                    pd.Operation = workerState.OpStrChangingAttrs;
                     pd.Source = op->TargetName;
                     pd.Preposition = "";
                     pd.Target = "";
@@ -8333,7 +8326,7 @@ unsigned ThreadWorkerBody(void* parameter)
             case ocDeleteDirLink:
             {
                 TRACE_I("Worker: delete op=" << op->Opcode << " src=" << (op->SourceName ? op->SourceName : "(null)"));
-                pd.Operation = opStrDeleting;
+                pd.Operation = workerState.OpStrDeleting;
                 pd.Source = op->SourceName;
                 pd.Preposition = "";
                 pd.Target = "";
@@ -8380,7 +8373,7 @@ unsigned ThreadWorkerBody(void* parameter)
                         break; // error ...
                     }
                 }
-                pd.Operation = opStrConverting;
+                pd.Operation = workerState.OpStrConverting;
                 pd.Source = op->SourceName;
                 pd.Preposition = "";
                 pd.Target = "";
@@ -8395,7 +8388,7 @@ unsigned ThreadWorkerBody(void* parameter)
 
             case ocChangeAttrs:
             {
-                pd.Operation = opChangAttrs;
+                pd.Operation = workerState.OpStrChangingAttrs;
                 pd.Source = op->SourceName;
                 pd.Preposition = "";
                 pd.Target = "";

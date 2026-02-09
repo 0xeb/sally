@@ -230,6 +230,19 @@ public:
         return ret;
     }
 
+    int AskFileErrorById(int titleId, const char* fileName, DWORD win32Error) override
+    {
+        int ret = PolicyToReturnValue(m_fileErrorPolicy);
+        char titleBuf[32];
+        wsprintfA(titleBuf, "IDS_%d", titleId);
+        char errBuf[32];
+        wsprintfA(errBuf, "err_%lu", win32Error);
+        m_calls.push_back({TestObserverCall::kAskFileError,
+                           fileName ? fileName : "",
+                           errBuf, ret});
+        return ret;
+    }
+
     int AskOverwrite(const char* sourceName, const char* sourceInfo,
                      const char* targetName, const char* targetInfo) override
     {
