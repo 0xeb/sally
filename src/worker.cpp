@@ -8,6 +8,8 @@
 #include "worker.h"
 #include "common/widepath.h"
 #include "common/IFileSystem.h"
+#include "common/IWorkerObserver.h"
+#include "DialogWorkerObserver.h"
 #include "common/unicode/helpers.h"
 
 #include <aclapi.h>
@@ -1329,43 +1331,13 @@ struct CProgressDlgData
     }
 };
 
-void SetProgressDialog(HWND hProgressDlg, CProgressData* data, CProgressDlgData& dlgData)
-{                                                              // wait for the response; the dialog must be updated
-    WaitForSingleObject(dlgData.WorkerNotSuspended, INFINITE); // if we should be in suspend mode, wait ...
-    if (!*dlgData.CancelWorker)                                // we need to stop the main thread
-        SendMessage(hProgressDlg, WM_USER_SETDIALOG, (WPARAM)data, 0);
-}
-
 int CaclProg(const CQuadWord& progressCurrent, const CQuadWord& progressTotal)
 {
     return progressCurrent >= progressTotal ? (progressTotal.Value == 0 ? 0 : 1000) : (int)((progressCurrent * CQuadWord(1000, 0)) / progressTotal).Value;
 }
 
-void SetProgress(HWND hProgressDlg, int operation, int summary, CProgressDlgData& dlgData)
-{                                                              // notify about the change and continue without waiting for a reply
-    WaitForSingleObject(dlgData.WorkerNotSuspended, INFINITE); // if we should be in suspend mode, wait ...
-    if (!*dlgData.CancelWorker &&
-        (*dlgData.OperationProgress != operation || *dlgData.SummaryProgress != summary))
-    {
-        *dlgData.OperationProgress = operation;
-        *dlgData.SummaryProgress = summary;
-        SendMessage(hProgressDlg, WM_USER_SETDIALOG, 0, 0);
-    }
-}
-
-void SetProgressWithoutSuspend(HWND hProgressDlg, int operation, int summary, CProgressDlgData& dlgData)
-{ // notify about the change and continue without waiting for a reply
-    if (!*dlgData.CancelWorker &&
-        (*dlgData.OperationProgress != operation || *dlgData.SummaryProgress != summary))
-    {
-        *dlgData.OperationProgress = operation;
-        *dlgData.SummaryProgress = summary;
-        SendMessage(hProgressDlg, WM_USER_SETDIALOG, 0, 0);
-    }
-}
-
 BOOL GetDirTime(const char* dirName, FILETIME* ftModified);
-BOOL DoCopyDirTime(HWND hProgressDlg, const char* targetName, FILETIME* modified, CProgressDlgData& dlgData, BOOL quiet);
+BOOL DoCopyDirTime(HWND hProgressDlg, IWorkerObserver& observer, const char* targetName, FILETIME* modified, CProgressDlgData& dlgData, BOOL quiet);
 
 void GetFileOverwriteInfo(char* buff, int buffLen, HANDLE file, const char* fileName, FILETIME* fileTime, BOOL* getTimeFailed)
 {
@@ -2003,7 +1975,7 @@ DWORD UncompressFile(char* fileName, DWORD attrs)
     return ret;
 }
 
-DWORD MyEncryptFile(HWND hProgressDlg, char* fileName, DWORD attrs, DWORD finalAttrs,
+DWORD MyEncryptFile(HWND hProgressDlg, IWorkerObserver& observer, char* fileName, DWORD attrs, DWORD finalAttrs,
                     CProgressDlgData& dlgData, BOOL& cancelOper, BOOL preserveDate)
 {
     DWORD retEnc = ERROR_SUCCESS;
@@ -2022,8 +1994,8 @@ DWORD MyEncryptFile(HWND hProgressDlg, char* fileName, DWORD attrs, DWORD finalA
     { // if it has and will keep the SYSTEM attribute, ask the user whether they really mean it
         if (!dlgData.EncryptSystemAll)
         {
-            WaitForSingleObject(dlgData.WorkerNotSuspended, INFINITE); // if we should be in suspend mode, wait ...
-            if (*dlgData.CancelWorker)
+            observer.WaitIfSuspended(); // if we should be in suspend mode, wait ...
+            if (observer.IsCancelled())
                 return retEnc;
 
             if (dlgData.SkipAllEncryptSystem)
@@ -2619,7 +2591,7 @@ BOOL CheckTailOfOutFile(CAsyncCopyParams* asyncPar, HANDLE in, HANDLE out, const
 // copies ADS into the newly created file/directory
 // returns FALSE only when cancelled; success + Skip both return TRUE; Skip sets 'skip'
 // (when not NULL) to TRUE
-BOOL DoCopyADS(HWND hProgressDlg, const char* sourceName, BOOL isDir, const char* targetName,
+BOOL DoCopyADS(HWND hProgressDlg, IWorkerObserver& observer, const char* sourceName, BOOL isDir, const char* targetName,
                CQuadWord const& totalDone, CQuadWord& operDone, CQuadWord const& operTotal,
                CProgressDlgData& dlgData, COperations* script, BOOL* skip, void* buffer)
 {
@@ -2766,8 +2738,8 @@ COPY_ADS_AGAIN:
                                     if (read == 0)
                                         break;                                                     // EOF
                                     if (!script->ChangeSpeedLimit)                                 // if the speed limit can change, this is not a "suitable" place to wait
-                                        WaitForSingleObject(dlgData.WorkerNotSuspended, INFINITE); // if we should be in suspend mode, wait ...
-                                    if (*dlgData.CancelWorker)
+                                        observer.WaitIfSuspended(); // if we should be in suspend mode, wait ...
+                                    if (observer.IsCancelled())
                                     {
                                     COPY_ERROR_ADS:
 
@@ -2795,8 +2767,8 @@ COPY_ADS_AGAIN:
                                         DWORD err;
                                         err = GetLastError();
 
-                                        WaitForSingleObject(dlgData.WorkerNotSuspended, INFINITE); // if we should be in suspend mode, wait ...
-                                        if (*dlgData.CancelWorker)
+                                        observer.WaitIfSuspended(); // if we should be in suspend mode, wait ...
+                                        if (observer.IsCancelled())
                                             goto COPY_ERROR_ADS;
 
                                         if (dlgData.SkipAllFileADSWrite)
@@ -2887,22 +2859,21 @@ COPY_ADS_AGAIN:
                                     if (endProcessing)
                                         break;
                                     if (!script->ChangeSpeedLimit)                                 // when the speed limit can change, this is not a suitable wait point
-                                        WaitForSingleObject(dlgData.WorkerNotSuspended, INFINITE); // if we should be in suspend mode, wait ...
-                                    if (*dlgData.CancelWorker)
+                                        observer.WaitIfSuspended(); // if we should be in suspend mode, wait ...
+                                    if (observer.IsCancelled())
                                         goto COPY_ERROR_ADS;
 
                                     script->AddBytesToSpeedMetersAndTFSandPS(read, FALSE, bufferSize, &limitBufferSize);
 
                                     if (!script->ChangeSpeedLimit)                                 // when the speed limit can change, this is not a suitable wait point
-                                        WaitForSingleObject(dlgData.WorkerNotSuspended, INFINITE); // if we should be in suspend mode, wait ...
+                                        observer.WaitIfSuspended(); // if we should be in suspend mode, wait ...
                                     operationDone += CQuadWord(read, 0);
-                                    SetProgressWithoutSuspend(hProgressDlg, CaclProg(operDone + operationDone, operTotal),
-                                                              CaclProg(totalDone + operDone + operationDone, script->TotalSize),
-                                                              dlgData);
+                                    observer.SetProgressWithoutSuspend(CaclProg(operDone + operationDone, operTotal),
+                                                              CaclProg(totalDone + operDone + operationDone, script->TotalSize));
 
                                     if (script->ChangeSpeedLimit)                                  // speed limit may change; this is the right place to wait until the
                                     {                                                              // worker resumes and fetch a fresh copy buffer size
-                                        WaitForSingleObject(dlgData.WorkerNotSuspended, INFINITE); // if we should be in suspend mode, wait ...
+                                        observer.WaitIfSuspended(); // if we should be in suspend mode, wait ...
                                         script->GetNewBufSize(&limitBufferSize, bufferSize);
                                     }
                                 }
@@ -2912,8 +2883,8 @@ COPY_ADS_AGAIN:
 
                                     DWORD err;
                                     err = GetLastError();
-                                    WaitForSingleObject(dlgData.WorkerNotSuspended, INFINITE); // if we should be in suspend mode, wait ...
-                                    if (*dlgData.CancelWorker)
+                                    observer.WaitIfSuspended(); // if we should be in suspend mode, wait ...
+                                    if (observer.IsCancelled())
                                         goto COPY_ERROR_ADS;
 
                                     if (dlgData.SkipAllFileADSRead)
@@ -3030,8 +3001,8 @@ COPY_ADS_AGAIN:
                                 goto COPY_OVERWRITE;
                             }
 
-                            WaitForSingleObject(dlgData.WorkerNotSuspended, INFINITE); // if we should be in suspend mode, wait ...
-                            if (*dlgData.CancelWorker)
+                            observer.WaitIfSuspended(); // if we should be in suspend mode, wait ...
+                            if (observer.IsCancelled())
                                 goto CANCEL_OPEN2_ADS;
 
                             if (dlgData.SkipAllFileADSOpenOut)
@@ -3102,8 +3073,8 @@ COPY_ADS_AGAIN:
                 else
                 {
                     DWORD err = GetLastError();
-                    WaitForSingleObject(dlgData.WorkerNotSuspended, INFINITE); // if we should be in suspend mode, wait ...
-                    if (*dlgData.CancelWorker)
+                    observer.WaitIfSuspended(); // if we should be in suspend mode, wait ...
+                    if (observer.IsCancelled())
                     {
                         doCopyADSRet = FALSE;
                         endProcessing = TRUE;
@@ -3165,8 +3136,8 @@ COPY_ADS_AGAIN:
     {
         if (adsWinError != NO_ERROR) // display the Windows error (low-memory warning goes only to TRACE_E)
         {
-            WaitForSingleObject(dlgData.WorkerNotSuspended, INFINITE); // if we should be in suspend mode, wait ...
-            if (*dlgData.CancelWorker)
+            observer.WaitIfSuspended(); // if we should be in suspend mode, wait ...
+            if (observer.IsCancelled())
                 return FALSE;
 
             if (dlgData.IgnoreAllADSReadErr)
@@ -3192,7 +3163,7 @@ COPY_ADS_AGAIN:
 
                 script->SetTFSandProgressSize(finalTransferredFileSize, totalDone + operTotal);
 
-                SetProgress(hProgressDlg, 0, CaclProg(totalDone + operTotal, script->TotalSize), dlgData);
+                observer.SetProgress(0, CaclProg(totalDone + operTotal, script->TotalSize));
                 return TRUE;
             }
 
@@ -3207,7 +3178,7 @@ COPY_ADS_AGAIN:
     {
         script->SetTFSandProgressSize(finalTransferredFileSize, totalDone + operTotal);
 
-        SetProgress(hProgressDlg, 0, CaclProg(totalDone + operTotal, script->TotalSize), dlgData);
+        observer.SetProgress(0, CaclProg(totalDone + operTotal, script->TotalSize));
     }
     return doCopyADSRet;
 }
@@ -3454,7 +3425,7 @@ void SetTFSandPSforSkippedFile(COperation* op, CQuadWord& lastTransferredFileSiz
 void DoCopyFileLoopOrig(HANDLE& in, HANDLE& out, void* buffer, int& limitBufferSize,
                         COperations* script, CProgressDlgData& dlgData, BOOL wholeFileAllocated,
                         COperation* op, const CQuadWord& totalDone, BOOL& copyError, BOOL& skipCopy,
-                        HWND hProgressDlg, CQuadWord& operationDone, CQuadWord& fileSize,
+                        HWND hProgressDlg, IWorkerObserver& observer, CQuadWord& operationDone, CQuadWord& fileSize,
                         int bufferSize, int& allocWholeFileOnStart, BOOL& copyAgain)
 {
     int autoRetryAttemptsSNAP = 0;
@@ -3468,8 +3439,8 @@ void DoCopyFileLoopOrig(HANDLE& in, HANDLE& out, void* buffer, int& limitBufferS
             if (read == 0)
                 break;                                                     // EOF
             if (!script->ChangeSpeedLimit)                                 // when the speed limit can change, this is not a suitable wait point
-                WaitForSingleObject(dlgData.WorkerNotSuspended, INFINITE); // if we should be in suspend mode, wait ...
-            if (*dlgData.CancelWorker)
+                observer.WaitIfSuspended(); // if we should be in suspend mode, wait ...
+            if (observer.IsCancelled())
             {
                 copyError = TRUE; // goto COPY_ERROR
                 return;
@@ -3488,8 +3459,8 @@ void DoCopyFileLoopOrig(HANDLE& in, HANDLE& out, void* buffer, int& limitBufferS
                 DWORD err;
                 err = GetLastError();
 
-                WaitForSingleObject(dlgData.WorkerNotSuspended, INFINITE); // if we should be in suspend mode, wait ...
-                if (*dlgData.CancelWorker)
+                observer.WaitIfSuspended(); // if we should be in suspend mode, wait ...
+                if (observer.IsCancelled())
                 {
                     copyError = TRUE; // goto COPY_ERROR
                     return;
@@ -3563,8 +3534,8 @@ void DoCopyFileLoopOrig(HANDLE& in, HANDLE& out, void* buffer, int& limitBufferS
                 }
             }
             if (!script->ChangeSpeedLimit)                                 // when the speed limit can change, this is not a suitable wait point
-                WaitForSingleObject(dlgData.WorkerNotSuspended, INFINITE); // if we should be in suspend mode, wait ...
-            if (*dlgData.CancelWorker)
+                observer.WaitIfSuspended(); // if we should be in suspend mode, wait ...
+            if (observer.IsCancelled())
             {
                 copyError = TRUE; // goto COPY_ERROR
                 return;
@@ -3573,14 +3544,14 @@ void DoCopyFileLoopOrig(HANDLE& in, HANDLE& out, void* buffer, int& limitBufferS
             script->AddBytesToSpeedMetersAndTFSandPS(read, FALSE, bufferSize, &limitBufferSize);
 
             if (!script->ChangeSpeedLimit)                                 // when the speed limit can change, this is not a suitable wait point
-                WaitForSingleObject(dlgData.WorkerNotSuspended, INFINITE); // if we should be in suspend mode, wait ...
+                observer.WaitIfSuspended(); // if we should be in suspend mode, wait ...
             operationDone += CQuadWord(read, 0);
-            SetProgressWithoutSuspend(hProgressDlg, CaclProg(operationDone, op->Size),
-                                      CaclProg(totalDone + operationDone, script->TotalSize), dlgData);
+            observer.SetProgressWithoutSuspend(CaclProg(operationDone, op->Size),
+                                                 CaclProg(totalDone + operationDone, script->TotalSize));
 
             if (script->ChangeSpeedLimit)                                  // speed limit may change; this is the right place to wait until the
             {                                                              // worker resumes and fetches a fresh copy buffer size
-                WaitForSingleObject(dlgData.WorkerNotSuspended, INFINITE); // if we should be in suspend mode, wait ...
+                observer.WaitIfSuspended(); // if we should be in suspend mode, wait ...
                 script->GetNewBufSize(&limitBufferSize, bufferSize);
             }
         }
@@ -3590,8 +3561,8 @@ void DoCopyFileLoopOrig(HANDLE& in, HANDLE& out, void* buffer, int& limitBufferS
 
             DWORD err;
             err = GetLastError();
-            WaitForSingleObject(dlgData.WorkerNotSuspended, INFINITE); // if we should be in suspend mode, wait ...
-            if (*dlgData.CancelWorker)
+            observer.WaitIfSuspended(); // if we should be in suspend mode, wait ...
+            if (observer.IsCancelled())
             {
                 copyError = TRUE; // goto COPY_ERROR
                 return;
@@ -3769,6 +3740,7 @@ struct CCopy_Context
     CProgressDlgData* DlgData;
     COperation* Op;
     HWND HProgressDlg;
+    IWorkerObserver* Observer;
     HANDLE* In;
     HANDLE* Out;
     BOOL WholeFileAllocated;
@@ -3778,7 +3750,7 @@ struct CCopy_Context
     const CQuadWord* LastTransferredFileSize;
 
     CCopy_Context(CAsyncCopyParams* asyncPar, int numOfBlocks, CProgressDlgData* dlgData, COperation* op,
-                  HWND hProgressDlg, HANDLE* in, HANDLE* out, BOOL wholeFileAllocated, COperations* script,
+                  HWND hProgressDlg, IWorkerObserver& observer, HANDLE* in, HANDLE* out, BOOL wholeFileAllocated, COperations* script,
                   CQuadWord* operationDone, const CQuadWord* totalDone, const CQuadWord* lastTransferredFileSize)
     {
         AsyncPar = asyncPar;
@@ -3801,6 +3773,7 @@ struct CCopy_Context
         DlgData = dlgData;
         Op = op;
         HProgressDlg = hProgressDlg;
+        Observer = &observer;
         In = in;
         Out = out;
         WholeFileAllocated = wholeFileAllocated;
@@ -3892,8 +3865,8 @@ BOOL CCopy_Context::StartReading(int blkIndex, DWORD readSize, DWORD* err, BOOL 
 #endif // ASYNC_COPY_DEBUG_MSG
 
     if (opCompleted && !Script->ChangeSpeedLimit)                   // when the speed limit can change, this is not a suitable wait point
-        WaitForSingleObject(DlgData->WorkerNotSuspended, INFINITE); // if we should be in suspend mode, wait ...
-    if (*DlgData->CancelWorker)
+        Observer->WaitIfSuspended(); // if we should be in suspend mode, wait ...
+    if (Observer->IsCancelled())
     {
         *err = ERROR_CANCELLED;
         return FALSE; // cancellation will be handled in the error-handling
@@ -3939,8 +3912,8 @@ BOOL CCopy_Context::StartWriting(int blkIndex, DWORD* err)
 #endif // ASYNC_COPY_DEBUG_MSG
 
     if (opCompleted && !Script->ChangeSpeedLimit)                   // when the speed limit can change, this is not a suitable wait point
-        WaitForSingleObject(DlgData->WorkerNotSuspended, INFINITE); // if we should be in suspend mode, wait ...
-    if (*DlgData->CancelWorker)
+        Observer->WaitIfSuspended(); // if we should be in suspend mode, wait ...
+    if (Observer->IsCancelled())
     {
         *err = ERROR_CANCELLED;
         return FALSE; // cancellation will be handled in the error-handling
@@ -4135,8 +4108,8 @@ BOOL CCopy_Context::RetryCopyReadErr(DWORD* err, BOOL* copyAgain, BOOL* errAgain
                 ForceOp = ReadOffset > WriteOffset ? fopWriting : fopNotUsed; // if the read side is ahead, resume with writing
                 *OperationDone = WriteOffset;
                 Script->SetTFSandProgressSize(*LastTransferredFileSize + *OperationDone, *TotalDone + *OperationDone);
-                SetProgressWithoutSuspend(HProgressDlg, CaclProg(*OperationDone, Op->Size),
-                                          CaclProg(*TotalDone + *OperationDone, Script->TotalSize), *DlgData);
+                Observer->SetProgressWithoutSuspend(CaclProg(*OperationDone, Op->Size),
+                                                 CaclProg(*TotalDone + *OperationDone, Script->TotalSize));
                 return TRUE; // success: proceed with retry
             }
         }
@@ -4166,8 +4139,8 @@ BOOL CCopy_Context::HandleReadingErr(int blkIndex, DWORD err, BOOL* copyError, B
 
     while (1)
     {
-        WaitForSingleObject(DlgData->WorkerNotSuspended, INFINITE); // if we should be in suspend mode, wait ...
-        if (*DlgData->CancelWorker)
+        Observer->WaitIfSuspended(); // if we should be in suspend mode, wait ...
+        if (Observer->IsCancelled())
         {
             CancelOpPhase2(blkIndex);
             *copyError = TRUE; // goto COPY_ERROR
@@ -4277,8 +4250,8 @@ BOOL CCopy_Context::RetryCopyWriteErr(DWORD* err, BOOL* copyAgain, BOOL* errAgai
         ForceOp = ReadOffset > WriteOffset ? fopWriting : fopNotUsed; // if the read side is ahead, resume with writing
         *OperationDone = WriteOffset;
         Script->SetTFSandProgressSize(*LastTransferredFileSize + *OperationDone, *TotalDone + *OperationDone);
-        SetProgressWithoutSuspend(HProgressDlg, CaclProg(*OperationDone, Op->Size),
-                                  CaclProg(*TotalDone + *OperationDone, Script->TotalSize), *DlgData);
+        Observer->SetProgressWithoutSuspend(CaclProg(*OperationDone, Op->Size),
+                                                 CaclProg(*TotalDone + *OperationDone, Script->TotalSize));
         return TRUE; // success: proceed with retry
     }
     else // still cannot open; problem persists
@@ -4299,8 +4272,8 @@ BOOL CCopy_Context::HandleWritingErr(int blkIndex, DWORD err, BOOL* copyError, B
 
     while (1)
     {
-        WaitForSingleObject(DlgData->WorkerNotSuspended, INFINITE); // if we are supposed to be in suspend mode, wait ...
-        if (*DlgData->CancelWorker)
+        Observer->WaitIfSuspended(); // if we are supposed to be in suspend mode, wait ...
+        if (Observer->IsCancelled())
         {
             CancelOpPhase2(blkIndex);
             *copyError = TRUE; // goto COPY_ERROR
@@ -4361,8 +4334,8 @@ BOOL CCopy_Context::HandleWritingErr(int blkIndex, DWORD err, BOOL* copyError, B
 BOOL CCopy_Context::HandleSuspModeAndCancel(BOOL* copyError)
 {
     if (!Script->ChangeSpeedLimit)                                  // if the speed limit cannot change (otherwise this is not a "suitable" place to wait)
-        WaitForSingleObject(DlgData->WorkerNotSuspended, INFINITE); // if we are supposed to be in suspend mode, wait ...
-    if (*DlgData->CancelWorker)
+        Observer->WaitIfSuspended(); // if we are supposed to be in suspend mode, wait ...
+    if (Observer->IsCancelled())
     {
         CancelOpPhase1();
         CancelOpPhase2(-1);
@@ -4374,7 +4347,7 @@ BOOL CCopy_Context::HandleSuspModeAndCancel(BOOL* copyError)
 
 void DoCopyFileLoopAsync(CAsyncCopyParams* asyncPar, HANDLE& in, HANDLE& out, void* buffer, int& limitBufferSize,
                          COperations* script, CProgressDlgData& dlgData, BOOL wholeFileAllocated, COperation* op,
-                         const CQuadWord& totalDone, BOOL& copyError, BOOL& skipCopy, HWND hProgressDlg,
+                         const CQuadWord& totalDone, BOOL& copyError, BOOL& skipCopy, HWND hProgressDlg, IWorkerObserver& observer,
                          CQuadWord& operationDone, CQuadWord& fileSize, int bufferSize,
                          int& allocWholeFileOnStart, BOOL& copyAgain, const CQuadWord& lastTransferredFileSize)
 {
@@ -4393,7 +4366,7 @@ void DoCopyFileLoopAsync(CAsyncCopyParams* asyncPar, HANDLE& in, HANDLE& out, vo
     int numOfBlocks = 8;
 
     // Copy operation context (prevents passing heaps of parameters to helper functions, now context methods)
-    CCopy_Context ctx(asyncPar, numOfBlocks, &dlgData, op, hProgressDlg, &in, &out, wholeFileAllocated, script,
+    CCopy_Context ctx(asyncPar, numOfBlocks, &dlgData, op, hProgressDlg, observer, &in, &out, wholeFileAllocated, script,
                       &operationDone, &totalDone, &lastTransferredFileSize);
     BOOL doCopy = TRUE;
     while (doCopy)
@@ -4523,14 +4496,14 @@ void DoCopyFileLoopAsync(CAsyncCopyParams* asyncPar, HANDLE& in, HANDLE& out, vo
                         script->AddBytesToSpeedMetersAndTFSandPS(bytes, FALSE, bufferSize, &limitBufferSize);
 
                         if (!script->ChangeSpeedLimit)                                 // if the speed limit can change, this is not a "suitable" place to wait
-                            WaitForSingleObject(dlgData.WorkerNotSuspended, INFINITE); // if we should be in suspend mode, wait ...
+                            observer.WaitIfSuspended(); // if we should be in suspend mode, wait ...
                         operationDone += CQuadWord(bytes, 0);
-                        SetProgressWithoutSuspend(hProgressDlg, CaclProg(operationDone, op->Size),
-                                                  CaclProg(totalDone + operationDone, script->TotalSize), dlgData);
+                        observer.SetProgressWithoutSuspend(CaclProg(operationDone, op->Size),
+                                                 CaclProg(totalDone + operationDone, script->TotalSize));
 
                         if (script->ChangeSpeedLimit)                                  // the speed limit is likely to change, this is a "suitable" place to wait until the
                         {                                                              // worker resumes so we can get the buffer size for copying again
-                            WaitForSingleObject(dlgData.WorkerNotSuspended, INFINITE); // if we should be in suspend mode, wait ...
+                            observer.WaitIfSuspended(); // if we should be in suspend mode, wait ...
                             script->GetNewBufSize(&limitBufferSize, bufferSize);
                         }
 
@@ -4706,7 +4679,7 @@ void DoCopyFileLoopAsync(CAsyncCopyParams* asyncPar, HANDLE& in, HANDLE& out, vo
     }
 }
 
-BOOL DoCopyFile(COperation* op, HWND hProgressDlg, void* buffer,
+BOOL DoCopyFile(COperation* op, HWND hProgressDlg, IWorkerObserver& observer, void* buffer,
                 COperations* script, CQuadWord& totalDone,
                 DWORD clearReadonlyMask, BOOL* skip, BOOL lantasticCheck,
                 int& mustDeleteFileBeforeOverwrite, int& allocWholeFileOnStart,
@@ -4765,7 +4738,7 @@ BOOL DoCopyFile(COperation* op, HWND hProgressDlg, void* buffer,
                         totalDone += op->Size;
                         script->AddBytesToTFSandSetProgressSize(fileSize, totalDone);
 
-                        SetProgress(hProgressDlg, 0, CaclProg(totalDone, script->TotalSize), dlgData);
+                        observer.SetProgress(0, CaclProg(totalDone, script->TotalSize));
                         if (skip != NULL)
                             *skip = TRUE;
                         return TRUE;
@@ -4887,8 +4860,8 @@ COPY_AGAIN:
                                 lossEncryptionAttr = TRUE;
                             else
                             {
-                                WaitForSingleObject(dlgData.WorkerNotSuspended, INFINITE); // if we should be in suspend mode, wait ...
-                                if (*dlgData.CancelWorker)
+                                observer.WaitIfSuspended(); // if we should be in suspend mode, wait ...
+                                if (observer.IsCancelled())
                                     goto CANCEL_ENCNOTSUP;
 
                                 if (dlgData.SkipAllFileOutLossEncr)
@@ -5003,7 +4976,7 @@ COPY_AGAIN:
                     if (useAsyncAlg)
                     {
                         DoCopyFileLoopAsync(asyncPar, in, out, buffer, limitBufferSize, script, dlgData, wholeFileAllocated, op,
-                                            totalDone, copyError, skipCopy, hProgressDlg, operationDone, fileSize,
+                                            totalDone, copyError, skipCopy, hProgressDlg, observer, operationDone, fileSize,
                                             bufferSize, allocWholeFileOnStart, copyAgain, lastTransferredFileSize);
                         // NOTE: neither 'in' nor 'out' has the file pointer (SetFilePointer) positioned at the end of the file,
                         //       'out' has it set only when (copyError || skipCopy)
@@ -5011,7 +4984,7 @@ COPY_AGAIN:
                     else
                     {
                         DoCopyFileLoopOrig(in, out, buffer, limitBufferSize, script, dlgData, wholeFileAllocated, op,
-                                           totalDone, copyError, skipCopy, hProgressDlg, operationDone, fileSize,
+                                           totalDone, copyError, skipCopy, hProgressDlg, observer, operationDone, fileSize,
                                            bufferSize, allocWholeFileOnStart, copyAgain);
                     }
 
@@ -5046,7 +5019,7 @@ COPY_AGAIN:
                             HANDLES(CloseHandle(out));
                         }
                         op->DeleteTargetFile();
-                        SetProgress(hProgressDlg, 0, CaclProg(totalDone, script->TotalSize), dlgData);
+                        observer.SetProgress(0, CaclProg(totalDone, script->TotalSize));
                         if (skip != NULL)
                             *skip = TRUE;
                         return TRUE;
@@ -5061,8 +5034,8 @@ COPY_AGAIN:
                         outSize.LoDWord = GetFileSize(out, &outSize.HiDWord);
                         if (inSize != outSize)
                         {                                                              // Lantastic 7.0: everything seems fine, but the result is wrong
-                            WaitForSingleObject(dlgData.WorkerNotSuspended, INFINITE); // if we should be in suspend mode, wait ...
-                            if (*dlgData.CancelWorker)
+                            observer.WaitIfSuspended(); // if we should be in suspend mode, wait ...
+                            if (observer.IsCancelled())
                                 goto COPY_ERROR;
 
                             if (dlgData.SkipAllFileWrite)
@@ -5081,7 +5054,7 @@ COPY_AGAIN:
                             {
                                 operationDone = CQuadWord(0, 0);
                                 script->SetTFSandProgressSize(lastTransferredFileSize, totalDone);
-                                SetProgress(hProgressDlg, 0, CaclProg(totalDone, script->TotalSize), dlgData);
+                                observer.SetProgress(0, CaclProg(totalDone, script->TotalSize));
                                 SetFilePointer(in, 0, NULL, FILE_BEGIN);  // read again
                                 SetFilePointer(out, 0, NULL, FILE_BEGIN); // write again
                                 SetEndOfFile(out);                        // truncate the output file
@@ -5106,8 +5079,8 @@ COPY_AGAIN:
                     {
                         DWORD err = GetLastError();
 
-                        WaitForSingleObject(dlgData.WorkerNotSuspended, INFINITE); // if we should be in suspend mode, wait ...
-                        if (*dlgData.CancelWorker)
+                        observer.WaitIfSuspended(); // if we should be in suspend mode, wait ...
+                        if (observer.IsCancelled())
                             goto COPY_ERROR;
 
                         if (dlgData.SkipAllGetFileTime)
@@ -5163,7 +5136,7 @@ COPY_AGAIN:
                         if (operDone < COPY_MIN_FILE_SIZE)
                             operDone = COPY_MIN_FILE_SIZE; // zero/small files take at least as long as files of size COPY_MIN_FILE_SIZE
                         BOOL adsSkip = FALSE;
-                        if (!DoCopyADS(hProgressDlg, op->SourceName, FALSE, op->TargetName, totalDone,
+                        if (!DoCopyADS(hProgressDlg, observer, op->SourceName, FALSE, op->TargetName, totalDone,
                                        operDone, op->Size, dlgData, script, &adsSkip, buffer) ||
                             adsSkip) // user hit cancel or skipped at least one ADS
                         {
@@ -5192,8 +5165,8 @@ COPY_AGAIN:
                             {
                                 DWORD err = GetLastError();
 
-                                WaitForSingleObject(dlgData.WorkerNotSuspended, INFINITE); // if we should be in suspend mode, wait ...
-                                if (*dlgData.CancelWorker)
+                                observer.WaitIfSuspended(); // if we should be in suspend mode, wait ...
+                                if (observer.IsCancelled())
                                     goto COPY_ERROR;
 
                                 if (dlgData.SkipAllSetFileTime)
@@ -5239,8 +5212,8 @@ COPY_AGAIN:
                         {
                             out = NULL;
                             DWORD err = GetLastError();
-                            WaitForSingleObject(dlgData.WorkerNotSuspended, INFINITE); // if we should be in suspend mode, wait ...
-                            if (*dlgData.CancelWorker)
+                            observer.WaitIfSuspended(); // if we should be in suspend mode, wait ...
+                            if (observer.IsCancelled())
                                 goto COPY_ERROR;
 
                             if (dlgData.SkipAllFileWrite)
@@ -5284,8 +5257,8 @@ COPY_AGAIN:
                         curAttrs = op->GetTargetAttributes();
                         if (curAttrs == INVALID_FILE_ATTRIBUTES || (curAttrs & DISPLAYED_ATTRIBUTES) != (attr & DISPLAYED_ATTRIBUTES))
                         {                                                              // attributes probably were not preserved, warn the user
-                            WaitForSingleObject(dlgData.WorkerNotSuspended, INFINITE); // if we should be in suspend mode, wait ...
-                            if (*dlgData.CancelWorker)
+                            observer.WaitIfSuspended(); // if we should be in suspend mode, wait ...
+                            if (observer.IsCancelled())
                                 goto COPY_ERROR_2;
 
                             int ret;
@@ -5325,8 +5298,8 @@ COPY_AGAIN:
                         DWORD err;
                         if (!DoCopySecurity(op->SourceName, op->TargetName, &err, NULL))
                         {
-                            WaitForSingleObject(dlgData.WorkerNotSuspended, INFINITE); // if we should be in suspend mode, wait ...
-                            if (*dlgData.CancelWorker)
+                            observer.WaitIfSuspended(); // if we should be in suspend mode, wait ...
+                            if (observer.IsCancelled())
                                 goto COPY_ERROR_2;
 
                             int ret;
@@ -5363,8 +5336,8 @@ COPY_AGAIN:
                 {
                     if (!invalidTgtName && encryptionNotSupported)
                     {
-                        WaitForSingleObject(dlgData.WorkerNotSuspended, INFINITE); // if we should be in suspend mode, wait ...
-                        if (*dlgData.CancelWorker)
+                        observer.WaitIfSuspended(); // if we should be in suspend mode, wait ...
+                        if (observer.IsCancelled())
                             goto CANCEL_OPEN2;
 
                         if (dlgData.SkipAllFileOutLossEncr)
@@ -5396,7 +5369,7 @@ COPY_AGAIN:
                             SetTFSandPSforSkippedFile(op, lastTransferredFileSize, script, totalDone);
 
                             HANDLES(CloseHandle(in));
-                            SetProgress(hProgressDlg, 0, CaclProg(totalDone, script->TotalSize), dlgData);
+                            observer.SetProgress(0, CaclProg(totalDone, script->TotalSize));
                             if (skip != NULL)
                                 *skip = TRUE;
                             return TRUE;
@@ -5444,8 +5417,8 @@ COPY_AGAIN:
                                 }
                                 out = NULL;
 
-                                WaitForSingleObject(dlgData.WorkerNotSuspended, INFINITE); // if we should be in suspend mode, wait ...
-                                if (*dlgData.CancelWorker)
+                                observer.WaitIfSuspended(); // if we should be in suspend mode, wait ...
+                                if (observer.IsCancelled())
                                     goto CANCEL_OPEN;
 
                                 if (dlgData.SkipAllOverwrite)
@@ -5498,7 +5471,7 @@ COPY_AGAIN:
                                     totalDone += op->Size;
                                     SetTFSandPSforSkippedFile(op, lastTransferredFileSize, script, totalDone);
 
-                                    SetProgress(hProgressDlg, 0, CaclProg(totalDone, script->TotalSize), dlgData);
+                                    observer.SetProgress(0, CaclProg(totalDone, script->TotalSize));
                                     if (skip != NULL)
                                         *skip = TRUE;
                                     return TRUE;
@@ -5521,8 +5494,8 @@ COPY_AGAIN:
                                     HANDLES(CloseHandle(in));
                                     in = NULL;
 
-                                    WaitForSingleObject(dlgData.WorkerNotSuspended, INFINITE); // if we should be in suspend mode, wait ...
-                                    if (*dlgData.CancelWorker)
+                                    observer.WaitIfSuspended(); // if we should be in suspend mode, wait ...
+                                    if (observer.IsCancelled())
                                         goto CANCEL_OPEN;
 
                                     if (dlgData.SkipAllSystemOrHidden)
@@ -5687,8 +5660,8 @@ COPY_AGAIN:
                                                 lossEncryptionAttr = TRUE;
                                             else
                                             {
-                                                WaitForSingleObject(dlgData.WorkerNotSuspended, INFINITE); // if we should be in suspend mode, wait ...
-                                                if (*dlgData.CancelWorker)
+                                                observer.WaitIfSuspended(); // if we should be in suspend mode, wait ...
+                                                if (observer.IsCancelled())
                                                     goto CANCEL_ENCNOTSUP;
 
                                                 if (dlgData.SkipAllFileOutLossEncr)
@@ -5731,8 +5704,8 @@ COPY_AGAIN:
                         {
                         NORMAL_ERROR:
 
-                            WaitForSingleObject(dlgData.WorkerNotSuspended, INFINITE); // if we should be in suspend mode, wait ...
-                            if (*dlgData.CancelWorker)
+                            observer.WaitIfSuspended(); // if we should be in suspend mode, wait ...
+                            if (observer.IsCancelled())
                                 goto CANCEL_OPEN2;
 
                             if (dlgData.SkipAllFileOpenOut)
@@ -5773,8 +5746,8 @@ COPY_AGAIN:
                 err = ERROR_INVALID_NAME;
             if (asyncPar->Failed())
                 err = ERROR_NOT_ENOUGH_MEMORY;                         // cannot create the synchronization event = lack of resources (will probably never happens, so we do not bother)
-            WaitForSingleObject(dlgData.WorkerNotSuspended, INFINITE); // if we should be in suspend mode, wait ...
-            if (*dlgData.CancelWorker)
+            observer.WaitIfSuspended(); // if we should be in suspend mode, wait ...
+            if (observer.IsCancelled())
                 return FALSE;
 
             if (dlgData.SkipAllFileOpenIn)
@@ -5802,7 +5775,7 @@ COPY_AGAIN:
                 totalDone += op->Size;
                 SetTFSandPSforSkippedFile(op, lastTransferredFileSize, script, totalDone);
 
-                SetProgress(hProgressDlg, 0, CaclProg(totalDone, script->TotalSize), dlgData);
+                observer.SetProgress(0, CaclProg(totalDone, script->TotalSize));
                 if (skip != NULL)
                     *skip = TRUE;
                 return TRUE;
@@ -5815,7 +5788,7 @@ COPY_AGAIN:
     }
 }
 
-BOOL DoMoveFile(COperation* op, HWND hProgressDlg, void* buffer,
+BOOL DoMoveFile(COperation* op, HWND hProgressDlg, IWorkerObserver& observer, void* buffer,
                 COperations* script, CQuadWord& totalDone, BOOL dir,
                 DWORD clearReadonlyMask, BOOL* novellRenamePatch, BOOL lantasticCheck,
                 int& mustDeleteFileBeforeOverwrite, int& allocWholeFileOnStart,
@@ -5861,8 +5834,8 @@ BOOL DoMoveFile(COperation* op, HWND hProgressDlg, void* buffer,
             if (srcSecurity.SrcError != ERROR_SUCCESS) // failed to read security info from the source file -> nothing to apply on the target
             {
                 srcSecurityErr = TRUE;
-                WaitForSingleObject(dlgData.WorkerNotSuspended, INFINITE); // if we should be in suspend mode, wait ...
-                if (*dlgData.CancelWorker)
+                observer.WaitIfSuspended(); // if we should be in suspend mode, wait ...
+                if (observer.IsCancelled())
                     return FALSE;
 
                 int ret;
@@ -5909,8 +5882,8 @@ BOOL DoMoveFile(COperation* op, HWND hProgressDlg, void* buffer,
                     curAttrs = SalGetFileAttributes(targetNameMvDir);
                     if (curAttrs == INVALID_FILE_ATTRIBUTES || (curAttrs & DISPLAYED_ATTRIBUTES) != (op->Attr & DISPLAYED_ATTRIBUTES))
                     {                                                              // attributes probably were not preserved, warn the user
-                        WaitForSingleObject(dlgData.WorkerNotSuspended, INFINITE); // if we should be in suspend mode, wait ...
-                        if (*dlgData.CancelWorker)
+                        observer.WaitIfSuspended(); // if we should be in suspend mode, wait ...
+                        if (observer.IsCancelled())
                             goto MOVE_ERROR_2;
 
                         int ret;
@@ -5948,8 +5921,8 @@ BOOL DoMoveFile(COperation* op, HWND hProgressDlg, void* buffer,
                     DWORD err;
                     if (!DoCopySecurity(sourceNameMvDir, targetNameMvDir, &err, &srcSecurity))
                     {
-                        WaitForSingleObject(dlgData.WorkerNotSuspended, INFINITE); // if we should be in suspend mode, wait ...
-                        if (*dlgData.CancelWorker)
+                        observer.WaitIfSuspended(); // if we should be in suspend mode, wait ...
+                        if (observer.IsCancelled())
                             goto MOVE_ERROR_2;
 
                         int ret;
@@ -5992,7 +5965,7 @@ BOOL DoMoveFile(COperation* op, HWND hProgressDlg, void* buffer,
                         {
                             if (*setDirTimeAfterMove == 0 /* need test */)
                                 *setDirTimeAfterMove = 1 /* yes */;
-                            DoCopyDirTime(hProgressDlg, targetNameMvDir, &dirTimeModified, dlgData, TRUE); // ignore any failure, this is just a hack (we already ignore time read errors from the directory); MoveFile should not change times
+                            DoCopyDirTime(hProgressDlg, observer, targetNameMvDir, &dirTimeModified, dlgData, TRUE); // ignore any failure, this is just a hack (we already ignore time read errors from the directory); MoveFile should not change times
                         }
                     }
                 }
@@ -6000,7 +5973,7 @@ BOOL DoMoveFile(COperation* op, HWND hProgressDlg, void* buffer,
                 script->AddBytesToSpeedMetersAndTFSandPS((DWORD)op->Size.Value, TRUE, 0, NULL, MAX_OP_FILESIZE);
 
                 totalDone += op->Size;
-                SetProgress(hProgressDlg, 0, CaclProg(totalDone, script->TotalSize), dlgData);
+                observer.SetProgress(0, CaclProg(totalDone, script->TotalSize));
                 return TRUE;
             }
             else
@@ -6128,8 +6101,8 @@ BOOL DoMoveFile(COperation* op, HWND hProgressDlg, void* buffer,
                         HANDLES(CloseHandle(in));
                         HANDLES(CloseHandle(out));
 
-                        WaitForSingleObject(dlgData.WorkerNotSuspended, INFINITE); // if we should be in suspend mode, wait ...
-                        if (*dlgData.CancelWorker)
+                        observer.WaitIfSuspended(); // if we should be in suspend mode, wait ...
+                        if (observer.IsCancelled())
                             goto CANCEL_OPEN;
 
                         if (dir)
@@ -6178,7 +6151,7 @@ BOOL DoMoveFile(COperation* op, HWND hProgressDlg, void* buffer,
 
                             totalDone += op->Size;
                             script->SetProgressSize(totalDone);
-                            SetProgress(hProgressDlg, 0, CaclProg(totalDone, script->TotalSize), dlgData);
+                            observer.SetProgress(0, CaclProg(totalDone, script->TotalSize));
                             return TRUE;
                         }
 
@@ -6201,8 +6174,8 @@ BOOL DoMoveFile(COperation* op, HWND hProgressDlg, void* buffer,
                     {
                         if (!dlgData.OverwriteHiddenAll && dlgData.CnfrmSHFileOver) // ignore script->OverwriteOlder here; user wants to see that this is a SYSTEM or HIDDEN file even with the option enabled
                         {
-                            WaitForSingleObject(dlgData.WorkerNotSuspended, INFINITE); // if we should be in suspend mode, wait ...
-                            if (*dlgData.CancelWorker)
+                            observer.WaitIfSuspended(); // if we should be in suspend mode, wait ...
+                            if (observer.IsCancelled())
                                 goto CANCEL_OPEN;
 
                             if (dir)
@@ -6248,8 +6221,8 @@ BOOL DoMoveFile(COperation* op, HWND hProgressDlg, void* buffer,
                             if (err2 == ERROR_FILE_NOT_FOUND)
                                 break; // if the user already deleted the file manually, everything is fine
 
-                            WaitForSingleObject(dlgData.WorkerNotSuspended, INFINITE); // if we should be in suspend mode, wait ...
-                            if (*dlgData.CancelWorker)
+                            observer.WaitIfSuspended(); // if we should be in suspend mode, wait ...
+                            if (observer.IsCancelled())
                                 return FALSE;
 
                             if (dir)
@@ -6279,7 +6252,7 @@ BOOL DoMoveFile(COperation* op, HWND hProgressDlg, void* buffer,
 
                                 totalDone += op->Size;
                                 script->SetProgressSize(totalDone);
-                                SetProgress(hProgressDlg, 0, CaclProg(totalDone, script->TotalSize), dlgData);
+                                observer.SetProgress(0, CaclProg(totalDone, script->TotalSize));
                                 return TRUE;
                             }
 
@@ -6293,8 +6266,8 @@ BOOL DoMoveFile(COperation* op, HWND hProgressDlg, void* buffer,
                 {
                 NORMAL_ERROR:
 
-                    WaitForSingleObject(dlgData.WorkerNotSuspended, INFINITE); // if we should be in suspend mode, wait ...
-                    if (*dlgData.CancelWorker)
+                    observer.WaitIfSuspended(); // if we should be in suspend mode, wait ...
+                    if (observer.IsCancelled())
                         return FALSE;
 
                     if (dlgData.SkipAllMoveErrors)
@@ -6327,7 +6300,7 @@ BOOL DoMoveFile(COperation* op, HWND hProgressDlg, void* buffer,
 
                             totalDone += op->Size;
                             script->SetProgressSize(totalDone);
-                            SetProgress(hProgressDlg, 0, CaclProg(totalDone, script->TotalSize), dlgData);
+                            observer.SetProgress(0, CaclProg(totalDone, script->TotalSize));
                             return TRUE;
                         }
 
@@ -6348,7 +6321,7 @@ BOOL DoMoveFile(COperation* op, HWND hProgressDlg, void* buffer,
         }
 
         BOOL skip;
-        BOOL notError = DoCopyFile(op, hProgressDlg, buffer, script, totalDone,
+        BOOL notError = DoCopyFile(op, hProgressDlg, observer, buffer, script, totalDone,
                                    clearReadonlyMask, &skip, lantasticCheck,
                                    mustDeleteFileBeforeOverwrite, allocWholeFileOnStart,
                                    dlgData, copyADS, copyAsEncrypted, TRUE, asyncPar);
@@ -6362,8 +6335,8 @@ BOOL DoMoveFile(COperation* op, HWND hProgressDlg, void* buffer,
                 {
                     DWORD err = GetLastError();
 
-                    WaitForSingleObject(dlgData.WorkerNotSuspended, INFINITE); // if we should be in suspend mode, wait ...
-                    if (*dlgData.CancelWorker)
+                    observer.WaitIfSuspended(); // if we should be in suspend mode, wait ...
+                    if (observer.IsCancelled())
                         return FALSE;
 
                     if (dlgData.SkipAllDeleteErr)
@@ -6394,7 +6367,7 @@ BOOL DoMoveFile(COperation* op, HWND hProgressDlg, void* buffer,
     }
 }
 
-BOOL DoDeleteFile(HWND hProgressDlg, char* name, const CQuadWord& size, COperations* script,
+BOOL DoDeleteFile(HWND hProgressDlg, IWorkerObserver& observer, char* name, const CQuadWord& size, COperations* script,
                   CQuadWord& totalDone, DWORD attr, CProgressDlgData& dlgData,
                   const std::wstring& nameW = std::wstring())
 {
@@ -6411,8 +6384,8 @@ BOOL DoDeleteFile(HWND hProgressDlg, char* name, const CQuadWord& size, COperati
             {
                 if (!dlgData.DeleteHiddenAll && dlgData.CnfrmSHFileDel)
                 {
-                    WaitForSingleObject(dlgData.WorkerNotSuspended, INFINITE); // if we should be in suspend mode, wait ...
-                    if (*dlgData.CancelWorker)
+                    observer.WaitIfSuspended(); // if we should be in suspend mode, wait ...
+                    if (observer.IsCancelled())
                         return FALSE;
 
                     if (dlgData.SkipAllSystemOrHidden)
@@ -6523,13 +6496,13 @@ BOOL DoDeleteFile(HWND hProgressDlg, char* name, const CQuadWord& size, COperati
         if (err == ERROR_SUCCESS)
         {
             totalDone += size;
-            SetProgress(hProgressDlg, 0, CaclProg(totalDone, script->TotalSize), dlgData);
+            observer.SetProgress(0, CaclProg(totalDone, script->TotalSize));
             return TRUE;
         }
         else
         {
-            WaitForSingleObject(dlgData.WorkerNotSuspended, INFINITE); // if we should be in suspend mode, wait ...
-            if (*dlgData.CancelWorker)
+            observer.WaitIfSuspended(); // if we should be in suspend mode, wait ...
+            if (observer.IsCancelled())
                 return FALSE;
 
             if (dlgData.SkipAllDeleteErr)
@@ -6555,7 +6528,7 @@ BOOL DoDeleteFile(HWND hProgressDlg, char* name, const CQuadWord& size, COperati
             SKIP_DELETE:
 
                 totalDone += size;
-                SetProgress(hProgressDlg, 0, CaclProg(totalDone, script->TotalSize), dlgData);
+                observer.SetProgress(0, CaclProg(totalDone, script->TotalSize));
                 return TRUE;
             }
 
@@ -6675,7 +6648,7 @@ BOOL GetDirTime(const char* dirName, FILETIME* ftModified)
     return FALSE;
 }
 
-BOOL DoCopyDirTime(HWND hProgressDlg, const char* targetName, FILETIME* modified, CProgressDlgData& dlgData, BOOL quiet)
+BOOL DoCopyDirTime(HWND hProgressDlg, IWorkerObserver& observer, const char* targetName, FILETIME* modified, CProgressDlgData& dlgData, BOOL quiet)
 {
     // if the path ends with a space/dot, we must append '\\', otherwise CreateFile
     // trims the spaces/dots and works with a different path
@@ -6712,8 +6685,8 @@ BOOL DoCopyDirTime(HWND hProgressDlg, const char* targetName, FILETIME* modified
 
     if (showError)
     {
-        WaitForSingleObject(dlgData.WorkerNotSuspended, INFINITE); // if we should be in suspend mode, wait ...
-        if (*dlgData.CancelWorker)
+        observer.WaitIfSuspended(); // if we should be in suspend mode, wait ...
+        if (observer.IsCancelled())
             return FALSE;
 
         int ret;
@@ -6742,7 +6715,7 @@ BOOL DoCopyDirTime(HWND hProgressDlg, const char* targetName, FILETIME* modified
     return TRUE;
 }
 
-BOOL DoCreateDir(HWND hProgressDlg, char* name, DWORD attr,
+BOOL DoCreateDir(HWND hProgressDlg, IWorkerObserver& observer, char* name, DWORD attr,
                  DWORD clearReadonlyMask, CProgressDlgData& dlgData,
                  CQuadWord& totalDone, CQuadWord& operTotal,
                  const char* sourceDir, BOOL adsCopy, COperations* script,
@@ -6781,7 +6754,7 @@ BOOL DoCreateDir(HWND hProgressDlg, char* name, DWORD attr,
             {
                 CQuadWord operDone = CREATE_DIR_SIZE; // directory already created
                 BOOL adsSkip = FALSE;
-                if (!DoCopyADS(hProgressDlg, sourceDir, TRUE, name, totalDone,
+                if (!DoCopyADS(hProgressDlg, observer, sourceDir, TRUE, name, totalDone,
                                operDone, operTotal, dlgData, script, &adsSkip, buffer) ||
                     adsSkip) // user cancelled or skipped at least one ADS
                 {
@@ -6820,14 +6793,14 @@ BOOL DoCreateDir(HWND hProgressDlg, char* name, DWORD attr,
                             BOOL dummyCancelOper = FALSE;
                             if (newAttr & FILE_ATTRIBUTE_ENCRYPTED)
                             {
-                                changeAttrErr = MyEncryptFile(hProgressDlg, name, currentAttrs, 0 /* allow encrypting directories with the SYSTEM attribute */,
+                                changeAttrErr = MyEncryptFile(hProgressDlg, observer, name, currentAttrs, 0 /* allow encrypting directories with the SYSTEM attribute */,
                                                               dlgData, dummyCancelOper, FALSE);
 
                                 if ( //(WindowsVistaAndLater || script->TargetPathSupEFS) &&  // complain regardless of OS version and EFS support; originally directories on FAT could not be encrypted before Vista, we behave the same (to match Explorer, the Encrypted attribute is not that important)
                                     !dlgData.DirCrLossEncrAll && changeAttrErr != ERROR_SUCCESS)
                                 {                                                              // failed to set the Encrypted attribute on the directory, ask the user what to do
-                                    WaitForSingleObject(dlgData.WorkerNotSuspended, INFINITE); // if we should be in suspend mode, wait ...
-                                    if (*dlgData.CancelWorker)
+                                    observer.WaitIfSuspended(); // if we should be in suspend mode, wait ...
+                                    if (observer.IsCancelled())
                                         goto CANCEL_CRDIR;
 
                                     int ret;
@@ -6891,8 +6864,8 @@ BOOL DoCreateDir(HWND hProgressDlg, char* name, DWORD attr,
                     curAttrs = SalGetFileAttributes(name);
                     if (curAttrs == INVALID_FILE_ATTRIBUTES || (curAttrs & DISPLAYED_ATTRIBUTES) != (newAttr & DISPLAYED_ATTRIBUTES))
                     {                                                              // attributes probably did not transfer; warn the user
-                        WaitForSingleObject(dlgData.WorkerNotSuspended, INFINITE); // if we should be in suspend mode, wait ...
-                        if (*dlgData.CancelWorker)
+                        observer.WaitIfSuspended(); // if we should be in suspend mode, wait ...
+                        if (observer.IsCancelled())
                             goto CANCEL_CRDIR;
 
                         int ret;
@@ -6932,8 +6905,8 @@ BOOL DoCreateDir(HWND hProgressDlg, char* name, DWORD attr,
                     DWORD err2;
                     if (!DoCopySecurity(sourceDir, name, &err2, NULL))
                     {
-                        WaitForSingleObject(dlgData.WorkerNotSuspended, INFINITE); // if we should be in suspend mode, wait ...
-                        if (*dlgData.CancelWorker)
+                        observer.WaitIfSuspended(); // if we should be in suspend mode, wait ...
+                        if (observer.IsCancelled())
                             goto CANCEL_CRDIR;
 
                         int ret;
@@ -6980,8 +6953,8 @@ BOOL DoCreateDir(HWND hProgressDlg, char* name, DWORD attr,
                         GetDirInfo(sAttr, sourceDir);
                         GetDirInfo(tAttr, name);
 
-                        WaitForSingleObject(dlgData.WorkerNotSuspended, INFINITE); // if we should be in suspend mode, wait ...
-                        if (*dlgData.CancelWorker)
+                        observer.WaitIfSuspended(); // if we should be in suspend mode, wait ...
+                        if (observer.IsCancelled())
                             return FALSE;
 
                         if (dlgData.SkipAllDirOver)
@@ -7015,8 +6988,8 @@ BOOL DoCreateDir(HWND hProgressDlg, char* name, DWORD attr,
                     return TRUE; // o.k.
                 }
 
-                WaitForSingleObject(dlgData.WorkerNotSuspended, INFINITE); // if we should be in suspend mode, wait ...
-                if (*dlgData.CancelWorker)
+                observer.WaitIfSuspended(); // if we should be in suspend mode, wait ...
+                if (observer.IsCancelled())
                     return FALSE;
 
                 if (dlgData.SkipAllDirCreate)
@@ -7045,8 +7018,8 @@ BOOL DoCreateDir(HWND hProgressDlg, char* name, DWORD attr,
                 continue;
             }
 
-            WaitForSingleObject(dlgData.WorkerNotSuspended, INFINITE); // if we should be in suspend mode, wait ...
-            if (*dlgData.CancelWorker)
+            observer.WaitIfSuspended(); // if we should be in suspend mode, wait ...
+            if (observer.IsCancelled())
                 return FALSE;
 
             if (dlgData.SkipAllDirCreateErr)
@@ -7081,7 +7054,7 @@ BOOL DoCreateDir(HWND hProgressDlg, char* name, DWORD attr,
     }
 }
 
-BOOL DoDeleteDir(HWND hProgressDlg, char* name, const CQuadWord& size, COperations* script,
+BOOL DoDeleteDir(HWND hProgressDlg, IWorkerObserver& observer, char* name, const CQuadWord& size, COperations* script,
                  CQuadWord& totalDone, DWORD attr, BOOL dontUseRecycleBin, CProgressDlgData& dlgData)
 {
     DWORD err;
@@ -7138,13 +7111,13 @@ BOOL DoDeleteDir(HWND hProgressDlg, char* name, const CQuadWord& size, COperatio
             script->AddBytesToSpeedMetersAndTFSandPS((DWORD)size.Value, TRUE, 0, NULL, MAX_OP_FILESIZE);
 
             totalDone += size;
-            SetProgress(hProgressDlg, 0, CaclProg(totalDone, script->TotalSize), dlgData);
+            observer.SetProgress(0, CaclProg(totalDone, script->TotalSize));
             return TRUE;
         }
         else
         {
-            WaitForSingleObject(dlgData.WorkerNotSuspended, INFINITE); // if we should be in suspend mode, wait ...
-            if (*dlgData.CancelWorker)
+            observer.WaitIfSuspended(); // if we should be in suspend mode, wait ...
+            if (observer.IsCancelled())
                 return FALSE;
 
             if (dlgData.SkipAllDeleteErr)
@@ -7181,7 +7154,7 @@ BOOL DoDeleteDir(HWND hProgressDlg, char* name, const CQuadWord& size, COperatio
 
                     totalDone += size;
                     script->SetProgressSize(totalDone);
-                    SetProgress(hProgressDlg, 0, CaclProg(totalDone, script->TotalSize), dlgData);
+                    observer.SetProgress(0, CaclProg(totalDone, script->TotalSize));
                     return TRUE;
                 }
 
@@ -7345,7 +7318,7 @@ BOOL DeleteDirLink(const char* name, DWORD* err)
     return DoDeleteDirLinkAux(nameDelLink, err);
 }
 
-BOOL DoDeleteDirLink(HWND hProgressDlg, char* name, const CQuadWord& size, COperations* script,
+BOOL DoDeleteDirLink(HWND hProgressDlg, IWorkerObserver& observer, char* name, const CQuadWord& size, COperations* script,
                      CQuadWord& totalDone, CProgressDlgData& dlgData)
 {
     // if the path ends with a space/dot, we must append '\\'; otherwise CreateFile
@@ -7364,13 +7337,13 @@ BOOL DoDeleteDirLink(HWND hProgressDlg, char* name, const CQuadWord& size, COper
             script->AddBytesToSpeedMetersAndTFSandPS((DWORD)size.Value, TRUE, 0, NULL, MAX_OP_FILESIZE);
 
             totalDone += size;
-            SetProgress(hProgressDlg, 0, CaclProg(totalDone, script->TotalSize), dlgData);
+            observer.SetProgress(0, CaclProg(totalDone, script->TotalSize));
             return TRUE;
         }
         else
         {
-            WaitForSingleObject(dlgData.WorkerNotSuspended, INFINITE); // if we should be in suspend mode, wait ...
-            if (*dlgData.CancelWorker)
+            observer.WaitIfSuspended(); // if we should be in suspend mode, wait ...
+            if (observer.IsCancelled())
                 return FALSE;
 
             if (dlgData.SkipAllDeleteErr)
@@ -7397,7 +7370,7 @@ BOOL DoDeleteDirLink(HWND hProgressDlg, char* name, const CQuadWord& size, COper
 
                 totalDone += size;
                 script->SetProgressSize(totalDone);
-                SetProgress(hProgressDlg, 0, CaclProg(totalDone, script->TotalSize), dlgData);
+                observer.SetProgress(0, CaclProg(totalDone, script->TotalSize));
                 return TRUE;
             }
 
@@ -7419,7 +7392,7 @@ BOOL DoDeleteDirLink(HWND hProgressDlg, char* name, const CQuadWord& size, COper
 //            1: replace line endings with CRLF (DOS, Windows, OS/2)
 //            2: replace line endings with LF (UNIX)
 //            3: replace line endings with CR (MAC)
-BOOL DoConvert(HWND hProgressDlg, char* name, char* sourceBuffer, char* targetBuffer,
+BOOL DoConvert(HWND hProgressDlg, IWorkerObserver& observer, char* name, char* sourceBuffer, char* targetBuffer,
                const CQuadWord& size, COperations* script, CQuadWord& totalDone,
                CConvertData& convertData, CProgressDlgData& dlgData)
 {
@@ -7487,12 +7460,12 @@ CONVERT_AGAIN:
                             BOOL cancelOper = FALSE;
                             if (srcAttrs & FILE_ATTRIBUTE_ENCRYPTED)
                             {
-                                MyEncryptFile(hProgressDlg, tmpFileName, tgtAttrs, 0 /* allow encrypting files with the SYSTEM attribute */,
+                                MyEncryptFile(hProgressDlg, observer, tmpFileName, tgtAttrs, 0 /* allow encrypting files with the SYSTEM attribute */,
                                               dlgData, cancelOper, FALSE);
                             }
                             else
                                 MyDecryptFile(tmpFileName, tgtAttrs, FALSE);
-                            if (*dlgData.CancelWorker || cancelOper)
+                            if (observer.IsCancelled() || cancelOper)
                             {
                                 HANDLES(CloseHandle(hSource));
                                 ClearReadOnlyAttr(tmpFileName); // ensure it can be deleted
@@ -7521,8 +7494,8 @@ CONVERT_AGAIN:
                                 DWORD written;
                                 if (read == 0)
                                     break;                                                 // EOF
-                                WaitForSingleObject(dlgData.WorkerNotSuspended, INFINITE); // if we should be in suspend mode, wait ...
-                                if (*dlgData.CancelWorker)
+                                observer.WaitIfSuspended(); // if we should be in suspend mode, wait ...
+                                if (observer.IsCancelled())
                                 {
                                 CONVERT_ERROR:
 
@@ -7606,8 +7579,8 @@ CONVERT_AGAIN:
                                     DWORD err;
                                     err = GetLastError();
 
-                                    WaitForSingleObject(dlgData.WorkerNotSuspended, INFINITE); // if we should be in suspend mode, wait ...
-                                    if (*dlgData.CancelWorker)
+                                    observer.WaitIfSuspended(); // if we should be in suspend mode, wait ...
+                                    if (observer.IsCancelled())
                                         goto CONVERT_ERROR;
 
                                     if (dlgData.SkipAllFileWrite)
@@ -7631,7 +7604,7 @@ CONVERT_AGAIN:
                                         {
                                             ClearReadOnlyAttr(tmpFileName); // ensure it can be deleted
                                             DeleteFileA(gFileSystem, tmpFileName);
-                                            SetProgress(hProgressDlg, 0, CaclProg(totalDone, script->TotalSize), dlgData);
+                                            observer.SetProgress(0, CaclProg(totalDone, script->TotalSize));
                                             goto CONVERT_AGAIN;
                                         }
                                         break;
@@ -7650,7 +7623,7 @@ CONVERT_AGAIN:
                                             HANDLES(CloseHandle(hTarget));
                                         ClearReadOnlyAttr(tmpFileName); // ensure it can be deleted
                                         DeleteFileA(gFileSystem, tmpFileName);
-                                        SetProgress(hProgressDlg, 0, CaclProg(totalDone, script->TotalSize), dlgData);
+                                        observer.SetProgress(0, CaclProg(totalDone, script->TotalSize));
                                         return TRUE;
                                     }
 
@@ -7658,20 +7631,20 @@ CONVERT_AGAIN:
                                         goto CONVERT_ERROR;
                                     }
                                 }
-                                WaitForSingleObject(dlgData.WorkerNotSuspended, INFINITE); // if we should be in suspend mode, wait ...
-                                if (*dlgData.CancelWorker)
+                                observer.WaitIfSuspended(); // if we should be in suspend mode, wait ...
+                                if (observer.IsCancelled())
                                     goto CONVERT_ERROR;
 
                                 operationDone += CQuadWord(read, 0);
-                                SetProgress(hProgressDlg,
+                                observer.SetProgress(
                                             CaclProg(operationDone, size),
-                                            CaclProg(totalDone + operationDone, script->TotalSize), dlgData);
+                                            CaclProg(totalDone + operationDone, script->TotalSize));
                             }
                             else
                             {
                                 DWORD err = GetLastError();
-                                WaitForSingleObject(dlgData.WorkerNotSuspended, INFINITE); // if we should be in suspend mode, wait ...
-                                if (*dlgData.CancelWorker)
+                                observer.WaitIfSuspended(); // if we should be in suspend mode, wait ...
+                                if (observer.IsCancelled())
                                     goto CONVERT_ERROR;
 
                                 if (dlgData.SkipAllFileRead)
@@ -7723,8 +7696,8 @@ CONVERT_AGAIN:
                                     {
                                         DWORD err = GetLastError();
 
-                                        WaitForSingleObject(dlgData.WorkerNotSuspended, INFINITE); // if we should be in suspend mode, wait ...
-                                        if (*dlgData.CancelWorker)
+                                        observer.WaitIfSuspended(); // if we should be in suspend mode, wait ...
+                                        if (observer.IsCancelled())
                                             return FALSE;
 
                                         if (dlgData.SkipAllMoveErrors)
@@ -7757,8 +7730,8 @@ CONVERT_AGAIN:
                             {
                                 DWORD err = GetLastError();
 
-                                WaitForSingleObject(dlgData.WorkerNotSuspended, INFINITE); // if we should be in suspend mode, wait ...
-                                if (*dlgData.CancelWorker)
+                                observer.WaitIfSuspended(); // if we should be in suspend mode, wait ...
+                                if (observer.IsCancelled())
                                 {
                                 CANCEL_CONVERT:
 
@@ -7827,8 +7800,8 @@ CONVERT_AGAIN:
                         strcpy(fakeName + (s - tmpPath), "\\cnv0000.tmp");
                     }
 
-                    WaitForSingleObject(dlgData.WorkerNotSuspended, INFINITE); // if we should be in suspend mode, wait ...
-                    if (*dlgData.CancelWorker)
+                    observer.WaitIfSuspended(); // if we should be in suspend mode, wait ...
+                    if (observer.IsCancelled())
                         goto CANCEL_OPEN2;
 
                     if (dlgData.SkipAllFileOpenOut)
@@ -7855,7 +7828,7 @@ CONVERT_AGAIN:
 
                         HANDLES(CloseHandle(hSource));
                         totalDone += size;
-                        SetProgress(hProgressDlg, 0, CaclProg(totalDone, script->TotalSize), dlgData);
+                        observer.SetProgress(0, CaclProg(totalDone, script->TotalSize));
                         return TRUE;
                     }
 
@@ -7875,8 +7848,8 @@ CONVERT_AGAIN:
             DWORD err = GetLastError();
             if (invalidName)
                 err = ERROR_INVALID_NAME;
-            WaitForSingleObject(dlgData.WorkerNotSuspended, INFINITE); // if we should be in suspend mode, wait ...
-            if (*dlgData.CancelWorker)
+            observer.WaitIfSuspended(); // if we should be in suspend mode, wait ...
+            if (observer.IsCancelled())
                 return FALSE;
 
             if (dlgData.SkipAllFileOpenIn)
@@ -7902,7 +7875,7 @@ CONVERT_AGAIN:
             SKIP_OPEN_IN:
 
                 totalDone += size;
-                SetProgress(hProgressDlg, 0, CaclProg(totalDone, script->TotalSize), dlgData);
+                observer.SetProgress(0, CaclProg(totalDone, script->TotalSize));
                 return TRUE;
             }
 
@@ -7913,7 +7886,7 @@ CONVERT_AGAIN:
     }
 }
 
-BOOL DoChangeAttrs(HWND hProgressDlg, char* name, const CQuadWord& size, DWORD attrs,
+BOOL DoChangeAttrs(HWND hProgressDlg, IWorkerObserver& observer, char* name, const CQuadWord& size, DWORD attrs,
                    COperations* script, CQuadWord& totalDone,
                    FILETIME* timeModified, FILETIME* timeCreated, FILETIME* timeAccessed,
                    BOOL& changeCompression, BOOL& changeEncryption, DWORD fileAttr,
@@ -7965,8 +7938,8 @@ BOOL DoChangeAttrs(HWND hProgressDlg, char* name, const CQuadWord& size, DWORD a
         if (error == ERROR_SUCCESS && changeEncryption && (attrs & FILE_ATTRIBUTE_ENCRYPTED))
         {
             BOOL cancelOper = FALSE;
-            error = MyEncryptFile(hProgressDlg, name, fileAttr, attrs, dlgData, cancelOper, TRUE);
-            if (*dlgData.CancelWorker || cancelOper)
+            error = MyEncryptFile(hProgressDlg, observer, name, fileAttr, attrs, dlgData, cancelOper, TRUE);
+            if (observer.IsCancelled() || cancelOper)
                 return FALSE;
             if (error != ERROR_SUCCESS)
             {
@@ -7977,8 +7950,8 @@ BOOL DoChangeAttrs(HWND hProgressDlg, char* name, const CQuadWord& size, DWORD a
         }
         if (showCompressErr || showEncryptErr)
         {
-            WaitForSingleObject(dlgData.WorkerNotSuspended, INFINITE); // if we should be in suspend mode, wait ...
-            if (*dlgData.CancelWorker)
+            observer.WaitIfSuspended(); // if we should be in suspend mode, wait ...
+            if (observer.IsCancelled())
                 return FALSE;
 
             if (showCompressErr)
@@ -8027,7 +8000,7 @@ BOOL DoChangeAttrs(HWND hProgressDlg, char* name, const CQuadWord& size, DWORD a
                 }
             }
             totalDone += size;
-            SetProgress(hProgressDlg, 0, CaclProg(totalDone, script->TotalSize), dlgData);
+            observer.SetProgress(0, CaclProg(totalDone, script->TotalSize));
             return TRUE;
         }
         else
@@ -8039,8 +8012,8 @@ BOOL DoChangeAttrs(HWND hProgressDlg, char* name, const CQuadWord& size, DWORD a
             if (errTitle == NULL)
                 errTitle = LoadStr(IDS_ERRORCHANGINGATTRS);
 
-            WaitForSingleObject(dlgData.WorkerNotSuspended, INFINITE); // if we should be in suspend mode, wait ...
-            if (*dlgData.CancelWorker)
+            observer.WaitIfSuspended(); // if we should be in suspend mode, wait ...
+            if (observer.IsCancelled())
                 return FALSE;
 
             if (dlgData.SkipAllChangeAttrs)
@@ -8066,7 +8039,7 @@ BOOL DoChangeAttrs(HWND hProgressDlg, char* name, const CQuadWord& size, DWORD a
             SKIP_ATTRS_ERROR:
 
                 totalDone += size;
-                SetProgress(hProgressDlg, 0, CaclProg(totalDone, script->TotalSize), dlgData);
+                observer.SetProgress(0, CaclProg(totalDone, script->TotalSize));
                 return TRUE;
             }
 
@@ -8131,6 +8104,10 @@ unsigned ThreadWorkerBody(void* parameter)
         GainWriteOwnerAccess();
 
     HWND hProgressDlg = data->HProgressDlg;
+    CDialogWorkerObserver dialogObserver(hProgressDlg, dlgData.WorkerNotSuspended,
+                                         dlgData.CancelWorker, dlgData.OperationProgress,
+                                         dlgData.SummaryProgress);
+    IWorkerObserver& observer = dialogObserver;
     void* buffer = data->Buffer;
     BOOL bufferIsAllocated = data->BufferIsAllocated;
     CChangeAttrsData* attrsData = (CChangeAttrsData*)data->Buffer;
@@ -8142,7 +8119,7 @@ unsigned ThreadWorkerBody(void* parameter)
     }
     SetEvent(wContinue); // data ready; resume the main thread or the progress-dialog thread
                          //---
-    SetProgress(hProgressDlg, 0, 0, dlgData);
+    observer.SetProgress(0, 0);
     script->InitSpeedMeters(FALSE);
 
     CPathBuffer lastLantasticCheckRoot; // Heap-allocated for long path support; last path root checked for Lantastic ("" = nothing checked yet)
@@ -8180,7 +8157,7 @@ unsigned ThreadWorkerBody(void* parameter)
         lstrcpyn(opChangAttrs, LoadStr(IDS_CHANGINGATTRS), 50);
 
         int i;
-        for (i = 0; !*dlgData.CancelWorker && i < script->Count; i++)
+        for (i = 0; !observer.IsCancelled() && i < script->Count; i++)
         {
             COperation* op = &script->At(i);
 
@@ -8192,13 +8169,13 @@ unsigned ThreadWorkerBody(void* parameter)
                 pd.Source = op->SourceName;
                 pd.Preposition = opStrCopyingPrep;
                 pd.Target = op->TargetName;
-                SetProgressDialog(hProgressDlg, &pd, dlgData);
+                observer.SetOperationInfo(&pd);
 
-                SetProgress(hProgressDlg, 0, CaclProg(totalDone, script->TotalSize), dlgData);
+                observer.SetProgress(0, CaclProg(totalDone, script->TotalSize));
 
                 BOOL lantasticCheck = IsLantasticDrive(op->TargetName, lastLantasticCheckRoot, lastIsLantasticPath);
 
-                Error = !DoCopyFile(op, hProgressDlg, buffer, script, totalDone,
+                Error = !DoCopyFile(op, hProgressDlg, observer, buffer, script, totalDone,
                                     clearReadonlyMask, NULL, lantasticCheck, mustDeleteFileBeforeOverwrite,
                                     allocWholeFileOnStart, dlgData,
                                     (op->OpFlags & OPFL_COPY_ADS) != 0,
@@ -8214,14 +8191,14 @@ unsigned ThreadWorkerBody(void* parameter)
                 pd.Source = op->SourceName;
                 pd.Preposition = opStrMovingPrep;
                 pd.Target = op->TargetName;
-                SetProgressDialog(hProgressDlg, &pd, dlgData);
+                observer.SetOperationInfo(&pd);
 
-                SetProgress(hProgressDlg, 0, CaclProg(totalDone, script->TotalSize), dlgData);
+                observer.SetProgress(0, CaclProg(totalDone, script->TotalSize));
 
                 BOOL lantasticCheck = IsLantasticDrive(op->TargetName, lastLantasticCheckRoot, lastIsLantasticPath);
                 BOOL ignInvalidName = op->Opcode == ocMoveDir && (op->OpFlags & OPFL_IGNORE_INVALID_NAME) != 0;
 
-                Error = !DoMoveFile(op, hProgressDlg, buffer, script, totalDone,
+                Error = !DoMoveFile(op, hProgressDlg, observer, buffer, script, totalDone,
                                     op->Opcode == ocMoveDir, clearReadonlyMask, &novellRenamePatch,
                                     lantasticCheck, mustDeleteFileBeforeOverwrite,
                                     allocWholeFileOnStart, dlgData,
@@ -8240,12 +8217,12 @@ unsigned ThreadWorkerBody(void* parameter)
                 pd.Source = op->TargetName;
                 pd.Preposition = "";
                 pd.Target = "";
-                SetProgressDialog(hProgressDlg, &pd, dlgData);
+                observer.SetOperationInfo(&pd);
 
-                SetProgress(hProgressDlg, 0, CaclProg(totalDone, script->TotalSize), dlgData);
+                observer.SetProgress(0, CaclProg(totalDone, script->TotalSize));
 
                 BOOL skip, alreadyExisted;
-                Error = !DoCreateDir(hProgressDlg, op->TargetName, op->Attr, clearReadonlyMask, dlgData,
+                Error = !DoCreateDir(hProgressDlg, observer, op->TargetName, op->Attr, clearReadonlyMask, dlgData,
                                      totalDone, op->Size, op->SourceName, copyADS, script, buffer, skip,
                                      alreadyExisted, crAsEncrypted, ignInvalidName);
                 if (!Error)
@@ -8282,7 +8259,7 @@ unsigned ThreadWorkerBody(void* parameter)
                     }
                     totalDone += op->Size;
                     script->SetProgressSize(totalDone);
-                    SetProgress(hProgressDlg, 0, CaclProg(totalDone, script->TotalSize), dlgData);
+                    observer.SetProgress(0, CaclProg(totalDone, script->TotalSize));
                 }
                 break;
             }
@@ -8331,21 +8308,21 @@ unsigned ThreadWorkerBody(void* parameter)
                     pd.Source = op->TargetName;
                     pd.Preposition = "";
                     pd.Target = "";
-                    SetProgressDialog(hProgressDlg, &pd, dlgData);
+                    observer.SetOperationInfo(&pd);
 
-                    SetProgress(hProgressDlg, 0, CaclProg(totalDone, script->TotalSize), dlgData);
+                    observer.SetProgress(0, CaclProg(totalDone, script->TotalSize));
 
                     FILETIME modified;
                     modified.dwLowDateTime = (DWORD)(DWORD_PTR)op->SourceName;
                     modified.dwHighDateTime = op->Attr;
-                    Error = !DoCopyDirTime(hProgressDlg, op->TargetName, &modified, dlgData, FALSE);
+                    Error = !DoCopyDirTime(hProgressDlg, observer, op->TargetName, &modified, dlgData, FALSE);
                 }
                 if (!Error)
                 {
                     script->AddBytesToSpeedMetersAndTFSandPS((DWORD)op->Size.Value, TRUE, 0, NULL, MAX_OP_FILESIZE);
 
                     totalDone += op->Size;
-                    SetProgress(hProgressDlg, 0, CaclProg(totalDone, script->TotalSize), dlgData);
+                    observer.SetProgress(0, CaclProg(totalDone, script->TotalSize));
                 }
                 break;
             }
@@ -8358,13 +8335,13 @@ unsigned ThreadWorkerBody(void* parameter)
                 pd.Source = op->SourceName;
                 pd.Preposition = "";
                 pd.Target = "";
-                SetProgressDialog(hProgressDlg, &pd, dlgData);
+                observer.SetOperationInfo(&pd);
 
-                SetProgress(hProgressDlg, 0, CaclProg(totalDone, script->TotalSize), dlgData);
+                observer.SetProgress(0, CaclProg(totalDone, script->TotalSize));
 
                 if (op->Opcode == ocDeleteFile)
                 {
-                    Error = !DoDeleteFile(hProgressDlg, op->SourceName, op->Size,
+                    Error = !DoDeleteFile(hProgressDlg, observer, op->SourceName, op->Size,
                                           script, totalDone, op->Attr, dlgData,
                                           op->SourceNameW);
                 }
@@ -8372,13 +8349,13 @@ unsigned ThreadWorkerBody(void* parameter)
                 {
                     if (op->Opcode == ocDeleteDir)
                     {
-                        Error = !DoDeleteDir(hProgressDlg, op->SourceName, op->Size,
+                        Error = !DoDeleteDir(hProgressDlg, observer, op->SourceName, op->Size,
                                              script, totalDone, op->Attr, (DWORD)(DWORD_PTR)op->TargetName != -1,
                                              dlgData);
                     }
                     else
                     {
-                        Error = !DoDeleteDirLink(hProgressDlg, op->SourceName, op->Size,
+                        Error = !DoDeleteDirLink(hProgressDlg, observer, op->SourceName, op->Size,
                                                  script, totalDone, dlgData);
                     }
                 }
@@ -8405,11 +8382,11 @@ unsigned ThreadWorkerBody(void* parameter)
                 pd.Source = op->SourceName;
                 pd.Preposition = "";
                 pd.Target = "";
-                SetProgressDialog(hProgressDlg, &pd, dlgData);
+                observer.SetOperationInfo(&pd);
 
-                SetProgress(hProgressDlg, 0, CaclProg(totalDone, script->TotalSize), dlgData);
+                observer.SetProgress(0, CaclProg(totalDone, script->TotalSize));
 
-                Error = !DoConvert(hProgressDlg, op->SourceName, (char*)buffer, tgtBuffer, op->Size, script,
+                Error = !DoConvert(hProgressDlg, observer, op->SourceName, (char*)buffer, tgtBuffer, op->Size, script,
                                    totalDone, convertData, dlgData);
                 break;
             }
@@ -8420,11 +8397,11 @@ unsigned ThreadWorkerBody(void* parameter)
                 pd.Source = op->SourceName;
                 pd.Preposition = "";
                 pd.Target = "";
-                SetProgressDialog(hProgressDlg, &pd, dlgData);
+                observer.SetOperationInfo(&pd);
 
-                SetProgress(hProgressDlg, 0, CaclProg(totalDone, script->TotalSize), dlgData);
+                observer.SetProgress(0, CaclProg(totalDone, script->TotalSize));
 
-                Error = !DoChangeAttrs(hProgressDlg, op->SourceName, op->Size, (DWORD)(DWORD_PTR)op->TargetName,
+                Error = !DoChangeAttrs(hProgressDlg, observer, op->SourceName, op->Size, (DWORD)(DWORD_PTR)op->TargetName,
                                        script, totalDone,
                                        attrsData->ChangeTimeModified ? &attrsData->TimeModified : NULL,
                                        attrsData->ChangeTimeCreated ? &attrsData->TimeCreated : NULL,
@@ -8439,15 +8416,15 @@ unsigned ThreadWorkerBody(void* parameter)
             }
             if (Error)
                 break;
-            WaitForSingleObject(dlgData.WorkerNotSuspended, INFINITE); // if we should be in suspend mode, wait ...
+            observer.WaitIfSuspended(); // if we should be in suspend mode, wait ...
         }
-        if (!Error && !*dlgData.CancelWorker && i == script->Count && totalDone != script->TotalSize &&
+        if (!Error && !observer.IsCancelled() && i == script->Count && totalDone != script->TotalSize &&
             (totalDone != CQuadWord(0, 0) || script->TotalSize != CQuadWord(1, 0))) // intentional change of script->TotalSize to one (prevents division by zero)
         {
             TRACE_E("ThreadWorkerBody(): operation done: totalDone != script->TotalSize (" << totalDone.Value << " != " << script->TotalSize.Value << ")");
         }
         CQuadWord transferredFileSize, progressSize;
-        if (!Error && !*dlgData.CancelWorker && i == script->Count &&
+        if (!Error && !observer.IsCancelled() && i == script->Count &&
             script->GetTFSandProgressSize(&transferredFileSize, &progressSize) &&
             (transferredFileSize != script->TotalFileSize ||
              progressSize != script->TotalSize &&
