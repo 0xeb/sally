@@ -731,7 +731,8 @@ int C7zClient::Delete(CSalamanderForOperationsAbstract* salamander, const char* 
             // close the open archive
             inArchive->Close();
             // delete it
-            if (::DeleteFile(archiveName))
+            CWidePath wArchiveName(archiveName);
+            if (DeleteFileW(wArchiveName))
             {
                 DWORD err2;
                 // rename the tmp file to the archive
@@ -776,7 +777,10 @@ int C7zClient::Delete(CSalamanderForOperationsAbstract* salamander, const char* 
     }
 
     delete archiveItems;
-    ::DeleteFile(tmpName);
+    {
+        CWidePath wTmpName(tmpName);
+        DeleteFileW(wTmpName);
+    }
 
     return ret;
 } /* C7zClient::Delete */
@@ -1202,7 +1206,8 @@ int C7zClient::Update(CSalamanderForOperationsAbstract* salamander, const char* 
                 // close the open archive
                 inArchive->Close();
                 // delete it
-                if (!::DeleteFile(archiveName))
+                CWidePath wArchiveName2(archiveName);
+                if (!DeleteFileW(wArchiveName2))
                 {
                     Error(IDS_CANT_UPDATE_ARCHIVE, FALSE, archiveName);
                     throw OPER_CANCEL;
@@ -1270,7 +1275,10 @@ int C7zClient::Update(CSalamanderForOperationsAbstract* salamander, const char* 
     delete archiveItems;
     delete updateList;
 
-    ::DeleteFile(tmpName);
+    {
+        CWidePath wTmpName2(tmpName);
+        DeleteFileW(wTmpName2);
+    }
 
     return ret;
 } /* C7zClient::Update */

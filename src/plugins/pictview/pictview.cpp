@@ -708,7 +708,7 @@ void CPluginInterface::LoadConfiguration(HWND parent, HKEY regKey, CSalamanderRe
             {
                 G.Save.RememberPath = TRUE; // compatible with previous version of PictView
             }
-            if (!registry->GetValue(hSaveKey, CONFIG_SAVE_INIT_DIR, REG_SZ, G.Save.InitDir, MAX_PATH))
+            if (!registry->GetValue(hSaveKey, CONFIG_SAVE_INIT_DIR, REG_SZ, G.Save.InitDir, SizeOf(G.Save.InitDir)))
             {
                 G.Save.InitDir[0] = 0;
             }
@@ -1518,7 +1518,7 @@ BOOL InitEXIF(HWND hParent, BOOL bSilent)
     {
         if (!bSilent)
         {
-            TCHAR errText[2 * MAX_PATH];
+            TCHAR errText[32768];
             _stprintf(errText, LoadStr(IDS_LOADEXIF), (const char*)path);
             SalamanderGeneral->SalMessageBox(hParent, errText, LoadStr(IDS_PLUGINNAME),
                                              MB_ICONEXCLAMATION | MB_OK);
@@ -1595,7 +1595,7 @@ void ReleaseViewer()
 class CViewerThread : public CThread
 {
 protected:
-    TCHAR Name[MAX_PATH];
+    TCHAR Name[32768];
     int Left, Top, Width, Height;
     UINT ShowCmd;
     BOOL AlwaysOnTop;
@@ -1616,7 +1616,7 @@ public:
                   BOOL* success, int enumFilesSourceUID,
                   int enumFilesCurrentIndex) : CThread(PLUGIN_NAME_EN)
     {
-        lstrcpyn(Name, name, MAX_PATH);
+        lstrcpyn(Name, name, SizeOf(Name));
         Left = left;
         Top = top;
         Width = width;
@@ -2491,7 +2491,7 @@ void FillMenuHistory(CGUIMenuPopupAbstract* popup, int cmdFirst, BOOL filesHisto
     }
     else
     {
-        TCHAR buff[MAX_PATH + 3];
+        TCHAR buff[32768 + 3];
         mi.String = buff;
         int index = 0;
         while (history[index] != NULL && index < historySize)

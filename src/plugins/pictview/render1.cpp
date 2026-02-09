@@ -50,7 +50,7 @@ void NormalizeRect(RECT* r)
 }
 
 // Path to focus, used by menu File/Focus
-TCHAR Focus_Path[MAX_PATH];
+TCHAR Focus_Path[32768];
 
 // Used by SaveAs dlg to get the current path in the source(=active) panel
 HWND ghSaveAsWindow = NULL;
@@ -118,7 +118,7 @@ CRendererWindow::~CRendererWindow()
 
 void CRendererWindow::SetTitle()
 {
-    TCHAR buff[MAX_PATH + 100];
+    TCHAR buff[32768 + 100];
 
     if (PVHandle != NULL)
     {
@@ -187,7 +187,7 @@ void CRendererWindow::SetTitle()
 
 BOOL CRendererWindow::OnFileOpen(LPCTSTR defaultDirectory)
 {
-    TCHAR file[MAX_PATH] = _T("");
+    TCHAR file[32768] = _T("");
     OPENFILENAME ofn;
     memset(&ofn, 0, sizeof(OPENFILENAME));
     ofn.lStructSize = sizeof(OPENFILENAME);
@@ -205,7 +205,7 @@ BOOL CRendererWindow::OnFileOpen(LPCTSTR defaultDirectory)
         s++;
     }
     ofn.lpstrFile = file;
-    ofn.nMaxFile = MAX_PATH;
+    ofn.nMaxFile = SizeOf(file);
     ofn.nFilterIndex = 1;
     ofn.lpstrInitialDir = defaultDirectory;
     ofn.Flags = OFN_HIDEREADONLY | OFN_PATHMUSTEXIST | OFN_FILEMUSTEXIST;
@@ -349,7 +349,7 @@ BOOL CRendererWindow::OpenFile(LPCTSTR name, int showCmd, HBITMAP hBmp)
 
     if (code != PVC_OK)
     {
-        TCHAR errText[MAX_PATH + 100];
+        TCHAR errText[32768 + 100];
         _stprintf(errText, LoadStr(IDS_ERROR_OPENING), name, PVW32DLL.PVGetErrorText(code));
         SalamanderGeneral->SalMessageBox(HWindow, errText, LoadStr(IDS_ERRORTITLE), MB_ICONEXCLAMATION);
         // In case the new file is not recognized, we keep the old one
@@ -2742,7 +2742,7 @@ void MakeValidFileName(TCHAR* path)
     *n = 0;
 }
 
-BOOL CRendererWindow::RenameFileInternal(LPCTSTR oldPath, LPCTSTR oldName, TCHAR (&newName)[MAX_PATH], BOOL* tryAgain)
+BOOL CRendererWindow::RenameFileInternal(LPCTSTR oldPath, LPCTSTR oldName, TCHAR* newName, int newNameSize, BOOL* tryAgain)
 {
     BOOL renamed = FALSE;
     *tryAgain = TRUE;
@@ -2754,14 +2754,14 @@ BOOL CRendererWindow::RenameFileInternal(LPCTSTR oldPath, LPCTSTR oldName, TCHAR
     {
         CPathBuffer myOldName;
         _tcscpy(myOldName, oldName);
-        TCHAR finalName[2 * MAX_PATH];
-        SalamanderGeneral->MaskName(finalName, 2 * MAX_PATH, myOldName, newName);
+        TCHAR finalName[32768];
+        SalamanderGeneral->MaskName(finalName, SizeOf(finalName), myOldName, newName);
 
         // strip unwanted characters from the beginning and end of the name
         MakeValidFileName(finalName);
-        // trim to MAX_PATH before copying to newName; the code a few lines below reports the error
-        if (_tcslen(finalName) >= MAX_PATH)
-            finalName[MAX_PATH - 1] = 0;
+        // trim to newNameSize before copying to newName; the code a few lines below reports the error
+        if ((int)_tcslen(finalName) >= newNameSize)
+            finalName[newNameSize - 1] = 0;
         // update 'newName' with the new file name
         _tcscpy(newName, finalName);
 
@@ -2770,7 +2770,7 @@ BOOL CRendererWindow::RenameFileInternal(LPCTSTR oldPath, LPCTSTR oldName, TCHAR
         memcpy(tgtPath, oldPath, l * sizeof(TCHAR));
         if (oldPath[l - 1] != '\\')
             tgtPath[l++] = '\\';
-        if (_tcslen(finalName) + l < MAX_PATH)
+        if ((int)_tcslen(finalName) + l < tgtPath.Size())
         {
             _tcscpy(tgtPath + l, finalName);
             CPathBuffer path;
@@ -3245,7 +3245,7 @@ LRESULT CRendererWindow::OnCommand(WPARAM wParam, LPARAM lParam, BOOL* closingVi
             if (Viewer->IsFullScreen())
                 Viewer->ToggleFullScreen();
 
-            lstrcpyn(Focus_Path, FileName, MAX_PATH);
+            lstrcpyn(Focus_Path, FileName, SizeOf(Focus_Path));
             SalamanderGeneral->PostMenuExtCommand(CMD_INTERNAL_FOCUS, TRUE);
             Sleep(500);        // switching to another window occurs, so in theory this Sleep should not hurt anything
             Focus_Path[0] = 0; // after 0.5 seconds we no longer want the focus (handles hitting the beginning of Salamander's BUSY mode)
@@ -3280,15 +3280,15 @@ LRESULT CRendererWindow::OnCommand(WPARAM wParam, LPARAM lParam, BOOL* closingVi
         oldPath[s - FileName] = 0;
         _tcscpy(oldName, s + 1);
 
-        TCHAR newName[MAX_PATH];
+        TCHAR newName[32768];
         _tcscpy(newName, s + 1);
-        CRenameDialog dlg(HWindow, newName, MAX_PATH);
+        CRenameDialog dlg(HWindow, newName, SizeOf(newName));
         while (1)
         {
             if (dlg.Execute() == IDOK)
             {
                 BOOL tryAgain;
-                BOOL renamed = RenameFileInternal(oldPath, oldName, newName, &tryAgain);
+                BOOL renamed = RenameFileInternal(oldPath, oldName, newName, SizeOf(newName), &tryAgain);
                 /*  // Petr: I commented out this heavy refresh because it is obsolete - refresh happens even in Salamander's inactive main window
           int sourcePanel;
 
@@ -3580,7 +3580,7 @@ LRESULT CRendererWindow::OnCommand(WPARAM wParam, LPARAM lParam, BOOL* closingVi
                 Viewer->SetStatusBarTexts();
                 if (!bSuccess)
                 {
-                    TCHAR errTmp[MAX_PATH + 20];
+                    TCHAR errTmp[32768 + 20];
                     TCHAR errBuff[164];
 
                     if (LastError)

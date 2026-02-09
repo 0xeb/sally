@@ -263,8 +263,8 @@ CPluginFSInterface::ListCurrentPath(CSalamanderDirectoryAbstract* dir,
              (data.cFileName[1] != 0 && (data.cFileName[1] != '.' || data.cFileName[2] != 0))))
         {
             CPathBuffer cFileName;
-            WideCharToMultiByte(CP_ACP, 0, data.cFileName, -1, cFileName, MAX_PATH, NULL, NULL);
-            cFileName[MAX_PATH - 1] = 0;
+            WideCharToMultiByte(CP_ACP, 0, data.cFileName, -1, cFileName, cFileName.Size(), NULL, NULL);
+            cFileName[cFileName.Size() - 1] = 0;
 
             file.Name = SalamanderGeneral->DupStr(cFileName);
             if (file.Name == NULL)
@@ -539,8 +539,8 @@ CPluginFSInterface::QuickRename(const char* fsName, int mode, HWND parent, CFile
     CPathBuffer nameTo;
     strcpy(nameFrom, Path);
     strcpy(nameTo, Path);
-    if (!CRAPI::PathAppend(nameFrom, file.Name, MAX_PATH) ||
-        !CRAPI::PathAppend(nameTo, newName, MAX_PATH))
+    if (!CRAPI::PathAppend(nameFrom, file.Name, nameFrom.Size()) ||
+        !CRAPI::PathAppend(nameTo, newName, nameTo.Size()))
     {
         SalamanderGeneral->SalMessageBox(parent, LoadStr(IDS_ERR_NAMETOOLONG),
                                          TitleWMobileError, MB_OK | MB_ICONEXCLAMATION);
@@ -894,7 +894,7 @@ CPluginFSInterface::Delete(const char* fsName, int mode, HWND parent, int panel,
             CFileInfo& fi = array[i];
 
             strcpy(fileName, rootPath);
-            if (!CRAPI::PathAppend(fileName, fi.cFileName, MAX_PATH))
+            if (!CRAPI::PathAppend(fileName, fi.cFileName, fileName.Size()))
             {
                 SalamanderGeneral->ShowMessageBox(LoadStr(IDS_ERR_PATHTOOLONG),
                                                   TitleWMobileError, MSGBOX_ERROR);
@@ -1258,8 +1258,8 @@ CPluginFSInterface::CopyOrMoveFromFS(BOOL copy, int mode, const char* fsName, HW
                         l = (int)(s - targetPath);
                     else
                         l = (int)strlen(targetPath);
-                    if (l > MAX_PATH - 1)
-                        l = MAX_PATH - 1;
+                    if (l > nextFocus.Size() - 1)
+                        l = nextFocus.Size() - 1;
                     memcpy(nextFocus, targetPath, l);
                     nextFocus[l] = 0;
                 }
@@ -1586,7 +1586,7 @@ CPluginFSInterface::CopyOrMoveFromFS(BOOL copy, int mode, const char* fsName, HW
         *endSource++ = '\\';
         *endSource = 0;
     }
-    int endSourceSize = MAX_PATH - (int)(endSource - sourceName); // maximum number of characters for a panel name
+    int endSourceSize = sourceName.Size() - (int)(endSource - sourceName); // maximum number of characters for a panel name
 
     char cefsSourceName[2 * MAX_PATH]; // buffer for the full CEFS name (for locating the operation source in the disk cache)
     sprintf(cefsSourceName, "%s:%s", fsName, sourceName.Get());
@@ -1599,7 +1599,7 @@ CPluginFSInterface::CopyOrMoveFromFS(BOOL copy, int mode, const char* fsName, HW
     CPathBuffer targetName; // buffer for the full disk name (if the target resides on disk)
     targetName[0] = 0;
     char* endTarget = targetName;
-    int endTargetSize = MAX_PATH;
+    int endTargetSize = targetName.Size();
 
     if (diskPath) // Windows target path
         strcpy(targetName, targetPath);
@@ -1612,7 +1612,7 @@ CPluginFSInterface::CopyOrMoveFromFS(BOOL copy, int mode, const char* fsName, HW
         *endTarget++ = '\\';
         *endTarget = 0;
     }
-    endTargetSize = MAX_PATH - (int)(endTarget - targetName); // maximum number of characters for a panel name
+    endTargetSize = targetName.Size() - (int)(endTarget - targetName); // maximum number of characters for a panel name
 
     const CFileData* f = NULL; // pointer to the file/directory in the panel to process
     BOOL isDir = FALSE;        // TRUE if 'f' is a directory
@@ -2356,7 +2356,7 @@ CPluginFSInterface::CopyOrMoveFromDiskToFS(BOOL copy, int mode, const char* fsNa
         *endSource++ = '\\';
         *endSource = 0;
     }
-    int endSourceSize = MAX_PATH - (int)(endSource - sourceName); // maximum number of characters for a 'next' name
+    int endSourceSize = sourceName.Size() - (int)(endSource - sourceName); // maximum number of characters for a 'next' name
 
     CPathBuffer targetName; // buffer for the full target disk name (the operation target resides on disk for CEFS)
     strcpy(targetName, userPart);
@@ -2366,7 +2366,7 @@ CPluginFSInterface::CopyOrMoveFromDiskToFS(BOOL copy, int mode, const char* fsNa
         *endTarget++ = '\\';
         *endTarget = 0;
     }
-    int endTargetSize = MAX_PATH - (int)(endTarget - targetName); // maximum number of characters for the destination name
+    int endTargetSize = targetName.Size() - (int)(endTarget - targetName); // maximum number of characters for the destination name
 
     SalamanderGeneral->CreateSafeWaitWindow(LoadStr(IDS_WAIT_READINGDIRTREE), TitleWMobile,
                                             500, FALSE, SalamanderGeneral->GetMainWindowHWND());
@@ -2757,7 +2757,7 @@ CPluginFSInterface::ChangeAttributes(const char* fsName, HWND parent, int panel,
         *end++ = '\\';
         *end = 0;
     }
-    int endSize = MAX_PATH - (int)(end - fileName); // maximum number of characters for a panel name
+    int endSize = fileName.Size() - (int)(end - fileName); // maximum number of characters for a panel name
 
     const CFileData* f = NULL; // pointer to the file/directory in the panel to process
     BOOL isDir = FALSE;        // TRUE if 'f' is a directory
@@ -3022,7 +3022,7 @@ CPluginFSInterface::ChangeAttributes(const char* fsName, HWND parent, int panel,
             CFileInfo& fi = array[i];
 
             *end = 0;
-            if (!CRAPI::PathAppend(fileName, fi.cFileName, MAX_PATH))
+            if (!CRAPI::PathAppend(fileName, fi.cFileName, fileName.Size()))
             {
                 SalamanderGeneral->ShowMessageBox(LoadStr(IDS_ERR_PATHTOOLONG),
                                                   TitleWMobileError, MSGBOX_ERROR);

@@ -144,7 +144,7 @@ typedef struct tagGlobals
         DWORD JPEGQuality;
         DWORD JPEGSubsampling;
         DWORD TIFFStripSize;
-        TCHAR InitDir[MAX_PATH];
+        TCHAR InitDir[32768];
         BOOL RememberPath; // Remember path when saving screenshots and clipboard pastes
     } Save;
 

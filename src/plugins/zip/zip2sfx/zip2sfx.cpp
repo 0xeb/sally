@@ -188,7 +188,7 @@ BOOL ProcessCommandline(int argc, char* argv[])
 DWORD SalGetFileAttributes(const char* fileName)
 {
     int fileNameLen = (int)strlen(fileName);
-    char fileNameCopy[3 * MAX_PATH];
+    char fileNameCopy[32768];
     // if the path ends with a trailing space or dot we must append '\\'; otherwise
     // GetFileAttributes trims that character and works with a different path.
     // The workaround still beats returning attributes of another file or directory

@@ -31,7 +31,7 @@ class CEnumFiles
 {
     int iFiles, iDirs, index;
     const CFileData* pFile;
-    TCHAR path[_MAX_PATH];
+    TCHAR path[32768];
 
 public:
     CEnumFiles(void);
@@ -150,7 +150,7 @@ const CFileData* CEnumFiles::GetFile(LPTSTR fileName)
     }
     if (ret)
     {
-        _sntprintf(fileName, _MAX_PATH, _T("%s%s%s"), path,
+        _sntprintf(fileName, SAL_MAX_LONG_PATH, _T("%s%s%s"), path,
                    (path[_tcslen(path) - 1] == '\\') ? _T("") : _T("\\"), ret->Name);
     }
     return ret;
@@ -403,7 +403,7 @@ void UpdateThumbnails(CSalamanderForOperationsAbstract* Salamander)
                                 else
                                 {
                                     int ret = GetLastError();
-                                    TCHAR errBuff[MAX_PATH + 20];
+                                    TCHAR errBuff[32768 + 20];
                                     int btns = BUTTONS_SKIPCANCEL;
 
                                     SalamanderGeneral->GetErrorText(ret, errBuff, SizeOf(errBuff));

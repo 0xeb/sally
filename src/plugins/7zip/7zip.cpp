@@ -329,7 +329,8 @@ BOOL SafeDeleteFile(const char* fileName, BOOL& silent)
     do
     {
         mbRet = DIALOG_OK;
-        if (!::DeleteFile(fileName) && !silent)
+        CWidePath wFileName(fileName);
+        if (!DeleteFileW(wFileName) && !silent)
         {
             DWORD err = ::GetLastError();
             mbRet = SalamanderGeneral->DialogError(SalamanderGeneral->GetMsgBoxParent(), BUTTONS_RETRYSKIPCANCEL,
@@ -365,7 +366,8 @@ BOOL SafeRemoveDirectory(const char* fileName, BOOL& silent)
     do
     {
         mbRet = DIALOG_OK;
-        if (!::RemoveDirectory(fileName) && !silent)
+        CWidePath wFileName2(fileName);
+        if (!RemoveDirectoryW(wFileName2) && !silent)
         {
             DWORD err = ::GetLastError();
             mbRet = SalamanderGeneral->DialogError(SalamanderGeneral->GetMsgBoxParent(), BUTTONS_RETRYSKIPCANCEL,
@@ -972,20 +974,21 @@ BOOL CPluginInterfaceForArchiver::PackToArchive(CSalamanderForOperationsAbstract
 
     // test whether the archive exists (we need to distinguish between update and create new archive)
     BOOL isNewArchive = FALSE;
-    HANDLE hArchive = ::CreateFile(fileName, GENERIC_READ, FILE_SHARE_READ, NULL, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, NULL);
+    CWidePath wFileName(fileName);
+    HANDLE hArchive = ::CreateFileW(wFileName, GENERIC_READ, FILE_SHARE_READ, NULL, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, NULL);
     if (hArchive == INVALID_HANDLE_VALUE)
     {
         isNewArchive = TRUE; // the file does not exist; this is a new archive
 
         // check whether the target path is writable
         hArchive = INVALID_HANDLE_VALUE;
-        hArchive = ::CreateFile(fileName, GENERIC_WRITE, FILE_SHARE_WRITE, NULL, CREATE_NEW, FILE_ATTRIBUTE_NORMAL, NULL);
+        hArchive = ::CreateFileW(wFileName, GENERIC_WRITE, FILE_SHARE_WRITE, NULL, CREATE_NEW, FILE_ATTRIBUTE_NORMAL, NULL);
         if (hArchive == INVALID_HANDLE_VALUE)
             return SysError(IDS_CANT_CREATE_ARCHIVE, ::GetLastError());
         else
         {
             ::CloseHandle(hArchive);
-            ::DeleteFile(fileName);
+            DeleteFileW(wFileName);
         }
     }
     else
@@ -1003,7 +1006,7 @@ BOOL CPluginInterfaceForArchiver::PackToArchive(CSalamanderForOperationsAbstract
 
         // check whether the file is writable
         hArchive = INVALID_HANDLE_VALUE;
-        hArchive = ::CreateFile(fileName, GENERIC_WRITE, FILE_SHARE_WRITE, NULL, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, NULL);
+        hArchive = ::CreateFileW(wFileName, GENERIC_WRITE, FILE_SHARE_WRITE, NULL, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, NULL);
         if (hArchive == INVALID_HANDLE_VALUE)
             return SysError(IDS_CANT_UPDATE_ARCHIVE, ::GetLastError(), FALSE, fileName);
         else
@@ -1112,9 +1115,9 @@ BOOL CPluginInterfaceForArchiver::PackToArchive(CSalamanderForOperationsAbstract
     { // first lock the archive file so we cannot delete it ourselves (bug: https://forum.altap.cz/viewtopic.php?f=3&t=3859)
         while (1)
         {
-            hArchive = ::CreateFile(fileName, GENERIC_READ /* I tried 0, but the system then allowed deleting the file */,
-                                    FILE_SHARE_READ | FILE_SHARE_WRITE,
-                                    NULL, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, NULL);
+            hArchive = ::CreateFileW(wFileName, GENERIC_READ /* I tried 0, but the system then allowed deleting the file */,
+                                       FILE_SHARE_READ | FILE_SHARE_WRITE,
+                                       NULL, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, NULL);
 
             if (hArchive != INVALID_HANDLE_VALUE)
                 break;
@@ -1171,15 +1174,14 @@ BOOL CPluginInterfaceForArchiver::PackToArchive(CSalamanderForOperationsAbstract
             if (ret)
             {
                 // prepare the buffer for names
-                char sourceName[MAX_PATH + 1]; // buffer for the full name on disk
-                strcpy(sourceName, sourcePath);
-                char* endSource = sourceName + strlen(sourceName); // space for the names from the 'next' enumeration
-                if (endSource > sourceName && *(endSource - 1) != '\\')
+                CPathBuffer sourceName(sourcePath); // heap-allocated for long path support
+                char* endSource = sourceName.Get() + strlen(sourceName.Get()); // space for the names from the 'next' enumeration
+                if (endSource > sourceName.Get() && *(endSource - 1) != '\\')
                 {
                     *endSource++ = '\\';
                     *endSource = 0;
                 }
-                int endSourceSize = MAX_PATH - (int)(endSource - sourceName); // maximum number of characters for a name from the 'next' enumeration
+                int endSourceSize = sourceName.Size() - (int)(endSource - sourceName.Get()); // maximum number of characters for a name from the 'next' enumeration
 
                 // delete directories; if something remains inside they will not be removed and that's fine :)
                 // because we iterate from leaves to the root, we can delete them this way
@@ -1194,7 +1196,8 @@ BOOL CPluginInterfaceForArchiver::PackToArchive(CSalamanderForOperationsAbstract
                             strcpy_s(endSource, endSourceSize, name);
                             // drop the read-only attribute if needed
                             SalamanderGeneral->ClearReadOnlyAttr(sourceName, attr);
-                            ::RemoveDirectory(sourceName);
+                            CWidePath wSourceName(sourceName);
+                            RemoveDirectoryW(wSourceName);
                         }
                         else
                             TRACE_E("Unable to delete directory, its full name is too long: " << sourcePath << " : " << name);

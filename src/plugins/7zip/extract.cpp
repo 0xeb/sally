@@ -385,7 +385,10 @@ MENU_TEMPLATE_ITEM MsgBoxButtons[] =
     case Keep:
         // keep the file, so set its attributes
         if (ExtractMode && ProcessedFileInfo.AttributesAreDefined)
-            SetFileAttributes(GetAnsiString(ProcessedFileInfo.FileName), ProcessedFileInfo.Attributes);
+            {
+                CWidePath wPath(GetAnsiString(ProcessedFileInfo.FileName));
+                SetFileAttributesW(wPath, ProcessedFileInfo.Attributes);
+            }
         break;
     }
 
@@ -476,7 +479,10 @@ STDMETHODIMP CExtractCallbackImp::SetOperationResult(INT32 resultEOperationResul
     OutFileStream.Release();
 
     if (ExtractMode && ProcessedFileInfo.AttributesAreDefined)
-        SetFileAttributes(GetAnsiString(ProcessedFileInfo.FileName), ProcessedFileInfo.Attributes);
+    {
+        CWidePath wPath2(GetAnsiString(ProcessedFileInfo.FileName));
+        SetFileAttributesW(wPath2, ProcessedFileInfo.Attributes);
+    }
 
     if (TargetDir && !ItemsToExtract.size())
     {

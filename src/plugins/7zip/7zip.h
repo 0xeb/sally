@@ -6,6 +6,37 @@
 
 #include "7za/CPP/Common/MyString.h"
 
+// Inline ANSI-to-Wide path converter for Win32 API calls in this plugin.
+// Converts ANSI path to wide string on the stack/heap for passing to *W APIs.
+class CWidePath
+{
+public:
+    explicit CWidePath(const char* ansiPath) : m_buf(NULL)
+    {
+        if (ansiPath == NULL)
+            return;
+        int len = MultiByteToWideChar(CP_ACP, 0, ansiPath, -1, NULL, 0);
+        if (len > 0)
+        {
+            m_buf = (wchar_t*)malloc(len * sizeof(wchar_t));
+            if (m_buf != NULL)
+                MultiByteToWideChar(CP_ACP, 0, ansiPath, -1, m_buf, len);
+        }
+    }
+    ~CWidePath()
+    {
+        if (m_buf != NULL)
+            free(m_buf);
+    }
+    operator const wchar_t*() const { return m_buf; }
+    BOOL IsValid() const { return m_buf != NULL; }
+
+private:
+    wchar_t* m_buf;
+    CWidePath(const CWidePath&);
+    CWidePath& operator=(const CWidePath&);
+};
+
 // Salamander general interface - valid from startup until the plugin is unloaded
 extern CSalamanderGeneralAbstract* SalamanderGeneral;
 // interface for convenient work with files

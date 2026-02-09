@@ -63,7 +63,7 @@ CProgressDlg::CProgressDlg(HWND parent, const char* title, const char* operation
 
 void CProgressDlg::Set(const char* fileName, DWORD progressTotal, BOOL dalayedPaint)
 {
-    lstrcpyn(TextCache, fileName != NULL ? fileName : "", MAX_PATH);
+    lstrcpyn(TextCache, fileName != NULL ? fileName : "", sizeof(TextCache));
     TextCacheIsDirty = TRUE;
 
     if (progressTotal != ProgressTotalCache)
@@ -232,8 +232,8 @@ CProgress2Dlg::CProgress2Dlg(HWND parent, const char* title, const char* operati
 
 void CProgress2Dlg::Set(const char* fileName, const char* fileName2, BOOL dalayedPaint)
 {
-    lstrcpyn(TextCache, fileName != NULL ? fileName : "", MAX_PATH);
-    lstrcpyn(TextCache2, fileName2 != NULL ? fileName2 : "", MAX_PATH);
+    lstrcpyn(TextCache, fileName != NULL ? fileName : "", sizeof(TextCache));
+    lstrcpyn(TextCache2, fileName2 != NULL ? fileName2 : "", sizeof(TextCache2));
     TextCache2IsDirty = TextCacheIsDirty = TRUE;
 
     if (!dalayedPaint)

@@ -124,7 +124,7 @@ int CZipUnpack::UnpackOneFile(const char* nameInZip, const CFileData* fileData, 
 {
     CALL_STACK_MESSAGE3("CZipUnpack::UnpackOneFile(%s, , %s)", nameInZip, targetPath);
     CFileInfo fileInfo;
-    TCHAR targetDir[MAX_PATH + 1];
+    TCHAR targetDir[32768];
     int targetDirLen;
     char* sour;
     CZIPFileData* zipFileData = (CZIPFileData*)fileData->PluginData;

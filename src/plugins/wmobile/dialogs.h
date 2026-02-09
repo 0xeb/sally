@@ -37,7 +37,7 @@ protected:
     // method; the same code has to be called to pump the message queue
     DWORD LastTickCount; // detects when it is time to repaint changed data
 
-    char TextCache[MAX_PATH];
+    char TextCache[32768];
     BOOL TextCacheIsDirty;
     DWORD ProgressCache;
     BOOL ProgressCacheIsDirty;
@@ -69,7 +69,7 @@ class CProgress2Dlg : public CProgressDlg
 protected:
     CGUIProgressBarAbstract* ProgressBar2;
 
-    char TextCache2[MAX_PATH];
+    char TextCache2[32768];
     BOOL TextCache2IsDirty;
 
     char Operation2[100];

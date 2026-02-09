@@ -2361,7 +2361,7 @@ DWORD CNethoodCacheEnumerationThread::EnumHiddenSharesNt(__in PCTSTR pszServerNa
     DWORD res;
 
 #ifndef _UNICODE
-    WCHAR szServerNameW[MAX_PATH];
+    WCHAR szServerNameW[32768];
     if (!MultiByteToWideChar(CP_ACP, 0, pszServerName, -1, szServerNameW, COUNTOF(szServerNameW)))
     {
         return GetLastError();
@@ -2516,9 +2516,9 @@ BOOL CNethoodCacheEnumerationThread::ResolveNetShortcut(
                     IPersistFile* fileInt;
                     if (link->QueryInterface(IID_IPersistFile, (LPVOID*)&fileInt) == S_OK)
                     {
-                        OLECHAR oleName[MAX_PATH];
-                        MultiByteToWideChar(CP_ACP, MB_PRECOMPOSED, name, -1, oleName, MAX_PATH);
-                        oleName[MAX_PATH - 1] = 0;
+                        OLECHAR oleName[32768];
+                        MultiByteToWideChar(CP_ACP, MB_PRECOMPOSED, name, -1, oleName, COUNTOF(oleName));
+                        oleName[COUNTOF(oleName) - 1] = 0;
                         if (fileInt->Load(oleName, STGM_READ) == S_OK)
                         {
                             if (link->GetPath(name, name.Size(), &data, SLGP_UNCPRIORITY) == NOERROR)
