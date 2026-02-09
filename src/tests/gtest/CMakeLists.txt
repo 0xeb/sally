@@ -408,3 +408,27 @@ add_test(NAME gtest_headless_copy COMMAND gtest_headless_copy)
 set_target_properties(gtest_headless_copy PROPERTIES
     RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/tests"
 )
+
+# CSelectionSnapshot tests
+add_executable(gtest_snapshot
+    gtest_snapshot.cpp
+)
+
+target_include_directories(gtest_snapshot PRIVATE
+    ${CMAKE_CURRENT_SOURCE_DIR}/../..
+    ${CMAKE_CURRENT_SOURCE_DIR}/../../common
+)
+
+target_compile_definitions(gtest_snapshot PRIVATE
+    WIN32 _WINDOWS _CRT_SECURE_NO_WARNINGS
+)
+
+target_link_libraries(gtest_snapshot
+    GTest::gtest GTest::gtest_main
+)
+
+add_test(NAME gtest_snapshot COMMAND gtest_snapshot)
+
+set_target_properties(gtest_snapshot PROPERTIES
+    RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/tests"
+)
