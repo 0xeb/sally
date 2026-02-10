@@ -2204,10 +2204,10 @@ void CMainWindow::SaveConfig(HWND parent)
                     itoa(i + 1, buf, 10);
                     if (CreateKey(actKey, buf, subKey))
                     {
-                        SetValue(subKey, USERMENU_ITEMNAME_REG, REG_SZ, UserMenuItems->At(i)->ItemName, -1);
-                        SetValue(subKey, USERMENU_COMMAND_REG, REG_SZ, UserMenuItems->At(i)->UMCommand, -1);
-                        SetValue(subKey, USERMENU_ARGUMENTS_REG, REG_SZ, UserMenuItems->At(i)->Arguments, -1);
-                        SetValue(subKey, USERMENU_INITDIR_REG, REG_SZ, UserMenuItems->At(i)->InitDir, -1);
+                        SetValue(subKey, USERMENU_ITEMNAME_REG, REG_SZ, UserMenuItems->At(i)->ItemName.c_str(), -1);
+                        SetValue(subKey, USERMENU_COMMAND_REG, REG_SZ, UserMenuItems->At(i)->UMCommand.c_str(), -1);
+                        SetValue(subKey, USERMENU_ARGUMENTS_REG, REG_SZ, UserMenuItems->At(i)->Arguments.c_str(), -1);
+                        SetValue(subKey, USERMENU_INITDIR_REG, REG_SZ, UserMenuItems->At(i)->InitDir.c_str(), -1);
                         SetValue(subKey, USERMENU_SHELL_REG, REG_DWORD,
                                  &UserMenuItems->At(i)->ThroughShell, sizeof(DWORD));
                         SetValue(subKey, USERMENU_CLOSE_REG, REG_DWORD,
@@ -2215,7 +2215,7 @@ void CMainWindow::SaveConfig(HWND parent)
                         SetValue(subKey, USERMENU_USEWINDOW_REG, REG_DWORD,
                                  &UserMenuItems->At(i)->UseWindow, sizeof(DWORD));
 
-                        SetValue(subKey, USERMENU_ICON_REG, REG_SZ, UserMenuItems->At(i)->Icon, -1);
+                        SetValue(subKey, USERMENU_ICON_REG, REG_SZ, UserMenuItems->At(i)->Icon.c_str(), -1);
                         SetValue(subKey, USERMENU_TYPE_REG, REG_DWORD,
                                  &UserMenuItems->At(i)->Type, sizeof(DWORD));
                         SetValue(subKey, USERMENU_SHOWINTOOLBAR_REG, REG_DWORD,

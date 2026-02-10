@@ -726,7 +726,7 @@ void CSalShExtPastedData::DoPasteOperation(BOOL copy, const char* tgtPath)
                     newArchiveDir = NULL; // so that newArchiveDir doesn't get released
                     if (plugin != NULL)
                     {
-                        StoredPluginData.Init(pluginDataAbs, plugin->DLLName, plugin->Version,
+                        StoredPluginData.Init(pluginDataAbs, plugin->DLLName.c_str(), plugin->Version.c_str(),
                                               plugin->GetPluginInterface()->GetInterface(), plugin->BuiltForVersion);
                     }
                     else

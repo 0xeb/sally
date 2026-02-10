@@ -769,7 +769,7 @@ BOOL CFilesWindow::ReadDirectory(HWND parent, BOOL isRefresh)
                                 }
                                 else // can't load -> we will remove it from the list of probed plugins (prevent from repeating error messages)
                                 {
-                                    TRACE_I("Unable to use plugin " << p->Name << " as thumbnail loader.");
+                                    TRACE_I("Unable to use plugin " << p->Name.c_str() << " as thumbnail loader.");
                                     thumbLoaderPlugins.Delete(i);
                                     readThumbnails = thumbLoaderPlugins.Count > 0;
                                     if (!thumbLoaderPlugins.IsGood())

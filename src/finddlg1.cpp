@@ -104,7 +104,7 @@ char* CFoundFilesData::GetText(int i, char* text, int fileNameFormat)
     case 2:
     {
         if (IsDir)
-            CopyMemory(text, DirColumnStr, DirColumnStrLen + 1);
+            CopyMemory(text, DirColumnStr.c_str(), DirColumnStrLen + 1);
         else
             NumberToStr(text, Size);
         break;

@@ -2171,7 +2171,7 @@ BOOL CFilesWindow::ChangePathToArchive(const char* archive, const char* archiveP
                     SetZIPArchiveSize(archiveSize);
                     if (plugin != NULL)
                     {
-                        PluginData.Init(pluginData, plugin->DLLName, plugin->Version,
+                        PluginData.Init(pluginData, plugin->DLLName.c_str(), plugin->Version.c_str(),
                                         plugin->GetPluginInterface()->GetInterface(), plugin->BuiltForVersion);
                     }
                     else
@@ -2489,7 +2489,7 @@ BOOL CFilesWindow::ChangeAndListPathOnFS(const char* fsName, int fsNameIndex, co
                         else
                             TRACE_E("CFilesWindow::ChangeAndListPathOnFS(): pluginFS.ChangePath() returned fs-name "
                                     "("
-                                    << newFSName << ") from other plugin: " << plugin->DLLName);
+                                    << newFSName << ") from other plugin: " << plugin->DLLName.c_str());
                     }
                     else
                         TRACE_E("Second unexpected situation in CFilesWindow::ChangeAndListPathOnFS()");
@@ -2734,7 +2734,7 @@ BOOL CFilesWindow::ChangePathToPluginFS(const char* fsName, const char* fsUserPa
                     // open the new FS
                     // load the plug-in before obtaining DLLName, Version, and plugin interfaces
                     CPluginFSInterfaceAbstract* auxFS = plugin->OpenFS(fsName, fsNameIndex);
-                    CPluginFSInterfaceEncapsulation pluginFS(auxFS, plugin->DLLName, plugin->Version,
+                    CPluginFSInterfaceEncapsulation pluginFS(auxFS, plugin->DLLName.c_str(), plugin->Version.c_str(),
                                                              plugin->GetPluginInterfaceForFS()->GetInterface(),
                                                              plugin->GetPluginInterface()->GetInterface(),
                                                              fsName, fsNameIndex, -1, 0, plugin->BuiltForVersion);
@@ -2786,7 +2786,7 @@ BOOL CFilesWindow::ChangePathToPluginFS(const char* fsName, const char* fsUserPa
 
                             SetPanelType(ptPluginFS);
                             SetPath(GetPath()); // detach the path from Snooper (stop monitoring changes on Path)
-                            SetPluginFS(pluginFS.GetInterface(), plugin->DLLName, plugin->Version,
+                            SetPluginFS(pluginFS.GetInterface(), plugin->DLLName.c_str(), plugin->Version.c_str(),
                                         plugin->GetPluginInterfaceForFS()->GetInterface(),
                                         plugin->GetPluginInterface()->GetInterface(),
                                         pluginFS.GetPluginFSName(), pluginFS.GetPluginFSNameIndex(),
@@ -2794,7 +2794,7 @@ BOOL CFilesWindow::ChangePathToPluginFS(const char* fsName, const char* fsUserPa
                                         plugin->BuiltForVersion);
                             SetPluginIface(plugin->GetPluginInterface()->GetInterface());
                             SetPluginFSDir(newFSDir);
-                            PluginData.Init(pluginData, plugin->DLLName, plugin->Version,
+                            PluginData.Init(pluginData, plugin->DLLName.c_str(), plugin->Version.c_str(),
                                             plugin->GetPluginInterface()->GetInterface(), plugin->BuiltForVersion);
                             SetPluginIconsType(pluginIconsType);
                             SetValidFileData(GetPluginFSDir()->GetValidData());
@@ -3318,7 +3318,7 @@ BOOL CFilesWindow::ChangePathToDetachedFS(int fsIndex, int suggestedTopIndex,
 
             SetPanelType(ptPluginFS);
             SetPath(GetPath()); // detach the path from Snooper (stop monitoring changes on Path)
-            SetPluginFS(pluginFS->GetInterface(), plugin->DLLName, plugin->Version,
+            SetPluginFS(pluginFS->GetInterface(), plugin->DLLName.c_str(), plugin->Version.c_str(),
                         plugin->GetPluginInterfaceForFS()->GetInterface(),
                         plugin->GetPluginInterface()->GetInterface(),
                         pluginFS->GetPluginFSName(), pluginFS->GetPluginFSNameIndex(),
@@ -3326,7 +3326,7 @@ BOOL CFilesWindow::ChangePathToDetachedFS(int fsIndex, int suggestedTopIndex,
                         plugin->BuiltForVersion);
             SetPluginIface(plugin->GetPluginInterface()->GetInterface());
             SetPluginFSDir(newFSDir);
-            PluginData.Init(pluginData, plugin->DLLName, plugin->Version,
+            PluginData.Init(pluginData, plugin->DLLName.c_str(), plugin->Version.c_str(),
                             plugin->GetPluginInterface()->GetInterface(), plugin->BuiltForVersion);
             SetPluginIconsType(pluginIconsType);
             SetValidFileData(GetPluginFSDir()->GetValidData());
@@ -3462,13 +3462,13 @@ void GetCommonFileTypeStr(char* buf, int* resLen, const char* ext)
     *d = 0;
     if (*ext == 0 && *uppercaseExt != 0)
     { // we have the entire extension in uppercase (no spaces and shorter than MAX_PATH) + it is not empty
-        *resLen = _snprintf_s(buf, TRANSFER_BUFFER_MAX, _TRUNCATE, CommonFileTypeName2, uppercaseExt.Get());
+        *resLen = _snprintf_s(buf, TRANSFER_BUFFER_MAX, _TRUNCATE, CommonFileTypeName2.c_str(), uppercaseExt.Get());
         if (*resLen < 0)
             *resLen = TRANSFER_BUFFER_MAX - 1; // _snprintf_s reports truncation to the buffer size
     }
     else
     {
-        memcpy(buf, CommonFileTypeName, CommonFileTypeNameLen + 1);
+        memcpy(buf, CommonFileTypeName.c_str(), CommonFileTypeNameLen + 1);
         *resLen = CommonFileTypeNameLen;
     }
 }
@@ -3628,7 +3628,7 @@ void CFilesWindow::RefreshListBox(int suggestedXOffset,
         int totalCount = Files->Count + Dirs->Count;
         if (dirsCount > 0)
         {
-            GetTextExtentPoint32(dc, DirColumnStr, DirColumnStrLen, &act);
+            GetTextExtentPoint32(dc, DirColumnStr.c_str(), DirColumnStrLen, &act);
             act.cx += SPACE_WIDTH;
             if (columnWidthSize < act.cx)
                 columnWidthSize = act.cx;
@@ -3827,7 +3827,7 @@ void CFilesWindow::RefreshListBox(int suggestedXOffset,
                     {
                         if (i == 0 && isDir && strcmp(f->Name, "..") == 0)
                         {
-                            GetTextExtentPoint32(dc, UpDirTypeName, UpDirTypeNameLen, &act);
+                            GetTextExtentPoint32(dc, UpDirTypeName.c_str(), UpDirTypeNameLen, &act);
                         }
                         else
                         {

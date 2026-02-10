@@ -963,7 +963,7 @@ void CFindIgnoreDialog::Validate(CTransferInfo& ti)
     for (i = 0; i < IgnoreList->GetCount(); i++)
     {
         CFindIgnoreItem* item = IgnoreList->At(i);
-        if (item->Enabled && !IsIgnorePathValid(item->Path))
+        if (item->Enabled && !IsIgnorePathValid(item->Path.c_str()))
         {
             gPrompter->ShowError(LoadStrW(IDS_ERRORTITLE), LoadStrW(IDS_ACBADDRIVE));
             ti.ErrorOn(IDC_FFI_NAMES);
@@ -1066,7 +1066,7 @@ CFindIgnoreDialog::DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
                 if (dispInfo->ToDo == edtlbGetData)
                 {
                     CFindIgnoreItem* item = IgnoreList->At((int)dispInfo->ItemID);
-                    strcpy(dispInfo->Buffer, item->Path);
+                    strcpy(dispInfo->Buffer, item->Path.c_str());
                     dispInfo->HIcon = item->Enabled ? HChecked : HUnchecked;
                     SetWindowLongPtr(HWindow, DWLP_MSGRESULT, FALSE);
                     return TRUE;

@@ -1,4 +1,4 @@
-﻿// SPDX-FileCopyrightText: 2023 Open Salamander Authors
+// SPDX-FileCopyrightText: 2023 Open Salamander Authors
 // SPDX-License-Identifier: GPL-2.0-or-later
 // CommentsTranslationProject: TRANSLATED
 
@@ -1986,24 +1986,20 @@ void CSalamanderGeneral::SetPluginBugReportInfo(const char* message, const char*
     CPluginData* data = Plugins.GetPluginData(Plugin);
     if (data != NULL)
     {
-        if (data->BugReportMessage != NULL)
-            free(data->BugReportMessage);
         if (message != NULL)
-            data->BugReportMessage = ::DupStr(message);
+            data->BugReportMessage = message;
         else
-            data->BugReportMessage = NULL;
-        if (data->BugReportEMail != NULL)
-            free(data->BugReportEMail);
+            data->BugReportMessage.clear();
         if (email != NULL)
         {
-            data->BugReportEMail = ::DupStr(email);
-            if (data->BugReportEMail != NULL && strlen(data->BugReportEMail) > 100)
+            data->BugReportEMail = email;
+            if (data->BugReportEMail.length() > 100)
             {
-                data->BugReportEMail[100] = 0;
+                data->BugReportEMail.resize(100);
             }
         }
         else
-            data->BugReportEMail = NULL;
+            data->BugReportEMail.clear();
     }
     else
     {
@@ -4212,12 +4208,10 @@ void CSalamanderGeneral::PostOpenUnpackDlgForThisPlugin(const char* unpackMask)
     if (data != NULL)
     {
         data->OpenUnpackDlg = TRUE;
-        if (data->UnpackDlgUnpackMask != NULL)
-            free(data->UnpackDlgUnpackMask);
         if (unpackMask != NULL)
-            data->UnpackDlgUnpackMask = DupStr(unpackMask);
+            data->UnpackDlgUnpackMask = unpackMask;
         else
-            data->UnpackDlgUnpackMask = NULL;
+            data->UnpackDlgUnpackMask.clear();
         OpenPackOrUnpackDlgForMarkedPlugins = TRUE;
     }
     else

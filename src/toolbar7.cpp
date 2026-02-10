@@ -87,7 +87,7 @@ CHotPathsBar::CHotPathsBar(HWND hNotifyWindow, CObjectOrigin origin)
           if (item->Type == umitSubmenuBegin)
             tii.Style |= TLBI_STYLE_WHOLEDROPDOWN | TLBI_STYLE_DROPDOWN;
           char buff[80];
-          lstrcpyn(buff, item->ItemName, 80);
+          lstrcpyn(buff, item->ItemName.c_str(), 80);
           RemoveAmpersands(buff);
           tii.Text = buff;
           tii.HIcon = item->HIcon;

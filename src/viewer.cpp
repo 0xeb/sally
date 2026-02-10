@@ -131,10 +131,9 @@ void HistoryComboBox(HWND hWindow, CTransferInfo& ti, int ctrlID, char* Text,
 
                     if (insert)
                     {
-                        char* newText = (char*)malloc(strlen(Text) + 1);
+                        char* newText = _strdup(Text);
                         if (newText != NULL)
                         {
-                            strcpy(newText, Text);
                             if (history[historySize - 1] != NULL)
                                 free(history[historySize - 1]);
                             memmove(history + 1, history,

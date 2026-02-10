@@ -10,21 +10,17 @@
 
 struct COneDriveBusinessStorage
 {
-    char* DisplayName;
-    char* UserFolder;
+    std::string DisplayName;
+    std::string UserFolder;
 
-    COneDriveBusinessStorage(char* displayName, char* userFolder) // saves allocated parameters
+    COneDriveBusinessStorage(const char* displayName, const char* userFolder)
     {
-        DisplayName = displayName;
-        UserFolder = userFolder;
+        DisplayName = displayName ? displayName : "";
+        UserFolder = userFolder ? userFolder : "";
     }
 
     ~COneDriveBusinessStorage()
     {
-        if (DisplayName != NULL)
-            free(DisplayName);
-        if (UserFolder != NULL)
-            free(UserFolder);
     }
 };
 

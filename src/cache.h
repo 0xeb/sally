@@ -39,8 +39,8 @@ class CCacheHandles;
 class CCacheData // tmp-name, info about file or directory on disk, internal use
 {
 protected:
-    char* Name;       // the item identification (path to original)
-    char* TmpName;    // the tmp-file name on disk (full path)
+    std::string Name;    // the item identification (path to original)
+    std::string TmpName; // the tmp-file name on disk (full path)
     HANDLE Preparing; // mutex, which "holds" the thread, which prepares the tmp-file
 
     // system objects - array of (HANDLE): state "signaled" -> remove this 'lock'
@@ -79,7 +79,7 @@ public:
     BOOL CleanFromDisk();
 
     // did the object initialization succeeded?
-    BOOL IsGood() { return Name != NULL; }
+    BOOL IsGood() { return !Name.empty(); }
 
     // should the tmp-file be cached?
     BOOL IsCached() { return Cached; }
@@ -87,8 +87,8 @@ public:
     // is the tmp-file without any link? (it still has no link/it has no link anymore?)
     BOOL IsLocked() { return LockObject.Count == 0 && NewCount == 0; }
 
-    BOOL NameEqual(const char* name) { return StrICmp(Name, name) == 0; }
-    BOOL TmpNameEqual(const char* tmpName) { return StrICmp(TmpName, tmpName) == 0; }
+    BOOL NameEqual(const char* name) { return StrICmp(Name.c_str(), name) == 0; }
+    BOOL TmpNameEqual(const char* tmpName) { return StrICmp(TmpName.c_str(), tmpName) == 0; }
 
     // waits until the tmp-file is prepared or until the method ReleaseName() is called
     // then 'exists' is set to return value matching CDiskCache::GetName()
@@ -117,7 +117,7 @@ public:
     BOOL ReleaseName(BOOL* lastLock, BOOL storeInCache);
 
     // returns the full name of the tmp-file
-    const char* GetTmpName() { return TmpName; }
+    const char* GetTmpName() { return TmpName.c_str(); }
 
     // detaches the object 'lock' (in "signaled" state) from the tmp-file (detaches the link)
     //
@@ -139,7 +139,7 @@ public:
     }
 
     // returns item identification (path to original)
-    const char* GetName() { return Name; }
+    const char* GetName() { return Name.c_str(); }
 
     // performs premature deletion of the tmp-file, which is deleted by the plugin 'ownDeletePlugin';
     // used when unloading the plugin (the tmp-file is marked as deleted - once all links are closed,
@@ -536,13 +536,13 @@ struct CPluginData;
 
 struct CDeleteManagerItem
 {
-    char* FileName;                   // the name of file, which should be deleted by the plugin
+    std::string FileName;                 // the name of file, which should be deleted by the plugin
     CPluginInterfaceAbstract* Plugin; // a plugin, which will delete the file via the method
                                       // CPluginInterfaceForArchiverAbstract::DeleteTmpCopy
 
     CDeleteManagerItem(const char* fileName, CPluginInterfaceAbstract* plugin);
     ~CDeleteManagerItem();
-    BOOL IsGood() { return FileName != NULL; }
+    BOOL IsGood() { return !FileName.empty(); }
 };
 
 class CDeleteManager

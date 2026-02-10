@@ -339,14 +339,11 @@ BOOL CFindOptions::Add(CFindOptionsItem* item)
 CFindIgnoreItem::CFindIgnoreItem()
 {
     Enabled = TRUE;
-    Path = NULL;
     Type = fiitUnknow;
 }
 
 CFindIgnoreItem::~CFindIgnoreItem()
 {
-    if (Path != NULL)
-        free(Path);
 }
 
 //*********************************************************************************
@@ -380,7 +377,7 @@ BOOL CFindIgnore::Save(HKEY hKey)
         itoa(i + 1, buf, 10);
         if (CreateKey(hKey, buf, subKey))
         {
-            SetValue(subKey, FINDIGNOREITEM_PATH_REG, REG_SZ, Items[i]->Path, -1);
+            SetValue(subKey, FINDIGNOREITEM_PATH_REG, REG_SZ, Items[i]->Path.c_str(), -1);
             if (!Items[i]->Enabled) // save only if it is FALSE
                 SetValue(subKey, FINDIGNOREITEM_ENABLED_REG, REG_DWORD, &Items[i]->Enabled, sizeof(DWORD));
             CloseKey(subKey);
@@ -409,7 +406,7 @@ BOOL CFindIgnore::Load(HKEY hKey, DWORD cfgVersion)
         CPathBuffer path; // Heap-allocated for long path support
         if (!GetValue(subKey, FINDIGNOREITEM_PATH_REG, REG_SZ, path, path.Size()))
             path[0] = 0;
-        item->Path = DupStr(path);
+        item->Path = path ? (const char*)path : "";
         if (!GetValue(subKey, FINDIGNOREITEM_ENABLED_REG, REG_DWORD, &item->Enabled, sizeof(DWORD)))
             item->Enabled = TRUE; // saved only if it is FALSE
         if (Configuration.ConfigVersion < 32)
@@ -417,7 +414,7 @@ BOOL CFindIgnore::Load(HKEY hKey, DWORD cfgVersion)
             // users were confused that this folder was not searched
             // so we keep it listed but uncheck the checkbox
             // anyone interested can manually enable it
-            if (strcmp(item->Path, "Local Settings\\Temporary Internet Files") == 0)
+            if (item->Path == "Local Settings\\Temporary Internet Files")
                 item->Enabled = FALSE;
         }
         Items.Add(item);
@@ -441,7 +438,7 @@ BOOL CFindIgnore::Load(CFindIgnore* source)
     for (i = 0; i < source->Items.Count; i++)
     {
         CFindIgnoreItem* item = source->At(i);
-        if (!Add(item->Enabled, item->Path))
+        if (!Add(item->Enabled, item->Path.c_str()))
             return FALSE;
     }
     return TRUE;
@@ -456,7 +453,7 @@ BOOL CFindIgnore::Prepare(CFindIgnore* source)
         CFindIgnoreItem* item = source->At(i);
         if (item->Enabled) // we are only interested in enabled items
         {
-            const char* path = item->Path;
+            const char* path = item->Path.c_str();
             while (*path == ' ')
                 path++;
             CFindIgnoreItemType type = fiitRelative;
@@ -530,7 +527,7 @@ BOOL CFindIgnore::Contains(const char* path, int startPathLen)
         {
         case fiitFull:
         {
-            if (item->Len > startPathLen && StrNICmp(path, item->Path, item->Len) == 0)
+            if (item->Len > startPathLen && StrNICmp(path, item->Path.c_str(), item->Len) == 0)
                 return TRUE;
             break;
         }
@@ -538,7 +535,7 @@ BOOL CFindIgnore::Contains(const char* path, int startPathLen)
         case fiitRooted:
         {
             const char* noRoot = SkipRoot(path);
-            if ((noRoot - path) + item->Len > startPathLen && StrNICmp(noRoot, item->Path, item->Len) == 0)
+            if ((noRoot - path) + item->Len > startPathLen && StrNICmp(noRoot, item->Path.c_str(), item->Len) == 0)
                 return TRUE;
             break;
         }
@@ -548,7 +545,7 @@ BOOL CFindIgnore::Contains(const char* path, int startPathLen)
             const char* m = path;
             while (m != NULL)
             {
-                m = StrIStr(m, item->Path);
+                m = StrIStr(m, item->Path.c_str());
                 if (m != NULL) // found
                 {
                     if ((m - path) + item->Len > startPathLen) // is it a subpath? then ignore it
@@ -591,13 +588,7 @@ BOOL CFindIgnore::Add(BOOL enabled, const char* path)
         return FALSE;
     }
     item->Enabled = enabled;
-    item->Path = DupStr(path);
-    if (item->Path == NULL)
-    {
-        TRACE_E(LOW_MEMORY);
-        delete item;
-        return FALSE;
-    }
+    item->Path = path ? path : "";
     Items.Add(item);
     if (!Items.IsGood())
     {
@@ -619,14 +610,14 @@ BOOL CFindIgnore::AddUnique(BOOL enabled, const char* path)
     for (i = 0; i < Items.Count; i++)
     {
         CFindIgnoreItem* item = Items[i];
-        int itemLen = (int)strlen(item->Path);
+        int itemLen = (int)item->Path.length();
         if (itemLen < 1)
             continue;
         if (item->Path[itemLen - 1] == '\\') // compare without a trailing backslash
             itemLen--;
         if (len != itemLen)
             continue;
-        if (StrNICmp(path, item->Path, len) == 0)
+        if (StrNICmp(path, item->Path.c_str(), len) == 0)
         {
             item->Enabled = TRUE; // always enable this item
             return TRUE;
@@ -643,16 +634,8 @@ BOOL CFindIgnore::Set(int index, BOOL enabled, const char* path)
         TRACE_E("Index is out of range");
         return FALSE;
     }
-    char* p = DupStr(path);
-    if (p == NULL)
-    {
-        TRACE_E(LOW_MEMORY);
-        return FALSE;
-    }
     CFindIgnoreItem* item = Items[index];
-    if (item->Path != NULL)
-        free(item->Path);
-    item->Path = p;
+    item->Path = path ? path : "";
     item->Enabled = enabled;
     return TRUE;
 }

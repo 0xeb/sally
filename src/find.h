@@ -259,7 +259,7 @@ class CFindIgnoreItem
 {
 public:
     BOOL Enabled;
-    char* Path;
+    std::string Path;
 
     // the following data are not saved; they are initialized in Prepare()
     CFindIgnoreItemType Type;

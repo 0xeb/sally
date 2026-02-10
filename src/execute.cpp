@@ -1,4 +1,4 @@
-﻿// SPDX-FileCopyrightText: 2023 Open Salamander Authors
+// SPDX-FileCopyrightText: 2023 Open Salamander Authors
 // SPDX-License-Identifier: GPL-2.0-or-later
 // CommentsTranslationProject: TRANSLATED
 
@@ -1009,7 +1009,7 @@ const char* WINAPI FileDataExpFileSize(HWND msgParent, void* param)
     if (!data->IsDir || sizeValid && data->FileData->SizeValid || plSizeValid)
         NumberToStr(data->Buffer, plSizeValid ? plSize : data->FileData->Size);
     else
-        CopyMemory(data->Buffer, DirColumnStr, DirColumnStrLen + 1);
+        CopyMemory(data->Buffer, DirColumnStr.c_str(), DirColumnStrLen + 1);
     return data->Buffer;
 }
 
@@ -1039,7 +1039,7 @@ const char* WINAPI FileDataExpFileSizeNoSpaces(HWND msgParent, void* param)
         _ui64toa(plSizeValid ? plSize.Value : data->FileData->Size.Value, data->Buffer, 10);
     }
     else
-        CopyMemory(data->Buffer, DirColumnStr, DirColumnStrLen + 1);
+        CopyMemory(data->Buffer, DirColumnStr.c_str(), DirColumnStrLen + 1);
     return data->Buffer;
 }
 

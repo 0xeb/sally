@@ -276,10 +276,10 @@ public:
 
 struct CFileTimeStampsItem
 {
-    char *ZIPRoot,
-        *SourcePath,
-        *FileName,
-        *DosFileName;
+    std::string ZIPRoot;
+    std::string SourcePath;
+    std::string FileName;
+    std::string DosFileName;
     FILETIME LastWrite;
     CQuadWord FileSize;
     DWORD Attr;
@@ -385,7 +385,7 @@ public:
 class CDirectorySizes
 {
 protected:
-    char* Path;                // full path to the directory whose subdirectory names and sizes are stored by us
+    std::string Path;              // full path to the directory whose subdirectory names and sizes are stored by us
     TDirectArray<char*> Names; // names of subdirectories
     BOOL CaseSensitive;
     BOOL NeedSort; // guard ensuring that the class is used correctly
@@ -397,7 +397,7 @@ public:
     // destroys all held data
     void Clean();
 
-    BOOL IsGood() { return Path != NULL; }
+    BOOL IsGood() { return !Path.empty(); }
 
     BOOL Add(const char* name, const CQuadWord* size);
 

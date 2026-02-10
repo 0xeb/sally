@@ -124,7 +124,7 @@ public:
             if (UserMenuBar->GetItemInfo2(pasteIndex, TRUE, &tii))
             {
                 CUserMenuItem* item = MainWindow->UserMenuItems->At(tii.ID - CM_USERMENU_MIN);
-                if (ExpandCommand(MainWindow->HWindow, item->UMCommand, fileName, MAX_PATH, TRUE))
+                if (ExpandCommand(MainWindow->HWindow, item->UMCommand.c_str(), fileName, MAX_PATH, TRUE))
                 {
                     if (!HasDropTarget(fileName))
                         pasteIndex = -1;
@@ -553,7 +553,7 @@ CUserMenuBar::CUserMenuBar(HWND hNotifyWindow, CObjectOrigin origin)
                 if (item->Type == umitSubmenuBegin)
                     tii.Style |= TLBI_STYLE_WHOLEDROPDOWN | TLBI_STYLE_DROPDOWN;
                 char buff[80];
-                lstrcpyn(buff, item->ItemName, 80);
+                lstrcpyn(buff, item->ItemName.c_str(), 80);
                 RemoveAmpersands(buff);
                 tii.Text = buff;
                 tii.HIcon = item->UMIcon;
@@ -641,11 +641,11 @@ void CUserMenuBar::OnGetToolTip(LPARAM lParam)
         if (Configuration.UserMenuToolbarLabels)
         {
             CPathBuffer umCommand; // Heap-allocated for long path support
-            if (ExpandCommand(MainWindow->HWindow, item->UMCommand, umCommand, umCommand.Size(), TRUE))
+            if (ExpandCommand(MainWindow->HWindow, item->UMCommand.c_str(), umCommand, umCommand.Size(), TRUE))
                 lstrcpy(tt->Buffer, umCommand);
         }
         else
-            lstrcpy(tt->Buffer, item->ItemName);
+            lstrcpy(tt->Buffer, item->ItemName.c_str());
     }
 }
 

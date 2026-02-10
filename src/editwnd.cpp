@@ -521,14 +521,13 @@ CEditLine::WindowProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
                                 }
                         if (from > 0)
                         {
-                            char* text = (char*)malloc(strlen(cmdLine) + 1);
+                            char* text = _strdup(cmdLine);
                             if (text != NULL)
                             {
                                 free(history[from]);
                                 for (i = from - 1; i >= 0; i--)
                                     history[i + 1] = history[i];
                                 history[0] = text;
-                                strcpy(history[0], cmdLine);
                             }
                         }
                     }

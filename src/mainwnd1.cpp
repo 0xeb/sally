@@ -351,7 +351,6 @@ CMainWindow::CMainWindow() : ChangeNotifArray(3, 5)
     IgnoreWM_SETTINGCHANGE = FALSE;
     LockedUI = FALSE;
     LockedUIToolWnd = NULL;
-    LockedUIReason = NULL;
 
     ToolTip = new CToolTip(ooStatic);
 
@@ -1563,7 +1562,7 @@ void CMainWindow::FillUserMenu2(CMenuPopup* menu, int* iterator, int max)
             mii.State = 0;
             mii.Type = MENU_TYPE_STRING;
             mii.ID = CM_USERMENU_MIN + *iterator;
-            mii.String = UserMenuItems->At(*iterator)->ItemName;
+            mii.String = const_cast<char*>(UserMenuItems->At(*iterator)->ItemName.c_str());
             mii.HIcon = UserMenuItems->At(*iterator)->UMIcon;
             menu->InsertItem(0xFFFFFFFF, TRUE, &mii);
             added++;
@@ -1581,7 +1580,7 @@ void CMainWindow::FillUserMenu2(CMenuPopup* menu, int* iterator, int max)
             mii.Mask = MENU_MASK_TYPE | MENU_MASK_STRING | MENU_MASK_ICON | MENU_MASK_SUBMENU;
             mii.Type = MENU_TYPE_STRING;
             mii.SubMenu = popup;
-            mii.String = UserMenuItems->At(*iterator)->ItemName;
+            mii.String = const_cast<char*>(UserMenuItems->At(*iterator)->ItemName.c_str());
             mii.HIcon = UserMenuItems->At(*iterator)->UMIcon;
             menu->InsertItem(0xFFFFFFFF, TRUE, &mii);
             // recursion

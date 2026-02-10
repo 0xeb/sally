@@ -494,7 +494,7 @@ BOOL ExpandCommand2(HWND parent,
 
     *fileNameUsed = FALSE;
     CPathBuffer command; // Heap-allocated for long path support
-    if (ExpandCommand(parent, item->UMCommand, command, command.Size(), ignoreEnvVarNotFoundOrTooLong))
+    if (ExpandCommand(parent, item->UMCommand.c_str(), command, command.Size(), ignoreEnvVarNotFoundOrTooLong))
     {
         CPathBuffer fileName; // Heap-allocated for long path support
         if (path[0] != 0)
@@ -540,10 +540,10 @@ BOOL ExpandCommand2(HWND parent,
             }
 
             char expArguments[USRMNUARGS_MAXLEN];
-            if (ExpandUserMenuArguments(parent, fileName, dosName, item->Arguments, expArguments,
+            if (ExpandUserMenuArguments(parent, fileName, dosName, item->Arguments.c_str(), expArguments,
                                         USRMNUARGS_MAXLEN, fileNameUsed, userMenuAdvancedData,
                                         ignoreEnvVarNotFoundOrTooLong) &&
-                ExpandInitDir(parent, fileName, dosName, item->InitDir, initDir, initDirSize,
+                ExpandInitDir(parent, fileName, dosName, item->InitDir.c_str(), initDir, initDirSize,
                               ignoreEnvVarNotFoundOrTooLong))
             {
                 int len = (int)strlen(command);
@@ -638,7 +638,7 @@ void CMainWindow::UserMenu(HWND parent, int itemIndex, UM_GetNextFileName getNex
         int errorPos1, errorPos2;
         CUserMenuValidationData userMenuValidationData;
         BOOL ok = TRUE;
-        if (ValidateUserMenuArguments(parent, UserMenuItems->At(itemIndex)->Arguments, errorPos1, errorPos2,
+        if (ValidateUserMenuArguments(parent, UserMenuItems->At(itemIndex)->Arguments.c_str(), errorPos1, errorPos2,
                                       &userMenuValidationData))
         {
             if (userMenuValidationData.UsesListOfSelNames && userMenuAdvancedData->ListOfSelNames[0] == 0)
@@ -2010,13 +2010,12 @@ void CMainWindow::LockUI(BOOL lock, HWND hToolWnd, const char* lockReason)
     {
         LockedUIToolWnd = hToolWnd;
         if (lockReason != NULL)
-            LockedUIReason = DupStr(lockReason);
+            LockedUIReason = lockReason;
     }
     else
     {
         LockedUIToolWnd = NULL;
-        if (LockedUIReason != NULL)
-            free(LockedUIReason);
+        LockedUIReason.clear();
     }
 
     if (HTopRebar != NULL)

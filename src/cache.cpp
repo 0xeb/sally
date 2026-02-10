@@ -31,19 +31,16 @@ BOOL InitializeDiskCache()
 CCacheData::CCacheData(const char* name, const char* tmpName, BOOL ownDelete,
                        CPluginInterfaceAbstract* ownDeletePlugin) : LockObject(1, 2), LockObjOwner(1, 2)
 {
-    Name = DupStr(name);
-    TmpName = DupStr(tmpName);
+    Name = name ? name : "";
+    TmpName = tmpName ? tmpName : "";
     Preparing = HANDLES(CreateMutex(NULL, TRUE, NULL));
-    if (Preparing == NULL || Name == NULL || TmpName == NULL)
+    if (Preparing == NULL || Name.empty() || TmpName.empty())
     {
-        if (Name != NULL)
-            free(Name);
-        if (TmpName != NULL)
-            free(TmpName);
+        Name.clear();
+        TmpName.clear();
         if (Preparing != NULL)
             HANDLES(CloseHandle(Preparing));
         Preparing = NULL;
-        TmpName = Name = NULL;
         NewCount = 0;
     }
     else
@@ -60,7 +57,7 @@ CCacheData::CCacheData(const char* name, const char* tmpName, BOOL ownDelete,
 
 CCacheData::~CCacheData()
 {
-    if (TmpName != NULL && LockObject.Count == 0) // tmp-file not needed anymore
+    if (!TmpName.empty() && LockObject.Count == 0) // tmp-file not needed anymore
     {
         if (!CleanFromDisk())
         {
@@ -76,15 +73,11 @@ CCacheData::~CCacheData()
     }
     else
     {
-        if (TmpName != NULL)
-            TRACE_I("Tmp-file " << TmpName << " stays on disk. It is still opened (in use).");
+        if (!TmpName.empty())
+            TRACE_I("Tmp-file " << TmpName.c_str() << " stays on disk. It is still opened (in use).");
     }
     if (NewCount != 0)
-        TRACE_E("Preliminary destruction of tmp-file " << TmpName);
-    if (Name != NULL)
-        free(Name);
-    if (TmpName != NULL)
-        free(TmpName);
+        TRACE_E("Preliminary destruction of tmp-file " << TmpName.c_str());
     if (Preparing != NULL)
     {
         ReleaseMutex(Preparing); // just in case
@@ -105,24 +98,24 @@ BOOL CCacheData::CleanFromDisk()
     {
         if (!OwnDelete)
         {
-            DWORD attrs = SalGetFileAttributes(TmpName);
+            DWORD attrs = SalGetFileAttributes(TmpName.c_str());
             if (attrs == 0xFFFFFFFF)
             {
                 return GetLastError() == ERROR_FILE_NOT_FOUND || GetLastError() == ERROR_PATH_NOT_FOUND;
             }
             if (attrs & FILE_ATTRIBUTE_DIRECTORY) // directory
             {
-                RemoveTemporaryDir(TmpName);
+                RemoveTemporaryDir(TmpName.c_str());
             }
             else // file
             {
                 if (attrs & FILE_ATTRIBUTE_READONLY)
                 {
-                    SetFileAttributes(TmpName, FILE_ATTRIBUTE_ARCHIVE);
+                    SetFileAttributes(TmpName.c_str(), FILE_ATTRIBUTE_ARCHIVE);
                 }
-                gFileSystem->DeleteFile(AnsiToWide(TmpName).c_str());
+                gFileSystem->DeleteFile(AnsiToWide(TmpName.c_str()).c_str());
             }
-            attrs = SalGetFileAttributes(TmpName); // check if the deletion was successful
+            attrs = SalGetFileAttributes(TmpName.c_str()); // check if the deletion was successful
             if (attrs == 0xFFFFFFFF)
             {
                 return GetLastError() == ERROR_FILE_NOT_FOUND || GetLastError() == ERROR_PATH_NOT_FOUND;
@@ -133,7 +126,7 @@ BOOL CCacheData::CleanFromDisk()
             if (OwnDeletePlugin != NULL) // we can start deleting (plugin can't be unloaded), otherwise the file
             {                            // won't be  deleted (it's either already deleted or it's just
                                          // disconnected - the plugin decides this during its unload
-                DeleteManager.AddFile(TmpName, OwnDeletePlugin);
+                DeleteManager.AddFile(TmpName.c_str(), OwnDeletePlugin);
                 OwnDeletePlugin = NULL; // no more deleting will be done
             }
             return TRUE; // success (we can't wait for the actual result of the operation)
@@ -174,13 +167,13 @@ CCacheData::GetName(CDiskCache* monitor, BOOL* exists, BOOL canBlock, BOOL onlyA
     {
         if (Prepared) // tmp-file is ready
         {
-            DWORD attrs = SalGetFileAttributes(TmpName);
+            DWORD attrs = SalGetFileAttributes(TmpName.c_str());
             if (attrs == 0xFFFFFFFF || OutOfDate)
             {
                 if (OutOfDate && attrs != 0xFFFFFFFF)
-                    TRACE_I("Updating tmp-file " << TmpName << ", it was out-of-date.");
+                    TRACE_I("Updating tmp-file " << TmpName.c_str() << ", it was out-of-date.");
                 else
-                    TRACE_I("Somebody has removed our tmp-file " << TmpName << ", we must ask client to create it again.");
+                    TRACE_I("Somebody has removed our tmp-file " << TmpName.c_str() << ", we must ask client to create it again.");
                 /*
         char dir[MAX_PATH];
         char *s = strrchr(TmpName, '\\');
@@ -211,7 +204,7 @@ CCacheData::GetName(CDiskCache* monitor, BOOL* exists, BOOL canBlock, BOOL onlyA
                 else
                 {
                     *exists = TRUE;
-                    return TmpName;
+                    return TmpName.c_str();
                 }
             }
         }
@@ -225,7 +218,7 @@ CCacheData::GetName(CDiskCache* monitor, BOOL* exists, BOOL canBlock, BOOL onlyA
     {
         TRACE_E("Unable to delete tmp-file.");
     }
-    return TmpName;
+    return TmpName.c_str();
 }
 
 BOOL CCacheData::NamePrepared(const CQuadWord& size)
@@ -318,7 +311,7 @@ void CCacheData::PrematureDeleteByPlugin(CPluginInterfaceAbstract* ownDeletePlug
         OwnDeletePlugin == ownDeletePlugin) // we're searching for this tmp-file (The plugin 'ownDeletePlugin' deletes it)
     {
         if (!onlyDetach)
-            DeleteManager.AddFile(TmpName, OwnDeletePlugin);
+            DeleteManager.AddFile(TmpName.c_str(), OwnDeletePlugin);
         OwnDeletePlugin = NULL;
     }
 }
@@ -1545,14 +1538,12 @@ void CDiskCache::ClearTEMPIfNeeded(HWND parent, HWND hActivePanel)
 
 CDeleteManagerItem::CDeleteManagerItem(const char* fileName, CPluginInterfaceAbstract* plugin)
 {
-    FileName = DupStr(fileName);
+    FileName = fileName ? fileName : "";
     Plugin = plugin;
 }
 
 CDeleteManagerItem::~CDeleteManagerItem()
 {
-    if (FileName != NULL)
-        free(FileName);
 }
 
 CDeleteManager::CDeleteManager() : Data(10, 50)
@@ -1641,7 +1632,7 @@ void CDeleteManager::ProcessData()
         }
         if (plugin != NULL)
         {
-            plugin->DeleteTmpCopy(item->FileName, firstFile);
+            plugin->DeleteTmpCopy(item->FileName.c_str(), firstFile);
             firstFile = FALSE;
         }
         else

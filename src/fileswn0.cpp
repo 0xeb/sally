@@ -166,7 +166,7 @@ BOOL CFilesWindow::IsNethoodFS()
     CPluginData* nethoodPlugin;
     return Is(ptPluginFS) && GetPluginFS()->NotEmpty() &&
            Plugins.GetFirstNethoodPluginFSName(NULL, &nethoodPlugin) &&
-           GetPluginFS()->GetDLLName() == nethoodPlugin->DLLName;
+           GetPluginFS()->GetDLLName() == nethoodPlugin->DLLName.c_str();
 }
 
 void CFilesWindow::CtrlPageDnOrEnter(WPARAM key)

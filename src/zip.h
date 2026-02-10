@@ -4,6 +4,8 @@
 
 #pragma once
 
+#include <string>
+
 extern HWND ProgressDialogActivateDrop;
 
 //
@@ -298,17 +300,17 @@ extern SPackCustomUnpacker CustomUnpackers[];
 class CPackerConfigData
 {
 public:
-    char* Title; // name shown to the user
-    char* Ext;   // standard extension (without the dot)
-    int Type;    // internal (-1, -2, ...; see CPlugins for details) / external (0; additional fields apply)
-                 // note: see OldType below
+    std::string Title; // name shown to the user
+    std::string Ext;   // standard extension (without the dot)
+    int Type;          // internal (-1, -2, ...; see CPlugins for details) / external (0; additional fields apply)
+                       // note: see OldType below
 
     // data for external packers
-    char* CmdExecCopy;
-    char* CmdArgsCopy;
+    std::string CmdExecCopy;
+    std::string CmdArgsCopy;
     BOOL SupportMove;
-    char* CmdExecMove;
-    char* CmdArgsMove;
+    std::string CmdExecMove;
+    std::string CmdArgsMove;
     BOOL SupportLongNames;
     BOOL NeedANSIListFile;
 
@@ -328,21 +330,15 @@ public:
 
     void Destroy()
     {
-        if (Title != NULL)
-            free(Title);
-        if (Ext != NULL)
-            free(Ext);
+        Title.clear();
+        Ext.clear();
         if (OldType && Type == 1 ||
             !OldType && Type == CUSTOMPACKER_EXTERNAL)
         {
-            if (CmdExecCopy != NULL)
-                free(CmdExecCopy);
-            if (CmdArgsCopy != NULL)
-                free(CmdArgsCopy);
-            if (CmdExecMove != NULL)
-                free(CmdExecMove);
-            if (CmdArgsMove != NULL)
-                free(CmdArgsMove);
+            CmdExecCopy.clear();
+            CmdArgsCopy.clear();
+            CmdExecMove.clear();
+            CmdArgsMove.clear();
         }
         Empty();
     }
@@ -350,26 +346,26 @@ public:
     void Empty()
     {
         OldType = FALSE;
-        Title = NULL;
-        Ext = NULL;
+        Title.clear();
+        Ext.clear();
         Type = 1;
-        CmdExecCopy = NULL;
-        CmdArgsCopy = NULL;
+        CmdExecCopy.clear();
+        CmdArgsCopy.clear();
         SupportMove = FALSE;
-        CmdExecMove = NULL;
-        CmdArgsMove = NULL;
+        CmdExecMove.clear();
+        CmdArgsMove.clear();
         SupportLongNames = FALSE;
         NeedANSIListFile = FALSE;
     }
 
     BOOL IsValid()
     {
-        if (Title == NULL || Ext == NULL)
+        if (Title.empty() || Ext.empty())
             return FALSE;
         if ((OldType && Type == 1 || !OldType && Type == CUSTOMPACKER_EXTERNAL) &&
-            (CmdExecCopy == NULL || CmdArgsCopy == NULL))
+            (CmdExecCopy.empty() || CmdArgsCopy.empty()))
             return FALSE;
-        if (SupportMove && (CmdExecMove == NULL || CmdArgsMove == NULL))
+        if (SupportMove && (CmdExecMove.empty() || CmdArgsMove.empty()))
             return FALSE;
         return TRUE;
     }
@@ -411,27 +407,23 @@ public:
     void DeletePacker(int index);
     void SetPackerCmdExecCopy(int index, const char* cmd)
     {
-        if (Packers[index]->CmdExecCopy)
-            free(Packers[index]->CmdExecCopy);
-        Packers[index]->CmdExecCopy = DupStr(cmd);
+        Packers[index]->CmdExecCopy = cmd;
     }
     void SetPackerCmdExecMove(int index, const char* cmd)
     {
-        if (Packers[index]->CmdExecMove)
-            free(Packers[index]->CmdExecMove);
-        Packers[index]->CmdExecMove = DupStr(cmd);
+        Packers[index]->CmdExecMove = cmd;
     }
 
     int GetPackerType(int index) { return Packers[index]->Type; }
     BOOL GetPackerOldType(int index) { return Packers[index]->OldType; }
-    const char* GetPackerTitle(int index) { return Packers[index]->Title; }
-    const char* GetPackerExt(int index) { return Packers[index]->Ext; }
+    const char* GetPackerTitle(int index) { return Packers[index]->Title.c_str(); }
+    const char* GetPackerExt(int index) { return Packers[index]->Ext.c_str(); }
     BOOL GetPackerSupLongNames(int index) { return Packers[index]->SupportLongNames; }
     BOOL GetPackerSupMove(int index) { return Packers[index]->SupportMove; }
-    const char* GetPackerCmdExecCopy(int index) { return Packers[index]->CmdExecCopy; }
-    const char* GetPackerCmdArgsCopy(int index) { return Packers[index]->CmdArgsCopy; }
-    const char* GetPackerCmdExecMove(int index) { return Packers[index]->CmdExecMove; }
-    const char* GetPackerCmdArgsMove(int index) { return Packers[index]->CmdArgsMove; }
+    const char* GetPackerCmdExecCopy(int index) { return Packers[index]->CmdExecCopy.c_str(); }
+    const char* GetPackerCmdArgsCopy(int index) { return Packers[index]->CmdArgsCopy.c_str(); }
+    const char* GetPackerCmdExecMove(int index) { return Packers[index]->CmdExecMove.c_str(); }
+    const char* GetPackerCmdArgsMove(int index) { return Packers[index]->CmdArgsMove.c_str(); }
     BOOL GetPackerNeedANSIListFile(int index) { return Packers[index]->NeedANSIListFile; }
 
     BOOL Save(int index, HKEY hKey);
@@ -457,14 +449,14 @@ public:
 class CUnpackerConfigData
 {
 public:
-    char* Title; // name shown to the user
-    char* Ext;   // list of standard extensions separated by semicolons
-    int Type;    // internal (-1, -2, ...; see CPlugins for details) / external (0; additional fields apply)
-                 // note: see OldType below
+    std::string Title; // name shown to the user
+    std::string Ext;   // list of standard extensions separated by semicolons
+    int Type;          // internal (-1, -2, ...; see CPlugins for details) / external (0; additional fields apply)
+                       // note: see OldType below
 
     // data for external packers
-    char* CmdExecExtract;
-    char* CmdArgsExtract;
+    std::string CmdExecExtract;
+    std::string CmdArgsExtract;
     BOOL SupportLongNames;
     BOOL NeedANSIListFile;
 
@@ -484,17 +476,13 @@ public:
 
     void Destroy()
     {
-        if (Title != NULL)
-            free(Title);
-        if (Ext != NULL)
-            free(Ext);
+        Title.clear();
+        Ext.clear();
         if (OldType && Type == 1 ||
             !OldType && Type == CUSTOMUNPACKER_EXTERNAL)
         {
-            if (CmdExecExtract != NULL)
-                free(CmdExecExtract);
-            if (CmdArgsExtract != NULL)
-                free(CmdArgsExtract);
+            CmdExecExtract.clear();
+            CmdArgsExtract.clear();
         }
         Empty();
     }
@@ -502,21 +490,21 @@ public:
     void Empty()
     {
         OldType = FALSE;
-        Title = NULL;
-        Ext = NULL;
+        Title.clear();
+        Ext.clear();
         Type = 1;
-        CmdExecExtract = NULL;
-        CmdArgsExtract = NULL;
+        CmdExecExtract.clear();
+        CmdArgsExtract.clear();
         SupportLongNames = FALSE;
         NeedANSIListFile = FALSE;
     }
 
     BOOL IsValid()
     {
-        if (Title == NULL || Ext == NULL)
+        if (Title.empty() || Ext.empty())
             return FALSE;
         if ((OldType && Type == 1 || !OldType && Type == CUSTOMUNPACKER_EXTERNAL) &&
-            (CmdExecExtract == NULL || CmdArgsExtract == NULL))
+            (CmdExecExtract.empty() || CmdArgsExtract.empty()))
             return FALSE;
         return TRUE;
     }
@@ -555,11 +543,11 @@ public:
 
     int GetUnpackerType(int index) { return Unpackers[index]->Type; }
     BOOL GetUnpackerOldType(int index) { return Unpackers[index]->OldType; }
-    const char* GetUnpackerTitle(int index) { return Unpackers[index]->Title; }
-    const char* GetUnpackerExt(int index) { return Unpackers[index]->Ext; }
+    const char* GetUnpackerTitle(int index) { return Unpackers[index]->Title.c_str(); }
+    const char* GetUnpackerExt(int index) { return Unpackers[index]->Ext.c_str(); }
     BOOL GetUnpackerSupLongNames(int index) { return Unpackers[index]->SupportLongNames; }
-    const char* GetUnpackerCmdExecExtract(int index) { return Unpackers[index]->CmdExecExtract; }
-    const char* GetUnpackerCmdArgsExtract(int index) { return Unpackers[index]->CmdArgsExtract; }
+    const char* GetUnpackerCmdExecExtract(int index) { return Unpackers[index]->CmdExecExtract.c_str(); }
+    const char* GetUnpackerCmdArgsExtract(int index) { return Unpackers[index]->CmdArgsExtract.c_str(); }
     BOOL GetUnpackerNeedANSIListFile(int index) { return Unpackers[index]->NeedANSIListFile; }
 
     BOOL Save(int index, HKEY hKey);

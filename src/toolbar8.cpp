@@ -107,5 +107,5 @@ void CPluginsBar::OnGetToolTip(LPARAM lParam)
     tt->Buffer[0] = 0;
     CPluginData* plugin = Plugins.Get(index);
     if (plugin != NULL)
-        lstrcpy(tt->Buffer, plugin->Name);
+        lstrcpy(tt->Buffer, plugin->Name.c_str());
 }

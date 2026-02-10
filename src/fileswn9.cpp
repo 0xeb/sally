@@ -1988,7 +1988,7 @@ BOOL CFilesWindow::BuildColumnsTemplate()
             {
                 if ((ViewTemplate->Flags & VIEW_SHOW_EXTENSION) == 0) // "Ext" is part of the "Name" column, the name and description of the "Ext" column are after the terminating null of the name and description
                 {
-                    AddStrToStr(column.Name, COLUMN_NAME_MAX, ColExtStr);
+                    AddStrToStr(column.Name, COLUMN_NAME_MAX, ColExtStr.c_str());
                     AddStrToStr(column.Description, COLUMN_DESCRIPTION_MAX, LoadStr(IDS_COLUMN_DESC_EXT));
                 }
                 else // to be safe, create double-null-terminated strings

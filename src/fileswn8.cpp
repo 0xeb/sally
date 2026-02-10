@@ -1,4 +1,4 @@
-// SPDX-FileCopyrightText: 2023 Open Salamander Authors
+﻿// SPDX-FileCopyrightText: 2023 Open Salamander Authors
 // SPDX-License-Identifier: GPL-2.0-or-later
 // CommentsTranslationProject: TRANSLATED
 
@@ -815,7 +815,7 @@ void CFilesWindow::FilesAction(CActionType type, CFilesWindow* target, int count
                                             // open a new FS
                                             // load the plugin before obtaining DLLName, Version and plugin interfaces
                                             CPluginFSInterfaceAbstract* auxFS = plugin->OpenFS(fsName, fsNameIndex);
-                                            CPluginFSInterfaceEncapsulation pluginFS(auxFS, plugin->DLLName, plugin->Version,
+                                            CPluginFSInterfaceEncapsulation pluginFS(auxFS, plugin->DLLName.c_str(), plugin->Version.c_str(),
                                                                                      plugin->GetPluginInterfaceForFS()->GetInterface(),
                                                                                      plugin->GetPluginInterface()->GetInterface(),
                                                                                      fsName, fsNameIndex, -1, 0, plugin->BuiltForVersion);

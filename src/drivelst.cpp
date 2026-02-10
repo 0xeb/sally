@@ -1,4 +1,4 @@
-// SPDX-FileCopyrightText: 2023 Open Salamander Authors
+﻿// SPDX-FileCopyrightText: 2023 Open Salamander Authors
 // SPDX-License-Identifier: GPL-2.0-or-later
 // CommentsTranslationProject: TRANSLATED
 
@@ -1427,7 +1427,7 @@ void COneDriveBusinessStorages::SortIn(COneDriveBusinessStorage* s)
     {
         for (int i = 0; i < Count; i++)
         {
-            if (StrICmp(s->DisplayName, At(i)->DisplayName) <= 0)
+            if (StrICmp(s->DisplayName.c_str(), At(i)->DisplayName.c_str()) <= 0)
             {
                 Insert(i, s);
                 return;
@@ -1443,10 +1443,10 @@ BOOL COneDriveBusinessStorages::Find(const char* displayName, const char** userF
     {
         for (int i = 0; i < Count; i++)
         {
-            if (StrICmp(displayName, At(i)->DisplayName) == 0)
+            if (StrICmp(displayName, At(i)->DisplayName.c_str()) == 0)
             {
                 if (userFolder != NULL)
-                    *userFolder = At(i)->UserFolder;
+                    *userFolder = At(i)->UserFolder.c_str();
                 return TRUE;
             }
         }
@@ -1536,7 +1536,7 @@ void InitOneDrivePath()
                             type == REG_SZ && size > 1)
                         { // we will collect everything that has DisplayName and UserFolder, no matter what it is, we will offer it to the user under "OneDrive"
                             //TRACE_I("OneDrive Business: DisplayName: " << disp << ", UserFolder: " << path);
-                            OneDriveBusinessStorages.SortIn(new COneDriveBusinessStorage(DupStr(disp), DupStr(path)));
+                            OneDriveBusinessStorages.SortIn(new COneDriveBusinessStorage(disp, path));
                         }
                     }
                     HANDLES(RegCloseKey(hAccount));
@@ -1992,7 +1992,7 @@ BOOL CDrivesList::BuildData(BOOL noTimeout, TDirectArray<CDriveData>* copyDrives
             }
             for (int i = 0; i < OneDriveBusinessStorages.Count; i++) // business
             {                                                        // WARNING: for drvtOneDriveBus, DisplayName is later taken from drv.DriveText, when changing the text format, change it !!!
-                sprintf_s(itemText, "%s - %s", LoadStr(IDS_ONEDRIVE), OneDriveBusinessStorages[i]->DisplayName);
+                sprintf_s(itemText, "%s - %s", LoadStr(IDS_ONEDRIVE), OneDriveBusinessStorages[i]->DisplayName.c_str());
                 AddToDrives(drv, 0, 0, drvtOneDriveBus, getGrayIcons, oneDriveIco, destroyOneDriveIco, itemText);
                 destroyOneDriveIco = FALSE;
             }
@@ -2030,7 +2030,7 @@ BOOL CDrivesList::BuildData(BOOL noTimeout, TDirectArray<CDriveData>* copyDrives
         for (i2 = 0; i2 < Drives->Count; i2++)
         {
             CDriveData* item = &Drives->At(i2);
-            if (item->DriveType == drvtPluginCmd && nethoodPlugin->DLLName == item->DLLName)
+            if (item->DriveType == drvtPluginCmd && nethoodPlugin->DLLName.c_str() == item->DLLName)
             {
                 neighborhoodIndex = i2;
                 break;
@@ -2288,7 +2288,7 @@ BOOL CDrivesList::ExecuteItem(int index, HWND hwnd, const RECT* exclude, BOOL* f
             }
             for (int i = 0; i < OneDriveBusinessStorages.Count; i++) // business
             {
-                sprintf_s(itemText, "%s - %s", LoadStr(IDS_ONEDRIVE), OneDriveBusinessStorages[i]->DisplayName);
+                sprintf_s(itemText, "%s - %s", LoadStr(IDS_ONEDRIVE), OneDriveBusinessStorages[i]->DisplayName.c_str());
                 mii.String = itemText;
                 mii.ID = i + 2;
                 menu.InsertItem(-1, TRUE, &mii);
@@ -2823,13 +2823,13 @@ BOOL CDrivesList::OnContextMenu(BOOL posByMouse, int itemIndex, int panel, const
                     {
                         selectedIndex = MenuPopup->GetSelectedItemIndex();
                         if (!(selectedIndex >= 0 && selectedIndex < Drives->Count &&
-                              (dt == drvtPluginCmd && Drives->At(selectedIndex).DLLName == pluginData->DLLName ||
+                              (dt == drvtPluginCmd && Drives->At(selectedIndex).DLLName == pluginData->DLLName.c_str() ||
                                dt == drvtPluginFS && Drives->At(selectedIndex).PluginFS == pluginFS)))
                         {
                             int i;
                             for (i = 0; i < Drives->Count; i++)
                             {
-                                if (dt == drvtPluginCmd && Drives->At(i).DLLName == pluginData->DLLName ||
+                                if (dt == drvtPluginCmd && Drives->At(i).DLLName == pluginData->DLLName.c_str() ||
                                     dt == drvtPluginFS && Drives->At(i).PluginFS == pluginFS)
                                 {
                                     MenuPopup->SetSelectedItemIndex(i);
@@ -3107,7 +3107,7 @@ BOOL CDrivesList::FindPanelPathIndex(CFilesWindow* panel, DWORD* index)
                 CDriveData* item = &Drives->At(i);
                 if (nethoodPlugin != NULL)
                 {
-                    if (item->DriveType == drvtPluginCmd && nethoodPlugin->DLLName == item->DLLName)
+                    if (item->DriveType == drvtPluginCmd && nethoodPlugin->DLLName.c_str() == item->DLLName)
                     {
                         *index = i;
                         return TRUE;

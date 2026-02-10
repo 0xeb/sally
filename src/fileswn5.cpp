@@ -1017,9 +1017,9 @@ BOOL ViewFileInt(HWND parent, const char* name, BOOL altView, DWORD handlerID, B
             CPathBuffer expCommand; // Heap-allocated for long path support
             CPathBuffer expArguments; // Heap-allocated for long path support
             CPathBuffer expInitDir; // Heap-allocated for long path support
-            if (ExpandCommand(parent, viewer->Command, expCommand, expCommand.Size(), FALSE) &&
-                ExpandArguments(parent, name, dosName, viewer->Arguments, expArguments, expArguments.Size(), NULL) &&
-                ExpandInitDir(parent, name, dosName, viewer->InitDir, expInitDir, expInitDir.Size(), FALSE))
+            if (ExpandCommand(parent, viewer->Command.c_str(), expCommand, expCommand.Size(), FALSE) &&
+                ExpandArguments(parent, name, dosName, viewer->Arguments.c_str(), expArguments, expArguments.Size(), NULL) &&
+                ExpandInitDir(parent, name, dosName, viewer->InitDir.c_str(), expInitDir, expInitDir.Size(), FALSE))
             {
                 if (SystemPolicies.GetMyRunRestricted() &&
                     !SystemPolicies.GetMyCanRun(expCommand))
@@ -1337,9 +1337,9 @@ void CFilesWindow::EditFile(char* name, DWORD handlerID)
         CPathBuffer expCommand; // Heap-allocated for long path support
         CPathBuffer expArguments; // Heap-allocated for long path support
         CPathBuffer expInitDir; // Heap-allocated for long path support
-        if (ExpandCommand(HWindow, editor->Command, expCommand, expCommand.Size(), FALSE) &&
-            ExpandArguments(HWindow, name, dosName, editor->Arguments, expArguments, expArguments.Size(), NULL) &&
-            ExpandInitDir(HWindow, name, dosName, editor->InitDir, expInitDir, expInitDir.Size(), FALSE))
+        if (ExpandCommand(HWindow, editor->Command.c_str(), expCommand, expCommand.Size(), FALSE) &&
+            ExpandArguments(HWindow, name, dosName, editor->Arguments.c_str(), expArguments, expArguments.Size(), NULL) &&
+            ExpandInitDir(HWindow, name, dosName, editor->InitDir.c_str(), expInitDir, expInitDir.Size(), FALSE))
         {
             if (SystemPolicies.GetMyRunRestricted() &&
                 !SystemPolicies.GetMyCanRun(expCommand))
@@ -1553,12 +1553,12 @@ void CFilesWindow::FillViewWithMenu(CMenuPopup* popup)
         {
             int pluginIndex = -item->ViewerType - 1;
             CPluginData* plugin = Plugins.Get(pluginIndex);
-            lstrcpy(buff, plugin->Name);
+            lstrcpy(buff, plugin->Name.c_str());
             if (plugin->PluginIconIndex != -1) // the plugin has an icon
                 imgIndex = pluginIndex;
         }
         if (item->ViewerType == VIEWER_EXTERNAL)
-            sprintf(buff, LoadStr(IDS_VIEWWITH_EXTERNAL), item->Command);
+            sprintf(buff, LoadStr(IDS_VIEWWITH_EXTERNAL), item->Command.c_str());
         if (item->ViewerType == VIEWER_INTERNAL)
             lstrcpy(buff, LoadStr(IDS_VIEWWITH_INTERNAL));
 
@@ -1612,9 +1612,9 @@ BOOL CFilesWindow::FillViewWithData(TDirectArray<CViewerMasksItem*>* items)
 
                 if (item->ViewerType == VIEWER_EXTERNAL)
                 {
-                    if (stricmp(item->Command, oldItem->Command) == 0 &&
-                        stricmp(item->Arguments, oldItem->Arguments) == 0 &&
-                        stricmp(item->InitDir, oldItem->InitDir) == 0)
+                    if (stricmp(item->Command.c_str(), oldItem->Command.c_str()) == 0 &&
+                        stricmp(item->Arguments.c_str(), oldItem->Arguments.c_str()) == 0 &&
+                        stricmp(item->InitDir.c_str(), oldItem->InitDir.c_str()) == 0)
                     {
                         alreadyAdded = TRUE;
                         break;
@@ -1738,9 +1738,9 @@ void CFilesWindow::FillEditWithMenu(CMenuPopup* popup)
         for (j = 0; j < i; j++)
         {
             CEditorMasksItem* oldItem = masks->At(j);
-            if (stricmp(item->Command, oldItem->Command) == 0 &&
-                stricmp(item->Arguments, oldItem->Arguments) == 0 &&
-                stricmp(item->InitDir, oldItem->InitDir) == 0)
+            if (stricmp(item->Command.c_str(), oldItem->Command.c_str()) == 0 &&
+                stricmp(item->Arguments.c_str(), oldItem->Arguments.c_str()) == 0 &&
+                stricmp(item->InitDir.c_str(), oldItem->InitDir.c_str()) == 0)
             {
                 alreadyAdded = TRUE;
                 break;
@@ -1748,7 +1748,7 @@ void CFilesWindow::FillEditWithMenu(CMenuPopup* popup)
         }
         if (!alreadyAdded)
         {
-            sprintf(buff, LoadStr(IDS_EDITWITH_EXTERNAL), item->Command);
+            sprintf(buff, LoadStr(IDS_EDITWITH_EXTERNAL), item->Command.c_str());
             popup->InsertItem(-1, TRUE, &mii);
         }
     }

@@ -690,7 +690,7 @@ void CFilesWindow::DragDropToArcOrFS(CTmpDragDropOperData* data)
                             // open a new FS
                             // load the plug-in before obtaining DLLName, Version and plugin interfaces
                             CPluginFSInterfaceAbstract* auxFS = plugin->OpenFS(data->ArchiveOrFSName, fsNameIndex2);
-                            CPluginFSInterfaceEncapsulation pluginFS(auxFS, plugin->DLLName, plugin->Version,
+                            CPluginFSInterfaceEncapsulation pluginFS(auxFS, plugin->DLLName.c_str(), plugin->Version.c_str(),
                                                                      plugin->GetPluginInterfaceForFS()->GetInterface(),
                                                                      plugin->GetPluginInterface()->GetInterface(),
                                                                      data->ArchiveOrFSName, fsNameIndex2, -1, 0,

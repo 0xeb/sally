@@ -164,7 +164,7 @@ BOOL OpenHtmlHelp(char* helpFileName, HWND parent, CHtmlHelpCommand command, DWO
         CLanguage language;
         if (language.Init(Configuration.LoadedSLGName, NULL))
         {
-            lstrcpyn(helpSubdir, language.HelpDir, helpSubdir.Size());
+            lstrcpyn(helpSubdir, language.HelpDir.c_str(), helpSubdir.Size());
             language.Free();
         }
         if (helpSubdir[0] == 0)
@@ -1261,7 +1261,7 @@ MENU_TEMPLATE_ITEM AddToSystemMenu[] =
                 RegenEnvironmentVariables();
             return 0;
         }
-        if (lParam != 0 && stricmp((LPCTSTR)lParam, "Extensions") == 0)
+        if (lParam != 0 && stricmp((LPCTSTR)lParam, "Extensions.c_str()") == 0)
         {
             // file associations changed, refresh them
             // this path is probably no longer used, it's some old branch,
@@ -5553,7 +5553,7 @@ MENU_TEMPLATE_ITEM AddToSystemMenu[] =
             if (data->GetPluginInterfaceForMenuExt()->NotEmpty())
             {
                 CALL_STACK_MESSAGE4("CPluginInterfaceForMenuExt::ExecuteMenuItem(, , %d,) (%s v. %s)",
-                                    (int)lParam, data->DLLName, data->Version);
+                                    (int)lParam, data->DLLName.c_str(), data->Version.c_str());
 
                 // lower the thread priority to "normal" (so operations don't burden the system)
                 SetThreadPriority(GetCurrentThread(), THREAD_PRIORITY_NORMAL);
@@ -6154,8 +6154,8 @@ MENU_TEMPLATE_ITEM AddToSystemMenu[] =
                     endAfterCleanup = TRUE; // cannot be refused -> perform minimal cleanup
                 else
                 {
-                    if (LockedUIReason != NULL && HasLockedUI())
-                        gPrompter->ShowInfo(AnsiToWide(SALAMANDER_TEXT_VERSION).c_str(), AnsiToWide(LockedUIReason).c_str());
+                    if (!LockedUIReason.empty() && HasLockedUI())
+                        gPrompter->ShowInfo(AnsiToWide(SALAMANDER_TEXT_VERSION).c_str(), AnsiToWide(LockedUIReason.c_str()).c_str());
                     else
                         TRACE_E("WM_USER_CLOSE_MAINWND: SalamanderBusy == TRUE!");
                     if (uMsg == WM_QUERYENDSESSION)

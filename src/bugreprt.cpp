@@ -219,7 +219,7 @@ MonitorEnumProc(HMONITOR hMonitor, HDC hdcMonitor, LPRECT lprcMonitor, LPARAM dw
     {
         if (StrICmp((const char*)dd.DeviceName, mi.szDevice) == 0)
         {
-            sprintf(buf, "Monitor %d Device Name: %s", data->Index, dd.DeviceString);
+            sprintf(buf, "Monitor %d Device Name.c_str(): %s", data->Index, dd.DeviceString);
             data->PrintLine(data->Param, buf, TRUE);
             break;
         }
@@ -434,7 +434,7 @@ BOOL PrintSystemVersion(FPrintLine PrintLine, void* param, char* buf, char* avbu
                 return FALSE;
         }
 
-        sprintf(buf, "GetVersionEx Version %u.%u (Build %u)", osvi.dwMajorVersion,
+        sprintf(buf, "GetVersionEx Version.c_str() %u.%u (Build %u)", osvi.dwMajorVersion,
                 osvi.dwMinorVersion, osvi.dwBuildNumber & 0xFFFF);
         if (bOsVersionInfoEx)
         {
@@ -446,7 +446,7 @@ BOOL PrintSystemVersion(FPrintLine PrintLine, void* param, char* buf, char* avbu
 
     ZeroMemory(&osvi, sizeof(OSVERSIONINFOEX));
     SalGetVersionEx(&osvi, FALSE); // !!! SLOW, original GetVersionEx() is deprecated !!!
-    sprintf(buf, "SalGetVersionEx Version %u.%u (Build %u)", osvi.dwMajorVersion,
+    sprintf(buf, "SalGetVersionEx Version.c_str() %u.%u (Build %u)", osvi.dwMajorVersion,
             osvi.dwMinorVersion, osvi.dwBuildNumber & 0xFFFF);
     sprintf(buf + strlen(buf), " SP %u.%u, SMask %u, PType %u, PlatId %u", osvi.wServicePackMajor,
             osvi.wServicePackMinor, osvi.wSuiteMask, osvi.wProductType, osvi.dwPlatformId);
@@ -685,7 +685,7 @@ void CCallStack::PrintBugReport(EXCEPTION_POINTERS* Exception, DWORD ThreadID, D
                         {
                             CPluginData* data = Plugins.GetPluginData(dll);
                             if (data != NULL)
-                                sprintf(term, ": in %s", data->Name);
+                                sprintf(term, ": in %s", data->Name.c_str());
                         }
                         __except (EXCEPTION_EXECUTE_HANDLER)
                         {
@@ -1591,7 +1591,7 @@ void CCallStack::PrintBugReport(EXCEPTION_POINTERS* Exception, DWORD ThreadID, D
                         {
                             CPluginData* data = Plugins.GetPluginData(panel->GetPluginFS()->GetPluginInterfaceForFS()->GetInterface());
                             if (data != NULL)
-                                sprintf(buf + lstrlen(buf), "%s v. %s", data->DLLName, data->Version);
+                                sprintf(buf + lstrlen(buf), "%s v. %s", data->DLLName.c_str(), data->Version.c_str());
                             else
                                 lstrcat(buf, "(error)");
                         }
@@ -1735,7 +1735,7 @@ void CCallStack::PrintBugReport(EXCEPTION_POINTERS* Exception, DWORD ThreadID, D
         CPluginData* plugin;
         while ((plugin = Plugins.Get(pluginIndex++)) != NULL)
         {
-            sprintf(buf, "%s: %s v. %s", plugin->Name, plugin->DLLName, plugin->Version);
+            sprintf(buf, "%s: %s v. %s", plugin->Name.c_str(), plugin->DLLName.c_str(), plugin->Version.c_str());
             if (plugin->DLL != NULL)
                 sprintf(buf + strlen(buf), ", loaded (0x%p)", plugin->DLL);
             else
@@ -1771,7 +1771,7 @@ void CCallStack::PrintBugReport(EXCEPTION_POINTERS* Exception, DWORD ThreadID, D
         PrintLine(param, buf, FALSE);
         PrintLine(param, "", FALSE);
 
-        lstrcpy(buf, "Module Name: ");
+        lstrcpy(buf, "Module Name.c_str(): ");
         GetModuleFileName(HInstance, buf + strlen(buf), 1000);
         PrintLine(param, buf, FALSE);
 
@@ -1843,7 +1843,7 @@ void CCallStack::PrintBugReport(EXCEPTION_POINTERS* Exception, DWORD ThreadID, D
                 lstrcpy(buf, "IE ");
                 if (version[0] != 0)
                 {
-                    lstrcat(buf, "Version: ");
+                    lstrcat(buf, "Version.c_str(): ");
                     lstrcat(buf, version);
                     lstrcat(buf, " ");
                 }
@@ -1864,7 +1864,7 @@ void CCallStack::PrintBugReport(EXCEPTION_POINTERS* Exception, DWORD ThreadID, D
             NOHANDLES(RegCloseKey(hKey));
         }
 
-        sprintf(buf, "COMCTL32.DLL Version: %u.%u", CCVerMajor, CCVerMinor);
+        sprintf(buf, "COMCTL32.DLL Version.c_str(): %u.%u", CCVerMajor, CCVerMinor);
         PrintLine(param, buf, TRUE);
 
         if (NOHANDLES(RegOpenKeyEx(HKEY_LOCAL_MACHINE,
@@ -1983,14 +1983,14 @@ void CCallStack::PrintBugReport(EXCEPTION_POINTERS* Exception, DWORD ThreadID, D
                     mhz = 0;
             }
             if (vendorName[0] != 0)
-                sprintf(buf, "Processor Vendor Name: %s", vendorName);
+                sprintf(buf, "Processor Vendor Name.c_str(): %s", vendorName);
             PrintLine(param, buf, TRUE);
             if (processorName[0] != 0)
             {
                 char* ss = processorName;
                 while (*ss == ' ')
                     ss++; // Intel adds spaces before the processor name so it looks nicer in the Control Panel System window
-                sprintf(buf, "Processor Name: %s", ss);
+                sprintf(buf, "Processor Name.c_str(): %s", ss);
                 PrintLine(param, buf, TRUE);
             }
             if (mhz != 0)
@@ -2040,7 +2040,7 @@ void CCallStack::PrintBugReport(EXCEPTION_POINTERS* Exception, DWORD ThreadID, D
             bios[_countof(bios) - 1] = 0; // at least terminate the buffer with a zero
             if (bios[0] != 0)
             {
-                sprintf(buf, "BIOS Version: %s", bios);
+                sprintf(buf, "BIOS Version.c_str(): %s", bios);
                 PrintLine(param, buf, TRUE);
             }
 
