@@ -1,4 +1,4 @@
-// SPDX-FileCopyrightText: 2023 Open Salamander Authors
+﻿// SPDX-FileCopyrightText: 2023 Open Salamander Authors
 // SPDX-License-Identifier: GPL-2.0-or-later
 // CommentsTranslationProject: TRANSLATED
 
@@ -2358,7 +2358,7 @@ struct CPluginMenuItem
 public:
     CPluginMenuItemType Type; // item type, see description in CPluginMenuItemType
     int IconIndex;            // icon index in the plugin icon bitmap; -1 = no icon; WARNING: index is unchecked (may be invalid)
-    char* Name;               // name of the menu item; if NULL, it represents a separator
+    std::string Name;          // name of the menu item; if empty, it represents a separator
     DWORD StateMask;          // hiword is an OR mask, loword is an AND mask; if it is -1,
                               // CPluginInterfaceAbstract::GetMenuItemState is used
     DWORD SkillLevel;         // which user levels should see this item MENU_SKILLLEVEL_XXX
@@ -2371,11 +2371,7 @@ public:
 public:
     CPluginMenuItem(int iconIndex, const char* name, DWORD hotKey, DWORD stateMask, int id, DWORD skillLevel,
                     CPluginMenuItemType type);
-    ~CPluginMenuItem()
-    {
-        if (Name != NULL)
-            free(Name);
-    }
+    ~CPluginMenuItem() {}
 };
 
 class CSalamanderDirectory;
@@ -2386,9 +2382,9 @@ struct CPluginData
 {
 public:
     int BuiltForVersion;       // valid only when the plugin is loaded: Salamander version the plugin was compiled for (see the list of versions under LAST_VERSION_OF_SALAMANDER in spl_vers.h)
-    char* Name;                // plugin name shown in Extensions/C.Packers/C.Unpackers dialogs
+    std::string Name;              // plugin name shown in Extensions/C.Packers/C.Unpackers dialogs
                                // max. length of the name MAX_PATH - 1
-    char* DLLName;             // DLL file name, relative to "plugins" or absolute
+    std::string DLLName;           // DLL file name, relative to "plugins" or absolute
                                // max. length of the name MAX_PATH - 1
     BOOL SupportPanelView;     // TRUE => supports ListArchive, UnpackArchive, UnpackOneFile (panel archiver/view)
     BOOL SupportPanelEdit;     // TRUE => supports PackToArchive, DeleteFromArchive (panel archiver/edit)
@@ -2402,26 +2398,26 @@ public:
 
     BOOL LoadOnStart; // should the plugin load at every Salamander start?
 
-    char* Version;                // plugin version (max length MAX_PATH - 1)
-    char* Copyright;              // manufacturer's copyright (max length MAX_PATH - 1)
-    char* Description;            // short plugin description (max length MAX_PATH - 1)
-    char* RegKeyName;             // registry key name for configuration (max length MAX_PATH - 1)
-    char* Extensions;             // archive extensions separated by ';' (max length MAX_PATH - 1)
+    std::string Version;              // plugin version (max length MAX_PATH - 1)
+    std::string Copyright;            // manufacturer's copyright (max length MAX_PATH - 1)
+    std::string Description;          // short plugin description (max length MAX_PATH - 1)
+    std::string RegKeyName;           // registry key name for configuration (max length MAX_PATH - 1)
+    std::string Extensions;           // archive extensions separated by ';' (max length MAX_PATH - 1)
     TIndirectArray<char> FSNames; // array of plugin filesystem names (each max length MAX_PATH - 1)
 
-    char* LastSLGName; // name of the last used .SLG file (NULL = none yet or same language as Salamander)
+    std::string LastSLGName; // name of the last used .SLG file (empty = none yet or same language as Salamander)
 
-    char* PluginHomePageURL; // URL of the plugin home page (NULL == no home page exists)
+    std::string PluginHomePageURL; // URL of the plugin home page (empty == no home page exists)
 
-    char* ChDrvMenuFSItemName;    // filesystem command in the change-drive menu: name (max length MAX_PATH - 1)
+    std::string ChDrvMenuFSItemName;  // filesystem command in the change-drive menu: name (max length MAX_PATH - 1)
     int ChDrvMenuFSItemIconIndex; // filesystem command in the change-drive menu: icon index (in PluginIcons; -1=no icon; the index is not checked – it may be invalid)
     BOOL ChDrvMenuFSItemVisible;  // filesystem command in the change-drive menu: is it visible? (users can hide it from Plugins Manager)
 
     TIndirectArray<CPluginMenuItem> MenuItems; // array of items in the menu
     BOOL DynMenuWasAlreadyBuild;               // TRUE if BuildMenu() was already called; further calls are ignored
 
-    char* BugReportMessage; // message to be displayed by the Bug Report dialog when a plugin exception occurs
-    char* BugReportEMail;   // e-mail to be displayed by the Bug Report dialog when a plugin exception occurs
+    std::string BugReportMessage; // message to be displayed by the Bug Report dialog when a plugin exception occurs
+    std::string BugReportEMail;   // e-mail to be displayed by the Bug Report dialog when a plugin exception occurs
 
     CMaskGroup ThumbnailMasks;   // masks determining files for which the plugin can create thumbnails (max length MAX_GROUPMASK - 1); NULL == the plugin does not generate any thumbnails
     BOOL ThumbnailMasksDisabled; // TRUE only when the plugin is unloading/removing
@@ -2465,7 +2461,7 @@ public:
     BOOL OpenPackDlg;                // TRUE = open the Pack dialog for this plugin
     int PackDlgDelFilesAfterPacking; // Pack dialog: "Delete files after packing" checkbox: 0=default, 1=on, 2=off
     BOOL OpenUnpackDlg;              // TRUE = open the Unpack dialog for this plugin
-    char* UnpackDlgUnpackMask;       // Unpack dialog: "Unpack files" mask; NULL=default, otherwise allocated mask text
+    std::string UnpackDlgUnpackMask;     // Unpack dialog: "Unpack files" mask; empty=default, otherwise mask text
 
 #ifdef _DEBUG
     int OpenedFSCounter; // count of open FS interfaces
@@ -2491,7 +2487,7 @@ public:
                 char* lastSLGName, const char* pluginHomePageURL);
     ~CPluginData();
 
-    BOOL IsGood() { return Name != NULL; } // was the constructor successful?
+    BOOL IsGood() { return !Name.empty(); } // was the constructor successful?
 
     // returns the plugin interface
     CPluginInterfaceEncapsulation* GetPluginInterface() { return &PluginIface; }
@@ -2756,7 +2752,7 @@ struct CPluginsStateCache
 // CPluginOrder specifies the order in which plugins are displayed (menu, plugin bar, ...)
 struct CPluginOrder
 {
-    char* DLLName; // DLL file name, relative to "plugins" or absolute
+    std::string DLLName; // DLL file name, relative to "plugins" or absolute
 
     // temporary variables, not stored in the registry
     BOOL ShowInBar; // used only when converting the old configuration
@@ -2797,8 +2793,8 @@ protected:
     CPluginFSInterfaceEncapsulation* WorkingPluginFS; // working plugin FS object (neither in a panel nor among detached FS yet)
 
     // LastPlgCmdXXX keep information about the last executed command from the Plugins menu
-    // if LastPlgCmdPlugin == NULL, LastPlgCmdID is meaningless and the menu item will be disabled with the default text
-    char* LastPlgCmdPlugin; // path to the plugin whose command was executed (CPluginData::DLLName)
+    // if LastPlgCmdPlugin is empty, LastPlgCmdID is meaningless and the menu item will be disabled with the default text
+    std::string LastPlgCmdPlugin; // path to the plugin whose command was executed (CPluginData::DLLName)
     int LastPlgCmdID;       // internal ID of the command (CPluginMenuItem::ID)
 
 public:                     // helper variables for handling menu items coming from plugins:
@@ -2819,7 +2815,7 @@ public:
         Load(NULL, NULL);
         StateCache.Clean();
         LoadInfoBase = 0;
-        LastPlgCmdPlugin = NULL;
+        // LastPlgCmdPlugin default-constructs to empty
         // initializing LastPlgCmdID has no meaning
         TimerTimeCounter = 0;
         StopTimerHandlerRecursion = FALSE;

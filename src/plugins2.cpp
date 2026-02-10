@@ -1,4 +1,4 @@
-﻿// SPDX-FileCopyrightText: 2023 Open Salamander Authors
+// SPDX-FileCopyrightText: 2023 Open Salamander Authors
 // SPDX-License-Identifier: GPL-2.0-or-later
 // CommentsTranslationProject: TRANSLATED
 
@@ -402,15 +402,10 @@ HICON GetIconFromDIB(HBITMAP hBitmap, int index)
 CPlugins::~CPlugins()
 {
     int i;
-    for (i = 0; i < Order.Count; i++)
-        free(Order[i].DLLName);
+    // Order elements' DLLName is now std::string (auto-destruct)
     Order.DetachMembers();
 
-    if (LastPlgCmdPlugin != NULL)
-    {
-        free(LastPlgCmdPlugin);
-        LastPlgCmdPlugin = NULL;
-    }
+    // LastPlgCmdPlugin is now std::string (auto-destruct)
     for (i = 0; i < Data.Count; i++)
     {
         if (Data[i]->GetLoaded())
@@ -480,14 +475,14 @@ BOOL CPlugins::AreFSNamesFromSamePlugin(const char* fsName1, const char* fsName2
 BOOL CPlugins::FindLastCommand(int* pluginIndex, int* menuItemIndex, BOOL rebuildDynMenu, HWND parent)
 {
     // we must know the path to the plugin that owned the last command
-    if (LastPlgCmdPlugin != NULL)
+    if (!LastPlgCmdPlugin.empty())
     {
         int i;
         for (i = 0; i < Data.Count; i++)
         {
             CPluginData* p = Data[i];
             // locate the plugin
-            if (stricmp(p->DLLName, LastPlgCmdPlugin) == 0)
+            if (stricmp(p->DLLName.c_str(), LastPlgCmdPlugin.c_str()) == 0)
             {
                 if (p->GetLoaded()) // if the plugin isn't loaded we pretend we didn't find anything
                 {
@@ -513,9 +508,7 @@ BOOL CPlugins::FindLastCommand(int* pluginIndex, int* menuItemIndex, BOOL rebuil
             }
         }
         // command was not found, clear Last Command item to avoid "resurrection" of old commands after reloading the plugin or re-adding an item to the dynamic menu
-        if (LastPlgCmdPlugin != NULL)
-            free(LastPlgCmdPlugin);
-        LastPlgCmdPlugin = NULL;
+        LastPlgCmdPlugin.clear();
     }
     return FALSE;
 }
@@ -648,7 +641,7 @@ void CPlugins::InitMenuItems(HWND parent, CMenuPopup* root)
                 mi.Type = MENU_TYPE_STRING;
 
 #ifdef _WIN64 // FIXME_X64_WINSCP - this will likely need a different approach... (ignoring missing WinSCP in the 64-bit Salamander)
-                if (IsPluginUnsupportedOnX64(p->DLLName))
+                if (IsPluginUnsupportedOnX64(p->DLLName.c_str()))
                 {
                     mi.Mask |= MENU_MASK_STATE;
                     mi.State = MENU_STATE_GRAYED;
@@ -656,7 +649,7 @@ void CPlugins::InitMenuItems(HWND parent, CMenuPopup* root)
 #endif // _WIN64
 
                 char pluginName[300];
-                lstrcpyn(pluginName, p->Name, 299);
+                lstrcpyn(pluginName, p->Name.c_str(), 299);
                 DuplicateAmpersands(pluginName, 299); // plugin name can contain '&'
 
                 mi.String = pluginName;
@@ -687,12 +680,12 @@ void CPlugins::InitMenuItems(HWND parent, CMenuPopup* root)
     {
         CPluginData* pluginData = Data[pluginIndex];
         CPluginMenuItem* menuItem = pluginData->MenuItems[menuItemIndex];
-        if (menuItem->Name != NULL) // display the item even if it doesn't match the current skill level
+        if (!menuItem->Name.empty()) // display the item even if it doesn't match the current skill level
         {
             lcmii.State = 0;
             pluginData->GetMenuItemStateType(pluginIndex, menuItemIndex, &lcmii);
 
-            lstrcpyn(lastCmdStr, pluginData->Name, 299);
+            lstrcpyn(lastCmdStr, pluginData->Name.c_str(), 299);
             char* s = strchr(lastCmdStr, '('); // drop text in parentheses from plugin name ("WinSCP (SFTP/SCP Client)" -> "WinSCP")
             if (s != NULL)
             {
@@ -705,7 +698,7 @@ void CPlugins::InitMenuItems(HWND parent, CMenuPopup* root)
             DuplicateAmpersands(lastCmdStr, 299); // plugin name may contain '&'character
             strcat(lastCmdStr, ": ");
             int cmdNameOffset = (int)strlen(lastCmdStr);
-            strcpy(lastCmdStr + cmdNameOffset, menuItem->Name);
+            strcpy(lastCmdStr + cmdNameOffset, menuItem->Name.c_str());
 
             // remove the hint from the text if it is present
             if ((menuItem->HotKey & HOTKEY_HINT) != 0)
@@ -1053,14 +1046,14 @@ void CPlugins::AddNamesToListView(HWND hListView, BOOL setOnly, int* numOfLoaded
         lvi.iImage = orderIndex;
         ListView_SetItem(hListView, &lvi);
         // plugin name
-        ListView_SetItemText(hListView, i, 0, plugin->Name);
+        ListView_SetItemText(hListView, i, 0, const_cast<char*>(plugin->Name.c_str()));
         // loaded
         ListView_SetItemText(hListView, i, 1,
                              LoadStr(plugin->GetLoaded() ? IDS_PLUGINS_LOADED_YES : IDS_PLUGINS_LOADED_NO));
         // version
-        ListView_SetItemText(hListView, i, 2, plugin->Version);
+        ListView_SetItemText(hListView, i, 2, const_cast<char*>(plugin->Version.c_str()));
         // location
-        ListView_SetItemText(hListView, i, 3, plugin->DLLName);
+        ListView_SetItemText(hListView, i, 3, const_cast<char*>(plugin->DLLName.c_str()));
     }
     *numOfLoaded = loaded;
 }
@@ -1106,7 +1099,7 @@ BOOL CPlugins::AddNamesToMenu(CMenuPopup* menu, DWORD firstID, int maxCount, BOO
             mii.ID = firstID + orderIndex;
 
             char pluginName[300];
-            lstrcpyn(pluginName, data->Name, 299);
+            lstrcpyn(pluginName, data->Name.c_str(), 299);
             DuplicateAmpersands(pluginName, 299); // plugin name may contain '&' character
 
             mii.String = (LPTSTR)pluginName;
@@ -1143,9 +1136,9 @@ BOOL CPlugins::AddItemsToChangeDrvMenu(CDrivesList* drvList, int& currentFSIndex
     {
         int orderIndex = Order[i].Index;
         CPluginData* p = Data[orderIndex];
-        if (p->SupportFS && p->ChDrvMenuFSItemName != NULL && p->ChDrvMenuFSItemVisible)
+        if (p->SupportFS && !p->ChDrvMenuFSItemName.empty() && p->ChDrvMenuFSItemVisible)
         {
-            drv.DriveText = p->ChDrvMenuFSItemName;
+            drv.DriveText = p->ChDrvMenuFSItemName.c_str();
             if (drv.DriveText.empty())
                 return FALSE;
             if (p->PluginIcons != NULL && p->ChDrvMenuFSItemIconIndex != -1)
@@ -1163,7 +1156,7 @@ BOOL CPlugins::AddItemsToChangeDrvMenu(CDrivesList* drvList, int& currentFSIndex
                 drv.HGrayIcon = NULL;
                 drv.DestroyIcon = TRUE;
             }
-            drv.DLLName = p->DLLName;
+            drv.DLLName = p->DLLName.c_str();
             int index;
             drvList->AddDrive(drv, index);
             if (currentFSIndex == -1 && ifaceForFS != NULL &&
@@ -1437,8 +1430,8 @@ void CPlugins::Load(HWND parent, HKEY regKey)
 
                         if (GetValue(itemKey, SALAMANDER_PLUGINS_FSCMDNAME, REG_SZ, fsCmdName, MAX_PATH))
                         {
-                            p->ChDrvMenuFSItemName = DupStr(fsCmdName);
-                            if (p->ChDrvMenuFSItemName != NULL)
+                            p->ChDrvMenuFSItemName = fsCmdName;
+                            if (!p->ChDrvMenuFSItemName.empty())
                             {
                                 // ChDrvMenuFSItemIconIndex isn't stored when it is -1 (handles old configuration conversion as well)
                                 if (!GetValue(itemKey, SALAMANDER_PLUGINS_FSCMDICON, REG_DWORD,
@@ -1612,13 +1605,13 @@ void CPlugins::Save(HWND parent, HKEY regKey, HKEY regKeyConfig, HKEY regKeyOrde
             {
                 CPluginData* p = Data[i];
 
-                SetValue(itemKey, SALAMANDER_PLUGINS_NAME, REG_SZ, p->Name, -1);
-                SetValue(itemKey, SALAMANDER_PLUGINS_DLLNAME, REG_SZ, p->DLLName, -1);
-                SetValue(itemKey, SALAMANDER_PLUGINS_VERSION, REG_SZ, p->Version, -1);
-                SetValue(itemKey, SALAMANDER_PLUGINS_COPYRIGHT, REG_SZ, p->Copyright, -1);
-                SetValue(itemKey, SALAMANDER_PLUGINS_EXTENSIONS, REG_SZ, p->Extensions, -1);
-                SetValue(itemKey, SALAMANDER_PLUGINS_DESCRIPTION, REG_SZ, p->Description, -1);
-                SetValue(itemKey, SALAMANDER_PLUGINS_REGKEYNAME, REG_SZ, p->RegKeyName, -1);
+                SetValue(itemKey, SALAMANDER_PLUGINS_NAME, REG_SZ, p->Name.c_str(), -1);
+                SetValue(itemKey, SALAMANDER_PLUGINS_DLLNAME, REG_SZ, p->DLLName.c_str(), -1);
+                SetValue(itemKey, SALAMANDER_PLUGINS_VERSION, REG_SZ, p->Version.c_str(), -1);
+                SetValue(itemKey, SALAMANDER_PLUGINS_COPYRIGHT, REG_SZ, p->Copyright.c_str(), -1);
+                SetValue(itemKey, SALAMANDER_PLUGINS_EXTENSIONS, REG_SZ, p->Extensions.c_str(), -1);
+                SetValue(itemKey, SALAMANDER_PLUGINS_DESCRIPTION, REG_SZ, p->Description.c_str(), -1);
+                SetValue(itemKey, SALAMANDER_PLUGINS_REGKEYNAME, REG_SZ, p->RegKeyName.c_str(), -1);
                 SaveFSNames(itemKey, &p->FSNames);
 
                 DWORD functions = 0;
@@ -1640,9 +1633,9 @@ void CPlugins::Save(HWND parent, HKEY regKey, HKEY regKeyConfig, HKEY regKeyOrde
                     SetValue(itemKey, SALAMANDER_PLUGINS_LOADONSTART, REG_DWORD, &loadOnStartDWORD, sizeof(DWORD));
                 }
 
-                if (p->ChDrvMenuFSItemName != NULL) // we have an FS command for the change-drive menu
+                if (!p->ChDrvMenuFSItemName.empty()) // we have an FS command for the change-drive menu
                 {
-                    SetValue(itemKey, SALAMANDER_PLUGINS_FSCMDNAME, REG_SZ, p->ChDrvMenuFSItemName, -1);
+                    SetValue(itemKey, SALAMANDER_PLUGINS_FSCMDNAME, REG_SZ, p->ChDrvMenuFSItemName.c_str(), -1);
 
                     // ChDrvMenuFSItemIconIndex isn't saved when it is -1 (handles old configuration conversion)
                     if (p->ChDrvMenuFSItemIconIndex != -1)
@@ -1661,13 +1654,13 @@ void CPlugins::Save(HWND parent, HKEY regKey, HKEY regKeyConfig, HKEY regKeyOrde
                 if (p->PluginUsesPasswordManager)
                     SetValue(itemKey, SALAMANDER_PLUGINS_USESPASSWDMAN, REG_DWORD, &p->PluginUsesPasswordManager, sizeof(DWORD));
 
-                if (p->LastSLGName != NULL && p->LastSLGName[0] != 0) // store it if it is not an empty string
+                if (!p->LastSLGName.empty() && p->LastSLGName.c_str()[0] != 0) // store it if it is not an empty string
                 {
-                    SetValue(itemKey, SALAMANDER_PLUGINS_LASTSLGNAME, REG_SZ, p->LastSLGName, -1);
+                    SetValue(itemKey, SALAMANDER_PLUGINS_LASTSLGNAME, REG_SZ, p->LastSLGName.c_str(), -1);
                 }
-                if (p->PluginHomePageURL != NULL && p->PluginHomePageURL[0] != 0) // store it if is not an empty string
+                if (!p->PluginHomePageURL.empty() && p->PluginHomePageURL.c_str()[0] != 0) // store it if is not an empty string
                 {
-                    SetValue(itemKey, SALAMANDER_PLUGINS_HOMEPAGE, REG_SZ, p->PluginHomePageURL, -1);
+                    SetValue(itemKey, SALAMANDER_PLUGINS_HOMEPAGE, REG_SZ, p->PluginHomePageURL.c_str(), -1);
                 }
                 if (p->ThumbnailMasks.GetMasksString()[0] != 0) // store it if it is not an empty string
                 {
@@ -1702,7 +1695,7 @@ void CPlugins::Save(HWND parent, HKEY regKey, HKEY regKeyConfig, HKEY regKeyOrde
                         if (CreateKey(menuKey, buf2, menuItemKey))
                         {
                             CPluginMenuItem* item = p->MenuItems[i2];
-                            if (item->Name != NULL || item->StateMask == -1)
+                            if (!item->Name.empty() || item->StateMask == -1)
                             {                                                              // we store "state" only if it is an item or a separator with "call-get-state"
                                 DWORD state = p->SupportDynMenuExt ? -1 : item->StateMask; // dynamic menu: this hack handles the situation when a plugin with a dynamic menu switches to a static one during loading and fails in the entry point (the dynamic menu contents remain and if it lacks call-get-state items, the menu might appear even without loading the plugin)
                                 SetValue(menuItemKey, SALAMANDER_PLUGINS_MENUITEMSTATE, REG_DWORD,
@@ -1710,8 +1703,8 @@ void CPlugins::Save(HWND parent, HKEY regKey, HKEY regKeyConfig, HKEY regKeyOrde
                                 SetValue(menuItemKey, SALAMANDER_PLUGINS_MENUITEMID, REG_DWORD,
                                          &(item->ID), sizeof(DWORD));
                             }
-                            if (item->Name != NULL) // regular item - store the name
-                                SetValue(menuItemKey, SALAMANDER_PLUGINS_MENUITEMNAME, REG_SZ, item->Name, -1);
+                            if (!item->Name.empty()) // regular item - store the name
+                                SetValue(menuItemKey, SALAMANDER_PLUGINS_MENUITEMNAME, REG_SZ, item->Name.c_str(), -1);
 
                             // SkillLevel is saved only if it differs from MENU_SKILLLEVEL_ALL
                             // saving registry space and ensuring the conversion of old configurations
@@ -1773,7 +1766,7 @@ void CPlugins::Save(HWND parent, HKEY regKey, HKEY regKeyConfig, HKEY regKeyOrde
             if (CreateKey(regKeyOrder, buf, itemKey))
             {
                 CPluginOrder* order = &Order[i];
-                SetValue(itemKey, SALAMANDER_PLUGINS_DLLNAME, REG_SZ, order->DLLName, -1);
+                SetValue(itemKey, SALAMANDER_PLUGINS_DLLNAME, REG_SZ, order->DLLName.c_str(), -1);
                 CloseKey(itemKey);
             }
         }
@@ -1947,11 +1940,11 @@ CPlugins::GetPluginDataFromSuffix(const char* dllSuffix)
         for (i = 0; i < Data.Count; i++)
         {
             CPluginData* data = Data[i];
-            char* s = data->DLLName;
+            const char* s = data->DLLName.c_str();
             if ((*s != '\\' || *(s + 1) != '\\') && // not UNC
                 (*s == 0 || *(s + 1) != ':'))       // not "c:" -> realtive path to plugins
             {
-                strcpy(name, data->DLLName);
+                strcpy(name, data->DLLName.c_str());
                 s = fullDLLName;
             }
             int len = (int)strlen(s);
@@ -2252,7 +2245,7 @@ void CPlugins::GetUniqueRegKeyName(char* uniqueKeyName, const char* regKeyName)
         int i;
         for (i = 0; i < Data.Count; i++)
         {
-            if (StrICmp(uniqueKeyName, Data[i]->RegKeyName) == 0) // not unique
+            if (StrICmp(uniqueKeyName, Data[i]->RegKeyName.c_str()) == 0) // not unique
             {
                 sprintf(uniqueKeyName + strlen(regKeyName), " (%d)", number++); // change key name
                 i = -1;                                                         // compare again
@@ -2475,10 +2468,10 @@ void CPlugins::FindViewEdit(const char* extensions, int exclude, BOOL& viewFound
             continue; // this index cannot be the result
 
         CPluginData* p = Data[i];
-        len = (int)strlen(p->Extensions);
+        len = (int)strlen(p->Extensions.c_str());
         if (len > 299)
             len = 299;
-        memcpy(ext2, p->Extensions, len);
+        memcpy(ext2, p->Extensions.c_str(), len);
         ext2[len] = 0;
         s = ext2 + len;
         while (s > ext2)
@@ -2571,7 +2564,7 @@ BOOL CPlugins::FindDLL(const char* dllName, int& index)
     int i;
     for (i = 0; i < Data.Count; i++)
     {
-        if (StrICmp(Data[i]->DLLName, dllName) == 0)
+        if (StrICmp(Data[i]->DLLName.c_str(), dllName) == 0)
         {
             index = i;
             return TRUE;
@@ -2960,11 +2953,11 @@ BOOL CPlugins::ReadPluginsVer(HWND parent, BOOL importFromOldConfig)
         {
             if (!Data[i]->GetLoaded()
 #ifdef _WIN64 // FIXME_X64_WINSCP - this will likely need a different approach... (ignoring missing WinSCP in the 64-bit Salamander)
-                && !IsPluginUnsupportedOnX64(Data[i]->DLLName)
+                && !IsPluginUnsupportedOnX64(Data[i]->DLLName.c_str())
 #endif // _WIN64
             )
             {
-                _snprintf_s(textProgress, _TRUNCATE, "%s\n%s", LoadStr(IDS_AUTOINSTALLPLUGINS), Data[i]->DLLName);
+                _snprintf_s(textProgress, _TRUNCATE, "%s\n%s", LoadStr(IDS_AUTOINSTALLPLUGINS), Data[i]->DLLName.c_str());
                 analysing.SetText(textProgress);
 
                 Data[i]->InitDLL(parent, TRUE, FALSE); // suppress the excessive repeated blinking of the cursor
@@ -3019,12 +3012,12 @@ BOOL CPlugins::TestAll(HWND parent)
     {
         BOOL wasLoaded = Data[i]->GetLoaded();
 #ifdef _WIN64 // FIXME_X64_WINSCP - this will likely need a different approach... (ignoring missing WinSCP in the 64-bit Salamander)
-        if (IsPluginUnsupportedOnX64(Data[i]->DLLName))
+        if (IsPluginUnsupportedOnX64(Data[i]->DLLName.c_str()))
             continue;
 #endif // _WIN64
         if (!wasLoaded)
         {
-            _snprintf_s(textProgress, _TRUNCATE, "%s\n%s", LoadStr(IDS_LOADINGPLUGINS), Data[i]->DLLName);
+            _snprintf_s(textProgress, _TRUNCATE, "%s\n%s", LoadStr(IDS_LOADINGPLUGINS), Data[i]->DLLName.c_str());
             analysing.SetText(textProgress);
         }
         if (!Data[i]->InitDLL(parent, FALSE, FALSE))
@@ -3070,11 +3063,11 @@ void CPlugins::LoadAll(HWND parent)
         {
             if (!Data[i]->GetLoaded()
 #ifdef _WIN64 // FIXME_X64_WINSCP - this will likely need a different approach... (ignoring missing WinSCP in the 64-bit Salamander)
-                && !IsPluginUnsupportedOnX64(Data[i]->DLLName)
+                && !IsPluginUnsupportedOnX64(Data[i]->DLLName.c_str())
 #endif // _WIN64
             )
             {
-                _snprintf_s(textProgress, _TRUNCATE, "%s\n%s", LoadStr(IDS_LOADINGPLUGINS), Data[i]->DLLName);
+                _snprintf_s(textProgress, _TRUNCATE, "%s\n%s", LoadStr(IDS_LOADINGPLUGINS), Data[i]->DLLName.c_str());
                 analysing.SetText(textProgress);
 
                 Data[i]->InitDLL(parent, TRUE);
@@ -3222,11 +3215,11 @@ void CPlugins::RemoveNoLongerExistingPlugins(BOOL canDelPluginRegKey, BOOL loadA
     {
         if (!Data[i]->GetLoaded() // applies only to unloaded plugins
 #ifdef _WIN64                     // FIXME_X64_WINSCP - this will likely need a different approach... (ignoring missing WinSCP in the 64-bit Salamander)
-            && !IsPluginUnsupportedOnX64(Data[i]->DLLName)
+            && !IsPluginUnsupportedOnX64(Data[i]->DLLName.c_str())
 #endif // _WIN64
         )
         {
-            char* fullName = Data[i]->DLLName;
+            const char* fullName = Data[i]->DLLName.c_str();
             if ((*fullName != '\\' || *(fullName + 1) != '\\') && // not UNC
                 (*fullName == 0 || *(fullName + 1) != ':'))       // not "c:" -> path relative to the plugins subdirectory
             {
@@ -3241,13 +3234,13 @@ void CPlugins::RemoveNoLongerExistingPlugins(BOOL canDelPluginRegKey, BOOL loadA
             {
                 CPathBuffer pluginName; // Heap-allocated for long path support
                 pluginName[0] = 0;
-                if (notLoadedPluginNames != NULL && Data[i]->RegKeyName != NULL && Data[i]->RegKeyName[0] != 0 &&
-                    _stricmp(Data[i]->DLLName, "fsearch\\fsearch.spl") != 0 && // we want to suppress FSearch (no need to alert that it's missing)
-                    _stricmp(Data[i]->DLLName, "eroiica\\eroiica.spl") != 0 && // we want to suppress Eroiica (no need to alert that it's missing)
-                    _stricmp(Data[i]->DLLName, "unace\\unace.spl") != 0 &&     // we want to suppress UnACE (no need to alert that it's missing)
-                    _stricmp(Data[i]->DLLName, "diskcopy\\diskcopy.spl") != 0) // we want to suppress DiskCopy (no need to alert that it's missing)
+                if (notLoadedPluginNames != NULL && !Data[i]->RegKeyName.empty() &&
+                    _stricmp(Data[i]->DLLName.c_str(), "fsearch\\fsearch.spl") != 0 && // we want to suppress FSearch (no need to alert that it's missing)
+                    _stricmp(Data[i]->DLLName.c_str(), "eroiica\\eroiica.spl") != 0 && // we want to suppress Eroiica (no need to alert that it's missing)
+                    _stricmp(Data[i]->DLLName.c_str(), "unace\\unace.spl") != 0 &&     // we want to suppress UnACE (no need to alert that it's missing)
+                    _stricmp(Data[i]->DLLName.c_str(), "diskcopy\\diskcopy.spl") != 0) // we want to suppress DiskCopy (no need to alert that it's missing)
                 {
-                    lstrcpyn(pluginName, Data[i]->Name, pluginName.Size()); // if it has a registry key, store its name
+                    lstrcpyn(pluginName, Data[i]->Name.c_str(), pluginName.Size()); // if it has a registry key, store its name
                 }
                 if (Remove(parent, i, canDelPluginRegKey))
                 {
@@ -3286,24 +3279,24 @@ void CPlugins::RemoveNoLongerExistingPlugins(BOOL canDelPluginRegKey, BOOL loadA
         {
             if (!Data[i]->GetLoaded()
 #ifdef _WIN64 // FIXME_X64_WINSCP - this will likely need a different approach... (ignoring missing WinSCP in the 64-bit Salamander)
-                && !IsPluginUnsupportedOnX64(Data[i]->DLLName)
+                && !IsPluginUnsupportedOnX64(Data[i]->DLLName.c_str())
 #endif // _WIN64
             )
             {
-                _snprintf_s(textProgress, _TRUNCATE, "%s\n%s", LoadStr(IDS_AUTOINSTALLPLUGINS), Data[i]->DLLName);
+                _snprintf_s(textProgress, _TRUNCATE, "%s\n%s", LoadStr(IDS_AUTOINSTALLPLUGINS), Data[i]->DLLName.c_str());
                 analysing.SetText(textProgress);
 
                 if (!Data[i]->InitDLL(parent, TRUE, FALSE)) // suppress the excessive repeated blinking of the cursor
                 {
-                    if (notLoadedPluginNames != NULL && Data[i]->RegKeyName != NULL && Data[i]->RegKeyName[0] != 0)
+                    if (notLoadedPluginNames != NULL && !Data[i]->RegKeyName.empty())
                     { // if it has a registry key, store its name
                         numOfNotLoaded++;
                         if (numOfNotLoaded <= maxNotLoadedPluginNames &&
-                            (int)strlen(notLoadedPluginNames) + 2 /*", "*/ + (int)strlen(Data[i]->Name) + 1 /*null*/ <= notLoadedPluginNamesSize)
+                            (int)strlen(notLoadedPluginNames) + 2 /*", "*/ + (int)Data[i]->Name.size() + 1 /*null*/ <= notLoadedPluginNamesSize)
                         {
                             if (*notLoadedPluginNames != 0)
                                 strcat(notLoadedPluginNames, ", ");
-                            strcat(notLoadedPluginNames, Data[i]->Name);
+                            strcat(notLoadedPluginNames, Data[i]->Name.c_str());
                         }
                         else
                         {
@@ -3392,9 +3385,9 @@ void CPlugins::AutoInstallStdPluginsDir(HWND parent)
                 if (Plugins.AddPlugin(parent, pluginName)) // whatever we add, will already be loaded (loading verifies it is a plugin)
                 {
                     CPluginData* p = Plugins.Get(Plugins.GetCount() - 1);
-                    if (StrICmp(p->DLLName, "nethood\\nethood.spl") == 0)
+                    if (StrICmp(p->DLLName.c_str(), "nethood\\nethood.spl") == 0)
                     {
-                        int index2 = AddPluginToOrder(p->DLLName, TRUE);
+                        int index2 = AddPluginToOrder(p->DLLName.c_str(), TRUE);
                         Plugins.ChangePluginsOrder(index2, 0);
                     }
                 }
@@ -3410,11 +3403,11 @@ void CPlugins::AutoInstallStdPluginsDir(HWND parent)
     {
         if (!Data[i]->GetLoaded()
 #ifdef _WIN64 // FIXME_X64_WINSCP - this will likely need a different approach... (ignoring missing WinSCP in the 64-bit Salamander)
-            && !IsPluginUnsupportedOnX64(Data[i]->DLLName)
+            && !IsPluginUnsupportedOnX64(Data[i]->DLLName.c_str())
 #endif // _WIN64
         )
         {
-            _snprintf_s(textProgress, _TRUNCATE, "%s\n%s", LoadStr(IDS_AUTOINSTALLPLUGINS), Data[i]->DLLName);
+            _snprintf_s(textProgress, _TRUNCATE, "%s\n%s", LoadStr(IDS_AUTOINSTALLPLUGINS), Data[i]->DLLName.c_str());
             analysing.SetText(textProgress);
 
             Data[i]->InitDLL(parent, TRUE, FALSE); // suppress the excessive repeated blinking of the cursor
@@ -3450,19 +3443,19 @@ BOOL CPlugins::EnumInstalledModules(int* index, char* module, char* version)
         {
             CPluginData* data = Data[*index - 1];
             // obtain the full name of the DLL
-            char* s = data->DLLName;
+            const char* s = data->DLLName.c_str();
             if ((*s != '\\' || *(s + 1) != '\\') && // not UNC
                 (*s == 0 || *(s + 1) != ':'))       // not "c:" -> relative path to packers
             {
                 GetModuleFileName(HInstance, module, MAX_PATH);
-                s = strrchr(module, '\\') + 1;
-                strcpy(s, "plugins\\");
-                strcat(s, data->DLLName);
+                char* p = strrchr(module, '\\') + 1;
+                strcpy(p, "plugins\\");
+                strcat(p, data->DLLName.c_str());
             }
             else
                 strcpy(module, s);
             // obtain the version
-            strcpy(version, data->Version);
+            strcpy(version, data->Version.c_str());
             (*index)++;
             return TRUE;
         }
@@ -3609,9 +3602,7 @@ BOOL CPlugins::HandleKeyDown(WPARAM wParam, LPARAM lParam, CFilesWindow* activeP
 void CPlugins::SetLastPlgCmd(const char* dllName, int id)
 {
     CALL_STACK_MESSAGE3("CPlugins::SetLastPlgCmd(%s, %d)", dllName, id);
-    if (LastPlgCmdPlugin != NULL)
-        free(LastPlgCmdPlugin);
-    LastPlgCmdPlugin = DupStr(dllName); // if allocation fails, LastPlgCmdPlugin will be NULL and the menu will show the default item
+    LastPlgCmdPlugin = dllName ? dllName : ""; // if allocation fails, LastPlgCmdPlugin will be NULL and the menu will show the default item
     LastPlgCmdID = id;
 }
 
@@ -3633,11 +3624,7 @@ void CPlugins::ClearLastSLGNames()
 {
     int i;
     for (i = 0; i < Data.Count; i++)
-        if (Data[i]->LastSLGName != NULL)
-        {
-            free(Data[i]->LastSLGName);
-            Data[i]->LastSLGName = NULL;
-        }
+        Data[i]->LastSLGName.clear();
 }
 
 BOOL CPlugins::GetFirstNethoodPluginFSName(char* fsName, CPluginData** nethoodPlugin)
@@ -3683,7 +3670,7 @@ int CPlugins::GetNumOfPluginsToLoad()
     {
         if (!Data[i]->GetLoaded()
 #ifdef _WIN64 // FIXME_X64_WINSCP - this will likely need a different approach... (ignoring missing WinSCP in the 64-bit Salamander)
-            && !IsPluginUnsupportedOnX64(Data[i]->DLLName)
+            && !IsPluginUnsupportedOnX64(Data[i]->DLLName.c_str())
 #endif // _WIN64
         )
         {

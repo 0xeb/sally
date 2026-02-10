@@ -194,7 +194,7 @@ void CPluginInterfaceForFSEncapsulation::CloseFS(CPluginFSInterfaceAbstract* fs)
     }
 #endif // _DEBUG
     CALL_STACK_MESSAGE3("CPluginInterfaceForFSEncapsulation::CloseFS() (%s v. %s)",
-                        data->DLLName, data->Version);
+                        data->DLLName.c_str(), data->Version.c_str());
     EnterPlugin();
     Interface->CloseFS(fs);
     Plugins.KillPluginFSTimer(fs, TRUE, 0); // we must remove timers of the closing FS (they wouldn't deliver and TRACE_E would appear)
@@ -241,7 +241,7 @@ void CPluginInterfaceForFSEncapsulation::ExecuteChangeDrivePostCommand(int panel
         return;
     }
     CALL_STACK_MESSAGE5("CPluginInterfaceForFSEncapsulation::ExecuteChangeDrivePostCommand(%d, %d, ) (%s v. %s)",
-                        panel, postCmd, data->DLLName, data->Version);
+                        panel, postCmd, data->DLLName.c_str(), data->Version.c_str());
     EnterPlugin();
     Interface->ExecuteChangeDrivePostCommand(panel, postCmd, postCmdParam);
     LeavePlugin();
@@ -258,7 +258,7 @@ void CPluginInterfaceForFSEncapsulation::ExecuteOnFS(int panel, CPluginFSInterfa
         return;
     }
     CALL_STACK_MESSAGE7("CPluginInterfaceForFSEncapsulation::ExecuteOnFS(%d, , %s, %d, , %d) (%s v. %s)",
-                        panel, pluginFSName, pluginFSNameIndex, isDir, data->DLLName, data->Version);
+                        panel, pluginFSName, pluginFSNameIndex, isDir, data->DLLName.c_str(), data->Version.c_str());
     EnterPlugin();
     Interface->ExecuteOnFS(panel, pluginFS, pluginFSName, pluginFSNameIndex, file, isDir);
     LeavePlugin();
@@ -275,7 +275,7 @@ BOOL CPluginInterfaceForFSEncapsulation::DisconnectFS(HWND parent, BOOL isInPane
         return FALSE;
     }
     CALL_STACK_MESSAGE7("CPluginInterfaceForFSEncapsulation::DisconnectFS(, %d, %d, , %s, %d) (%s v. %s)",
-                        isInPanel, panel, pluginFSName, pluginFSNameIndex, data->DLLName, data->Version);
+                        isInPanel, panel, pluginFSName, pluginFSNameIndex, data->DLLName.c_str(), data->Version.c_str());
     EnterPlugin();
     BOOL ret = Interface->DisconnectFS(parent, isInPanel, panel, pluginFS, pluginFSName, pluginFSNameIndex);
     LeavePlugin();
@@ -292,7 +292,7 @@ void CPluginInterfaceForFSEncapsulation::ConvertPathToInternal(const char* fsNam
         return;
     }
     CALL_STACK_MESSAGE6("CPluginInterfaceForFSEncapsulation::ConvertPathToInternal(%s, %d, %s) (%s v. %s)",
-                        fsName, fsNameIndex, fsUserPart, data->DLLName, data->Version);
+                        fsName, fsNameIndex, fsUserPart, data->DLLName.c_str(), data->Version.c_str());
     EnterPlugin();
     Interface->ConvertPathToInternal(fsName, fsNameIndex, fsUserPart);
     LeavePlugin();
@@ -308,7 +308,7 @@ void CPluginInterfaceForFSEncapsulation::ConvertPathToExternal(const char* fsNam
         return;
     }
     CALL_STACK_MESSAGE6("CPluginInterfaceForFSEncapsulation::ConvertPathToExternal(%s, %d, %s) (%s v. %s)",
-                        fsName, fsNameIndex, fsUserPart, data->DLLName, data->Version);
+                        fsName, fsNameIndex, fsUserPart, data->DLLName.c_str(), data->Version.c_str());
     EnterPlugin();
     Interface->ConvertPathToExternal(fsName, fsNameIndex, fsUserPart);
     LeavePlugin();
@@ -329,7 +329,7 @@ void CPluginInterfaceEncapsulation::ReleasePluginDataInterface(CPluginDataInterf
     }
 #endif // _DEBUG
     CALL_STACK_MESSAGE3("CPluginInterfaceEncapsulation::ReleasePluginDataInterface() (%s v. %s)",
-                        data->DLLName, data->Version);
+                        data->DLLName.c_str(), data->Version.c_str());
     EnterPlugin();
     Interface->ReleasePluginDataInterface(pluginData);
     LeavePlugin();
@@ -1231,9 +1231,7 @@ void CSalamanderConnect::SetChangeDriveMenuItem(const char* title, int iconIndex
     {
         if (p->SupportFS)
         {
-            if (p->ChDrvMenuFSItemName != NULL)
-                free(p->ChDrvMenuFSItemName);
-            p->ChDrvMenuFSItemName = NULL;
+            p->ChDrvMenuFSItemName.clear();
             p->ChDrvMenuFSItemIconIndex = -1;
 
             if (title == NULL)
@@ -1242,8 +1240,8 @@ void CSalamanderConnect::SetChangeDriveMenuItem(const char* title, int iconIndex
                 return;
             }
 
-            p->ChDrvMenuFSItemName = DupStr(title);
-            if (p->ChDrvMenuFSItemName != NULL)
+            p->ChDrvMenuFSItemName = title;
+            if (!p->ChDrvMenuFSItemName.empty())
                 p->ChDrvMenuFSItemIconIndex = iconIndex;
         }
         else
@@ -1580,7 +1578,7 @@ BOOL CSalamanderPluginEntry::SetBasicPluginData(const char* pluginName, DWORD fu
         Plugin->SupportViewer && !supportViewer ||
         Plugin->SupportFS && !supportFS)
     { // downgrading capabilities is not possible ...
-        std::wstring msg = FormatStrW(LoadStrW(IDS_REINSTALLPLUGIN), AnsiToWide(Plugin->Name).c_str(), AnsiToWide(Plugin->DLLName).c_str());
+        std::wstring msg = FormatStrW(LoadStrW(IDS_REINSTALLPLUGIN), AnsiToWide(Plugin->Name.c_str()).c_str(), AnsiToWide(Plugin->DLLName.c_str()).c_str());
         gPrompter->ShowError(LoadStrW(IDS_ERRORTITLE), msg.c_str());
         Error = TRUE;
         return FALSE;
@@ -1597,60 +1595,25 @@ BOOL CSalamanderPluginEntry::SetBasicPluginData(const char* pluginName, DWORD fu
     Plugin->SupportFS = supportFS;
     Plugin->SupportDynMenuExt = supportDynMenuExt;
 
-    char* s = DupStr(pluginName);
-    if (s != NULL)
-    {
-        free(Plugin->Name);
-        Plugin->Name = s;
-    }
-    s = DupStr(version);
-    if (s != NULL)
-    {
-        free(Plugin->Version);
-        Plugin->Version = s;
-    }
-    Plugin->SalamanderDebug.Init(Plugin->DLLName, Plugin->Version);
-    Plugin->SalamanderPasswordManager.Init(Plugin->DLLName);
-    s = DupStr(copyright);
-    if (s != NULL)
-    {
-        free(Plugin->Copyright);
-        Plugin->Copyright = s;
-    }
-    s = DupStr((supportPanelView || supportPanelEdit) ? extensions : "");
-    if (s != NULL)
-    {
-        free(Plugin->Extensions);
-        Plugin->Extensions = s;
-    }
-    s = DupStr(description);
-    if (s != NULL)
-    {
-        free(Plugin->Description);
-        Plugin->Description = s;
-    }
+    Plugin->Name = pluginName;
+    Plugin->Version = version;
+    Plugin->SalamanderDebug.Init(Plugin->DLLName.c_str(), Plugin->Version.c_str());
+    Plugin->SalamanderPasswordManager.Init(Plugin->DLLName.c_str());
+    Plugin->Copyright = copyright;
+    Plugin->Extensions = (supportPanelView || supportPanelEdit) ? extensions : "";
+    Plugin->Description = description;
     if (supportLoadSave)
     {
-        if (Plugin->RegKeyName[0] == 0)
+        if (Plugin->RegKeyName.empty() || Plugin->RegKeyName[0] == 0)
         { // new plugin with load/save - set a new key name in the registry
             CPathBuffer uniqueKeyName;  // Heap-allocated for long path support
             Plugins.GetUniqueRegKeyName(uniqueKeyName, regKeyName);
-            s = DupStr(uniqueKeyName);
-            if (s != NULL)
-            {
-                free(Plugin->RegKeyName);
-                Plugin->RegKeyName = s;
-            }
+            Plugin->RegKeyName = uniqueKeyName.Get();
         }
     }
     else // does not support load/save
     {
-        s = DupStr("");
-        if (s != NULL)
-        {
-            free(Plugin->RegKeyName);
-            Plugin->RegKeyName = s;
-        }
+        Plugin->RegKeyName.clear();
     }
     if (Plugin->SupportFS)
     {
@@ -1664,7 +1627,7 @@ BOOL CSalamanderPluginEntry::SetBasicPluginData(const char* pluginName, DWORD fu
 
             CPathBuffer uniqueFSName;  // Heap-allocated for long path support
             Plugins.GetUniqueFSName(uniqueFSName, fsName, NULL, &OldFSNames);
-            s = DupStr(uniqueFSName);
+            char* s = DupStr(uniqueFSName);
             if (s != NULL)
             {
                 Plugin->FSNames.Add(s);
@@ -1716,18 +1679,18 @@ CSalamanderPluginEntry::LoadLanguageModule(HWND parent, const char* pluginName)
     CPathBuffer errorText;
 
     // obtain the path to the plugin's LANG directory
-    char* s = Plugin->DLLName;
-    if ((*s != '\\' || *(s + 1) != '\\') && // not UNC
-        (*s == 0 || *(s + 1) != ':'))       // not "c:" -> path relative to the plugins subdirectory
+    const char* dllStr = Plugin->DLLName.c_str();
+    if ((*dllStr != '\\' || *(dllStr + 1) != '\\') && // not UNC
+        (*dllStr == 0 || *(dllStr + 1) != ':'))       // not "c:" -> path relative to the plugins subdirectory
     {
         GetModuleFileName(HInstance, path, path.Size());
-        s = strrchr(path, '\\') + 1;
+        char* s = strrchr(path, '\\') + 1;
         strcpy(s, "plugins\\");
-        strcat(s, Plugin->DLLName);
+        strcat(s, Plugin->DLLName.c_str());
     }
     else
-        lstrcpyn(path, s, path.Size());
-    s = strrchr(path, '\\') + 1;
+        lstrcpyn(path, dllStr, path.Size());
+    char* s = strrchr(path, '\\') + 1;
     lstrcpyn(s, "lang\\", path.Size() - (int)(s - path.Get()));
     char* slgName = path.Get() + strlen(path);
     int slgNameBufSize = path.Size() - (int)(slgName - path.Get());
@@ -1741,8 +1704,8 @@ CSalamanderPluginEntry::LoadLanguageModule(HWND parent, const char* pluginName)
         if (lang != NULL)
             HANDLES(FreeLibrary(lang));
         lang = NULL;
-        if (Plugin->LastSLGName == NULL ||               // no .slg chosen during the previous plugin load
-            _stricmp(slgName, Plugin->LastSLGName) == 0) // we already tried this .slg
+        if (Plugin->LastSLGName.empty() ||                       // no .slg chosen during the previous plugin load
+            _stricmp(slgName, Plugin->LastSLGName.c_str()) == 0) // we already tried this .slg
         {
             if (!Configuration.DoNotDispCantLoadPluginSLG)
             {
@@ -1755,7 +1718,7 @@ CSalamanderPluginEntry::LoadLanguageModule(HWND parent, const char* pluginName)
         }
         else // try to load the .slg chosen during the previous plugin load
         {
-            lstrcpyn(slgName, Plugin->LastSLGName, slgNameBufSize);
+            lstrcpyn(slgName, Plugin->LastSLGName.c_str(), slgNameBufSize);
             lang = HANDLES_Q(LoadLibrary(path));
             if (lang == NULL || !IsSLGFileValid(Plugin->GetPluginDLL(), lang, languageID, NULL))
             { // the SLG doesn't exist or isn't the expected one (completely different file or at least another version)
@@ -1811,15 +1774,11 @@ CSalamanderPluginEntry::LoadLanguageModule(HWND parent, const char* pluginName)
             }
         }
     }
-    if (Plugin->LastSLGName != NULL)
-    {
-        free(Plugin->LastSLGName);
-        Plugin->LastSLGName = NULL;
-    }
+    Plugin->LastSLGName.clear();
     if (lang != NULL)
     {
         if (_stricmp(slgName, Configuration.LoadedSLGName) != 0)
-            Plugin->LastSLGName = DupStr(slgName);
+            Plugin->LastSLGName = slgName;
         if (Plugin->SalamanderGeneral.LanguageModule == NULL)
             Plugin->SalamanderGeneral.LanguageModule = lang;
         else
@@ -1835,9 +1794,7 @@ CSalamanderPluginEntry::LoadLanguageModule(HWND parent, const char* pluginName)
 void CSalamanderPluginEntry::SetPluginHomePageURL(const char* url)
 {
     CALL_STACK_MESSAGE2("CSalamanderPluginEntry::SetPluginHomePageURL(%s)", url);
-    if (Plugin->PluginHomePageURL != NULL)
-        free(Plugin->PluginHomePageURL);
-    Plugin->PluginHomePageURL = DupStr(url);
+    Plugin->PluginHomePageURL = url ? url : "";
 }
 
 BOOL CSalamanderPluginEntry::AddFSName(const char* fsName, int* newFSNameIndex)
@@ -1898,25 +1855,19 @@ CPluginMenuItem::CPluginMenuItem(int iconIndex, const char* name, DWORD hotKey, 
     Type = type;
     IconIndex = iconIndex;
     if (name != NULL)
-        Name = DupStr(name); // on error we will become a separator ;-)
-    else
-        Name = NULL;
+        Name = name; // on error we will become a separator ;-)
+    // else Name stays empty (= separator)
 #ifdef _DEBUG
     if (name != NULL && (hotKey & HOTKEY_HINT) == 0)
     {
         // since version 2.5 beta 7 hot keys are supported
         // the hot key must not be part of the text
-        char* p = Name;
-        while (*p != 0)
+        auto tabPos = Name.find('\t');
+        if (tabPos != std::string::npos)
         {
-            if (*p == '\t')
-            {
-                if (Configuration.ConfigVersion >= 25) // warn only on newer configurations
-                    TRACE_E("Plugin menu item contains hot key (" << name << "). Use the AddMenuItem/'hotKey' parameter instead.");
-                *p = 0;
-                break;
-            }
-            p++;
+            if (Configuration.ConfigVersion >= 25) // warn only on newer configurations
+                TRACE_E("Plugin menu item contains hot key (" << name << "). Use the AddMenuItem/'hotKey' parameter instead.");
+            Name.resize(tabPos);
         }
     }
 #endif // _DEBUG
@@ -1966,18 +1917,17 @@ CPluginData::CPluginData(const char* name, const char* dllName, BOOL supportPane
     ShowSubmenuInPluginsBar = TRUE;
     ThumbnailMasksDisabled = FALSE;
     DynMenuWasAlreadyBuild = FALSE;
-    BugReportMessage = NULL;
-    BugReportEMail = NULL;
+    // BugReportMessage, BugReportEMail default-construct to empty
     SubMenu = NULL;
     DLL = NULL;
     BuiltForVersion = 0;
-    Name = DupStr(name);
-    DLLName = DupStr(dllName);
-    Version = DupStr(version);
-    Copyright = DupStr(copyright);
-    Extensions = DupStr(extensions);
-    Description = DupStr(description);
-    RegKeyName = DupStr(regKeyName);
+    Name = name ? name : "";
+    DLLName = dllName ? dllName : "";
+    Version = version ? version : "";
+    Copyright = copyright ? copyright : "";
+    Extensions = extensions ? extensions : "";
+    Description = description ? description : "";
+    RegKeyName = regKeyName ? regKeyName : "";
     SupportFS = supportFS;
     BOOL lowMem = FALSE;
     if (SupportFS && fsNames != NULL)
@@ -2002,41 +1952,29 @@ CPluginData::CPluginData(const char* name, const char* dllName, BOOL supportPane
             }
         }
     }
-    LastSLGName = (lastSLGName == NULL || lastSLGName[0] == 0) ? NULL : DupStr(lastSLGName);
-    PluginHomePageURL = pluginHomePageURL != NULL ? DupStr(pluginHomePageURL) : NULL;
-    if (Name == NULL || DLLName == NULL || Version == NULL || Copyright == NULL ||
-        Description == NULL || RegKeyName == NULL || Extensions == NULL ||
-        !FSNames.IsGood() || lowMem ||
-        lastSLGName != NULL && lastSLGName[0] != 0 && LastSLGName == NULL)
+    LastSLGName = (lastSLGName != NULL && lastSLGName[0] != 0) ? lastSLGName : "";
+    PluginHomePageURL = pluginHomePageURL != NULL ? pluginHomePageURL : "";
+    if (Name.empty() || DLLName.empty() || Version.empty() || Copyright.empty() ||
+        Description.empty() || RegKeyName.empty() || Extensions.empty() ||
+        !FSNames.IsGood() || lowMem)
     {
-        if (Name != NULL)
-            free(Name);
-        if (DLLName != NULL)
-            free(DLLName);
-        if (Version != NULL)
-            free(Version);
-        if (Copyright != NULL)
-            free(Copyright);
-        if (Extensions != NULL)
-            free(Extensions);
-        if (Description != NULL)
-            free(Description);
-        if (RegKeyName != NULL)
-            free(RegKeyName);
+        Name.clear();
+        DLLName.clear();
+        Version.clear();
+        Copyright.clear();
+        Extensions.clear();
+        Description.clear();
+        RegKeyName.clear();
         if (!FSNames.IsGood())
             FSNames.ResetState();
         FSNames.DestroyMembers();
         if (!FSNames.IsGood())
             FSNames.ResetState();
-        if (LastSLGName != NULL)
-            free(LastSLGName);
-        if (PluginHomePageURL != NULL)
-            free(PluginHomePageURL);
-        Extensions = Name = DLLName = Version = Copyright = Description = RegKeyName =
-            LastSLGName = PluginHomePageURL = NULL;
+        LastSLGName.clear();
+        PluginHomePageURL.clear();
     }
-    SalamanderDebug.Init(DLLName, Version);
-    SalamanderPasswordManager.Init(DLLName);
+    SalamanderDebug.Init(DLLName.c_str(), Version.c_str());
+    SalamanderPasswordManager.Init(DLLName.c_str());
     SupportPanelView = supportPanelView;
     SupportPanelEdit = supportPanelEdit;
     SupportCustomPack = supportCustomPack;
@@ -2046,7 +1984,7 @@ CPluginData::CPluginData(const char* name, const char* dllName, BOOL supportPane
     SupportViewer = supportViewer;
     SupportDynMenuExt = supportDynMenuExt;
     LoadOnStart = loadOnStart;
-    ChDrvMenuFSItemName = NULL;
+    // ChDrvMenuFSItemName default-constructs to empty
     ChDrvMenuFSItemVisible = TRUE;
     ChDrvMenuFSItemIconIndex = -1;
     ShouldUnload = FALSE;
@@ -2058,7 +1996,7 @@ CPluginData::CPluginData(const char* name, const char* dllName, BOOL supportPane
     OpenPackDlg = FALSE;
     PackDlgDelFilesAfterPacking = 0;
     OpenUnpackDlg = FALSE;
-    UnpackDlgUnpackMask = NULL;
+    // UnpackDlgUnpackMask default-constructs to empty
     PluginIsNethood = FALSE;
     PluginUsesPasswordManager = FALSE;
     IconOverlaysCount = 0;
@@ -2085,35 +2023,12 @@ CPluginData::~CPluginData()
         TRACE_E("CPluginData::~CPluginData(): unexpected situation (2)!");
         HANDLES(FreeLibrary(DLL));
     }
-    if (Name != NULL)
-        free(Name);
-    if (DLLName != NULL)
-        free(DLLName);
-    if (Version != NULL)
-        free(Version);
-    if (Copyright != NULL)
-        free(Copyright);
-    if (Extensions != NULL)
-        free(Extensions);
-    if (Description != NULL)
-        free(Description);
-    if (RegKeyName != NULL)
-        free(RegKeyName);
+    // Name, DLLName, Version, Copyright, Extensions, Description, RegKeyName,
+    // ChDrvMenuFSItemName, LastSLGName, PluginHomePageURL are std::string (auto-destruct)
     FSNames.DestroyMembers();
-    if (ChDrvMenuFSItemName != NULL)
-        free(ChDrvMenuFSItemName);
-    if (BugReportMessage != NULL)
-        free(BugReportMessage);
-    if (BugReportEMail != NULL)
-        free(BugReportEMail);
-    if (LastSLGName != NULL)
-        free(LastSLGName);
-    if (PluginHomePageURL != NULL)
-        free(PluginHomePageURL);
+    // BugReportMessage, BugReportEMail, UnpackDlgUnpackMask are std::string (auto-destruct)
     if (ArcCacheTmpPath != NULL)
         free(ArcCacheTmpPath);
-    if (UnpackDlgUnpackMask != NULL)
-        free(UnpackDlgUnpackMask);
     if (PluginIcons != NULL)
         delete PluginIcons;
     if (PluginIconsGray != NULL)
@@ -2137,11 +2052,11 @@ BOOL CPluginData::InitDLL(HWND parent, BOOL quiet, BOOL waitCursor, BOOL showUns
 
 #ifdef _WIN64 // FIXME_X64_WINSCP - this probably needs a different solution... (ignoring missing WinSCP in the x64 version of Salamander)
     const char* pluginNameEN;
-    if (IsPluginUnsupportedOnX64(DLLName, &pluginNameEN))
+    if (IsPluginUnsupportedOnX64(DLLName.c_str(), &pluginNameEN))
     {
         if (showUnsupOnX64) // inform the user this plugin is available only in the 32-bit version (x86)
         {
-            std::wstring msg = FormatStrW(LoadStrW(IDS_PLUGINISX86ONLY), AnsiToWide(Name == NULL || Name[0] == 0 ? pluginNameEN : Name).c_str());
+            std::wstring msg = FormatStrW(LoadStrW(IDS_PLUGINISX86ONLY), AnsiToWide(Name.empty() ? pluginNameEN : Name.c_str()).c_str());
             gPrompter->ShowInfo(LoadStrW(IDS_INFOTITLE), msg.c_str());
         }
         return FALSE;
@@ -2154,14 +2069,20 @@ BOOL CPluginData::InitDLL(HWND parent, BOOL quiet, BOOL waitCursor, BOOL showUns
 
         // obtain the full DLL name
         CPathBuffer buf; // Heap-allocated for long path support
-        char* s = DLLName;
-        if ((*s != '\\' || *(s + 1) != '\\') && // not UNC
-            (*s == 0 || *(s + 1) != ':'))       // not "c:" -> path relative to the plugins subdirectory
+        const char* dllStr = DLLName.c_str();
+        char* s;
+        if ((*dllStr != '\\' || *(dllStr + 1) != '\\') && // not UNC
+            (*dllStr == 0 || *(dllStr + 1) != ':'))       // not "c:" -> path relative to the plugins subdirectory
         {
             GetModuleFileName(HInstance, buf, buf.Size());
             s = strrchr(buf, '\\') + 1;
             strcpy(s, "plugins\\");
-            strcat(s, DLLName);
+            strcat(s, DLLName.c_str());
+            s = buf;
+        }
+        else
+        {
+            lstrcpyn(buf, dllStr, buf.Size());
             s = buf;
         }
 
@@ -2177,7 +2098,7 @@ BOOL CPluginData::InitDLL(HWND parent, BOOL quiet, BOOL waitCursor, BOOL showUns
             DWORD err = GetLastError();
             if (!quiet)
             {
-                std::wstring msg = FormatStrW(LoadStrW(IDS_UNABLETOLOADPLUGIN), AnsiToWide(Name).c_str(), AnsiToWide(s).c_str(), GetErrorTextW(err));
+                std::wstring msg = FormatStrW(LoadStrW(IDS_UNABLETOLOADPLUGIN), AnsiToWide(Name.c_str()).c_str(), AnsiToWide(s).c_str(), GetErrorTextW(err));
                 gPrompter->ShowError(LoadStrW(IDS_ERRORTITLE), msg.c_str());
             }
         }
@@ -2233,10 +2154,9 @@ BOOL CPluginData::InitDLL(HWND parent, BOOL quiet, BOOL waitCursor, BOOL showUns
                 BOOL oldVer = BuiltForVersion < PLUGIN_REQVER;
                 if (!oldVer)
                 {
-                    if (PluginHomePageURL != NULL)
+                    if (!PluginHomePageURL.empty())
                     { // delete the plugin URL just before calling the entry point so it remains available if loading of the plugin fails due to an old plugin version (the user can use the URL to obtain a new version of the plugin)
-                        free(PluginHomePageURL);
-                        PluginHomePageURL = NULL;
+                        PluginHomePageURL.clear();
                     }
 
                     BOOL oldPluginIsNethood = PluginIsNethood;
@@ -2284,7 +2204,7 @@ BOOL CPluginData::InitDLL(HWND parent, BOOL quiet, BOOL waitCursor, BOOL showUns
                     PluginIfaceForViewer.Init(PluginIface.GetInterfaceForViewer());
                     PluginIfaceForMenuExt.Init(PluginIface.GetInterfaceForMenuExt(), BuiltForVersion);
                     PluginIfaceForFS.Init(PluginIface.GetInterfaceForFS(), BuiltForVersion);
-                    PluginIfaceForThumbLoader.Init(PluginIface.GetInterfaceForThumbLoader(), DLLName, Version);
+                    PluginIfaceForThumbLoader.Init(PluginIface.GetInterfaceForThumbLoader(), DLLName.c_str(), Version.c_str());
                 }
                 else // clear the other parts of the plugin interface as well
                 {
@@ -2293,10 +2213,10 @@ BOOL CPluginData::InitDLL(HWND parent, BOOL quiet, BOOL waitCursor, BOOL showUns
                         if (!quiet)
                         {
                             std::wstring msg;
-                            if (Name == NULL || Name[0] == 0)
+                            if (Name.empty() || Name[0] == 0)
                                 msg = FormatStrW(LoadStrW(IDS_OLDPLUGINVERSION2), AnsiToWide(s).c_str());
                             else
-                                msg = FormatStrW(LoadStrW(IDS_OLDPLUGINVERSION), AnsiToWide(Name).c_str(), AnsiToWide(s).c_str());
+                                msg = FormatStrW(LoadStrW(IDS_OLDPLUGINVERSION), AnsiToWide(Name.c_str()).c_str(), AnsiToWide(s).c_str());
                             gPrompter->ShowError(LoadStrW(IDS_ERRORTITLE), msg.c_str());
                         }
                     }
@@ -2336,11 +2256,11 @@ BOOL CPluginData::InitDLL(HWND parent, BOOL quiet, BOOL waitCursor, BOOL showUns
                             if (OpenKey(hSal, SALAMANDER_PLUGINSCONFIG, actKey))
                             {
                                 HKEY regKey;
-                                if (OpenKey(actKey, RegKeyName, regKey))
+                                if (OpenKey(actKey, RegKeyName.c_str(), regKey))
                                 {
                                     CSalamanderRegistry registry;
                                     {
-                                        CALL_STACK_MESSAGE3("1.PluginIface.LoadConfiguration(, ,) (%s v. %s)", DLLName, Version);
+                                        CALL_STACK_MESSAGE3("1.PluginIface.LoadConfiguration(, ,) (%s v. %s)", DLLName.c_str(), Version.c_str());
                                         PluginIface.LoadConfiguration(parent, regKey, &registry);
                                     }
                                     loaded = TRUE;
@@ -2357,7 +2277,7 @@ BOOL CPluginData::InitDLL(HWND parent, BOOL quiet, BOOL waitCursor, BOOL showUns
                     {
                         CSalamanderRegistry registry;
                         {
-                            CALL_STACK_MESSAGE3("2.PluginIface.LoadConfiguration(, ,) (%s v. %s)", DLLName, Version);
+                            CALL_STACK_MESSAGE3("2.PluginIface.LoadConfiguration(, ,) (%s v. %s)", DLLName.c_str(), Version.c_str());
                             PluginIface.LoadConfiguration(parent, NULL, &registry);
                         }
                     }
@@ -2395,15 +2315,14 @@ BOOL CPluginData::InitDLL(HWND parent, BOOL quiet, BOOL waitCursor, BOOL showUns
                     }
 
                     // remove the FS command from the change-drive menu; only the new one applies
-                    if (ChDrvMenuFSItemName != NULL)
-                        free(ChDrvMenuFSItemName);
-                    ChDrvMenuFSItemName = NULL;
+                    if (!ChDrvMenuFSItemName.empty())
+                        ChDrvMenuFSItemName.clear();
                     ChDrvMenuFSItemIconIndex = -1;
 
                     CSalamanderConnect salConnect(Plugins.GetIndexJustForConnect(this), supportCustomPack, supportCustomUnpack,
                                                   supportPanelView, supportPanelEdit, supportViewer);
                     {
-                        CALL_STACK_MESSAGE3("PluginIface.Connect(,) (%s v. %s)", DLLName, Version);
+                        CALL_STACK_MESSAGE3("PluginIface.Connect(,) (%s v. %s)", DLLName.c_str(), Version.c_str());
                         PluginIface.Connect(parent, &salConnect); // call the plugin's Connect
                         if (!SupportDynMenuExt)
                             HotKeysMerge(&oldMenuItems); // synchronize hot keys
@@ -2436,7 +2355,7 @@ BOOL CPluginData::InitDLL(HWND parent, BOOL quiet, BOOL waitCursor, BOOL showUns
                             TRACE_E("The plugin didn't provide interface for file-system (see GetInterfaceForFS).");
                         }
                         {
-                            CALL_STACK_MESSAGE3("PluginIface.Release(,) (%s v. %s)", DLLName, Version);
+                            CALL_STACK_MESSAGE3("PluginIface.Release(,) (%s v. %s)", DLLName.c_str(), Version.c_str());
                             PluginIface.Release(parent, TRUE);
                         }
                         Plugins.EnterDataCS();
@@ -2462,10 +2381,10 @@ BOOL CPluginData::InitDLL(HWND parent, BOOL quiet, BOOL waitCursor, BOOL showUns
                         if (!quiet)
                         {
                             std::wstring msg;
-                            if (Name == NULL || Name[0] == 0)
+                            if (Name.empty() || Name[0] == 0)
                                 msg = FormatStrW(LoadStrW(IDS_PLUGININVALID2), AnsiToWide(s).c_str());
                             else
-                                msg = FormatStrW(LoadStrW(IDS_PLUGININVALID), AnsiToWide(Name).c_str(), AnsiToWide(s).c_str());
+                                msg = FormatStrW(LoadStrW(IDS_PLUGININVALID), AnsiToWide(Name.c_str()).c_str(), AnsiToWide(s).c_str());
                             gPrompter->ShowError(LoadStrW(IDS_ERRORTITLE), msg.c_str());
                         }
                     }
@@ -2528,7 +2447,7 @@ void CPluginData::GetDisplayName(char* buf, int bufSize)
     int l = (int)strlen(add);
     if (l + 1 < bufSize)
     {
-        lstrcpyn(buf, Name, bufSize - l);
+        lstrcpyn(buf, Name.c_str(), bufSize - l);
         lstrcpyn(buf + strlen(buf), add, l + 1);
     }
     else
@@ -2627,7 +2546,7 @@ BOOL CPluginData::Remove(HWND parent, int index, BOOL canDelPluginRegKey)
                 unloaded = TRUE; // will be unloaded and can be removed
             else
             {
-                std::wstring msg = FormatStrW(LoadStrW(IDS_PLUGINFORCEUNLOAD), AnsiToWide(Name).c_str());
+                std::wstring msg = FormatStrW(LoadStrW(IDS_PLUGINFORCEUNLOAD), AnsiToWide(Name.c_str()).c_str());
                 if (gPrompter->AskYesNo(LoadStrW(IDS_QUESTION), msg.c_str()).type == PromptResult::kYes)
                 {
                     PluginIface.Release(parent, TRUE);
@@ -2818,7 +2737,7 @@ BOOL CPluginData::Remove(HWND parent, int index, BOOL canDelPluginRegKey)
                 if (OpenKey(salamander, SALAMANDER_PLUGINSCONFIG, actKey))
                 {
                     HKEY regKey;
-                    if (OpenKey(actKey, RegKeyName, regKey))
+                    if (OpenKey(actKey, RegKeyName.c_str(), regKey))
                     {
                         shouldDelete = TRUE;
                         CloseKey(regKey);
@@ -2836,12 +2755,12 @@ BOOL CPluginData::Remove(HWND parent, int index, BOOL canDelPluginRegKey)
                     if (CreateKey(salamander, SALAMANDER_PLUGINSCONFIG, actKey))
                     {
                         HKEY regKey;
-                        if (CreateKey(actKey, RegKeyName, regKey))
+                        if (CreateKey(actKey, RegKeyName.c_str(), regKey))
                         {
                             ClearKey(regKey);
                             CloseKey(regKey);
                         }
-                        DeleteKey(actKey, RegKeyName);
+                        DeleteKey(actKey, RegKeyName.c_str());
                         CloseKey(actKey);
                     }
                     CloseKey(salamander);
@@ -2857,11 +2776,11 @@ BOOL CPluginData::Remove(HWND parent, int index, BOOL canDelPluginRegKey)
 
 void CPluginData::Save(HWND parent, HKEY regKeyConfig)
 {
-    CALL_STACK_MESSAGE5("CPluginData::Save(0x%p, 0x%p) (%s v. %s)", parent, regKeyConfig, DLLName, Version);
+    CALL_STACK_MESSAGE5("CPluginData::Save(0x%p, 0x%p) (%s v. %s)", parent, regKeyConfig, DLLName.c_str(), Version.c_str());
     if (SupportLoadSave && InitDLL(parent))
     {
         HKEY regKey;
-        if (CreateKey(regKeyConfig, RegKeyName, regKey))
+        if (CreateKey(regKeyConfig, RegKeyName.c_str(), regKey))
         {
             CSalamanderRegistry registry;
             PluginIface.SaveConfiguration(parent, regKey, &registry);
@@ -2872,7 +2791,7 @@ void CPluginData::Save(HWND parent, HKEY regKeyConfig)
 
 void CPluginData::Configuration(HWND parent)
 {
-    CALL_STACK_MESSAGE4("CPluginData::Configuration(0x%p) (%s v. %s)", parent, DLLName, Version);
+    CALL_STACK_MESSAGE4("CPluginData::Configuration(0x%p) (%s v. %s)", parent, DLLName.c_str(), Version.c_str());
     if (InitDLL(parent))
     {
         PluginIface.Configuration(parent);
@@ -2881,7 +2800,7 @@ void CPluginData::Configuration(HWND parent)
 
 void CPluginData::Event(int event, DWORD param)
 {
-    CALL_STACK_MESSAGE4("CPluginData::Event(%d,) (%s v. %s)", event, DLLName, Version);
+    CALL_STACK_MESSAGE4("CPluginData::Event(%d,) (%s v. %s)", event, DLLName.c_str(), Version.c_str());
     if (GetLoaded() && PluginIface.NotEmpty()) // call only if the plugin is loaded (just a "notification")
     {
         PluginIface.Event(event, param);
@@ -2890,7 +2809,7 @@ void CPluginData::Event(int event, DWORD param)
 
 void CPluginData::ClearHistory(HWND parent)
 {
-    CALL_STACK_MESSAGE3("CPluginData::ClearHistory() (%s v. %s)", DLLName, Version);
+    CALL_STACK_MESSAGE3("CPluginData::ClearHistory() (%s v. %s)", DLLName.c_str(), Version.c_str());
     if (InitDLL(parent))
     {
         PluginIface.ClearHistory(parent);
@@ -2899,7 +2818,7 @@ void CPluginData::ClearHistory(HWND parent)
 
 void CPluginData::AcceptChangeOnPathNotification(const char* path, BOOL includingSubdirs)
 {
-    CALL_STACK_MESSAGE3("CPluginData::AcceptChangeOnPathNotification() (%s v. %s)", DLLName, Version);
+    CALL_STACK_MESSAGE3("CPluginData::AcceptChangeOnPathNotification() (%s v. %s)", DLLName.c_str(), Version.c_str());
     if (GetLoaded() && PluginIface.NotEmpty()) // call only if the plugin is loaded (just a "notification")
     {
         PluginIface.AcceptChangeOnPathNotification(path, includingSubdirs);
@@ -2908,14 +2827,14 @@ void CPluginData::AcceptChangeOnPathNotification(const char* path, BOOL includin
 
 void CPluginData::PasswordManagerEvent(HWND parent, int event)
 {
-    CALL_STACK_MESSAGE4("CPluginData::PasswordManagerEvent(, %d) (%s v. %s)", event, DLLName, Version);
+    CALL_STACK_MESSAGE4("CPluginData::PasswordManagerEvent(, %d) (%s v. %s)", event, DLLName.c_str(), Version.c_str());
     if (GetLoaded() && PluginUsesPasswordManager) // in case the plugin stopped using the Password Manager (did not call SetPluginUsesPasswordManager())
         PluginIface.PasswordManagerEvent(parent, event);
 }
 
 void CPluginData::About(HWND parent)
 {
-    CALL_STACK_MESSAGE4("CPluginData::About(0x%p) (%s v. %s)", parent, DLLName, Version);
+    CALL_STACK_MESSAGE4("CPluginData::About(0x%p) (%s v. %s)", parent, DLLName.c_str(), Version.c_str());
     if (InitDLL(parent))
     {
         PluginIface.About(parent);
@@ -2941,7 +2860,7 @@ void CPluginData::CallLoadOrSaveConfiguration(BOOL load,
                 if (OpenKey(salamander, SALAMANDER_PLUGINSCONFIG, actKey))
                 {
                     HKEY regKey;
-                    if (OpenKey(actKey, RegKeyName, regKey)) // try to open the plugin's private key
+                    if (OpenKey(actKey, RegKeyName.c_str(), regKey)) // try to open the plugin's private key
                     {
                         CSalamanderRegistry registry;
                         {
@@ -3003,7 +2922,7 @@ void CPluginData::CallLoadOrSaveConfiguration(BOOL load,
                         if (CreateKey(salamander, SALAMANDER_PLUGINSCONFIG, actKey))
                         {
                             HKEY regKey;
-                            if (CreateKey(actKey, RegKeyName, regKey))
+                            if (CreateKey(actKey, RegKeyName.c_str(), regKey))
                             {
                                 CSalamanderRegistry registry;
                                 {
@@ -3030,7 +2949,7 @@ void CPluginData::CallLoadOrSaveConfiguration(BOOL load,
 
 BOOL CPluginData::Unload(HWND parent, BOOL ask)
 {
-    CALL_STACK_MESSAGE5("CPluginData::Unload(0x%p, %d) (%s v. %s)", parent, ask, DLLName, Version);
+    CALL_STACK_MESSAGE5("CPluginData::Unload(0x%p, %d) (%s v. %s)", parent, ask, DLLName.c_str(), Version.c_str());
     BOOL ret = FALSE;
     if (DLL != NULL)
     {
@@ -3040,7 +2959,7 @@ BOOL CPluginData::Unload(HWND parent, BOOL ask)
             BOOL skipUnload = FALSE;
             if (SupportLoadSave && ::Configuration.AutoSave)
             { // ask if the user wants to save configuration when "save on exit" is on
-                std::wstring msg = FormatStrW(LoadStrW(IDS_PLUGINSAVECONFIG), AnsiToWide(Name).c_str());
+                std::wstring msg = FormatStrW(LoadStrW(IDS_PLUGINSAVECONFIG), AnsiToWide(Name.c_str()).c_str());
                 if (!ask || gPrompter->AskYesNo(LoadStrW(IDS_QUESTION), msg.c_str()).type == PromptResult::kYes)
                 {
                     LoadSaveToRegistryMutex.Enter();
@@ -3095,7 +3014,7 @@ BOOL CPluginData::Unload(HWND parent, BOOL ask)
 
                     if (ask && salKeyDoesNotExist)
                     {
-                        std::wstring failMsg = FormatStrW(LoadStrW(IDS_PLUGINSAVEFAILED), AnsiToWide(Name).c_str());
+                        std::wstring failMsg = FormatStrW(LoadStrW(IDS_PLUGINSAVEFAILED), AnsiToWide(Name.c_str()).c_str());
                         skipUnload = gPrompter->AskYesNo(LoadStrW(IDS_QUESTION), failMsg.c_str()).type == PromptResult::kNo;
                     }
                 }
@@ -3113,7 +3032,7 @@ BOOL CPluginData::Unload(HWND parent, BOOL ask)
                     ret = TRUE;
                 else
                 {
-                    std::wstring forceMsg = FormatStrW(LoadStrW(IDS_PLUGINFORCEUNLOAD), AnsiToWide(Name).c_str());
+                    std::wstring forceMsg = FormatStrW(LoadStrW(IDS_PLUGINFORCEUNLOAD), AnsiToWide(Name.c_str()).c_str());
                     if (gPrompter->AskYesNo(LoadStrW(IDS_QUESTION), forceMsg.c_str()).type == PromptResult::kYes)
                     {
                         PluginIface.Release(parent, TRUE);
@@ -3207,7 +3126,7 @@ void CPluginData::AddMenuItemsToSubmenuAux(CMenuPopup* menu, int& i, int count, 
         {
             BOOL hidden = FALSE;
             MENU_ITEM_INFO mi;
-            if (item->Name == NULL) // separator or failed allocation of start-submenu name
+            if (item->Name.empty()) // separator or failed allocation of start-submenu name
             {
                 if (item->Type == pmitStartSubmenu)
                     skipSubMenu = TRUE; // failed to allocate start-submenu name: insert separator and skip the rest of the submenu
@@ -3234,7 +3153,7 @@ void CPluginData::AddMenuItemsToSubmenuAux(CMenuPopup* menu, int& i, int count, 
                           MENU_MASK_STRING | MENU_MASK_SKILLLEVEL | MENU_MASK_IMAGEINDEX |
                           (item->Type == pmitStartSubmenu ? MENU_MASK_SUBMENU : 0);
                 mi.Type = MENU_TYPE_STRING;
-                lstrcpyn(buff, item->Name, 400);
+                lstrcpyn(buff, item->Name.c_str(), 400);
                 mi.String = buff;
 
                 if (HOTKEY_GET(item->HotKey) != 0)
@@ -3377,7 +3296,7 @@ CPluginData::GetMaskForMenuItems(int index)
 
 void CPluginData::InitMenuItems(HWND parent, int index, CMenuPopup* menu)
 {
-    CALL_STACK_MESSAGE4("CPluginData::InitMenuItems(, %d, ) (%s v. %s)", index, DLLName, Version);
+    CALL_STACK_MESSAGE4("CPluginData::InitMenuItems(, %d, ) (%s v. %s)", index, DLLName.c_str(), Version.c_str());
     int count = menu->GetItemCount();
     if (count == 0) // submenu needs to be initialized
     {
@@ -3469,7 +3388,7 @@ void CPluginData::InitMenuItems(HWND parent, int index, CMenuPopup* menu)
 
 BOOL CPluginData::ExecuteMenuItem(CFilesWindow* panel, HWND parent, int index, int suid, BOOL& unselect)
 {
-    CALL_STACK_MESSAGE5("CPluginData::ExecuteMenuItem(, , %d, %d, ) (%s v. %s)", index, suid, DLLName, Version);
+    CALL_STACK_MESSAGE5("CPluginData::ExecuteMenuItem(, , %d, %d, ) (%s v. %s)", index, suid, DLLName.c_str(), Version.c_str());
     unselect = FALSE;
     int id;
     int i;
@@ -3484,7 +3403,7 @@ BOOL CPluginData::ExecuteMenuItem(CFilesWindow* panel, HWND parent, int index, i
                 CSalamanderForOperations sm(panel);
                 unselect = PluginIfaceForMenuExt.ExecuteMenuItem(&sm, parent, id, mask);
             }
-            Plugins.SetLastPlgCmd(DLLName, id); // save last command
+            Plugins.SetLastPlgCmd(DLLName.c_str(), id); // save last command
             return TRUE;
         }
     }
@@ -3493,7 +3412,7 @@ BOOL CPluginData::ExecuteMenuItem(CFilesWindow* panel, HWND parent, int index, i
 
 BOOL CPluginData::ExecuteMenuItem2(CFilesWindow* panel, HWND parent, int index, int id, BOOL& unselect)
 {
-    CALL_STACK_MESSAGE5("CPluginData::ExecuteMenuItem2(, , %d, %d, ) (%s v. %s)", index, id, DLLName, Version);
+    CALL_STACK_MESSAGE5("CPluginData::ExecuteMenuItem2(, , %d, %d, ) (%s v. %s)", index, id, DLLName.c_str(), Version.c_str());
     unselect = FALSE;
     int i;
     for (i = 0; i < MenuItems.Count; i++)
@@ -3508,7 +3427,7 @@ BOOL CPluginData::ExecuteMenuItem2(CFilesWindow* panel, HWND parent, int index, 
             }
             else
                 TRACE_E("PluginIfaceForMenuExt is not initialized!");
-            Plugins.SetLastPlgCmd(DLLName, id); // save last command
+            Plugins.SetLastPlgCmd(DLLName.c_str(), id); // save last command
             return TRUE;
         }
     }
@@ -3517,7 +3436,7 @@ BOOL CPluginData::ExecuteMenuItem2(CFilesWindow* panel, HWND parent, int index, 
 
 BOOL CPluginData::HelpForMenuItem(HWND parent, int index, int suid, BOOL& helpDisplayed)
 {
-    CALL_STACK_MESSAGE5("CPluginData::HelpForMenuItem(, %d, %d, ) (%s v. %s)", index, suid, DLLName, Version);
+    CALL_STACK_MESSAGE5("CPluginData::HelpForMenuItem(, %d, %d, ) (%s v. %s)", index, suid, DLLName.c_str(), Version.c_str());
     helpDisplayed = FALSE;
     int id;
     int i;
@@ -3536,7 +3455,7 @@ BOOL CPluginData::HelpForMenuItem(HWND parent, int index, int suid, BOOL& helpDi
 
 BOOL CPluginData::BuildMenu(HWND parent, BOOL force)
 {
-    CALL_STACK_MESSAGE3("CPluginData::BuildMenu() (%s v. %s)", DLLName, Version);
+    CALL_STACK_MESSAGE3("CPluginData::BuildMenu() (%s v. %s)", DLLName.c_str(), Version.c_str());
     if (GetLoaded() && SupportDynMenuExt && (!DynMenuWasAlreadyBuild || force))
     {
         DynMenuWasAlreadyBuild = TRUE; // prevent needless rebuilds of the menu, especially when building the menu for Last Command and again when opening a plugin submenu containing command in the Last Command
@@ -3555,7 +3474,7 @@ BOOL CPluginData::BuildMenu(HWND parent, BOOL force)
 
             CSalamanderBuildMenu salBuildMenu(Plugins.GetIndexJustForConnect(this));
             {
-                CALL_STACK_MESSAGE3("PluginIfaceForMenuExt.BuildMenu(,) (%s v. %s)", DLLName, Version);
+                CALL_STACK_MESSAGE3("PluginIfaceForMenuExt.BuildMenu(,) (%s v. %s)", DLLName.c_str(), Version.c_str());
                 PluginIfaceForMenuExt.BuildMenu(parent, &salBuildMenu); // call the plugin's BuildMenu
                 HotKeysMerge(&oldMenuItems);                            // synchronize hot keys
                 HotKeysEnsureIntegrity();                               // prevent conflicts with Salamander or another plugin
@@ -3572,7 +3491,7 @@ BOOL CPluginData::BuildMenu(HWND parent, BOOL force)
 BOOL CPluginData::ListArchive(CFilesWindow* panel, const char* archiveFileName, CSalamanderDirectory& dir,
                               CPluginDataInterfaceAbstract*& pluginData)
 {
-    CALL_STACK_MESSAGE4("CPluginData::ListArchive(, %s, ,) (%s v. %s)", archiveFileName, DLLName, Version);
+    CALL_STACK_MESSAGE4("CPluginData::ListArchive(, %s, ,) (%s v. %s)", archiveFileName, DLLName.c_str(), Version.c_str());
     BOOL ret = FALSE;
     if (InitDLL(MainWindow->HWindow))
     {
@@ -3685,7 +3604,7 @@ BOOL CPluginData::CanCloseArchive(CFilesWindow* panel, const char* archiveFileNa
 
 BOOL CPluginData::CanViewFile(const char* name)
 {
-    CALL_STACK_MESSAGE4("CPluginData::CanViewFile(%s) (%s v. %s)", name, DLLName, Version);
+    CALL_STACK_MESSAGE4("CPluginData::CanViewFile(%s) (%s v. %s)", name, DLLName.c_str(), Version.c_str());
     BOOL ret = FALSE;
     if (InitDLL(MainWindow->HWindow)
         /*&& PluginIfaceForViewer.NotEmpty()*/) // unnecessary, because downgrade is not possible and InitDLL checks the interfaces
@@ -3721,7 +3640,7 @@ BOOL CPluginData::ViewFile(const char* name, int left, int top, int width, int h
 CPluginFSInterfaceAbstract*
 CPluginData::OpenFS(const char* fsName, int fsNameIndex)
 {
-    CALL_STACK_MESSAGE5("CPluginData::OpenFS(%s, %d) (%s v. %s)", fsName, fsNameIndex, DLLName, Version);
+    CALL_STACK_MESSAGE5("CPluginData::OpenFS(%s, %d) (%s v. %s)", fsName, fsNameIndex, DLLName.c_str(), Version.c_str());
     CPluginFSInterfaceAbstract* ret = NULL;
     if (InitDLL(MainWindow->HWindow)
         /*&& PluginIfaceForFS.NotEmpty()*/) // unnecessary, because downgrade is impossible and InitDLL checks the interfaces
@@ -3737,9 +3656,9 @@ CPluginData::OpenFS(const char* fsName, int fsNameIndex)
 
 void CPluginData::ExecuteChangeDriveMenuItem(int panel)
 {
-    CALL_STACK_MESSAGE4("CPluginData::ExecuteChangeDriveMenuItem(%d) (%s v. %s)", panel, DLLName, Version);
+    CALL_STACK_MESSAGE4("CPluginData::ExecuteChangeDriveMenuItem(%d) (%s v. %s)", panel, DLLName.c_str(), Version.c_str());
     if (InitDLL(MainWindow->HWindow) &&
-        ChDrvMenuFSItemName != NULL         // in case the plugin removed the item during this load
+        !ChDrvMenuFSItemName.empty()         // in case the plugin removed the item during this load
         /*&& PluginIfaceForFS.NotEmpty()*/) // unnecessary, because downgrade is impossible and InitDLL checks the interfaces
     {
         PluginIfaceForFS.ExecuteChangeDriveMenuItem(panel);
@@ -3753,9 +3672,9 @@ BOOL CPluginData::ChangeDriveMenuItemContextMenu(HWND parent, int panel, int x, 
                                                  BOOL& closeMenu, int& postCmd, void*& postCmdParam)
 {
     CALL_STACK_MESSAGE9("CPluginData::ChangeDriveMenuItemContextMenu(, %d, %d, %d, , %s, %d, %d, , , ,) (%s v. %s)",
-                        panel, x, y, pluginFSName, pluginFSNameIndex, isDetachedFS, DLLName, Version);
+                        panel, x, y, pluginFSName, pluginFSNameIndex, isDetachedFS, DLLName.c_str(), Version.c_str());
     if (InitDLL(parent) &&
-        (pluginFS != NULL || ChDrvMenuFSItemName != NULL) // in case the plugin removed the item during this load
+        (pluginFS != NULL || !ChDrvMenuFSItemName.empty()) // in case the plugin removed the item during this load
         /*&& PluginIfaceForFS.NotEmpty()*/)               // unnecessary, because downgrade is impossible and InitDLL checks the interfaces
     {
         return PluginIfaceForFS.ChangeDriveMenuItemContextMenu(parent, panel, x, y, pluginFS,
@@ -3780,7 +3699,7 @@ void CPluginData::EnsureShareExistsOnServer(HWND parent, int panel, const char* 
 
 void CPluginData::GetCacheInfo(char* arcCacheTmpPath, BOOL* arcCacheOwnDelete, BOOL* arcCacheCacheCopies)
 {
-    CALL_STACK_MESSAGE3("CPluginData::GetCacheInfo(, ,) (%s v. %s)", DLLName, Version);
+    CALL_STACK_MESSAGE3("CPluginData::GetCacheInfo(, ,) (%s v. %s)", DLLName.c_str(), Version.c_str());
     if (InitDLL(MainWindow->HWindow) &&
         PluginIfaceForArchiver.NotEmpty()) // this part of the condition is most likely "always true"
     {

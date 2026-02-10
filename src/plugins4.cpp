@@ -15,17 +15,16 @@ int CPlugins::AddPluginToOrder(const char* dllName, BOOL showInBar)
 {
     int index = -1;
     CPluginOrder o;
-    o.DLLName = DupStr(dllName);
+    o.DLLName = dllName ? dllName : "";
     o.ShowInBar = showInBar;
     o.Index = -1;
     o.Flags = 0;
-    if (o.DLLName != NULL)
+    if (!o.DLLName.empty())
     {
         index = Order.Add(o);
         if (!Order.IsGood())
         {
             index = -1;
-            free(o.DLLName);
             Order.ResetState();
         }
     }
@@ -35,13 +34,13 @@ int CPlugins::AddPluginToOrder(const char* dllName, BOOL showInBar)
 void CPlugins::QuickSortPluginsByName(int left, int right)
 {
     int i = left, j = right;
-    const char* pivot = Data[Order[(i + j) / 2].Index]->Name;
+    const char* pivot = Data[Order[(i + j) / 2].Index]->Name.c_str();
 
     do
     {
-        while (strcmp(Data[Order[i].Index]->Name, pivot) < 0 && i < right)
+        while (strcmp(Data[Order[i].Index]->Name.c_str(), pivot) < 0 && i < right)
             i++;
-        while (strcmp(pivot, Data[Order[j].Index]->Name) < 0 && j > left)
+        while (strcmp(pivot, Data[Order[j].Index]->Name.c_str()) < 0 && j > left)
             j--;
 
         if (i <= j)
@@ -66,7 +65,7 @@ BOOL CPlugins::PluginVisibleInBar(const char* dllName)
     for (i = 0; i < Order.Count; i++)
     {
         CPluginOrder* order = &Order[i];
-        if (stricmp(dllName, order->DLLName) == 0)
+        if (stricmp(dllName, order->DLLName.c_str()) == 0)
         {
             return order->ShowInBar;
         }
@@ -92,7 +91,7 @@ void CPlugins::UpdatePluginsOrder(BOOL sortByName)
         for (j = 0; j < Order.Count; j++)
         {
             CPluginOrder* order = &Order[j];
-            if (order->Flags == 0 && stricmp(pluginData->DLLName, order->DLLName) == 0)
+            if (order->Flags == 0 && stricmp(pluginData->DLLName.c_str(), order->DLLName.c_str()) == 0)
             {
                 foundIndex = j;
                 break;
@@ -101,7 +100,7 @@ void CPlugins::UpdatePluginsOrder(BOOL sortByName)
         DWORD flags = 1;
         if (foundIndex == -1) // this plugin has no record in the Order array => append it to the end
         {
-            foundIndex = AddPluginToOrder(pluginData->DLLName, TRUE);
+            foundIndex = AddPluginToOrder(pluginData->DLLName.c_str(), TRUE);
             if (firstAdded)
             {
                 firstAdded = FALSE;
@@ -121,7 +120,7 @@ void CPlugins::UpdatePluginsOrder(BOOL sortByName)
     {
         if (Order[i].Flags == 0)
         {
-            free(Order[i].DLLName);
+            /* Order[i].DLLName is std::string */
             Order.Delete(i);
         }
     }
