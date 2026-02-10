@@ -1,4 +1,4 @@
-﻿// SPDX-FileCopyrightText: 2023 Open Salamander Authors
+// SPDX-FileCopyrightText: 2023 Open Salamander Authors
 // SPDX-License-Identifier: GPL-2.0-or-later
 // CommentsTranslationProject: TRANSLATED
 
@@ -31,7 +31,6 @@ CViewerMasksItem::CViewerMasksItem(const char* masks, const char* command, const
                         masks, command, arguments, initDir, viewerType, oldType);
     OldType = oldType;
     Masks = NULL;
-    Command = Arguments = InitDir = NULL;
     ViewerType = viewerType;
     HandlerID = ViewerHandlerID++;
     Set(masks, command, arguments, initDir);
@@ -41,7 +40,6 @@ CViewerMasksItem::CViewerMasksItem()
 {
     CALL_STACK_MESSAGE1("CViewerMasksItem()");
     Masks = NULL;
-    Command = Arguments = InitDir = NULL;
     ViewerType = VIEWER_EXTERNAL;
     HandlerID = ViewerHandlerID++;
     OldType = FALSE;
@@ -52,61 +50,39 @@ CViewerMasksItem::CViewerMasksItem(CViewerMasksItem& item)
 {
     CALL_STACK_MESSAGE1("CViewerMasksItem(&)");
     Masks = NULL;
-    Command = Arguments = InitDir = NULL;
     ViewerType = item.ViewerType;
     OldType = item.OldType;
     HandlerID = item.HandlerID;
-    Set(item.Masks->GetMasksString(), item.Command, item.Arguments, item.InitDir);
+    Set(item.Masks->GetMasksString(), item.Command.c_str(), item.Arguments.c_str(), item.InitDir.c_str());
 }
 
 CViewerMasksItem::~CViewerMasksItem()
 {
     if (Masks != NULL)
         delete Masks;
-    if (Command != NULL)
-        free(Command);
-    if (Arguments != NULL)
-        free(Arguments);
-    if (InitDir != NULL)
-        free(InitDir);
 }
 
 BOOL CViewerMasksItem::IsGood()
 {
-    return Masks != NULL && Command != NULL && Arguments != NULL && InitDir != NULL;
+    return Masks != NULL;
 }
 
 BOOL CViewerMasksItem::Set(const char* masks, const char* command, const char* arguments, const char* initDir)
 {
     CALL_STACK_MESSAGE5("CViewerMasksItem::Set(%s, %s, %s, %s)", masks, command, arguments, initDir);
 
-    char* commandName = (char*)malloc(strlen(command) + 1);
-    char* argumentsName = (char*)malloc(strlen(arguments) + 1);
-    char* initDirName = (char*)malloc(strlen(initDir) + 1);
-
     if (Masks == NULL)
         Masks = new CMaskGroup;
-    if (Masks == NULL || commandName == NULL || argumentsName == NULL || initDirName == NULL)
+    if (Masks == NULL)
     {
         TRACE_E(LOW_MEMORY);
         return FALSE;
     }
 
     Masks->SetMasksString(masks);
-    strcpy(commandName, command);
-    strcpy(argumentsName, arguments);
-    strcpy(initDirName, initDir);
-
-    if (Command != NULL)
-        free(Command);
-    if (Arguments != NULL)
-        free(Arguments);
-    if (InitDir != NULL)
-        free(InitDir);
-
-    Command = commandName;
-    Arguments = argumentsName;
-    InitDir = initDirName;
+    Command = command;
+    Arguments = arguments;
+    InitDir = initDir;
 
     return TRUE;
 }
@@ -149,7 +125,6 @@ CEditorMasksItem::CEditorMasksItem(char* masks, char* command, char* arguments, 
 {
     CALL_STACK_MESSAGE5("CEditorMasksItem(%s, %s, %s, %s)", masks, command, arguments, initDir);
     Masks = new CMaskGroup;
-    Command = Arguments = InitDir = NULL;
     HandlerID = EditorHandlerID++;
     Set(masks, command, arguments, initDir);
 }
@@ -158,7 +133,6 @@ CEditorMasksItem::CEditorMasksItem()
 {
     CALL_STACK_MESSAGE1("CEditorMasksItem()");
     Masks = new CMaskGroup;
-    Command = Arguments = InitDir = NULL;
     HandlerID = EditorHandlerID++;
     Set("", "", "\"$(Name)\"", "$(FullPath)");
 }
@@ -167,56 +141,30 @@ CEditorMasksItem::CEditorMasksItem(CEditorMasksItem& item)
 {
     CALL_STACK_MESSAGE1("CEditorMasksItem(&)");
     Masks = new CMaskGroup;
-    Command = Arguments = InitDir = NULL;
     HandlerID = item.HandlerID;
-    Set(item.Masks->GetMasksString(), item.Command, item.Arguments, item.InitDir);
+    Set(item.Masks->GetMasksString(), item.Command.c_str(), item.Arguments.c_str(), item.InitDir.c_str());
 }
 
 CEditorMasksItem::~CEditorMasksItem()
 {
     if (Masks != NULL)
         delete Masks;
-    if (Command != NULL)
-        free(Command);
-    if (Arguments != NULL)
-        free(Arguments);
-    if (InitDir != NULL)
-        free(InitDir);
 }
 
 BOOL CEditorMasksItem::Set(const char* masks, const char* command, const char* arguments, const char* initDir)
 {
     CALL_STACK_MESSAGE5("CEditorMasksItem::Set(%s, %s, %s, %s)", masks, command, arguments, initDir);
-    char* commandName = (char*)malloc(strlen(command) + 1);
-    char* argumentsName = (char*)malloc(strlen(arguments) + 1);
-    char* initDirName = (char*)malloc(strlen(initDir) + 1);
-    if (commandName == NULL || argumentsName == NULL || initDirName == NULL)
-    {
-        TRACE_E(LOW_MEMORY);
-        return FALSE;
-    }
     if (Masks != NULL)
         Masks->SetMasksString(masks);
-    strcpy(commandName, command);
-    strcpy(argumentsName, arguments);
-    strcpy(initDirName, initDir);
-
-    if (Command != NULL)
-        free(Command);
-    if (Arguments != NULL)
-        free(Arguments);
-    if (InitDir != NULL)
-        free(InitDir);
-
-    Command = commandName;
-    Arguments = argumentsName;
-    InitDir = initDirName;
+    Command = command;
+    Arguments = arguments;
+    InitDir = initDir;
     return TRUE;
 }
 
 BOOL CEditorMasksItem::IsGood()
 {
-    return Masks != NULL && Command != NULL && Arguments != NULL && InitDir != NULL;
+    return Masks != NULL;
 }
 
 BOOL CEditorMasks::Load(CEditorMasks& source)
@@ -793,7 +741,7 @@ int CLanguageSelectorDialog::Execute()
         int index = GetPreferredLanguageIndex(SLGName);
         CPathBuffer path; // Heap-allocated for long path support
         GetModuleFileName(HInstance, path, path.Size());
-        sprintf(strrchr(path, '\\') + 1, "lang\\%s", Items[index].FileName);
+        sprintf(strrchr(path, '\\') + 1, "lang\\%s", Items[index].FileName.c_str());
         hTmpLanguage = HANDLES(LoadLibrary(path));
         if (hTmpLanguage != NULL)
             Modul = hTmpLanguage;
@@ -814,7 +762,7 @@ BOOL CLanguageSelectorDialog::GetSLGName(char* path, int index)
 {
     if (index >= Items.Count)
         return FALSE;
-    lstrcpy(path, Items[index].FileName);
+    lstrcpy(path, Items[index].FileName.c_str());
     return TRUE;
 }
 
@@ -823,7 +771,7 @@ BOOL CLanguageSelectorDialog::SLGNameExists(const char* slgName)
     int i;
     for (i = 0; i < Items.Count; i++)
     {
-        if (StrICmp(Items[i].FileName, slgName) == 0)
+        if (StrICmp(Items[i].FileName.c_str(), slgName) == 0)
             return TRUE;
     }
     return FALSE;
@@ -834,15 +782,15 @@ void CLanguageSelectorDialog::FillControls()
     int index = ListView_GetNextItem(HListView, -1, LVIS_FOCUSED);
     if (index != -1)
     {
-        SetDlgItemTextW(HWindow, IDC_SLG_AUTHOR, Items[index].AuthorW);
-        SetDlgItemText(HWindow, IDC_SLG_WEB, Items[index].Web);
-        SetDlgItemTextW(HWindow, IDC_SLG_COMMENT, Items[index].CommentW);
+        SetDlgItemTextW(HWindow, IDC_SLG_AUTHOR, Items[index].AuthorW.c_str());
+        SetDlgItemText(HWindow, IDC_SLG_WEB, Items[index].Web.c_str());
+        SetDlgItemTextW(HWindow, IDC_SLG_COMMENT, Items[index].CommentW.c_str());
         if (PluginName == NULL)
-            SetDlgItemText(HWindow, IDC_SLG_HELPDIR, Items[index].HelpDir);
+            SetDlgItemText(HWindow, IDC_SLG_HELPDIR, Items[index].HelpDir.c_str());
         if (Web != NULL)
         {
             char buff[300];
-            sprintf(buff, "http://%s", Items[index].Web);
+            sprintf(buff, "http://%s", Items[index].Web.c_str());
             Web->SetActionOpen(buff);
         }
     }
@@ -862,7 +810,7 @@ void CLanguageSelectorDialog::LoadListView()
 
         Items[i].GetLanguageName(buff, 200);
         ListView_SetItemText(HListView, i, 0, buff);
-        sprintf(buff, "lang\\%s", Items[i].FileName);
+        sprintf(buff, "lang\\%s", Items[i].FileName.c_str());
         ListView_SetItemText(HListView, i, 1, buff);
     }
 
@@ -894,7 +842,7 @@ void CLanguageSelectorDialog::Transfer(CTransferInfo& ti)
         int index = ListView_GetNextItem(HListView, -1, LVIS_FOCUSED);
         if (index != -1)
         {
-            lstrcpy(SLGName, Items[index].FileName);
+            lstrcpy(SLGName, Items[index].FileName.c_str());
             if (PluginName != NULL) // store the alternative language name only when selecting an alternative language for a plug-in
             {
                 if (Configuration.UseAsAltSLGInOtherPlugins)
@@ -955,13 +903,13 @@ int CLanguageSelectorDialog::GetPreferredLanguageIndex(const char* selectSLGName
     int i;
     for (i = 0; i < Items.Count; i++)
     {
-        if (selectSLGName != NULL && stricmp(Items[i].FileName, selectSLGName) == 0)
+        if (selectSLGName != NULL && stricmp(Items[i].FileName.c_str(), selectSLGName) == 0)
             return i;
         if (localeIndex == -1 && Items[i].LanguageID == langID)
             localeIndex = i;
         if (primarylocaleIndex == -1 && PRIMARYLANGID(Items[i].LanguageID) == primaryID)
             primarylocaleIndex = i;
-        if (stricmp(Items[i].FileName, "english.slg") == 0)
+        if (stricmp(Items[i].FileName.c_str(), "english.slg") == 0)
             englishIndex = i;
     }
     if (localeIndex == -1)

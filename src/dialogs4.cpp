@@ -2000,7 +2000,7 @@ void CCfgPageUserMenu::Validate(CTransferInfo& ti)
         CUserMenuItem* item = UserMenuItems->At(i);
         if (item->Type == umitItem)
         {
-            if (!ValidateCommandFile(HWindow, item->UMCommand, errorPos1, errorPos2))
+            if (!ValidateCommandFile(HWindow, item->UMCommand.c_str(), errorPos1, errorPos2))
             {
                 EditLB->SetCurSel(i);
                 ti.ErrorOn(IDE_COMMAND);
@@ -2008,7 +2008,7 @@ void CCfgPageUserMenu::Validate(CTransferInfo& ti)
                             errorPos1, errorPos2);
                 return;
             }
-            if (!ValidateUserMenuArguments(HWindow, item->Arguments, errorPos1, errorPos2, NULL))
+            if (!ValidateUserMenuArguments(HWindow, item->Arguments.c_str(), errorPos1, errorPos2, NULL))
             {
                 EditLB->SetCurSel(i);
                 ti.ErrorOn(IDE_ARGUMENTS);
@@ -2016,7 +2016,7 @@ void CCfgPageUserMenu::Validate(CTransferInfo& ti)
                             errorPos1, errorPos2);
                 return;
             }
-            if (!ValidateInitDir(HWindow, item->InitDir, errorPos1, errorPos2))
+            if (!ValidateInitDir(HWindow, item->InitDir.c_str(), errorPos1, errorPos2))
             {
                 EditLB->SetCurSel(i);
                 ti.ErrorOn(IDE_INITDIR);
@@ -2141,12 +2141,12 @@ void CCfgPageUserMenu::LoadControls()
     SendMessage(GetDlgItem(HWindow, IDE_ARGUMENTS), EM_LIMITTEXT, USRMNUARGS_MAXLEN - 1, 0);
     SendMessage(GetDlgItem(HWindow, IDE_INITDIR), EM_LIMITTEXT, MAX_PATH - 1, 0);
     SendMessage(GetDlgItem(HWindow, IDE_COMMAND), WM_SETTEXT, 0,
-                (LPARAM)(empty ? "" : item->UMCommand));
+                (LPARAM)(empty ? "" : item->UMCommand.c_str()));
     SendMessage(GetDlgItem(HWindow, IDE_ARGUMENTS), WM_SETTEXT, 0,
-                (LPARAM)(empty ? "" : item->Arguments));
+                (LPARAM)(empty ? "" : item->Arguments.c_str()));
     SendMessage(GetDlgItem(HWindow, IDE_ARGUMENTS), EM_SETSEL, 0, -1); // so that Browse overwrites the content
     SendMessage(GetDlgItem(HWindow, IDE_INITDIR), WM_SETTEXT, 0,
-                (LPARAM)(empty ? "" : item->InitDir));
+                (LPARAM)(empty ? "" : item->InitDir.c_str()));
     SendMessage(GetDlgItem(HWindow, IDE_INITDIR), EM_SETSEL, 0, -1); // so that Browse overwrites the content
 
     //  SmallIcon->SetIcon(!empty ? item->HIcon : NULL);
@@ -2177,7 +2177,7 @@ void CCfgPageUserMenu::StoreControls()
         SendMessage(GetDlgItem(HWindow, IDE_INITDIR), WM_GETTEXT,
                     initdir.Size(), (LPARAM)initdir.Get());
 
-        item->Set(item->ItemName, command, arguments, initdir, item->Icon);
+        item->Set(item->ItemName.c_str(), command, arguments, initdir, item->Icon.c_str());
 
         BOOL submenu = (IsDlgButtonChecked(HWindow, IDC_UM_SUBMENU) == BST_CHECKED);
         BOOL separator = (IsDlgButtonChecked(HWindow, IDC_UM_SEPARATOR) == BST_CHECKED);
@@ -2349,25 +2349,26 @@ CCfgPageUserMenu::DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
             if (index >= 0 && index < EditLB->GetCount())
             {
                 CUserMenuItem* item = UserMenuItems->At(index);
-                if (item->Icon != NULL && item->Icon[0] != 0)
+                if (!item->Icon.empty())
                 {
                     // Icon is in the format "file name,resID"
                     // perform decomposition
-                    char* iterator = item->Icon + strlen(item->Icon) - 1;
-                    while (iterator > item->Icon && *iterator != ',')
+                    const char* iconStr = item->Icon.c_str();
+                    const char* iterator = iconStr + item->Icon.length() - 1;
+                    while (iterator > iconStr && *iterator != ',')
                         iterator--;
-                    if (iterator > item->Icon && *iterator == ',')
+                    if (iterator > iconStr && *iterator == ',')
                     {
-                        strncpy(fileName, item->Icon, iterator - item->Icon);
-                        fileName[iterator - item->Icon] = 0;
+                        strncpy(fileName, iconStr, iterator - iconStr);
+                        fileName[iterator - iconStr] = 0;
                         iterator++;
                         resID = atoi(iterator);
                     }
                 }
                 BOOL error = FALSE;
-                if (fileName[0] == 0 && item->UMCommand != NULL)
+                if (fileName[0] == 0 && !item->UMCommand.empty())
                 {
-                    if (!ExpandCommand(MainWindow->HWindow, item->UMCommand, fileName, fileName.Size(), FALSE))
+                    if (!ExpandCommand(MainWindow->HWindow, item->UMCommand.c_str(), fileName, fileName.Size(), FALSE))
                         error = TRUE;
                     else
                     {
@@ -2382,7 +2383,7 @@ CCfgPageUserMenu::DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
                     if (dlg.Execute() == IDOK)
                     {
                         sprintf(fileName + strlen(fileName), ",%d", resID);
-                        item->Set(item->ItemName, item->UMCommand, item->Arguments, item->InitDir, fileName);
+                        item->Set(item->ItemName.c_str(), item->UMCommand.c_str(), item->Arguments.c_str(), item->InitDir.c_str(), fileName);
                         item->GetIconHandle(NULL, FALSE);
                         EditLB->RedrawFocusedItem();
                     }
@@ -2423,7 +2424,7 @@ CCfgPageUserMenu::DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
                 if (dispInfo->ToDo == edtlbGetData)
                 {
                     CUserMenuItem* item = (CUserMenuItem*)dispInfo->ItemID;
-                    strcpy(dispInfo->Buffer, item->ItemName);
+                    strcpy(dispInfo->Buffer, item->ItemName.c_str());
                     dispInfo->HIcon = item->UMIcon;
                     SetWindowLongPtr(HWindow, DWLP_MSGRESULT, FALSE);
                     return TRUE;
@@ -2441,13 +2442,13 @@ CCfgPageUserMenu::DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
                             return TRUE;
                         }
                         UserMenuItems->Add(item);
-                        item->Set(dispInfo->Buffer, item->UMCommand, item->Arguments, item->InitDir, item->Icon);
+                        item->Set(dispInfo->Buffer, item->UMCommand.c_str(), item->Arguments.c_str(), item->InitDir.c_str(), item->Icon.c_str());
                         EditLB->SetItemData((INT_PTR)item);
                     }
                     else
                     {
                         item = (CUserMenuItem*)dispInfo->ItemID;
-                        item->Set(dispInfo->Buffer, item->UMCommand, item->Arguments, item->InitDir, item->Icon);
+                        item->Set(dispInfo->Buffer, item->UMCommand.c_str(), item->Arguments.c_str(), item->InitDir.c_str(), item->Icon.c_str());
                     }
 
                     LoadControls();

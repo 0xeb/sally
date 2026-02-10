@@ -1,4 +1,4 @@
-// SPDX-FileCopyrightText: 2023 Open Salamander Authors
+﻿// SPDX-FileCopyrightText: 2023 Open Salamander Authors
 // SPDX-License-Identifier: GPL-2.0-or-later
 // CommentsTranslationProject: TRANSLATED
 
@@ -212,8 +212,8 @@ void CPluginsDlg::OnSelChanged()
     HWND showInChDrv = GetDlgItem(HWindow, IDC_PLUGINSHOWINCHDRV);
     if (p != NULL)
     {
-        if (p->DLLName != NULL)
-            lstrcpyn(LastSelectedPluginDLLName, p->DLLName, LastSelectedPluginDLLName.Size());
+        if (!p->DLLName.empty())
+            lstrcpyn(LastSelectedPluginDLLName, p->DLLName.c_str(), LastSelectedPluginDLLName.Size());
         else
             *LastSelectedPluginDLLName = 0;
 
@@ -223,16 +223,16 @@ void CPluginsDlg::OnSelChanged()
             ShowWindow(showInChDrv, SW_SHOW);
 
         // description
-        SetWindowText(GetDlgItem(HWindow, IDC_PLUGINDESCRIPTION), p->Description);
+        SetWindowText(GetDlgItem(HWindow, IDC_PLUGINDESCRIPTION), p->Description.c_str());
         // copyright
-        SetWindowText(GetDlgItem(HWindow, IDC_PLUGINCOPYRIGHT), p->Copyright);
+        SetWindowText(GetDlgItem(HWindow, IDC_PLUGINCOPYRIGHT), p->Copyright.c_str());
         // www
         SetWindowText(GetDlgItem(HWindow, IDC_PLUGINWWW),
-                      p->PluginHomePageURL != NULL ? p->PluginHomePageURL : LoadStr(IDS_PLUGINURLNONE));
-        Url->SetActionOpen(p->PluginHomePageURL != NULL ? p->PluginHomePageURL : "");
+                      !p->PluginHomePageURL.empty() ? p->PluginHomePageURL.c_str() : LoadStr(IDS_PLUGINURLNONE));
+        Url->SetActionOpen(!p->PluginHomePageURL.empty() ? p->PluginHomePageURL.c_str() : "");
         // extension
         SetWindowText(GetDlgItem(HWindow, IDC_PLUGINEXTENSIONS),
-                      p->Extensions[0] == 0 ? LoadStr(IDS_PLUGINEXTNONE) : p->Extensions);
+                      p->Extensions.c_str()[0] == 0 ? LoadStr(IDS_PLUGINEXTNONE) : p->Extensions.c_str());
         // FS Name
         char buf[500];
         buf[0] = 0;
@@ -324,29 +324,29 @@ void CPluginsDlg::OnSelChanged()
 
         CPathBuffer buff;
         char pluginName[300];
-        lstrcpyn(pluginName, p->Name, 299);
+        lstrcpyn(pluginName, p->Name.c_str(), 299);
         DuplicateAmpersands(pluginName, 299); // plugin name may contain the '&' character
         sprintf(buff, ShowInBarText, pluginName);
         SetWindowText(showInBar, buff);
 
         char fsItemText[200];
         const char* itemText;
-        if (p->ChDrvMenuFSItemName != NULL)
+        if (!p->ChDrvMenuFSItemName.empty())
         {
-            char* s = p->ChDrvMenuFSItemName;
+            const char* s = p->ChDrvMenuFSItemName.c_str();
             while (*s != 0 && *s != '\t')
                 s++;
             if (*s == 0)
-                itemText = p->ChDrvMenuFSItemName;
+                itemText = p->ChDrvMenuFSItemName.c_str();
             else // there is at least one tab character
             {
                 lstrcpyn(fsItemText, s + 1, 200);
                 itemText = fsItemText;
-                s = fsItemText;
-                while (*s != 0 && *s != '\t')
-                    s++;
-                if (*s == '\t')
-                    *s = 0;
+                char* s2 = fsItemText;
+                while (*s2 != 0 && *s2 != '\t')
+                    s2++;
+                if (*s2 == '\t')
+                    *s2 = 0;
             }
         }
         else
@@ -365,7 +365,7 @@ void CPluginsDlg::OnSelChanged()
             CheckDlgButton(HWindow, IDC_PLUGINSHOWINBAR, showInBar2 ? BST_CHECKED : BST_UNCHECKED);
             EnableWindow(GetDlgItem(HWindow, IDC_PLUGINSHOWINBAR), hasMenu);
 
-            BOOL hasItem = p->ChDrvMenuFSItemName != NULL;
+            BOOL hasItem = !p->ChDrvMenuFSItemName.empty();
             BOOL showInChDrv2 = Plugins.GetShowInChDrv(Plugins.GetIndexByOrder(orderIndex));
             if (!hasItem)
                 showInChDrv2 = FALSE;
@@ -786,8 +786,8 @@ CPluginsDlg::DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
                     int index;
                     if (Plugins.FindDLL(pluginName, index))
                     {
-                        std::wstring msg = FormatStrW(LoadStrW(IDS_PLUGINEXISTS), AnsiToWide(Plugins.Get(index)->Name).c_str(),
-                                AnsiToWide(Plugins.Get(index)->DLLName).c_str());
+                        std::wstring msg = FormatStrW(LoadStrW(IDS_PLUGINEXISTS), AnsiToWide(Plugins.Get(index)->Name.c_str()).c_str(),
+                                AnsiToWide(Plugins.Get(index)->DLLName.c_str()).c_str());
                         //                add = SalMessageBox(HWindow, buf2, LoadStr(IDS_QUESTION),
                         //                                    MB_YESNOCANCEL | MB_ICONQUESTION | MB_DEFBUTTON2) == IDYES;
                         gPrompter->ShowError(LoadStrW(IDS_ERRORTITLE), msg.c_str());
@@ -825,7 +825,7 @@ CPluginsDlg::DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
             CPluginData* p = GetSelectedPlugin(&index, &lvIndex);
             if (p != NULL)
             {
-                strcpy(name, p->Name);
+                strcpy(name, p->Name.c_str());
                 std::wstring msg = FormatStrW(LoadStrW(IDS_PLUGINREMOVEOK), AnsiToWide(name).c_str());
                 if (gPrompter->AskYesNo(LoadStrW(IDS_QUESTION), msg.c_str()).type == PromptResult::kYes)
                 {
@@ -844,7 +844,7 @@ CPluginsDlg::DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
             {
                 if (p->InitDLL(HWindow))
                 {
-                    std::wstring msg = FormatStrW(LoadStrW(IDS_PLUGINTESTOK), AnsiToWide(p->Name).c_str());
+                    std::wstring msg = FormatStrW(LoadStrW(IDS_PLUGINTESTOK), AnsiToWide(p->Name.c_str()).c_str());
                     gPrompter->ShowInfo(LoadStrW(IDS_INFOTITLE), msg.c_str());
                 }
                 RefreshListView(); // a DLL was loaded, we have fresher data ...
@@ -866,12 +866,12 @@ CPluginsDlg::DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
         {
             CPluginData* p = GetSelectedPlugin();
 #ifdef _WIN64 // FIXME_X64_WINSCP - this will probably need to be solved differently... (ignoring the missing WinSCP in the x64 version of Salamander)
-            if (p != NULL && IsPluginUnsupportedOnX64(p->DLLName))
+            if (p != NULL && IsPluginUnsupportedOnX64(p->DLLName.c_str()))
             {
                 // inform the user that this plugin is available only in the 32-bit version (x86)
                 // IDS_PLUGINISX86ONLY is not an ideal text but I don't care, it will do,
                 // and we won't bother translators unnecessarily
-                std::wstring msg = FormatStrW(LoadStrW(IDS_PLUGINISX86ONLY), AnsiToWide(p->Name).c_str());
+                std::wstring msg = FormatStrW(LoadStrW(IDS_PLUGINISX86ONLY), AnsiToWide(p->Name.c_str()).c_str());
                 gPrompter->ShowInfo(LoadStrW(IDS_INFOTITLE), msg.c_str());
                 return 0;
             }
@@ -879,14 +879,14 @@ CPluginsDlg::DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
             if (p != NULL)
             {
                 CPathBuffer buf; // Heap-allocated for long path support
-                char* s = p->DLLName;
+                const char* s = p->DLLName.c_str();
                 if ((*s != '\\' || *(s + 1) != '\\') && // not UNC
                     (*s == 0 || *(s + 1) != ':'))       // not "c:" -> relative path to plugins subdirectory
                 {
                     GetModuleFileName(HInstance, buf, buf.Size());
-                    s = strrchr(buf, '\\') + 1;
-                    strcpy(s, "plugins\\");
-                    strcat(s, p->DLLName);
+                    char* p2 = strrchr(buf, '\\') + 1;
+                    strcpy(p2, "plugins\\");
+                    strcat(p2, p->DLLName.c_str());
                     s = buf;
                 }
                 lstrcpyn(FocusPlugin, s, FocusPlugin.Size());
@@ -1049,7 +1049,7 @@ void CPluginKeys::RefreshListView(BOOL setOnly)
         CPluginMenuItem* item = Plugin->MenuItems[i];
         if (item->Type == pmitEndSubmenu && level > 0)
             level--;
-        if ((item->Type != pmitItemOrSeparator && item->Type != pmitStartSubmenu) || item->Name == NULL)
+        if ((item->Type != pmitItemOrSeparator && item->Type != pmitStartSubmenu) || item->Name.empty())
             continue;
 
         if (!setOnly)
@@ -1067,7 +1067,7 @@ void CPluginKeys::RefreshListView(BOOL setOnly)
         }
         // command name
         char buff[500];
-        lstrcpyn(buff, item->Name, 500);
+        lstrcpyn(buff, item->Name.c_str(), 500);
         RemoveAmpersands(buff);
 
         // remove the hint from the text if present
@@ -1202,7 +1202,7 @@ void CPluginKeys::HandleConflictWarning()
             {
                 if (HOTKEY_GET(HotKeys[i]) == hotKey)
                 {
-                    sprintf(buff, LoadStr(IDS_HOTKEY_PLUGIN_CONFLICT), Plugin->Name);
+                    sprintf(buff, LoadStr(IDS_HOTKEY_PLUGIN_CONFLICT), Plugin->Name.c_str());
                     break;
                 }
             }
@@ -1216,7 +1216,7 @@ void CPluginKeys::HandleConflictWarning()
             if (Plugins.FindHotKey(hotKey, TRUE, Plugin, &pluginIndex, &menuItemIndex))
             {
                 CPluginData* plugin = Plugins.Get(pluginIndex);
-                sprintf(buff, LoadStr(IDS_HOTKEY_PLUGIN_CONFLICT), plugin->Name);
+                sprintf(buff, LoadStr(IDS_HOTKEY_PLUGIN_CONFLICT), plugin->Name.c_str());
             }
         }
     }
@@ -1235,7 +1235,7 @@ CPluginKeys::DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
         char buff[500];
         char buff2[500];
         GetWindowText(HWindow, buff, 500);
-        sprintf(buff2, buff, Plugin->Name);
+        sprintf(buff2, buff, Plugin->Name.c_str());
         SetWindowText(HWindow, buff2);
 
         // listview setup
@@ -1329,7 +1329,7 @@ CPluginKeys::DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
 
         case IDC_RESET:
         {
-            std::wstring msg = FormatStrW(LoadStrW(IDS_PLUGINRESETKEYS), AnsiToWide(Plugin->Name).c_str());
+            std::wstring msg = FormatStrW(LoadStrW(IDS_PLUGINRESETKEYS), AnsiToWide(Plugin->Name.c_str()).c_str());
             if (gPrompter->ConfirmError(LoadStrW(IDS_INFOTITLE), msg.c_str()).type == PromptResult::kOk)
             {
                 int i;
@@ -1964,7 +1964,7 @@ void CCfgPageViewers::Validate(CTransferInfo& ti)
             CViewerMasksItem* item = ViewerMasks[i];
             if (item->ViewerType == VIEWER_EXTERNAL)
             {
-                if (!ValidateCommandFile(HWindow, item->Command, errorPos1, errorPos2))
+                if (!ValidateCommandFile(HWindow, item->Command.c_str(), errorPos1, errorPos2))
                 {
                     EditLB->SetCurSel(i);
                     ti.ErrorOn(IDE_COMMAND);
@@ -1972,7 +1972,7 @@ void CCfgPageViewers::Validate(CTransferInfo& ti)
                                 errorPos1, errorPos2);
                     return;
                 }
-                if (!ValidateArguments(HWindow, item->Arguments, errorPos1, errorPos2))
+                if (!ValidateArguments(HWindow, item->Arguments.c_str(), errorPos1, errorPos2))
                 {
                     EditLB->SetCurSel(i);
                     ti.ErrorOn(IDE_ARGUMENTS);
@@ -1980,7 +1980,7 @@ void CCfgPageViewers::Validate(CTransferInfo& ti)
                                 errorPos1, errorPos2);
                     return;
                 }
-                if (!ValidateInitDir(HWindow, item->InitDir, errorPos1, errorPos2))
+                if (!ValidateInitDir(HWindow, item->InitDir.c_str(), errorPos1, errorPos2))
                 {
                     EditLB->SetCurSel(i);
                     ti.ErrorOn(IDE_INITDIR);
@@ -2033,12 +2033,12 @@ void CCfgPageViewers::LoadControls()
     SendMessage(GetDlgItem(HWindow, IDE_ARGUMENTS), EM_LIMITTEXT, MAX_PATH - 1, 0);
     SendMessage(GetDlgItem(HWindow, IDE_INITDIR), EM_LIMITTEXT, MAX_PATH - 1, 0);
     SendMessage(GetDlgItem(HWindow, IDE_COMMAND), WM_SETTEXT, 0,
-                (LPARAM)(empty ? "" : item->Command));
+                (LPARAM)(empty ? "" : item->Command.c_str()));
     SendMessage(GetDlgItem(HWindow, IDE_ARGUMENTS), WM_SETTEXT, 0,
-                (LPARAM)(empty ? "" : item->Arguments));
+                (LPARAM)(empty ? "" : item->Arguments.c_str()));
     SendMessage(GetDlgItem(HWindow, IDE_ARGUMENTS), EM_SETSEL, 0, -1); // so the browse overwrites the content
     SendMessage(GetDlgItem(HWindow, IDE_INITDIR), WM_SETTEXT, 0,
-                (LPARAM)(empty ? "" : item->InitDir));
+                (LPARAM)(empty ? "" : item->InitDir.c_str()));
     SendMessage(GetDlgItem(HWindow, IDE_INITDIR), EM_SETSEL, 0, -1); // so the browse overwrites the content
     DisableNotification = FALSE;
 }
@@ -2229,13 +2229,13 @@ CCfgPageViewers::DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
                             return TRUE;
                         }
                         ViewerMasks.Add(item);
-                        item->Set(dispInfo->Buffer, item->Command, item->Arguments, item->InitDir);
+                        item->Set(dispInfo->Buffer, item->Command.c_str(), item->Arguments.c_str(), item->InitDir.c_str());
                         EditLB->SetItemData((INT_PTR)item);
                     }
                     else
                     {
                         item = (CViewerMasksItem*)dispInfo->ItemID;
-                        item->Set(dispInfo->Buffer, item->Command, item->Arguments, item->InitDir);
+                        item->Set(dispInfo->Buffer, item->Command.c_str(), item->Arguments.c_str(), item->InitDir.c_str());
                     }
 
                     LoadControls();
@@ -2271,21 +2271,21 @@ CCfgPageViewers::DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
                 int srcIndex = index;
                 int dstIndex = dispInfo->NewIndex;
 
-                char buf[sizeof(CViewerMasksItem)];
-                memcpy(buf, ViewerMasks[srcIndex], sizeof(CViewerMasksItem));
+                CViewerMasksItem tmp = std::move(*ViewerMasks[srcIndex]);
+
                 if (srcIndex < dstIndex)
                 {
                     int i;
                     for (i = srcIndex; i < dstIndex; i++)
-                        memcpy(ViewerMasks[i], ViewerMasks[i + 1], sizeof(CViewerMasksItem));
+                        *ViewerMasks[i] = std::move(*ViewerMasks[i + 1]);
                 }
                 else
                 {
                     int i;
                     for (i = srcIndex; i > dstIndex; i--)
-                        memcpy(ViewerMasks[i], ViewerMasks[i - 1], sizeof(CViewerMasksItem));
+                        *ViewerMasks[i] = std::move(*ViewerMasks[i - 1]);
                 }
-                memcpy(ViewerMasks[dstIndex], buf, sizeof(CViewerMasksItem));
+                *ViewerMasks[dstIndex] = std::move(tmp);
 
                 SetWindowLongPtr(HWindow, DWLP_MSGRESULT, FALSE); // allow change
                 return TRUE;
@@ -2374,7 +2374,7 @@ void CCfgPageEditors::Validate(CTransferInfo& ti)
             }
 
             CEditorMasksItem* item = EditorMasks[i];
-            if (!ValidateCommandFile(HWindow, item->Command, errorPos1, errorPos2))
+            if (!ValidateCommandFile(HWindow, item->Command.c_str(), errorPos1, errorPos2))
             {
                 EditLB->SetCurSel(i);
                 ti.ErrorOn(IDE_COMMAND);
@@ -2382,7 +2382,7 @@ void CCfgPageEditors::Validate(CTransferInfo& ti)
                             errorPos1, errorPos2);
                 return;
             }
-            if (!ValidateArguments(HWindow, item->Arguments, errorPos1, errorPos2))
+            if (!ValidateArguments(HWindow, item->Arguments.c_str(), errorPos1, errorPos2))
             {
                 EditLB->SetCurSel(i);
                 ti.ErrorOn(IDE_ARGUMENTS);
@@ -2390,7 +2390,7 @@ void CCfgPageEditors::Validate(CTransferInfo& ti)
                             errorPos1, errorPos2);
                 return;
             }
-            if (!ValidateInitDir(HWindow, item->InitDir, errorPos1, errorPos2))
+            if (!ValidateInitDir(HWindow, item->InitDir.c_str(), errorPos1, errorPos2))
             {
                 EditLB->SetCurSel(i);
                 ti.ErrorOn(IDE_INITDIR);
@@ -2419,12 +2419,12 @@ void CCfgPageEditors::LoadControls()
     SendMessage(GetDlgItem(HWindow, IDE_ARGUMENTS), EM_LIMITTEXT, MAX_PATH - 1, 0);
     SendMessage(GetDlgItem(HWindow, IDE_INITDIR), EM_LIMITTEXT, MAX_PATH - 1, 0);
     SendMessage(GetDlgItem(HWindow, IDE_COMMAND), WM_SETTEXT, 0,
-                (LPARAM)(empty ? "" : item->Command));
+                (LPARAM)(empty ? "" : item->Command.c_str()));
     SendMessage(GetDlgItem(HWindow, IDE_ARGUMENTS), WM_SETTEXT, 0,
-                (LPARAM)(empty ? "" : item->Arguments));
+                (LPARAM)(empty ? "" : item->Arguments.c_str()));
     SendMessage(GetDlgItem(HWindow, IDE_ARGUMENTS), EM_SETSEL, 0, -1); // so the browse overwrites the content
     SendMessage(GetDlgItem(HWindow, IDE_INITDIR), WM_SETTEXT, 0,
-                (LPARAM)(empty ? "" : item->InitDir));
+                (LPARAM)(empty ? "" : item->InitDir.c_str()));
     SendMessage(GetDlgItem(HWindow, IDE_INITDIR), EM_SETSEL, 0, -1); // so the browse overwrites the content
     DisableNotification = FALSE;
 }
@@ -2584,13 +2584,13 @@ CCfgPageEditors::DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
                             return TRUE;
                         }
                         EditorMasks.Add(item);
-                        item->Set(dispInfo->Buffer, item->Command, item->Arguments, item->InitDir);
+                        item->Set(dispInfo->Buffer, item->Command.c_str(), item->Arguments.c_str(), item->InitDir.c_str());
                         EditLB->SetItemData((INT_PTR)item);
                     }
                     else
                     {
                         item = (CEditorMasksItem*)dispInfo->ItemID;
-                        item->Set(dispInfo->Buffer, item->Command, item->Arguments, item->InitDir);
+                        item->Set(dispInfo->Buffer, item->Command.c_str(), item->Arguments.c_str(), item->InitDir.c_str());
                     }
 
                     EnableControls();
@@ -2626,21 +2626,21 @@ CCfgPageEditors::DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
                 int srcIndex = index;
                 int dstIndex = dispInfo->NewIndex;
 
-                char buf[sizeof(CEditorMasksItem)];
-                memcpy(buf, EditorMasks[srcIndex], sizeof(CEditorMasksItem));
+                CEditorMasksItem tmp = std::move(*EditorMasks[srcIndex]);
+
                 if (srcIndex < dstIndex)
                 {
                     int i;
                     for (i = srcIndex; i < dstIndex; i++)
-                        memcpy(EditorMasks[i], EditorMasks[i + 1], sizeof(CEditorMasksItem));
+                        *EditorMasks[i] = std::move(*EditorMasks[i + 1]);
                 }
                 else
                 {
                     int i;
                     for (i = srcIndex; i > dstIndex; i--)
-                        memcpy(EditorMasks[i], EditorMasks[i - 1], sizeof(CEditorMasksItem));
+                        *EditorMasks[i] = std::move(*EditorMasks[i - 1]);
                 }
-                memcpy(EditorMasks[dstIndex], buf, sizeof(CEditorMasksItem));
+                *EditorMasks[dstIndex] = std::move(tmp);
 
                 SetWindowLongPtr(HWindow, DWLP_MSGRESULT, FALSE); // allow change
                 return TRUE;

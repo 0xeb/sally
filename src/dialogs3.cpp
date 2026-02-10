@@ -2734,11 +2734,8 @@ CWaitWindow::CWaitWindow(HWND hParent, int textResID, BOOL showCloseButton, CObj
     if (textResID != 0)
     {
         char* t = LoadStr(textResID);
-        Text = DupStr(t);
+        Text = t ? t : "";
     }
-    else
-        Text = NULL;
-    Caption = NULL;
     ShowCloseButton = showCloseButton;
     ShowProgressBar = showProgressBar;
     BarMax = 0;
@@ -2749,19 +2746,13 @@ CWaitWindow::CWaitWindow(HWND hParent, int textResID, BOOL showCloseButton, CObj
 
 CWaitWindow::~CWaitWindow()
 {
-    if (Text != NULL)
-        free(Text);
-    if (Caption != NULL)
-        free(Caption);
     if (CacheBitmap != NULL)
         delete (CacheBitmap);
 }
 
 void CWaitWindow::SetText(const char* text)
 {
-    if (Text != NULL)
-        free(Text);
-    Text = DupStr(text);
+    Text = text ? text : "";
     if (HWindow != NULL && IsWindowVisible(HWindow))
     {
         HDC hDC = GetDC(HWindow);
@@ -2786,9 +2777,7 @@ void CWaitWindow::SetText(const char* text)
 
 void CWaitWindow::SetCaption(const char* text)
 {
-    if (Caption != NULL)
-        free(Caption);
-    Caption = DupStr(text);
+    Caption = text ? text : "";
 }
 
 #define WAITWINDOW_HMARGIN 21
@@ -2796,7 +2785,7 @@ void CWaitWindow::SetCaption(const char* text)
 
 HWND CWaitWindow::Create(HWND hForegroundWnd)
 {
-    if (Text == NULL)
+    if (Text.empty())
     {
         TRACE_E("CWaitWindow::Create(): you must set text for wait-wnd first!");
         return NULL;
@@ -2831,12 +2820,12 @@ HWND CWaitWindow::Create(HWND hForegroundWnd)
         tR.top = 0;
         tR.right = 1;
         tR.bottom = 1;
-        DrawText(dc, Text, -1, &tR, DT_CALCRECT | DT_LEFT | DT_NOPREFIX);
+        DrawText(dc, Text.c_str(), -1, &tR, DT_CALCRECT | DT_LEFT | DT_NOPREFIX);
         if (tR.right + 2 * WAITWINDOW_HMARGIN >= scrW)
         {
             tR.right = (int)(scrW / 1.8);
             tR.bottom = 1;
-            DrawText(dc, Text, -1, &tR, DT_CALCRECT | DT_LEFT | DT_NOPREFIX | DT_WORDBREAK);
+            DrawText(dc, Text.c_str(), -1, &tR, DT_CALCRECT | DT_LEFT | DT_NOPREFIX | DT_WORDBREAK);
             NeedWrap = TRUE;
         }
         TextSize.cx = tR.right;
@@ -2866,7 +2855,7 @@ HWND CWaitWindow::Create(HWND hForegroundWnd)
 
     CreateEx(WS_EX_DLGMODALFRAME | WS_EX_TOOLWINDOW,
              SAVEBITS_CLASSNAME,
-             Caption == NULL ? "Open Salamander" : Caption,
+             Caption.empty() ? "Open Salamander" : Caption.c_str(),
              WS_BORDER | WS_OVERLAPPED | (ShowCloseButton ? WS_SYSMENU : 0),
              0, 0, width, height,
              HParent,
@@ -2971,7 +2960,7 @@ void CWaitWindow::PaintText(HDC hDC)
         r.bottom -= 4;
     }
 
-    if (Text != NULL)
+    if (!Text.empty())
     {
 
         HDC hDestDC = hDC;
@@ -2985,7 +2974,7 @@ void CWaitWindow::PaintText(HDC hDC)
         SetTextColor(hDestDC, GetSysColor(COLOR_BTNTEXT));
         // we won't clip so that we survive minor text extension
         // that may occur during a SetText call
-        DrawText(hDestDC, Text, (int)strlen(Text), &r, DT_LEFT | DT_NOPREFIX | DT_NOCLIP | (NeedWrap ? DT_WORDBREAK : 0));
+        DrawText(hDestDC, Text.c_str(), (int)Text.length(), &r, DT_LEFT | DT_NOPREFIX | DT_NOCLIP | (NeedWrap ? DT_WORDBREAK : 0));
         SetBkMode(hDestDC, prevBkMode);
         SelectObject(hDestDC, hOldFont);
 

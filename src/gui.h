@@ -48,7 +48,7 @@ protected:
                          // minimum is 10ms, default value is 50ms -- so 20 movements per second
                          // be careful with low values, animation can noticeably load the processor
     BOOL TimerIsRunning; // is timer running?
-    char* Text;          // if different from NULL, will be displayed instead of number
+    std::string Text;   // if not empty, will be displayed instead of number
     HFONT HFont;         // font for progress bar
 };
 
@@ -127,7 +127,7 @@ protected:
     char PathSeparator;  // path separator; implicitly '\\'
     BOOL MouseIsTracked; // we installed mouse leave tracking
     // tooltip support
-    char* ToolTipText; // string that will be displayed as our tooltip
+    std::string ToolTipText; // string that will be displayed as our tooltip
     HWND HToolTipNW;   // notification window
     DWORD ToolTipID;   // and ID under which tool tip should ask for text
     BOOL HintMode;     // should we display tooltip as Hint?
@@ -234,7 +234,7 @@ protected:
     RECT ClientRect;
     // tooltip support
     BOOL MouseIsTracked;  // we installed mouse leave tracking
-    char* ToolTipText;    // string that will be displayed as our tooltip
+    std::string ToolTipText;  // string that will be displayed as our tooltip
     HWND HToolTipNW;      // notification window
     DWORD ToolTipID;      // and ID under which tool tip should ask for text
     DWORD DropDownUpTime; // time in [ms], when drop down was released, to protect against new pressing

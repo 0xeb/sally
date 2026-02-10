@@ -931,10 +931,8 @@ void CDisconnectDialog::InitColumns()
 
 char* CreateIndexedPluginPathText(const char* pathText, int index)
 {
-    char* newText = (char*)malloc(strlen(pathText) + 15); // leave room for 14 characters (" [-1234567890]")
-    if (newText != NULL)
-        sprintf(newText, "%s [%d]", pathText, index);
-    return newText;
+    std::string newText = std::string(pathText) + " [" + std::to_string(index) + "]";
+    return _strdup(newText.c_str());
 }
 
 void CDisconnectDialog::EnumConnections()

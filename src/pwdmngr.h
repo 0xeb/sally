@@ -95,8 +95,8 @@ class CPasswordManager
 {
 private:
     BOOL UseMasterPassword;                          // the user has (at some point) provided the master password used for data encryption; the plaintext value may later be NULL and must be requested again
-    char* PlainMasterPassword;                       // allocated password (in plaintext) terminated by a null character; NULL if the user has not entered it during this session; not stored into the registry
-    char* OldPlainMasterPassword;                    // temporarily holds the previous PlainMasterPassword during the call to Plugins.PasswordManagerEvent(), allowing the plug-in to request decryption of its passwords
+    std::string PlainMasterPassword;                 // password (in plaintext); empty if the user has not entered it during this session; not stored into the registry
+    std::string OldPlainMasterPassword;              // temporarily holds the previous PlainMasterPassword during the call to Plugins.PasswordManagerEvent(), allowing the plug-in to request decryption of its passwords
     CMasterPasswordVerifier* MasterPasswordVerifier; // used to verify the correctness of the master password; stored in the registry; may be NULL
 
     CSalamanderCryptAbstract* SalamanderCrypt; // interface for the work with cryptographic library
@@ -115,7 +115,7 @@ public:
 
     BOOL ChangeMasterPassword(HWND hParent);
     BOOL IsUsingMasterPassword() { return UseMasterPassword; }         // are the passwords protected using AES/Master Password?
-    BOOL IsMasterPasswordSet() { return PlainMasterPassword != NULL; } // has the user entered the Master Password in this session?
+    BOOL IsMasterPasswordSet() { return !PlainMasterPassword.empty(); } // has the user entered the Master Password in this session?
 
     // when master password usage is enabled and the password has not been entered
     // in this session, it displays a dialog for entering it

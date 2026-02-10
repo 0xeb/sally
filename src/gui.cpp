@@ -97,7 +97,6 @@ CProgressBar::CProgressBar(HWND hDlg, int ctrlID)
         }
         HANDLES(ReleaseDC(NULL, hDC));
     }
-    Text = NULL;
 
     // get the default font from the dialog
     HFont = (HFONT)SendMessage(hDlg, WM_GETFONT, 0, 0);
@@ -110,8 +109,6 @@ CProgressBar::~CProgressBar()
     Stop();
     if (Bitmap != NULL)
         delete (Bitmap);
-    if (Text != NULL)
-        free(Text);
 }
 
 void CProgressBar::SetProgress(DWORD progress, const char* text)
@@ -227,18 +224,18 @@ void CProgressBar::Paint(HDC hDC)
         // prepare and measure the string
         char buff[50];
 
-        char* progress;
+        const char* progress;
         int progressLen;
 
-        if (Text != NULL)
+        if (!Text.empty())
         {
-            progress = Text;
-            progressLen = (int)strlen(progress);
+            progress = Text.c_str();
+            progressLen = (int)Text.length();
         }
         else
         {
             progress = buff;
-            progressLen = sprintf(progress, "%d %%", (int)((Progress /*+ 5*/) / 10)); // we do not round the progress, beacause otherwise 100% is visible from 99.5%-100%, which annoys some users (notable with FTP, where it can last half a minute)
+            progressLen = sprintf(buff, "%d %%", (int)((Progress /*+ 5*/) / 10)); // we do not round the progress, beacause otherwise 100% is visible from 99.5%-100%, which annoys some users (notable with FTP, where it can last half a minute)
         }
 
         SIZE sz;
@@ -353,21 +350,14 @@ CProgressBar::WindowProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
         BOOL paint = TRUE;
         BOOL textChanged = FALSE;
 
-        if ((text != NULL || Text != NULL) &&
-            (text == NULL || Text == NULL || strcmp(text, Text) != 0))
+        if ((text != NULL || !Text.empty()) &&
+            (text == NULL || Text.empty() || strcmp(text, Text.c_str()) != 0))
         {
             textChanged = TRUE;
-            if (Text != NULL)
-            {
-                free(Text);
-                Text = NULL;
-            }
             if (text != NULL)
-            {
-                Text = DupStr(text);
-                if (Text == NULL)
-                    TRACE_E(LOW_MEMORY);
-            }
+                Text = text;
+            else
+                Text.clear();
         }
 
         if (progress == (DWORD)-1)
@@ -465,7 +455,6 @@ CStaticText::CStaticText(HWND hDlg, int ctrlID, DWORD flags)
     Alignment = 0; // left
     PathSeparator = '\\';
     MouseIsTracked = FALSE;
-    ToolTipText = NULL;
     HToolTipNW = NULL;
     ToolTipID = 0;
     HintMode = FALSE;
@@ -529,8 +518,6 @@ CStaticText::CStaticText(HWND hDlg, int ctrlID, DWORD flags)
 
 CStaticText::~CStaticText()
 {
-    if (ToolTipText != NULL)
-        free(ToolTipText);
     if (Text != NULL)
         free(Text);
     if (Text2 != NULL)
@@ -826,27 +813,18 @@ BOOL CStaticText::TextHitTest(POINT* screenCursorPos)
 
 BOOL CStaticText::SetToolTipText(const char* text)
 {
-    if (text != NULL && ToolTipText != NULL && strcmp(ToolTipText, text) == 0)
+    if (text != NULL && !ToolTipText.empty() && strcmp(ToolTipText.c_str(), text) == 0)
         return TRUE;
 
     if (text == NULL)
     {
-        if (ToolTipText != NULL)
-            free(ToolTipText);
-        ToolTipText = NULL;
+        ToolTipText.clear();
         HToolTipNW = NULL;
         ToolTipID = 0;
         return TRUE;
     }
 
-    char* newText = DupStr(text);
-    if (newText == NULL)
-        return FALSE;
-
-    if (ToolTipText != NULL)
-        free(ToolTipText);
-
-    ToolTipText = newText;
+    ToolTipText = text;
     HToolTipNW = NULL;
     ToolTipID = 0;
 
@@ -857,9 +835,7 @@ BOOL CStaticText::SetToolTipText(const char* text)
 
 void CStaticText::SetToolTip(HWND hNotifyWindow, DWORD id)
 {
-    if (ToolTipText != NULL)
-        free(ToolTipText);
-    ToolTipText = NULL;
+    ToolTipText.clear();
 
     HToolTipNW = hNotifyWindow;
     ToolTipID = id;
@@ -872,7 +848,7 @@ void CStaticText::EnableHintToolTip(BOOL enable)
 
 BOOL CStaticText::ToolTipAssigned()
 {
-    return ToolTipText != NULL || HToolTipNW != NULL;
+    return !ToolTipText.empty() || HToolTipNW != NULL;
 }
 
 void CStaticText::DrawFocus(HDC hDC)
@@ -965,7 +941,7 @@ CStaticText::WindowProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
             p.y = GET_Y_LPARAM(messagePos);
             if (TextHitTest(&p))
             {
-                if (ToolTipText != NULL)
+                if (!ToolTipText.empty())
                     SetCurrentToolTip(HWindow, 1);
                 else if (HToolTipNW != NULL)
                     SetCurrentToolTip(HWindow, ToolTipID);
@@ -1006,8 +982,8 @@ CStaticText::WindowProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
 
     case WM_USER_TTGETTEXT:
     {
-        if (ToolTipText != NULL)
-            lstrcpyn((char*)lParam, ToolTipText, TOOLTIP_TEXT_MAX);
+        if (!ToolTipText.empty())
+            lstrcpyn((char*)lParam, ToolTipText.c_str(), TOOLTIP_TEXT_MAX);
         return 0;
     }
 
@@ -1636,7 +1612,6 @@ CButton::CButton(HWND hDlg, int ctrlID, DWORD flags, CObjectOrigin origin)
     Captured = FALSE;
     Space = FALSE;
     MouseIsTracked = FALSE;
-    ToolTipText = NULL;
     HToolTipNW = NULL;
     ToolTipID = 0;
     Hot = FALSE;
@@ -1647,8 +1622,6 @@ CButton::CButton(HWND hDlg, int ctrlID, DWORD flags, CObjectOrigin origin)
 
 CButton::~CButton()
 {
-    if (ToolTipText != NULL)
-        free(ToolTipText);
 }
 
 DWORD
@@ -1906,22 +1879,13 @@ BOOL CButton::SetToolTipText(const char* text)
 {
     if (text == NULL)
     {
-        if (ToolTipText != NULL)
-            free(ToolTipText);
-        ToolTipText = NULL;
+        ToolTipText.clear();
         HToolTipNW = NULL;
         ToolTipID = 0;
         return TRUE;
     }
 
-    char* newText = DupStr(text);
-    if (newText == NULL)
-        return FALSE;
-
-    if (ToolTipText != NULL)
-        free(ToolTipText);
-
-    ToolTipText = newText;
+    ToolTipText = text;
     HToolTipNW = NULL;
     ToolTipID = 0;
     return TRUE;
@@ -1929,9 +1893,7 @@ BOOL CButton::SetToolTipText(const char* text)
 
 void CButton::SetToolTip(HWND hNotifyWindow, DWORD id)
 {
-    if (ToolTipText != NULL)
-        free(ToolTipText);
-    ToolTipText = NULL;
+    ToolTipText.clear();
 
     HToolTipNW = hNotifyWindow;
     ToolTipID = id;
@@ -1939,7 +1901,7 @@ void CButton::SetToolTip(HWND hNotifyWindow, DWORD id)
 
 BOOL CButton::ToolTipAssigned()
 {
-    return ToolTipText != NULL || HToolTipNW != NULL;
+    return !ToolTipText.empty() || HToolTipNW != NULL;
 }
 
 LRESULT
@@ -2420,7 +2382,7 @@ CButton::WindowProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
             {
                 if (HitTest(lParam) != 0)
                 {
-                    if (ToolTipText != NULL)
+                    if (!ToolTipText.empty())
                         SetCurrentToolTip(HWindow, 1);
                     else if (HToolTipNW != NULL)
                         SetCurrentToolTip(HWindow, ToolTipID);
@@ -2456,8 +2418,8 @@ CButton::WindowProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
 
     case WM_USER_TTGETTEXT:
     {
-        if (ToolTipText != NULL)
-            lstrcpyn((char*)lParam, ToolTipText, TOOLTIP_TEXT_MAX);
+        if (!ToolTipText.empty())
+            lstrcpyn((char*)lParam, ToolTipText.c_str(), TOOLTIP_TEXT_MAX);
         return 0;
     }
 

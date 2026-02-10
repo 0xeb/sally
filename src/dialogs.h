@@ -1110,8 +1110,8 @@ protected:
 class CWaitWindow : public CWindow
 {
 protected:
-    char* Caption;
-    char* Text;
+    std::string Caption;
+    std::string Text;
     SIZE TextSize;
     HWND HParent;
     HWND HForegroundWnd;
