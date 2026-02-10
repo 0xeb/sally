@@ -442,16 +442,9 @@ void CPackerFormatConfig::AddDefault(int SalamVersion)
     case 2: // what was added after beta1
         // workaround to add the PK3 extension to ZIP
         for (index = 0; index < Formats.Count; index++)
-            if (!stricmp(Formats[index]->Ext, "zip"))
+            if (!stricmp(Formats[index]->Ext.c_str(), "zip"))
             {
-                char* ptr = (char*)malloc(strlen(Formats[index]->Ext) + 5);
-                if (ptr != NULL)
-                {
-                    strcpy(ptr, Formats[index]->Ext);
-                    strcat(ptr, ";pk3");
-                    free(Formats[index]->Ext);
-                    Formats[index]->Ext = ptr;
-                }
+                Formats[index]->Ext += ";pk3";
                 break;
             }
         // and new extensions
@@ -463,16 +456,9 @@ void CPackerFormatConfig::AddDefault(int SalamVersion)
     case 4: // beta3 but with old configuration (contains $(SpawnName))
         // workaround to add the C## extension to ACE
         for (index = 0; index < Formats.Count; index++)
-            if (!stricmp(Formats[index]->Ext, "ace"))
+            if (!stricmp(Formats[index]->Ext.c_str(), "ace"))
             {
-                char* ptr = (char*)malloc(strlen(Formats[index]->Ext) + 5);
-                if (ptr != NULL)
-                {
-                    strcpy(ptr, Formats[index]->Ext);
-                    strcat(ptr, ";c##");
-                    free(Formats[index]->Ext);
-                    Formats[index]->Ext = ptr;
-                }
+                Formats[index]->Ext += ";c##";
                 break;
             }
 
@@ -482,16 +468,9 @@ void CPackerFormatConfig::AddDefault(int SalamVersion)
         SetFormat(index, "tgz;tbz;taz;tar;gz;bz;bz2;z;rpm;cpio", FALSE, 0, -2, TRUE);
         // workaround to add the JAR extension to ZIP
         for (index = 0; index < Formats.Count; index++)
-            if (!stricmp(Formats[index]->Ext, "zip;pk3"))
+            if (!stricmp(Formats[index]->Ext.c_str(), "zip;pk3"))
             {
-                char* ptr = (char*)malloc(strlen(Formats[index]->Ext) + 5);
-                if (ptr != NULL)
-                {
-                    strcpy(ptr, Formats[index]->Ext);
-                    strcat(ptr, ";jar");
-                    free(Formats[index]->Ext);
-                    Formats[index]->Ext = ptr;
-                }
+                Formats[index]->Ext += ";jar";
                 break;
             }
     }
@@ -567,7 +546,7 @@ BOOL CPackerFormatConfig::SetFormat(int index, const char* ext, BOOL usePacker,
     CPackerFormatConfigData* data = Formats[index];
     data->Destroy();
 
-    data->Ext = DupStr(ext);
+    data->Ext = ext;
     data->UsePacker = usePacker;
     if (usePacker)
         data->PackerIndex = packerIndex;
@@ -712,31 +691,27 @@ BOOL CPackerFormatConfig::Load(HKEY hKey)
 BOOL
 CPackerFormatConfig::SwapFormats(int index1, int index2)
 {
-  BYTE buff[sizeof(CPackerFormatConfigData)];
-  memcpy(buff, Formats[index1], sizeof(CPackerFormatConfigData));
-  memcpy(Formats[index1], Formats[index2], sizeof(CPackerFormatConfigData));
-  memcpy(Formats[index2], buff, sizeof(CPackerFormatConfigData));
+  std::swap(Formats[index1], Formats[index2]);
   return TRUE;
 }
 */
 
 BOOL CPackerFormatConfig::MoveFormat(int srcIndex, int dstIndex)
 {
-    BYTE buff[sizeof(CPackerFormatConfigData)];
-    memcpy(buff, Formats[srcIndex], sizeof(CPackerFormatConfigData));
+    CPackerFormatConfigData* tmp = Formats[srcIndex];
     if (srcIndex < dstIndex)
     {
         int i;
         for (i = srcIndex; i < dstIndex; i++)
-            memcpy(Formats[i], Formats[i + 1], sizeof(CPackerFormatConfigData));
+            Formats[i] = Formats[i + 1];
     }
     else
     {
         int i;
         for (i = srcIndex; i > dstIndex; i--)
-            memcpy(Formats[i], Formats[i - 1], sizeof(CPackerFormatConfigData));
+            Formats[i] = Formats[i - 1];
     }
-    memcpy(Formats[dstIndex], buff, sizeof(CPackerFormatConfigData));
+    Formats[dstIndex] = tmp;
     return TRUE;
 }
 
@@ -886,27 +861,27 @@ BOOL CArchiverConfig::SetArchiver(int index, DWORD uid, const char* title, EPack
     data->Destroy();
 
     data->UID = uid;
-    data->Title = DupStr(title);
+    data->Title = title;
     data->Type = type;
     data->ExesAreSame = exesAreSame;
     // the variable and executable name are constant strings from Salamander's code; a shallow copy is enough
     data->PackerVariable = packerVariable;
     data->PackerExecutable = packerExecutable;
     // the path to the executable is allocated, make a copy
-    data->PackExeFile = DupStr(packExeFile);
+    data->PackExeFile = packExeFile;
     if (!data->ExesAreSame)
     {
         // if the unpacker differs, initialize it as well
         data->UnpackerVariable = unpackerVariable;
         data->UnpackerExecutable = unpackerExecutable;
-        data->UnpackExeFile = DupStr(unpackExeFile);
+        data->UnpackExeFile = unpackExeFile;
     }
     else
     {
         // if the packer is the same, the work is easier
         data->UnpackerVariable = NULL;
         data->UnpackerExecutable = NULL;
-        data->UnpackExeFile = DupStr(packExeFile);
+        data->UnpackExeFile = packExeFile;
     }
 
     // are the values meaningful?
@@ -925,10 +900,8 @@ BOOL CArchiverConfig::SetArchiver(int index, DWORD uid, const char* title, EPack
 void CArchiverConfig::SetPackerExeFile(int index, const char* filename)
 {
     CArchiverConfigData* data = Archivers[index];
-    if (data->PackExeFile)
-        free(data->PackExeFile);
     // if we get NULL (not found by auto-configuration), use the default executable name
-    data->PackExeFile = DupStr(filename != NULL ? filename : data->PackerExecutable);
+    data->PackExeFile = filename != NULL ? filename : data->PackerExecutable;
 }
 
 // sets the packer path for the unpacker at the given index
@@ -936,10 +909,8 @@ void CArchiverConfig::SetPackerExeFile(int index, const char* filename)
 void CArchiverConfig::SetUnpackerExeFile(int index, const char* filename)
 {
     CArchiverConfigData* data = Archivers[index];
-    if (data->UnpackExeFile)
-        free(data->UnpackExeFile);
     // if we get NULL (not found by auto-configuration), use the default executable name
-    data->UnpackExeFile = DupStr(filename != NULL ? filename : data->UnpackerExecutable);
+    data->UnpackExeFile = filename != NULL ? filename : data->UnpackerExecutable;
 }
 
 // saves the configuration of a single entry into the registry
@@ -1014,7 +985,7 @@ BOOL CArchiverConfig::Load(HKEY hKey)
         {
             CArchiverConfigData* arch = Archivers[i];
             // for keys that are complete and whose title matches the default value, take over their paths
-            if (Configuration.ConfigVersion <= 64 && stricmp(title, arch->Title) == 0 || // Title is now translated and cannot be used anymore
+            if (Configuration.ConfigVersion <= 64 && stricmp(title, arch->Title.c_str()) == 0 || // Title is now translated and cannot be used anymore
                 Configuration.ConfigVersion > 64 && uid == arch->UID)                    // thus we introduced a standard UID
             {
                 SetPackerExeFile(i, packExe);

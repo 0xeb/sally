@@ -1857,21 +1857,17 @@ BOOL PackUnpackOneFile(CFilesWindow* panel, const char* archiveFileName,
     }
 
     // find the extracted file - the name may not match due to the Czech characters and long names :-(
-    char* extractedFile = (char*)malloc(strlen(tmpDirNameBuf) + 2 + 1);
+    std::string extractedFile = std::string(tmpDirNameBuf) + "\\*";
     WIN32_FIND_DATA foundFile;
-    strcpy(extractedFile, tmpDirNameBuf);
-    strcat(extractedFile, "\\*");
-    HANDLE found = SalFindFirstFileH(extractedFile, &foundFile);
+    HANDLE found = SalFindFirstFileH(extractedFile.c_str(), &foundFile);
     if (found == INVALID_HANDLE_VALUE)
     {
         char buffer[1000];
         strcpy(buffer, "FindFirstFile: ");
         strcat(buffer, GetErrorText(GetLastError()));
         RemoveTemporaryDir(tmpDirNameBuf);
-        free(extractedFile);
         return (*PackErrorHandlerPtr)(NULL, IDS_PACKERR_GENERAL, buffer);
     }
-    free(extractedFile);
     while (foundFile.cFileName[0] == 0 ||
            strcmp(foundFile.cFileName, ".") == 0 || strcmp(foundFile.cFileName, "..") == 0)
     {
@@ -1888,31 +1884,21 @@ BOOL PackUnpackOneFile(CFilesWindow* panel, const char* archiveFileName,
     HANDLES(FindClose(found));
 
     // and finally move it where it belongs
-    char* srcName = (char*)malloc(strlen(tmpDirNameBuf) + 1 + strlen(foundFile.cFileName) + 1);
-    strcpy(srcName, tmpDirNameBuf);
-    strcat(srcName, "\\");
-    strcat(srcName, foundFile.cFileName);
+    std::string srcName = std::string(tmpDirNameBuf) + "\\" + foundFile.cFileName;
     const char* onlyName = strrchr(nameInArchive, '\\');
     if (onlyName == NULL)
         onlyName = nameInArchive;
-    char* destName = (char*)malloc(strlen(targetDir) + 1 + strlen(onlyName) + 1);
-    strcpy(destName, targetDir);
-    strcat(destName, "\\");
-    strcat(destName, onlyName);
-    if (!SalMoveFile(srcName, destName))
+    std::string destName = std::string(targetDir) + "\\" + onlyName;
+    if (!SalMoveFile(srcName.c_str(), destName.c_str()))
     {
         char buffer[1000];
         strcpy(buffer, "MoveFile: ");
         strcat(buffer, GetErrorText(GetLastError()));
         RemoveTemporaryDir(tmpDirNameBuf);
-        free(srcName);
-        free(destName);
         return (*PackErrorHandlerPtr)(NULL, IDS_PACKERR_GENERAL, buffer);
     }
 
     // and clean up
-    free(srcName);
-    free(destName);
     RemoveTemporaryDir(tmpDirNameBuf);
     return TRUE;
 }

@@ -4,6 +4,8 @@
 
 #pragma once
 
+#include <string>
+
 // ****************************************************************************
 // Constants
 //
@@ -61,26 +63,23 @@ struct SPackLocation
 class CPackACFound
 {
 public:
-    char* FullName;     // name of the found program including the path
-    CQuadWord Size;     // size
-    FILETIME LastWrite; // date
+    std::string FullName; // name of the found program including the path
+    CQuadWord Size;       // size
+    FILETIME LastWrite;   // date
     BOOL Selected;
 
     CPackACFound()
     {
-        FullName = NULL;
         Selected = FALSE;
     }
     ~CPackACFound()
     {
-        if (FullName != NULL)
-            free(FullName);
     }
     BOOL Set(const char* fullName, const CQuadWord& size, FILETIME lastWrite);
     void InvertSelect() { Selected = !Selected; }
     void Select(BOOL newSelect) { Selected = newSelect; }
     BOOL IsSelected() { return Selected; }
-    char* GetText(int column);
+    const char* GetText(int column);
 };
 
 // array of found packers
@@ -434,15 +433,15 @@ class CArchiverConfigData
 {
 public:
     DWORD UID;                      // unique identifier of the archiver (see ARC_UID_XXX)
-    char* Title;                    // name under which it appears in the configuration
+    std::string Title;                  // name under which it appears in the configuration
     const char* PackerVariable;     // name of the variable expanded as the packer
     const char* UnpackerVariable;   // name of the variable expanded as the unpacker (NULL when it's a packer)
     const char* PackerExecutable;   // packer program name for searching on disk
     const char* UnpackerExecutable; // unpacker program name or NULL
     EPackExeType Type;              // archiver type (16bit, 32bit)
     BOOL ExesAreSame;               // true if PackExeFile is used for both pack and unpack
-    char* PackExeFile;              // path to the pack program
-    char* UnpackExeFile;            // path to the unpack program or NULL
+    std::string PackExeFile;        // path to the pack program
+    std::string UnpackExeFile;      // path to the unpack program or empty
 
 public:
     CArchiverConfigData()
@@ -457,35 +456,32 @@ public:
 
     void Destroy()
     {
-        if (Title != NULL)
-            free(Title);
-        if (PackExeFile != NULL)
-            free(PackExeFile);
-        if (UnpackExeFile != NULL)
-            free(UnpackExeFile);
+        Title.clear();
+        PackExeFile.clear();
+        UnpackExeFile.clear();
         Empty();
     }
 
     void Empty()
     {
         UID = 0;
-        Title = NULL;
+        Title.clear();
         PackerVariable = NULL;
         UnpackerVariable = NULL;
         PackerExecutable = NULL;
         UnpackerExecutable = NULL;
         Type = EXE_END;
         ExesAreSame = FALSE;
-        PackExeFile = NULL;
-        UnpackExeFile = NULL;
+        PackExeFile.clear();
+        UnpackExeFile.clear();
     }
 
     BOOL IsValid()
     {
-        if (Title == NULL || PackerVariable == NULL || PackerExecutable == NULL ||
-            Type >= EXE_END || PackExeFile == NULL ||
+        if (Title.empty() || PackerVariable == NULL || PackerExecutable == NULL ||
+            Type >= EXE_END || PackExeFile.empty() ||
             (!ExesAreSame && (UnpackerVariable == NULL || UnpackerExecutable == NULL ||
-                              UnpackExeFile == NULL)))
+                              UnpackExeFile.empty())))
             return FALSE;
         return TRUE;
     }
@@ -516,7 +512,7 @@ public:
     int GetArchiversCount() { return Archivers.Count; } // returns the number of items in the array
 
     DWORD GetArchiverUID(int index) { return Archivers[index]->UID; }
-    const char* GetArchiverTitle(int index) { return Archivers[index]->Title; }
+    const char* GetArchiverTitle(int index) { return Archivers[index]->Title.c_str(); }
     const char* GetPackerVariable(int index) { return Archivers[index]->PackerVariable; }
     const char* GetUnpackerVariable(int index) { return Archivers[index]->UnpackerVariable; }
     const char* GetPackerExecutable(int index) { return Archivers[index]->PackerExecutable; }
@@ -524,8 +520,8 @@ public:
     EPackExeType GetArchiverType(int index) { return Archivers[index]->Type; }
     void SetPackerExeFile(int index, const char* filename);
     void SetUnpackerExeFile(int index, const char* filename);
-    const char* GetPackerExeFile(int index) { return Archivers[index]->PackExeFile; }
-    const char* GetUnpackerExeFile(int index) { return Archivers[index]->UnpackExeFile; }
+    const char* GetPackerExeFile(int index) { return Archivers[index]->PackExeFile.c_str(); }
+    const char* GetUnpackerExeFile(int index) { return Archivers[index]->UnpackExeFile.c_str(); }
     const SPackModifyTable* GetPackerConfigTable(int index) { return &PackModifyTable[index]; }
     const SPackBrowseTable* GetUnpackerConfigTable(int index) { return &PackBrowseTable[index]; }
     BOOL ArchiverExesAreSame(int index) { return Archivers[index]->ExesAreSame; }
@@ -586,7 +582,7 @@ public:
 class CPackerFormatConfigData
 {
 public:
-    char* Ext;         // list of extensions the archive can have
+    std::string Ext;   // list of extensions the archive can have
     BOOL UsePacker;    // true if PackerIndex is valid (we can also pack)
     int PackerIndex;   // reference to the packer table
     int UnpackerIndex; // reference to the unpacker table
@@ -606,15 +602,14 @@ public:
 
     void Destroy()
     {
-        if (Ext != NULL)
-            free(Ext);
+        Ext.clear();
         Empty();
     }
 
     void Empty()
     {
         OldType = FALSE;
-        Ext = NULL;
+        Ext.clear();
         UsePacker = FALSE;
         PackerIndex = 500;
         UnpackerIndex = 500;
@@ -622,7 +617,7 @@ public:
 
     BOOL IsValid()
     {
-        if (Ext == NULL || UnpackerIndex == 500 || UsePacker && PackerIndex == 500)
+        if (Ext.empty() || UnpackerIndex == 500 || UsePacker && PackerIndex == 500)
             return FALSE;
         return TRUE;
     }
@@ -668,7 +663,7 @@ public:
     int GetUnpackerIndex(int index) { return Formats[index]->UnpackerIndex; }
     BOOL GetUsePacker(int index) { return Formats[index]->UsePacker; }
     int GetPackerIndex(int index) { return Formats[index]->PackerIndex; }
-    const char* GetExt(int index) { return Formats[index]->Ext; }
+    const char* GetExt(int index) { return Formats[index]->Ext.c_str(); }
     BOOL GetOldType(int index) { return Formats[index]->OldType; }
 
     BOOL Save(int index, HKEY hKey);

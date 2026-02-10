@@ -289,46 +289,25 @@ void CPackerConfig::AddDefault(int SalamVersion)
                 if (strncmp(cmdC, "$(SpawnName) ", 13) == 0 ||
                     GetPackerSupMove(index) && strncmp(cmdM, "$(SpawnName) ", 13) == 0)
                 {
-                    char* copyCmdBuf = (char*)malloc(strlen(cmdC) + 1);
-                    if (strncmp(cmdC, "$(SpawnName) ", 13) == 0)
-                        strcpy(copyCmdBuf, cmdC + 13);
-                    else
-                        strcpy(copyCmdBuf, cmdC);
-                    char* copyArgBuf = (char*)malloc(strlen(GetPackerCmdArgsCopy(index)) + 1);
-                    strcpy(copyArgBuf, GetPackerCmdArgsCopy(index));
+                    std::string copyCmdBuf = (strncmp(cmdC, "$(SpawnName) ", 13) == 0) ? (cmdC + 13) : cmdC;
+                    std::string copyArgBuf = GetPackerCmdArgsCopy(index);
 
-                    char *moveCmdBuf, *moveArgBuf;
+                    std::string moveCmdBuf, moveArgBuf;
                     if (GetPackerSupMove(index))
                     {
-                        moveCmdBuf = (char*)malloc(strlen(cmdM) + 1);
-                        if (strncmp(cmdM, "$(SpawnName) ", 13) == 0)
-                            strcpy(moveCmdBuf, cmdM + 13);
-                        else
-                            strcpy(moveCmdBuf, cmdM);
-                        moveArgBuf = (char*)malloc(strlen(GetPackerCmdArgsMove(index)) + 1);
-                        strcpy(moveArgBuf, GetPackerCmdArgsMove(index));
+                        moveCmdBuf = (strncmp(cmdM, "$(SpawnName) ", 13) == 0) ? (cmdM + 13) : cmdM;
+                        moveArgBuf = GetPackerCmdArgsMove(index);
                     }
-                    else
-                        moveCmdBuf = moveArgBuf = NULL;
 
-                    char* TitleBuf = (char*)malloc(strlen(GetPackerTitle(index)) + 1);
-                    strcpy(TitleBuf, GetPackerTitle(index));
-                    char* ExtBuf = (char*)malloc(strlen(GetPackerExt(index)) + 1);
-                    strcpy(ExtBuf, GetPackerExt(index));
+                    std::string TitleBuf = GetPackerTitle(index);
+                    std::string ExtBuf = GetPackerExt(index);
 
-                    SetPacker(index, GetPackerType(index), TitleBuf, ExtBuf, TRUE,
+                    SetPacker(index, GetPackerType(index), TitleBuf.c_str(), ExtBuf.c_str(), TRUE,
                               GetPackerSupLongNames(index), GetPackerSupMove(index),
-                              copyCmdBuf, copyArgBuf, moveCmdBuf, moveArgBuf,
+                              copyCmdBuf.c_str(), copyArgBuf.c_str(),
+                              GetPackerSupMove(index) ? moveCmdBuf.c_str() : NULL,
+                              GetPackerSupMove(index) ? moveArgBuf.c_str() : NULL,
                               GetPackerNeedANSIListFile(index));
-
-                    free(copyCmdBuf);
-                    free(copyArgBuf);
-                    if (moveCmdBuf != NULL)
-                        free(moveCmdBuf);
-                    if (moveArgBuf != NULL)
-                        free(moveArgBuf);
-                    free(TitleBuf);
-                    free(ExtBuf);
                 }
             }
     case 5: // beta 3 but without tar
@@ -417,12 +396,11 @@ void CPackerConfig::AddDefault(int SalamVersion)
             if ((GetPackerOldType(index) && GetPackerType(index) != 1) ||
                 (!GetPackerOldType(index) && GetPackerType(index) != CUSTOMPACKER_EXTERNAL))
             { // take only plug-ins (not external packers)
-                char* s = Packers[index]->Title;
-                char* f;
-                if (s != NULL && (f = strstr(s, "(Internal)")) != NULL) // contains (Internal)
+                std::string& s = Packers[index]->Title;
+                size_t pos = s.find("(Internal)");
+                if (pos != std::string::npos && pos + 10 == s.length())
                 {
-                    if (strlen(f) == 10)
-                        strcpy(f, "(Plugin)"); // (Internal) is at the end of the string
+                    s.replace(pos, 10, "(Plugin)");
                 }
             }
         }
@@ -466,18 +444,8 @@ void CPackerConfig::AddDefault(int SalamVersion)
                         {
                             canDelLHA = TRUE;
                             // convert to new arguments (added "-m")
-                            char* s = DupStr(newLHACopyArgs);
-                            if (s != NULL)
-                            {
-                                free(Packers[index]->CmdArgsCopy); // cannot be NULL (old arguments here)
-                                Packers[index]->CmdArgsCopy = s;
-                            }
-                            s = DupStr(newLHAMoveArgs);
-                            if (s != NULL)
-                            {
-                                free(Packers[index]->CmdArgsMove); // cannot be NULL (old arguments here)
-                                Packers[index]->CmdArgsMove = s;
-                            }
+                            Packers[index]->CmdArgsCopy = newLHACopyArgs;
+                            Packers[index]->CmdArgsMove = newLHAMoveArgs;
                         }
                     }
                     else
@@ -546,18 +514,8 @@ void CPackerConfig::AddDefault(int SalamVersion)
                         strcmp(moveArgs, "-add -move -path -attr \"$(ArchiveFullName)\" @\"$(ListFullName)\"") == 0)
                     {
                         // convert to new arguments (added "-nozipextension")
-                        char* s = DupStr(newPKZIP25CopyArgs);
-                        if (s != NULL)
-                        {
-                            free(Packers[index]->CmdArgsCopy); // cannot be NULL (old arguments here)
-                            Packers[index]->CmdArgsCopy = s;
-                        }
-                        s = DupStr(newPKZIP25MoveArgs);
-                        if (s != NULL)
-                        {
-                            free(Packers[index]->CmdArgsMove); // cannot be NULL (old arguments here)
-                            Packers[index]->CmdArgsMove = s;
-                        }
+                        Packers[index]->CmdArgsCopy = newPKZIP25CopyArgs;
+                        Packers[index]->CmdArgsMove = newPKZIP25MoveArgs;
                     }
                 }
             }
@@ -596,10 +554,8 @@ void CPackerConfig::AddDefault(int SalamVersion)
                         strcmp(moveArgs, "m \"$(ArchiveFullName)\" @\"$(ListFullName)\"") == 0)
                     {
                         // convert to new arguments (added "-scol")
-                        free(Packers[index]->CmdArgsCopy); // cannot be NULL (old arguments here)
-                        Packers[index]->CmdArgsCopy = DupStr(newRAR5CopyArgs);
-                        free(Packers[index]->CmdArgsMove); // cannot be NULL (old arguments here)
-                        Packers[index]->CmdArgsMove = DupStr(newRAR5MoveArgs);
+                        Packers[index]->CmdArgsCopy = newRAR5CopyArgs;
+                        Packers[index]->CmdArgsMove = newRAR5MoveArgs;
                     }
                     if (copyArgs != NULL &&
                         strcmp(copyArgs, "a -v1440 \"$(ArchiveFullName)\" @\"$(ListFullName)\"") == 0 &&
@@ -607,10 +563,8 @@ void CPackerConfig::AddDefault(int SalamVersion)
                         strcmp(moveArgs, "m -v1440 \"$(ArchiveFullName)\" @\"$(ListFullName)\"") == 0)
                     {
                         // convert to new arguments (added "-scol")
-                        free(Packers[index]->CmdArgsCopy); // cannot be NULL (old arguments here)
-                        Packers[index]->CmdArgsCopy = DupStr(newRAR5CopyVolArgs);
-                        free(Packers[index]->CmdArgsMove); // cannot be NULL (old arguments here)
-                        Packers[index]->CmdArgsMove = DupStr(newRAR5MoveVolArgs);
+                        Packers[index]->CmdArgsCopy = newRAR5CopyVolArgs;
+                        Packers[index]->CmdArgsMove = newRAR5MoveVolArgs;
                     }
                 }
             }
@@ -670,31 +624,27 @@ int CPackerConfig::AddPacker(BOOL toFirstIndex)
 BOOL
 CPackerConfig::SwapPackers(int index1, int index2)
 {
-  BYTE buff[sizeof(CPackerConfigData)];
-  memcpy(buff, Packers[index1], sizeof(CPackerConfigData));
-  memcpy(Packers[index1], Packers[index2], sizeof(CPackerConfigData));
-  memcpy(Packers[index2], buff, sizeof(CPackerConfigData));
+  std::swap(Packers[index1], Packers[index2]);
   return TRUE;
 }
 */
 
 BOOL CPackerConfig::MovePacker(int srcIndex, int dstIndex)
 {
-    BYTE buff[sizeof(CPackerConfigData)];
-    memcpy(buff, Packers[srcIndex], sizeof(CPackerConfigData));
+    CPackerConfigData* tmp = Packers[srcIndex];
     if (srcIndex < dstIndex)
     {
         int i;
         for (i = srcIndex; i < dstIndex; i++)
-            memcpy(Packers[i], Packers[i + 1], sizeof(CPackerConfigData));
+            Packers[i] = Packers[i + 1];
     }
     else
     {
         int i;
         for (i = srcIndex; i > dstIndex; i--)
-            memcpy(Packers[i], Packers[i - 1], sizeof(CPackerConfigData));
+            Packers[i] = Packers[i - 1];
     }
-    memcpy(Packers[dstIndex], buff, sizeof(CPackerConfigData));
+    Packers[dstIndex] = tmp;
     return TRUE;
 }
 
@@ -726,19 +676,19 @@ BOOL CPackerConfig::SetPacker(int index, int type, const char* title, const char
     data->Destroy();
     data->Type = type;
     data->OldType = old;
-    data->Title = DupStr(title);
-    data->Ext = DupStr(ext);
+    data->Title = title;
+    data->Ext = ext;
     if (old && data->Type == 1 ||
         !old && data->Type == CUSTOMPACKER_EXTERNAL)
     {
-        data->CmdExecCopy = DupStr(cmdExecCopy);
-        data->CmdArgsCopy = DupStr(cmdArgsCopy);
+        data->CmdExecCopy = cmdExecCopy ? cmdExecCopy : "";
+        data->CmdArgsCopy = cmdArgsCopy ? cmdArgsCopy : "";
         data->SupportMove = supportMove;
 
         if (data->SupportMove)
         {
-            data->CmdExecMove = DupStr(cmdExecMove);
-            data->CmdArgsMove = DupStr(cmdArgsMove);
+            data->CmdExecMove = cmdExecMove ? cmdExecMove : "";
+            data->CmdArgsMove = cmdArgsMove ? cmdArgsMove : "";
         }
         data->SupportLongNames = supportLongNames;
         data->NeedANSIListFile = needANSIListFile;
@@ -760,10 +710,8 @@ BOOL CPackerConfig::SetPacker(int index, int type, const char* title, const char
 BOOL CPackerConfig::SetPackerTitle(int index, const char* title)
 {
     CPackerConfigData* data = Packers[index];
-    if (data->Title != NULL)
-        free(data->Title);
-    data->Title = DupStr(title);
-    return data->Title != NULL;
+    data->Title = title;
+    return TRUE;
 }
 
 BOOL CPackerConfig::ExecutePacker(CFilesWindow* panel, const char* zipFile, BOOL move,
@@ -776,7 +724,7 @@ BOOL CPackerConfig::ExecutePacker(CFilesWindow* panel, const char* zipFile, BOOL
         CPackerConfigData* data = Packers[PreferedPacker];
         if (data->Type == CUSTOMPACKER_EXTERNAL)
         {
-            char* command;
+            std::string command;
             if (move)
             {
                 if (!data->SupportMove)
@@ -784,30 +732,15 @@ BOOL CPackerConfig::ExecutePacker(CFilesWindow* panel, const char* zipFile, BOOL
                     TRACE_E("Using \"Move to archive\" with packer, which does not support it !!!");
                     return FALSE;
                 }
-                command = (char*)malloc(strlen(data->CmdExecMove) +
-                                        strlen(data->CmdArgsMove) + 2);
-                if (command == NULL)
-                {
-                    TRACE_E(LOW_MEMORY);
-                    return FALSE;
-                }
-                sprintf(command, "%s %s", data->CmdExecMove, data->CmdArgsMove);
+                command = std::string(data->CmdExecMove) + " " + data->CmdArgsMove;
             }
             else
             {
-                command = (char*)malloc(strlen(data->CmdExecCopy) +
-                                        strlen(data->CmdArgsCopy) + 2);
-                if (command == NULL)
-                {
-                    TRACE_E(LOW_MEMORY);
-                    return FALSE;
-                }
-                sprintf(command, "%s %s", data->CmdExecCopy, data->CmdArgsCopy);
+                command = std::string(data->CmdExecCopy) + " " + data->CmdArgsCopy;
             }
-            BOOL ret = PackUniversalCompress(NULL, command, NULL, sourcePath, FALSE,
+            BOOL ret = PackUniversalCompress(NULL, command.c_str(), NULL, sourcePath, FALSE,
                                              data->SupportLongNames, zipFile, sourcePath, NULL,
                                              next, param, data->NeedANSIListFile);
-            free(command);
             return ret;
         }
         else
@@ -964,32 +897,19 @@ void CUnpackerConfig::AddDefault(int SalamVersion)
         int i;
         for (i = 0; i < Unpackers.Count; i++)
         {
-            int count = 1;
-            char* ptr = Unpackers[i]->Ext;
-            if (ptr == NULL || *ptr == '\0')
+            if (Unpackers[i]->Ext.empty())
                 continue;
-            while (*ptr != '\0')
+            std::string result;
+            result += "*.";
+            for (const char* ptr = Unpackers[i]->Ext.c_str(); *ptr != '\0'; ptr++)
             {
-                if (*ptr++ == ';')
-                    count++;
-            }
-            char* nptr = (char*)malloc(strlen(Unpackers[i]->Ext) + count * 2 + 1);
-            ptr = Unpackers[i]->Ext;
-            int pos = 0;
-            nptr[pos++] = '*';
-            nptr[pos++] = '.';
-            while (*ptr != '\0')
-            {
-                nptr[pos++] = *ptr;
-                if (*ptr++ == ';')
+                result += *ptr;
+                if (*ptr == ';')
                 {
-                    nptr[pos++] = '*';
-                    nptr[pos++] = '.';
+                    result += "*.";
                 }
             }
-            nptr[pos] = '\0';
-            free(Unpackers[i]->Ext);
-            Unpackers[i]->Ext = nptr;
+            Unpackers[i]->Ext = result;
         }
     }
 
@@ -1006,16 +926,9 @@ void CUnpackerConfig::AddDefault(int SalamVersion)
     case 2: // added after beta1
         // hack to add the pk3 extension to zip
         for (i = 0; i < Unpackers.Count; i++)
-            if (!strnicmp(Unpackers[i]->Ext, "*.zip", 5))
+            if (!strnicmp(Unpackers[i]->Ext.c_str(), "*.zip", 5))
             {
-                char* ptr = (char*)malloc(strlen(Unpackers[i]->Ext) + 13);
-                if (ptr != NULL)
-                {
-                    strcpy(ptr, Unpackers[i]->Ext);
-                    strcat(ptr, ";*.pk3;*.jar");
-                    free(Unpackers[i]->Ext);
-                    Unpackers[i]->Ext = ptr;
-                }
+                Unpackers[i]->Ext += ";*.pk3;*.jar";
                 break;
             }
         // and new formats
@@ -1075,22 +988,14 @@ void CUnpackerConfig::AddDefault(int SalamVersion)
                 const char* cmd = GetUnpackerCmdExecExtract(index);
                 if (strncmp(cmd, "$(SpawnName) ", 13) == 0)
                 {
-                    char* extractCmdBuf = (char*)malloc(strlen(cmd) + 1 - 13);
-                    strcpy(extractCmdBuf, cmd + 13);
-                    char* extractArgBuf = (char*)malloc(strlen(GetUnpackerCmdArgsExtract(index)) + 1);
-                    strcpy(extractArgBuf, GetUnpackerCmdArgsExtract(index));
-                    char* TitleBuf = (char*)malloc(strlen(GetUnpackerTitle(index)) + 1);
-                    strcpy(TitleBuf, GetUnpackerTitle(index));
-                    char* ExtBuf = (char*)malloc(strlen(GetUnpackerExt(index)) + 1);
-                    strcpy(ExtBuf, GetUnpackerExt(index));
+                    std::string extractCmdBuf = cmd + 13;
+                    std::string extractArgBuf = GetUnpackerCmdArgsExtract(index);
+                    std::string TitleBuf = GetUnpackerTitle(index);
+                    std::string ExtBuf = GetUnpackerExt(index);
 
-                    SetUnpacker(index, GetUnpackerType(index), TitleBuf, ExtBuf, TRUE,
-                                GetUnpackerSupLongNames(index), extractCmdBuf, extractArgBuf,
+                    SetUnpacker(index, GetUnpackerType(index), TitleBuf.c_str(), ExtBuf.c_str(), TRUE,
+                                GetUnpackerSupLongNames(index), extractCmdBuf.c_str(), extractArgBuf.c_str(),
                                 GetUnpackerNeedANSIListFile(index));
-                    free(extractCmdBuf);
-                    free(extractArgBuf);
-                    free(TitleBuf);
-                    free(ExtBuf);
                 }
             }
     case 5: // beta 3 but without tar
@@ -1160,12 +1065,11 @@ void CUnpackerConfig::AddDefault(int SalamVersion)
             if ((GetUnpackerOldType(index) && GetUnpackerType(index) != 1) ||
                 (!GetUnpackerOldType(index) && GetUnpackerType(index) != CUSTOMUNPACKER_EXTERNAL))
             { // take only plug-ins (not external unpackers)
-                char* s = Unpackers[index]->Title;
-                char* f;
-                if (s != NULL && (f = strstr(s, "(Internal)")) != NULL) // contains (Internal)
+                std::string& s = Unpackers[index]->Title;
+                size_t pos = s.find("(Internal)");
+                if (pos != std::string::npos && pos + 10 == s.length())
                 {
-                    if (strlen(f) == 10)
-                        strcpy(f, "(Plugin)"); // (Internal) is at the end of the string
+                    s.replace(pos, 10, "(Plugin)");
                 }
             }
         }
@@ -1215,18 +1119,8 @@ void CUnpackerConfig::AddDefault(int SalamVersion)
                         strcmp(ext, "*.zip") == 0)
                     {
                         // convert to new arguments (added "-nozipextension" + "*.pk3;*.jar")
-                        char* s = DupStr(newPKZIP25Args);
-                        if (s != NULL)
-                        {
-                            free(Unpackers[index]->CmdArgsExtract); // cannot be NULL (old arguments here)
-                            Unpackers[index]->CmdArgsExtract = s;
-                        }
-                        s = DupStr(newPKZIP25Ext);
-                        if (s != NULL)
-                        {
-                            free(Unpackers[index]->Ext); // cannot be NULL (old arguments here)
-                            Unpackers[index]->Ext = s;
-                        }
+                        Unpackers[index]->CmdArgsExtract = newPKZIP25Args;
+                        Unpackers[index]->Ext = newPKZIP25Ext;
                     }
                 }
             }
@@ -1258,8 +1152,7 @@ void CUnpackerConfig::AddDefault(int SalamVersion)
                         strcmp(extrArgs, "x \"$(ArchiveFullName)\" @\"$(ListFullName)\"") == 0)
                     {
                         // convert to new arguments (added "-scol")
-                        free(Unpackers[index]->CmdArgsExtract); // cannot be NULL (old arguments here)
-                        Unpackers[index]->CmdArgsExtract = DupStr(newRAR5Args);
+                        Unpackers[index]->CmdArgsExtract = newRAR5Args;
                     }
                 }
             }
@@ -1315,31 +1208,27 @@ int CUnpackerConfig::AddUnpacker(BOOL toFirstIndex)
 BOOL
 CUnpackerConfig::SwapUnpackers(int index1, int index2)
 {
-  BYTE buff[sizeof(CUnpackerConfigData)];
-  memcpy(buff, Unpackers[index1], sizeof(CUnpackerConfigData));
-  memcpy(Unpackers[index1], Unpackers[index2], sizeof(CUnpackerConfigData));
-  memcpy(Unpackers[index2], buff, sizeof(CUnpackerConfigData));
+  std::swap(Unpackers[index1], Unpackers[index2]);
   return TRUE;
 }
 */
 
 BOOL CUnpackerConfig::MoveUnpacker(int srcIndex, int dstIndex)
 {
-    BYTE buff[sizeof(CUnpackerConfigData)];
-    memcpy(buff, Unpackers[srcIndex], sizeof(CUnpackerConfigData));
+    CUnpackerConfigData* tmp = Unpackers[srcIndex];
     if (srcIndex < dstIndex)
     {
         int i;
         for (i = srcIndex; i < dstIndex; i++)
-            memcpy(Unpackers[i], Unpackers[i + 1], sizeof(CUnpackerConfigData));
+            Unpackers[i] = Unpackers[i + 1];
     }
     else
     {
         int i;
         for (i = srcIndex; i > dstIndex; i--)
-            memcpy(Unpackers[i], Unpackers[i - 1], sizeof(CUnpackerConfigData));
+            Unpackers[i] = Unpackers[i - 1];
     }
-    memcpy(Unpackers[dstIndex], buff, sizeof(CUnpackerConfigData));
+    Unpackers[dstIndex] = tmp;
     return TRUE;
 }
 
@@ -1370,13 +1259,13 @@ BOOL CUnpackerConfig::SetUnpacker(int index, int type, const char* title, const 
     data->Destroy();
     data->Type = type;
     data->OldType = old;
-    data->Title = DupStr(title);
-    data->Ext = DupStr(ext);
+    data->Title = title;
+    data->Ext = ext;
     if (old && data->Type == 1 ||
         !old && data->Type == CUSTOMUNPACKER_EXTERNAL)
     {
-        data->CmdExecExtract = DupStr(cmdExecExtract);
-        data->CmdArgsExtract = DupStr(cmdArgsExtract);
+        data->CmdExecExtract = cmdExecExtract ? cmdExecExtract : "";
+        data->CmdArgsExtract = cmdArgsExtract ? cmdArgsExtract : "";
         data->SupportLongNames = supportLongNames;
         data->NeedANSIListFile = needANSIListFile;
     }
@@ -1397,10 +1286,8 @@ BOOL CUnpackerConfig::SetUnpacker(int index, int type, const char* title, const 
 BOOL CUnpackerConfig::SetUnpackerTitle(int index, const char* title)
 {
     CUnpackerConfigData* data = Unpackers[index];
-    if (data->Title != NULL)
-        free(data->Title);
-    data->Title = DupStr(title);
-    return data->Title != NULL;
+    data->Title = title;
+    return TRUE;
 }
 
 BOOL CUnpackerConfig::ExecuteUnpacker(HWND parent, CFilesWindow* panel, const char* zipFile, const char* mask,

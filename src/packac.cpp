@@ -1222,23 +1222,15 @@ int CPackACPacker::CheckAndInsert(const char* path, const char* fileName, FILETI
     if (*ref == '\0' && act == &fileName[lstrlen(fileName) - 4] &&
         exeType == Type)
     {
-        char* fullName = (char*)malloc(strlen(path) + strlen(fileName) + 1);
-        if (fullName == NULL)
-        {
-            TRACE_E(LOW_MEMORY);
-            return -1;
-        }
-        strcpy(fullName, path);
-        strcat(fullName, fileName);
+        std::string fullName = std::string(path) + fileName;
         // we found a new item, check whether it is new for us
         int i;
         for (i = 0; i < Found.Count; i++)
         {
-            char* n2 = Found.At(i)->FullName;
+            const char* n2 = Found.At(i)->FullName.c_str();
             // if we already have it, return
-            if (!strcmp(fullName, n2))
+            if (!strcmp(fullName.c_str(), n2))
             {
-                free(fullName);
                 return 0;
             }
         }
@@ -1247,8 +1239,7 @@ int CPackACPacker::CheckAndInsert(const char* path, const char* fileName, FILETI
         if (newItem != NULL)
         {
             // initialize it
-            BOOL good = newItem->Set(fullName, size, lastWriteTime);
-            free(fullName);
+            BOOL good = newItem->Set(fullName.c_str(), size, lastWriteTime);
             int index;
             if (good)
             {
@@ -1271,7 +1262,6 @@ int CPackACPacker::CheckAndInsert(const char* path, const char* fileName, FILETI
                 newItem = NULL;
             }
         }
-        free(fullName);
         if (newItem == NULL)
             return -1;
     }
@@ -1331,7 +1321,7 @@ CPackACArray::GetSelectedFullName()
     int i;
     for (i = 0; i < Count; i++)
         if (At(i)->Selected)
-            return At(i)->FullName;
+            return At(i)->FullName.c_str();
     // if none is selected, return NULL
     return NULL;
 }
@@ -1591,7 +1581,7 @@ CPackACListView::WindowProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
 //
 
 // returns the text that belongs to the given column
-char* CPackACFound::GetText(int column)
+const char* CPackACFound::GetText(int column)
 {
     CALL_STACK_MESSAGE2("CPackACFound::GetText(%d)", column);
     static char text[100];
@@ -1599,7 +1589,7 @@ char* CPackACFound::GetText(int column)
     {
     // Name
     case 0:
-        return FullName;
+        return FullName.c_str();
     // Size
     case 1:
     {
@@ -1643,11 +1633,7 @@ char* CPackACFound::GetText(int column)
 BOOL CPackACFound::Set(const char* fullName, const CQuadWord& size, FILETIME lastWrite)
 {
     CALL_STACK_MESSAGE2("CPackACFound::Set(%s, , )", fullName);
-    FullName = (char*)malloc(strlen(fullName) + 1);
-    if (FullName != NULL)
-        strcpy(FullName, fullName);
-    else
-        return FALSE;
+    FullName = fullName;
     Size = size;
     LastWrite = lastWrite;
     return TRUE;

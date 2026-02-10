@@ -23,6 +23,7 @@
 #include <winioctl.h>
 #include <winnetwk.h>
 #include <ostream>
+#include <string>
 #include <limits.h>
 #include <commctrl.h>
 #include <stdio.h>
@@ -35,6 +36,7 @@
 #include <wfext.h>
 #endif
 #include <math.h>
+#include <string>
 
 // Long path support (Phase 1)
 #include "common/widepath.h"
