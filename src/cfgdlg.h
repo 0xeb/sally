@@ -76,9 +76,9 @@ public:
 struct CViewerMasksItem
 {
     CMaskGroup* Masks;
-    char *Command,
-        *Arguments,
-        *InitDir;
+    std::string Command;
+    std::string Arguments;
+    std::string InitDir;
 
     int ViewerType;
 
@@ -121,9 +121,9 @@ public:
 struct CEditorMasksItem
 {
     CMaskGroup* Masks;
-    char *Command,
-        *Arguments,
-        *InitDir;
+    std::string Command;
+    std::string Arguments;
+    std::string InitDir;
 
     DWORD HandlerID; // unique ID (valid during the Salamander session)
                      // used to identify the editor when selecting from the history of the file - CFileHistory

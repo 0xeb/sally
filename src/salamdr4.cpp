@@ -22,52 +22,22 @@
 
 CTruncatedString::CTruncatedString()
 {
-    Text = NULL;
     SubStrIndex = -1;
     SubStrLen = 0;
-    TruncatedText = NULL;
+    HasTruncated = FALSE;
 }
 
 CTruncatedString::~CTruncatedString()
 {
-    if (Text != NULL)
-        free(Text);
-    if (TruncatedText != NULL)
-        free(TruncatedText);
 };
 
 BOOL CTruncatedString::CopyFrom(const CTruncatedString* src)
 {
-    if (Text != NULL)
-    {
-        free(Text);
-        Text = NULL;
-    }
-    if (src->Text != NULL)
-    {
-        Text = DupStr(src->Text);
-        if (Text == NULL)
-        {
-            TRACE_E(LOW_MEMORY);
-            return FALSE;
-        }
-    }
+    Text = src->Text;
     SubStrIndex = src->SubStrIndex;
     SubStrLen = src->SubStrLen;
-    if (TruncatedText != NULL)
-    {
-        free(TruncatedText);
-        TruncatedText = NULL;
-    }
-    if (src->TruncatedText != NULL)
-    {
-        TruncatedText = DupStr(src->TruncatedText);
-        if (TruncatedText == NULL)
-        {
-            TRACE_E(LOW_MEMORY);
-            return FALSE;
-        }
-    }
+    TruncatedText = src->TruncatedText;
+    HasTruncated = src->HasTruncated;
     return TRUE;
 }
 
@@ -116,21 +86,16 @@ BOOL CTruncatedString::Set(const char* str, const char* subStr)
             len += subStrLen;
         }
     }
-    char* text = (char*)malloc(len + 1);
-    if (text == NULL)
-        return FALSE;
-    if (Text != NULL)
-        free(Text);
-    Text = text;
+    Text.resize(len);
     if (subStrIndex != -1)
     {
-        sprintf(Text, str, subStr);
+        sprintf(Text.data(), str, subStr);
         SubStrIndex = subStrIndex;
         SubStrLen = subStrLen;
     }
     else
     {
-        strcpy(Text, str);
+        strcpy(Text.data(), str);
         SubStrIndex = -1;
         SubStrLen = 0;
     }
@@ -141,19 +106,19 @@ BOOL CTruncatedString::Set(const char* str, const char* subStr)
 const char*
 CTruncatedString::Get()
 {
-    if (SubStrIndex == -1 || TruncatedText == NULL)
+    if (SubStrIndex == -1 || !HasTruncated)
     {
-        if (Text == NULL)
+        if (Text.empty())
         {
             TRACE_E("Text == NULL");
             return "";
         }
         else
-            return Text;
+            return Text.c_str();
     }
     else
     {
-        return TruncatedText;
+        return TruncatedText.c_str();
     }
 }
 
@@ -171,37 +136,28 @@ BOOL CTruncatedString::TruncateText(HWND hWindow, BOOL forMessageBox)
 
     int fitChars;
     int alpDx[8000]; // for measuring widths
-    int textLen = (int)strlen(Text);
-    char* truncated = (char*)malloc(textLen + 1 + 3); // 3: reserve for an ellipsis in the extreme case
-    if (truncated == NULL)
+    int textLen = (int)Text.length();
+    TruncatedText.resize(textLen + 3); // 3: reserve for an ellipsis in the extreme case
+    HasTruncated = TRUE;
     {
-        TRACE_E(LOW_MEMORY);
-        ret = FALSE;
-    }
-    else
-    {
-        if (TruncatedText != NULL)
-            free(TruncatedText);
-        TruncatedText = truncated;
-
         if (forMessageBox)
         {
             // for message boxes -- we just ensure that the substring is not larger than 400 points (so it fits even on 640x480)
             int chars = SubStrLen;
             int maxWidth = 400;
             SIZE sz;
-            GetTextExtentExPoint(hDC, Text + SubStrIndex, SubStrLen, maxWidth, &fitChars, alpDx, &sz);
+            GetTextExtentExPoint(hDC, Text.c_str() + SubStrIndex, SubStrLen, maxWidth, &fitChars, alpDx, &sz);
             if (fitChars < SubStrLen)
             {
                 // first part with the truncated substring
-                memcpy(TruncatedText, Text, SubStrIndex + fitChars);
+                memcpy(TruncatedText.data(), Text.c_str(), SubStrIndex + fitChars);
                 // ellipsis
-                memcpy(TruncatedText + SubStrIndex + fitChars, "...", 3);
+                memcpy(TruncatedText.data() + SubStrIndex + fitChars, "...", 3);
                 // the rest
-                strcpy(TruncatedText + SubStrIndex + fitChars + 3, Text + SubStrIndex + SubStrLen);
+                strcpy(TruncatedText.data() + SubStrIndex + fitChars + 3, Text.c_str() + SubStrIndex + SubStrLen);
             }
             else
-                memcpy(TruncatedText, Text, textLen + 1); // just copy -— we still fit
+                memcpy(TruncatedText.data(), Text.c_str(), textLen + 1); // just copy -— we still fit
         }
         else
         {
@@ -215,10 +171,10 @@ BOOL CTruncatedString::TruncateText(HWND hWindow, BOOL forMessageBox)
             if (textLen > 8000)
             {
                 TRACE_E("Text was truncated (to 7999 characters)");
-                Text[7999] = 0;
+                Text.resize(7999);
                 textLen = 7999;
             }
-            GetTextExtentExPoint(hDC, Text, textLen, 0, NULL, alpDx, &sz);
+            GetTextExtentExPoint(hDC, Text.c_str(), textLen, 0, NULL, alpDx, &sz);
             if (sz.cx > maxWidth)
             {
                 int width = sz.cx;
@@ -235,14 +191,14 @@ BOOL CTruncatedString::TruncateText(HWND hWindow, BOOL forMessageBox)
                     index--;
                 }
                 // the first part with the shortened substring
-                memcpy(TruncatedText, Text, index);
+                memcpy(TruncatedText.data(), Text.c_str(), index);
                 // ellipsis
-                memcpy(TruncatedText + index, "...", 3);
+                memcpy(TruncatedText.data() + index, "...", 3);
                 // the rest
-                strcpy(TruncatedText + index + 3, Text + SubStrIndex + SubStrLen);
+                strcpy(TruncatedText.data() + index + 3, Text.c_str() + SubStrIndex + SubStrLen);
             }
             else
-                memcpy(TruncatedText, Text, textLen + 1); // just copy -— we still fit
+                memcpy(TruncatedText.data(), Text.c_str(), textLen + 1); // just copy -— we still fit
         }
     }
 
@@ -1164,7 +1120,7 @@ void WINAPI InternalGetSize()
 {
     if (TransferIsDir && !TransferFileData->SizeValid) // only directories without a known size
     {
-        memmove(TransferBuffer, DirColumnStr, DirColumnStrLen);
+        memmove(TransferBuffer, DirColumnStr.c_str(), DirColumnStrLen);
         TransferLen = DirColumnStrLen;
     }
     else
@@ -1204,7 +1160,7 @@ void WINAPI InternalGetType()
     if (TransferIsDir) // we will have to handle directories differently
     {
         TransferLen = TransferIsDir == 1 ? FolderTypeNameLen : UpDirTypeNameLen;
-        memcpy(TransferBuffer, TransferIsDir == 1 ? FolderTypeName : UpDirTypeName, TransferLen);
+        memcpy(TransferBuffer, TransferIsDir == 1 ? FolderTypeName : UpDirTypeName.c_str(), TransferLen);
     }
     else
     {
@@ -1538,7 +1494,7 @@ BOOL CSalamanderView::SetColumnName(int index, const char* name, const char* des
             s++;
         if (s == name + COLUMN_NAME_MAX || beg == s)
         {
-            TRACE_E("CSalamanderView::SetColumnName(): name is not double string (names of Name and Ext columns are expected) or second string is empty.");
+            TRACE_E("CSalamanderView::SetColumnName(): name is not double string (names of Name.c_str() and Ext columns are expected) or second string is empty.");
             return FALSE;
         }
         const char* s2 = description + strlen(description) + 1;
@@ -1547,7 +1503,7 @@ BOOL CSalamanderView::SetColumnName(int index, const char* name, const char* des
             s2++;
         if (s2 == description + COLUMN_DESCRIPTION_MAX || beg == s2)
         {
-            TRACE_E("CSalamanderView::SetColumnName(): description is not double string (descriptions of Name and Ext columns are expected) or second string is empty.");
+            TRACE_E("CSalamanderView::SetColumnName(): description is not double string (descriptions of Name.c_str() and Ext columns are expected) or second string is empty.");
             return FALSE;
         }
         // copy the double strings
@@ -1587,7 +1543,7 @@ BOOL CSalamanderView::DeleteColumn(int index)
     }
     if (index == 0)
     {
-        TRACE_E("CSalamanderView::DeleteColumn(): index=" << index << " Name column can't be deleted.");
+        TRACE_E("CSalamanderView::DeleteColumn(): index=" << index << " Name.c_str() column can't be deleted.");
         return FALSE;
     }
     Panel->Columns.Delete(index);
@@ -1607,26 +1563,24 @@ CFileHistoryItem::CFileHistoryItem(CFileHistoryItemTypeEnum type, DWORD handlerI
 {
     Type = type;
     HandlerID = handlerID;
-    FileName = DupStr(fileName);
+    FileName = fileName;
     HIcon = NULL;
-    if (FileName == NULL)
+    if (FileName.empty())
         return;
 
     // try to pull the icon from the system
-    HIcon = GetFileOrPathIconAux(FileName, FALSE, FALSE);
+    HIcon = GetFileOrPathIconAux(FileName.c_str(), FALSE, FALSE);
 }
 
 CFileHistoryItem::~CFileHistoryItem()
 {
-    if (FileName != NULL)
-        free(FileName);
     if (HIcon != NULL)
         HANDLES(DestroyIcon(HIcon));
 }
 
 BOOL CFileHistoryItem::Equal(CFileHistoryItemTypeEnum type, DWORD handlerID, const char* fileName)
 {
-    return (Type == type && HandlerID == handlerID && lstrcmp(FileName, fileName) == 0);
+    return (Type == type && HandlerID == handlerID && lstrcmp(FileName.c_str(), fileName) == 0);
 }
 
 BOOL CFileHistoryItem::Execute()
@@ -1636,15 +1590,15 @@ BOOL CFileHistoryItem::Execute()
     switch (Type)
     {
     case fhitView:
-        panel->ViewFile(FileName, FALSE, HandlerID, -1, -1);
+        panel->ViewFile(const_cast<char*>(FileName.c_str()), FALSE, HandlerID, -1, -1);
         break;
     case fhitEdit:
-        panel->EditFile(FileName, HandlerID);
+        panel->EditFile(const_cast<char*>(FileName.c_str()), HandlerID);
         break;
     case fhitOpen:
     {
         CPathBuffer buff; // Heap-allocated for long path support
-        lstrcpyn(buff, FileName, buff.Size());
+        lstrcpyn(buff, FileName.c_str(), buff.Size());
         char* ptr = strrchr(buff.Get(), '\\');
         if (ptr != NULL)
         {

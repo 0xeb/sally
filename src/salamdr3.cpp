@@ -1705,7 +1705,6 @@ CPathHistoryItem::CPathHistoryItem(int type, const char* pathOrArchiveOrFSName,
     PluginFS = NULL;
 
     TopIndex = -1;
-    FocusedName = NULL;
 
     if (Type == 0) // disk
     {
@@ -1717,26 +1716,12 @@ CPathHistoryItem::CPathHistoryItem(int type, const char* pathOrArchiveOrFSName,
         {
             if (*(e - 1) == '\\')
                 e--;
-            PathOrArchiveOrFSName = (char*)malloc((e - pathOrArchiveOrFSName) + 1);
-            if (PathOrArchiveOrFSName != NULL)
-            {
-                memcpy(PathOrArchiveOrFSName, pathOrArchiveOrFSName, e - pathOrArchiveOrFSName);
-                PathOrArchiveOrFSName[e - pathOrArchiveOrFSName] = 0;
-            }
+            PathOrArchiveOrFSName.assign(pathOrArchiveOrFSName, e - pathOrArchiveOrFSName);
         }
         else // it's a normal root path (c:\)
         {
-            PathOrArchiveOrFSName = DupStr(root);
+            PathOrArchiveOrFSName = root.Get();
         }
-        if (PathOrArchiveOrFSName == NULL)
-        {
-            TRACE_E(LOW_MEMORY);
-            if (PathOrArchiveOrFSName != NULL)
-                free(PathOrArchiveOrFSName);
-            PathOrArchiveOrFSName = NULL;
-            HIcon = NULL;
-        }
-        ArchivePathOrFSUserPart = NULL;
     }
     else
     {
@@ -1744,19 +1729,8 @@ CPathHistoryItem::CPathHistoryItem(int type, const char* pathOrArchiveOrFSName,
         {
             if (Type == 2)
                 PluginFS = pluginFS;
-            PathOrArchiveOrFSName = DupStr(pathOrArchiveOrFSName);
-            ArchivePathOrFSUserPart = DupStr(archivePathOrFSUserPart);
-            if (PathOrArchiveOrFSName == NULL || ArchivePathOrFSUserPart == NULL)
-            {
-                TRACE_E(LOW_MEMORY);
-                if (PathOrArchiveOrFSName != NULL)
-                    free(PathOrArchiveOrFSName);
-                if (ArchivePathOrFSUserPart != NULL)
-                    free(ArchivePathOrFSUserPart);
-                PathOrArchiveOrFSName = NULL;
-                ArchivePathOrFSUserPart = NULL;
-                HIcon = NULL;
-            }
+            PathOrArchiveOrFSName = pathOrArchiveOrFSName;
+            ArchivePathOrFSUserPart = archivePathOrFSUserPart;
         }
         else
             TRACE_E("CPathHistoryItem::CPathHistoryItem(): unknown 'type'");
@@ -1765,12 +1739,6 @@ CPathHistoryItem::CPathHistoryItem(int type, const char* pathOrArchiveOrFSName,
 
 CPathHistoryItem::~CPathHistoryItem()
 {
-    if (FocusedName != NULL)
-        free(FocusedName);
-    if (PathOrArchiveOrFSName != NULL)
-        free(PathOrArchiveOrFSName);
-    if (ArchivePathOrFSUserPart != NULL)
-        free(ArchivePathOrFSUserPart);
     if (HIcon != NULL)
         HANDLES(DestroyIcon(HIcon));
 }
@@ -1778,16 +1746,15 @@ CPathHistoryItem::~CPathHistoryItem()
 void CPathHistoryItem::ChangeData(int topIndex, const char* focusedName)
 {
     TopIndex = topIndex;
-    if (FocusedName != NULL)
+    if (!FocusedName.empty())
     {
-        if (focusedName != NULL && strcmp(FocusedName, focusedName) == 0)
+        if (focusedName != NULL && strcmp(FocusedName.c_str(), focusedName) == 0)
             return; // no change -> end
-        free(FocusedName);
     }
     if (focusedName != NULL)
-        FocusedName = DupStr(focusedName);
+        FocusedName = focusedName;
     else
-        FocusedName = NULL;
+        FocusedName.clear();
 }
 
 void CPathHistoryItem::GetPath(char* buffer, int bufferSize)
@@ -1795,21 +1762,21 @@ void CPathHistoryItem::GetPath(char* buffer, int bufferSize)
     char* origBuffer = buffer;
     if (bufferSize == 0)
         return;
-    if (PathOrArchiveOrFSName == NULL)
+    if (PathOrArchiveOrFSName.empty())
     {
         buffer[0] = 0;
         return;
     }
-    int l = (int)strlen(PathOrArchiveOrFSName) + 1;
+    int l = (int)PathOrArchiveOrFSName.length() + 1;
     if (l > bufferSize)
         l = bufferSize;
-    memcpy(buffer, PathOrArchiveOrFSName, l - 1);
+    memcpy(buffer, PathOrArchiveOrFSName.c_str(), l - 1);
     buffer[l - 1] = 0;
     if (Type == 1 || Type == 2) // archive or FS
     {
         buffer += l - 1;
         bufferSize -= l - 1;
-        char* s = ArchivePathOrFSUserPart;
+        const char* s = ArchivePathOrFSUserPart.c_str();
         if (*s != 0 || Type == 2)
         {
             if (bufferSize >= 2) // add '\\' or ':'
@@ -1911,13 +1878,13 @@ BOOL CPathHistoryItem::Execute(CFilesWindow* panel)
 {
     BOOL ret = TRUE; // normally return success
     CPathBuffer errBuf;
-    if (PathOrArchiveOrFSName != NULL) // valid data
+    if (!PathOrArchiveOrFSName.empty()) // valid data
     {
         int failReason;
         BOOL clear = TRUE;
         if (Type == 0) // disk
         {
-            if (!panel->ChangePathToDisk(panel->HWindow, PathOrArchiveOrFSName, TopIndex, FocusedName, NULL,
+            if (!panel->ChangePathToDisk(panel->HWindow, PathOrArchiveOrFSName.c_str(), TopIndex, FocusedName.empty() ? NULL : FocusedName.c_str(), NULL,
                                          TRUE, FALSE, FALSE, &failReason))
             {
                 if (failReason == CHPPFR_CANNOTCLOSEPATH)
@@ -1931,8 +1898,8 @@ BOOL CPathHistoryItem::Execute(CFilesWindow* panel)
         {
             if (Type == 1) // archive
             {
-                if (!panel->ChangePathToArchive(PathOrArchiveOrFSName, ArchivePathOrFSUserPart, TopIndex,
-                                                FocusedName, FALSE, NULL, TRUE, &failReason, FALSE, FALSE, TRUE))
+                if (!panel->ChangePathToArchive(PathOrArchiveOrFSName.c_str(), ArchivePathOrFSUserPart.c_str(), TopIndex,
+                                                FocusedName.empty() ? NULL : FocusedName.c_str(), FALSE, NULL, TRUE, &failReason, FALSE, FALSE, TRUE))
                 {
                     if (failReason == CHPPFR_CANNOTCLOSEPATH)
                     {
@@ -1943,7 +1910,7 @@ BOOL CPathHistoryItem::Execute(CFilesWindow* panel)
                     {
                         if (failReason == CHPPFR_SHORTERPATH || failReason == CHPPFR_FILENAMEFOCUSED)
                         {
-                            std::wstring msg = FormatStrW(LoadStrW(IDS_PATHINARCHIVENOTFOUND), AnsiToWide(ArchivePathOrFSUserPart).c_str());
+                            std::wstring msg = FormatStrW(LoadStrW(IDS_PATHINARCHIVENOTFOUND), AnsiToWide(ArchivePathOrFSUserPart.c_str()).c_str());
                             gPrompter->ShowError(LoadStrW(IDS_ERRORCHANGINGDIR), msg.c_str());
                         }
                     }
@@ -1969,8 +1936,8 @@ BOOL CPathHistoryItem::Execute(CFilesWindow* panel)
                                 done = TRUE;
                                 // try changing to requested path (it was there last time, don't need to test IsOurPath),
                                 // also reconnect detached FS
-                                if (!panel->ChangePathToDetachedFS(i, TopIndex, FocusedName, TRUE, &failReason,
-                                                                   PathOrArchiveOrFSName, ArchivePathOrFSUserPart))
+                                if (!panel->ChangePathToDetachedFS(i, TopIndex, FocusedName.empty() ? NULL : FocusedName.c_str(), TRUE, &failReason,
+                                                                   PathOrArchiveOrFSName.c_str(), ArchivePathOrFSUserPart.c_str()))
                                 {
                                     if (failReason == CHPPFR_CANNOTCLOSEPATH)
                                     {
@@ -1992,19 +1959,19 @@ BOOL CPathHistoryItem::Execute(CFilesWindow* panel)
                     if (!done && MainWindow != NULL &&
                         (!panel->Is(ptPluginFS) || // FS interface in panel cannot list the path
                          !panel->GetPluginFS()->Contains(PluginFS) &&
-                             !panel->IsPathFromActiveFS(PathOrArchiveOrFSName, ArchivePathOrFSUserPart,
+                             !panel->IsPathFromActiveFS(PathOrArchiveOrFSName.c_str(), ArchivePathOrFSUserPart.data(),
                                                         fsNameIndex, convertPathToInternalDummy)))
                     {
                         CDetachedFSList* list = MainWindow->DetachedFSList;
                         int i;
                         for (i = 0; i < list->Count; i++)
                         {
-                            if (list->At(i)->IsPathFromThisFS(PathOrArchiveOrFSName, ArchivePathOrFSUserPart))
+                            if (list->At(i)->IsPathFromThisFS(PathOrArchiveOrFSName.c_str(), ArchivePathOrFSUserPart.c_str()))
                             {
                                 done = TRUE;
                                 // try changing to requested path, also reconnect detached FS
-                                if (!panel->ChangePathToDetachedFS(i, TopIndex, FocusedName, TRUE, &failReason,
-                                                                   PathOrArchiveOrFSName, ArchivePathOrFSUserPart))
+                                if (!panel->ChangePathToDetachedFS(i, TopIndex, FocusedName.empty() ? NULL : FocusedName.c_str(), TRUE, &failReason,
+                                                                   PathOrArchiveOrFSName.c_str(), ArchivePathOrFSUserPart.c_str()))
                                 {
                                     if (failReason == CHPPFR_SHORTERPATH) // almost success (path is just shortened) (CHPPFR_FILENAMEFOCUSED not a risk here)
                                     {                                     // restore FS interface record
@@ -2031,8 +1998,8 @@ BOOL CPathHistoryItem::Execute(CFilesWindow* panel)
                     // when nothing else works, open new FS interface or just change path on active FS interface
                     if (!done)
                     {
-                        if (!panel->ChangePathToPluginFS(PathOrArchiveOrFSName, ArchivePathOrFSUserPart, TopIndex,
-                                                         FocusedName, FALSE, 2, NULL, TRUE, &failReason))
+                        if (!panel->ChangePathToPluginFS(PathOrArchiveOrFSName.c_str(), ArchivePathOrFSUserPart.c_str(), TopIndex,
+                                                         FocusedName.empty() ? NULL : FocusedName.c_str(), FALSE, 2, NULL, TRUE, &failReason))
                         {
                             if (failReason == CHPPFR_SHORTERPATH ||   // almost success (path is just shortened)
                                 failReason == CHPPFR_FILENAMEFOCUSED) // almost success (path just changed to file and it was focused)
@@ -2079,8 +2046,8 @@ BOOL CPathHistoryItem::IsTheSamePath(CPathHistoryItem& item, CPluginFSInterfaceE
         {
             if (Type == 1) // archivee
             {
-                if (StrICmp(PathOrArchiveOrFSName, item.PathOrArchiveOrFSName) == 0 &&  // archive file is "case-insensitive"
-                    strcmp(ArchivePathOrFSUserPart, item.ArchivePathOrFSUserPart) == 0) // path in archive is "case-sensitive"
+                if (StrICmp(PathOrArchiveOrFSName.c_str(), item.PathOrArchiveOrFSName.c_str()) == 0 &&  // archive file is "case-insensitive"
+                    strcmp(ArchivePathOrFSUserPart.c_str(), item.ArchivePathOrFSUserPart.c_str()) == 0) // path in archive is "case-sensitive"
                 {
                     return TRUE;
                 }
@@ -2089,16 +2056,16 @@ BOOL CPathHistoryItem::IsTheSamePath(CPathHistoryItem& item, CPluginFSInterfaceE
             {
                 if (Type == 2) // FS
                 {
-                    if (StrICmp(PathOrArchiveOrFSName, item.PathOrArchiveOrFSName) == 0) // fs-name is "case-insensitive"
+                    if (StrICmp(PathOrArchiveOrFSName.c_str(), item.PathOrArchiveOrFSName.c_str()) == 0) // fs-name is "case-insensitive"
                     {
-                        if (strcmp(ArchivePathOrFSUserPart, item.ArchivePathOrFSUserPart) == 0) // fs-user-part is "case-sensitive"
+                        if (strcmp(ArchivePathOrFSUserPart.c_str(), item.ArchivePathOrFSUserPart.c_str()) == 0) // fs-user-part is "case-sensitive"
                             return TRUE;
                         if (curPluginFS != NULL && // also handle case when both fs-user-parts are identical because FS returns TRUE from IsCurrentPath for them (generally we would need to introduce method for comparing two fs-user-parts, but I don't want to do it just for histories, maybe later...)
-                            StrICmp(PathOrArchiveOrFSName, curPluginFS->GetPluginFSName()) == 0)
+                            StrICmp(PathOrArchiveOrFSName.c_str(), curPluginFS->GetPluginFSName()) == 0)
                         {
                             int fsNameInd = curPluginFS->GetPluginFSNameIndex();
-                            if (curPluginFS->IsCurrentPath(fsNameInd, fsNameInd, ArchivePathOrFSUserPart) &&
-                                curPluginFS->IsCurrentPath(fsNameInd, fsNameInd, item.ArchivePathOrFSUserPart))
+                            if (curPluginFS->IsCurrentPath(fsNameInd, fsNameInd, ArchivePathOrFSUserPart.c_str()) &&
+                                curPluginFS->IsCurrentPath(fsNameInd, fsNameInd, item.ArchivePathOrFSUserPart.c_str()))
                             {
                                 return TRUE;
                             }
@@ -2288,7 +2255,7 @@ void CPathHistory::Execute(int index, BOOL forward, CFilesWindow* panel, BOOL al
 
     if (NewItem != NULL)
     {
-        AddPathUnique(NewItem->Type, NewItem->PathOrArchiveOrFSName, NewItem->ArchivePathOrFSUserPart,
+        AddPathUnique(NewItem->Type, NewItem->PathOrArchiveOrFSName.c_str(), NewItem->ArchivePathOrFSUserPart.c_str(),
                       NewItem->HIcon, NewItem->PluginFS, NULL);
         NewItem->HIcon = NULL; // AddPathUnique method took over responsibility for icon destruction
         delete NewItem;
@@ -2511,7 +2478,7 @@ void CPathHistory::SaveToRegistry(HKEY hKey, const char* name, BOOL onlyClear)
                 {
                 case 0: // disk
                 {
-                    strcpy(path, item->PathOrArchiveOrFSName);
+                    strcpy(path, item->PathOrArchiveOrFSName.c_str());
                     break;
                 }
 
@@ -2520,10 +2487,10 @@ void CPathHistory::SaveToRegistry(HKEY hKey, const char* name, BOOL onlyClear)
                 case 1: // archive
                 case 2: // FS
                 {
-                    lstrcpyn(path, item->PathOrArchiveOrFSName, path.Size());
+                    lstrcpyn(path, item->PathOrArchiveOrFSName.c_str(), path.Size());
                     StrNCat(path, ":", path.Size());
-                    if (item->ArchivePathOrFSUserPart != NULL)
-                        StrNCat(path, item->ArchivePathOrFSUserPart, path.Size());
+                    if (!item->ArchivePathOrFSUserPart.empty())
+                        StrNCat(path, item->ArchivePathOrFSUserPart.c_str(), path.Size());
                     break;
                 }
                 default:
@@ -2914,12 +2881,11 @@ void CUserMenuIconBkgndReader::LeaveCSAfterUMIconsUpdate()
 // CUserMenuItem
 //
 
-CUserMenuItem::CUserMenuItem(char* name, char* umCommand, char* arguments, char* initDir, char* icon,
+CUserMenuItem::CUserMenuItem(const char* name, const char* umCommand, const char* arguments, const char* initDir, const char* icon,
                              int throughShell, int closeShell, int useWindow, int showInToolbar, CUserMenuItemType type,
                              CUserMenuIconDataArr* bkgndReaderData)
 {
     UMIcon = NULL;
-    ItemName = UMCommand = Arguments = InitDir = Icon = NULL;
     ThroughShell = throughShell;
     CloseShell = closeShell;
     UseWindow = useWindow;
@@ -2933,7 +2899,6 @@ CUserMenuItem::CUserMenuItem(char* name, char* umCommand, char* arguments, char*
 CUserMenuItem::CUserMenuItem()
 {
     UMIcon = NULL;
-    ItemName = UMCommand = Arguments = InitDir = Icon = NULL;
     ThroughShell = TRUE;
     CloseShell = TRUE;
     UseWindow = TRUE;
@@ -2948,13 +2913,12 @@ CUserMenuItem::CUserMenuItem()
 CUserMenuItem::CUserMenuItem(CUserMenuItem& item, CUserMenuIconDataArr* bkgndReaderData)
 {
     UMIcon = NULL;
-    ItemName = UMCommand = Arguments = InitDir = Icon = NULL;
     ThroughShell = item.ThroughShell;
     CloseShell = item.CloseShell;
     UseWindow = item.UseWindow;
     ShowInToolbar = item.ShowInToolbar;
     Type = item.Type;
-    Set(item.ItemName, item.UMCommand, item.Arguments, item.InitDir, item.Icon);
+    Set(item.ItemName.c_str(), item.UMCommand.c_str(), item.Arguments.c_str(), item.InitDir.c_str(), item.Icon.c_str());
     if (Type == umitItem)
     {
         if (bkgndReaderData == NULL) // here it's a copy to cfg dialog, we don't propagate newly loaded icons there (wait until dialog end)
@@ -2979,54 +2943,16 @@ CUserMenuItem::~CUserMenuItem()
     // umitSubmenuBegin shares one icon
     if (UMIcon != NULL && Type != umitSubmenuBegin)
         HANDLES(DestroyIcon(UMIcon));
-    if (ItemName != NULL)
-        free(ItemName);
-    if (UMCommand != NULL)
-        free(UMCommand);
-    if (Arguments != NULL)
-        free(Arguments);
-    if (InitDir != NULL)
-        free(InitDir);
-    if (Icon != NULL)
-        free(Icon);
+    // std::string members auto-destroyed
 }
 
-BOOL CUserMenuItem::Set(char* name, char* umCommand, char* arguments, char* initDir, char* icon)
+BOOL CUserMenuItem::Set(const char* name, const char* umCommand, const char* arguments, const char* initDir, const char* icon)
 {
-    char* itemName = (char*)malloc(strlen(name) + 1);
-    char* commandName = (char*)malloc(strlen(umCommand) + 1);
-    char* argumentsName = (char*)malloc(strlen(arguments) + 1);
-    char* initDirName = (char*)malloc(strlen(initDir) + 1);
-    char* iconName = (char*)malloc(strlen(icon) + 1);
-    if (itemName == NULL || commandName == NULL ||
-        argumentsName == NULL || initDirName == NULL || iconName == NULL)
-    {
-        TRACE_E(LOW_MEMORY);
-        return FALSE;
-    }
-
-    strcpy(itemName, name);
-    strcpy(commandName, umCommand);
-    strcpy(argumentsName, arguments);
-    strcpy(initDirName, initDir);
-    strcpy(iconName, icon);
-
-    if (ItemName != NULL)
-        free(ItemName);
-    if (UMCommand != NULL)
-        free(UMCommand);
-    if (Arguments != NULL)
-        free(Arguments);
-    if (InitDir != NULL)
-        free(InitDir);
-    if (Icon != NULL)
-        free(Icon);
-
-    ItemName = itemName;
-    UMCommand = commandName;
-    Arguments = argumentsName;
-    InitDir = initDirName;
-    Icon = iconName;
+    ItemName = name;
+    UMCommand = umCommand;
+    Arguments = arguments;
+    InitDir = initDir;
+    Icon = icon;
     return TRUE;
 }
 
@@ -3070,17 +2996,18 @@ BOOL CUserMenuItem::GetIconHandle(CUserMenuIconDataArr* bkgndReaderData, BOOL ge
     CPathBuffer fileName; // Heap-allocated for long path support
     fileName[0] = 0;
     DWORD iconIndex = -1;
-    if (MainWindow != NULL && Icon != NULL && Icon[0] != 0)
+    if (MainWindow != NULL && !Icon.empty())
     {
         // Icon is in format "filename,resID"
         // perform decomposition
-        char* iterator = Icon + strlen(Icon) - 1;
-        while (iterator > Icon && *iterator != ',')
+        const char* iconStr = Icon.c_str();
+        const char* iterator = iconStr + Icon.length() - 1;
+        while (iterator > iconStr && *iterator != ',')
             iterator--;
-        if (iterator > Icon && *iterator == ',')
+        if (iterator > iconStr && *iterator == ',')
         {
-            strncpy(fileName, Icon, iterator - Icon);
-            fileName[iterator - Icon] = 0;
+            strncpy(fileName, iconStr, iterator - iconStr);
+            fileName[iterator - iconStr] = 0;
             iterator++;
             iconIndex = atoi(iterator);
         }
@@ -3097,8 +3024,8 @@ BOOL CUserMenuItem::GetIconHandle(CUserMenuIconDataArr* bkgndReaderData, BOOL ge
 
     // in case previous method failed - try to get icon from system
     CPathBuffer umCommand; // Heap-allocated for long path support
-    if (MainWindow != NULL && UMCommand != NULL && UMCommand[0] != 0 &&
-        ExpandCommand(MainWindow->HWindow, UMCommand, umCommand, umCommand.Size(), TRUE))
+    if (MainWindow != NULL && !UMCommand.empty() &&
+        ExpandCommand(MainWindow->HWindow, UMCommand.c_str(), umCommand, umCommand.Size(), TRUE))
     {
         while (strlen(umCommand) > 2 && CutDoubleQuotesFromBothSides(umCommand))
             ;
@@ -3136,9 +3063,9 @@ BOOL CUserMenuItem::GetIconHandle(CUserMenuIconDataArr* bkgndReaderData, BOOL ge
 
 BOOL CUserMenuItem::GetHotKey(char* key)
 {
-    if (ItemName == NULL || Type == umitSeparator)
+    if (ItemName.empty() || Type == umitSeparator)
         return FALSE;
-    char* iterator = ItemName;
+    const char* iterator = ItemName.c_str();
     while (*iterator != 0)
     {
         if (*iterator == '&' && *(iterator + 1) != 0 && *(iterator + 1) != '&')
@@ -3396,7 +3323,6 @@ BOOL ReleaseMenuWheelHook()
 
 CFileTimeStampsItem::CFileTimeStampsItem()
 {
-    DosFileName = FileName = SourcePath = ZIPRoot = NULL;
     memset(&LastWrite, 0, sizeof(LastWrite));
     FileSize = CQuadWord(0, 0);
     Attr = 0;
@@ -3404,15 +3330,6 @@ CFileTimeStampsItem::CFileTimeStampsItem()
 
 CFileTimeStampsItem::~CFileTimeStampsItem()
 {
-    if (ZIPRoot != NULL)
-        free(ZIPRoot);
-    if (SourcePath != NULL)
-        free(SourcePath);
-    if (FileName != NULL)
-        free(FileName);
-    if (DosFileName != NULL)
-        free(DosFileName);
-    DosFileName = FileName = SourcePath = ZIPRoot = NULL;
 }
 
 BOOL CFileTimeStampsItem::Set(const char* zipRoot, const char* sourcePath, const char* fileName,
@@ -3421,28 +3338,21 @@ BOOL CFileTimeStampsItem::Set(const char* zipRoot, const char* sourcePath, const
 {
     if (*zipRoot == '\\')
         zipRoot++;
-    ZIPRoot = DupStr(zipRoot);
-    if (ZIPRoot != NULL) // zip-root has no '\\' at beginning or end
-    {
-        int l = (int)strlen(ZIPRoot);
-        if (l > 0 && ZIPRoot[l - 1] == '\\')
-            ZIPRoot[l - 1] = 0;
-    }
-    SourcePath = DupStr(sourcePath);
-    if (SourcePath != NULL) // source-path has no '\\' at end
-    {
-        int l = (int)strlen(SourcePath);
-        if (l > 0 && SourcePath[l - 1] == '\\')
-            SourcePath[l - 1] = 0;
-    }
-    FileName = DupStr(fileName);
+    ZIPRoot = zipRoot;
+    // zip-root has no '\\' at beginning or end
+    if (!ZIPRoot.empty() && ZIPRoot.back() == '\\')
+        ZIPRoot.pop_back();
+    SourcePath = sourcePath;
+    // source-path has no '\\' at end
+    if (!SourcePath.empty() && SourcePath.back() == '\\')
+        SourcePath.pop_back();
+    FileName = fileName;
     if (dosFileName[0] != 0)
-        DosFileName = DupStr(dosFileName);
+        DosFileName = dosFileName;
     LastWrite = lastWrite;
     FileSize = fileSize;
     Attr = attr;
-    return ZIPRoot != NULL && SourcePath != NULL && FileName != NULL &&
-           (DosFileName != NULL || dosFileName[0] == 0);
+    return TRUE;
 }
 
 //
@@ -3480,8 +3390,8 @@ BOOL CFileTimeStamps::AddFile(const char* zipFile, const char* zipRoot, const ch
     for (i = 0; i < List.Count; i++)
     {
         CFileTimeStampsItem* item2 = List[i];
-        if (StrICmp(item->FileName, item2->FileName) == 0 &&
-            StrICmp(item->SourcePath, item2->SourcePath) == 0)
+        if (StrICmp(item->FileName.c_str(), item2->FileName.c_str()) == 0 &&
+            StrICmp(item->SourcePath.c_str(), item2->SourcePath.c_str()) == 0)
         {
             delete item;
             return FALSE; // already here, don't add another ...
@@ -3532,7 +3442,7 @@ const char* WINAPI FileTimeStampsEnum2(HWND parent, int enumFiles, const char** 
     {
         CFileTimeStampsItem* item = data->PackList->At(data->Index++);
         if (dosName != NULL)
-            *dosName = (item->DosFileName == NULL) ? item->FileName : item->DosFileName;
+            *dosName = item->DosFileName.empty() ? item->FileName.c_str() : item->DosFileName.c_str();
         if (isDir != NULL)
             *isDir = FALSE;
         if (size != NULL)
@@ -3541,7 +3451,7 @@ const char* WINAPI FileTimeStampsEnum2(HWND parent, int enumFiles, const char** 
             *attr = item->Attr;
         if (lastWrite != NULL)
             *lastWrite = item->LastWrite;
-        return item->FileName;
+        return item->FileName.c_str();
     }
     else
         return NULL;
@@ -3553,8 +3463,8 @@ void CFileTimeStamps::AddFilesToListBox(HWND list)
     for (i = 0; i < List.Count; i++)
     {
         CPathBuffer buf; // Heap-allocated for long path support
-        strcpy(buf, List[i]->ZIPRoot);
-        SalPathAppend(buf, List[i]->FileName, buf.Size());
+        strcpy(buf, List[i]->ZIPRoot.c_str());
+        SalPathAppend(buf, List[i]->FileName.c_str(), buf.Size());
         SendMessage(list, LB_ADDSTRING, 0, (LPARAM)buf.Get());
     }
 }
@@ -3624,13 +3534,13 @@ void CFileTimeStamps::CopyFilesTo(HWND parent, int* indexes, int count, const ch
             {
                 CFileTimeStampsItem* item = List[index];
                 CPathBuffer name; // Heap-allocated for long path support
-                strcpy(name, item->SourcePath);
-                tooLongName |= !SalPathAppend(name, item->FileName, name.Size());
+                strcpy(name, item->SourcePath.c_str());
+                tooLongName |= !SalPathAppend(name, item->FileName.c_str(), name.Size());
                 ok &= fromStr.Add(name, (int)strlen(name) + 1);
 
                 strcpy(name, path);
-                tooLongName |= !SalPathAppend(name, item->ZIPRoot, name.Size());
-                tooLongName |= !SalPathAppend(name, item->FileName, name.Size());
+                tooLongName |= !SalPathAppend(name, item->ZIPRoot.c_str(), name.Size());
+                tooLongName |= !SalPathAppend(name, item->FileName.c_str(), name.Size());
                 ok &= toStr.Add(name, (int)strlen(name) + 1);
             }
         }
@@ -3725,19 +3635,19 @@ void CFileTimeStamps::CheckAndPackAndClear(HWND parent, BOOL* someFilesChanged, 
                     while (!showDlg && List.Count > 0)
                     {
                         CFileTimeStampsItem* item1 = List[0];
-                        char *r1, *s1;
+                        const char *r1, *s1;
                         if (item1 != NULL)
                         {
-                            r1 = item1->ZIPRoot;
-                            s1 = item1->SourcePath;
+                            r1 = item1->ZIPRoot.c_str();
+                            s1 = item1->SourcePath.c_str();
                             packList.Add(item1);
                             List.Detach(0);
                         }
                         for (i = List.Count - 1; i >= 0; i--) // quadratic complexity hopefully won't be a problem here
                         {                                     // going from back, because Detach is "simpler" that way
                             CFileTimeStampsItem* item2 = List[i];
-                            char* r2 = item2->ZIPRoot;
-                            char* s2 = item2->SourcePath;
+                            const char* r2 = item2->ZIPRoot.c_str();
+                            const char* s2 = item2->SourcePath.c_str();
                             if (strcmp(r1, r2) == 0 && // matching zip-root (case-sensitive comparison necessary - update test\A.txt and Test\b.txt must not happen at once)
                                 StrICmp(s1, s2) == 0)  // matching source-path
                             {
@@ -3950,7 +3860,7 @@ BOOL CFileHistory::FillPopupMenu(CMenuPopup* popup)
         CFileHistoryItem* item = Files[i];
 
         // separate name from path with '\t' character - it will be in separate column
-        lstrcpy(name, item->FileName);
+        lstrcpy(name, item->FileName.c_str());
         char* ptr = strrchr(name, '\\');
         if (ptr == NULL)
             return FALSE;

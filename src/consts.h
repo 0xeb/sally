@@ -1720,23 +1720,23 @@ extern int PasteLinkIsRunning; // if greater than zero, Paste Shortcuts command 
 
 extern BOOL CannotCloseSalMainWnd; // TRUE = main window must not be closed
 
-extern const char* DirColumnStr;      // LoadStr(IDS_DIRCOLUMN) - used too often, we cache it
+extern std::string DirColumnStr;      // LoadStr(IDS_DIRCOLUMN) - used too often, we cache it
 extern int DirColumnStrLen;           // string length
-extern const char* ColExtStr;         // LoadStr(IDS_COLUMN_NAME_EXT) - used too often, we cache it
+extern std::string ColExtStr;         // LoadStr(IDS_COLUMN_NAME_EXT) - used too often, we cache it
 extern int ColExtStrLen;              // string length
 extern int TextEllipsisWidth;         // width of "..." string displayed with 'Font' font
 extern int TextEllipsisWidthEnv;      // width of "..." string displayed with 'FontEnv' font
-extern const char* ProgDlgHoursStr;   // LoadStr(IDS_PROGDLGHOURS) - used too often, we cache it
-extern const char* ProgDlgMinutesStr; // LoadStr(IDS_PROGDLGMINUTES) - used too often, we cache it
-extern const char* ProgDlgSecsStr;    // LoadStr(IDS_PROGDLGSECS) - used too often, we cache it
+extern std::string ProgDlgHoursStr;   // LoadStr(IDS_PROGDLGHOURS) - used too often, we cache it
+extern std::string ProgDlgMinutesStr; // LoadStr(IDS_PROGDLGMINUTES) - used too often, we cache it
+extern std::string ProgDlgSecsStr;    // LoadStr(IDS_PROGDLGSECS) - used too often, we cache it
 
 extern char FolderTypeName[80];         // file-type for all directories (retrieved from system directory)
 extern int FolderTypeNameLen;           // FolderTypeName string length
-extern const char* UpDirTypeName;       // LoadStr(IDS_UPDIRTYPENAME) - used too often, we cache it
+extern std::string UpDirTypeName;       // LoadStr(IDS_UPDIRTYPENAME) - used too often, we cache it
 extern int UpDirTypeNameLen;            // string length
-extern const char* CommonFileTypeName;  // LoadStr(IDS_COMMONFILETYPE) - used too often, we cache it
+extern std::string CommonFileTypeName;  // LoadStr(IDS_COMMONFILETYPE) - used too often, we cache it
 extern int CommonFileTypeNameLen;       // CommonFileTypeName string length
-extern const char* CommonFileTypeName2; // LoadStr(IDS_COMMONFILETYPE2) - used too often, we cache it
+extern std::string CommonFileTypeName2; // LoadStr(IDS_COMMONFILETYPE2) - used too often, we cache it
 
 extern CPathBuffer WindowsDirectory; // cached result of GetWindowsDirectory (heap-allocated)
 

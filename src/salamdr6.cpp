@@ -1,4 +1,4 @@
-﻿// SPDX-FileCopyrightText: 2023 Open Salamander Authors
+// SPDX-FileCopyrightText: 2023 Open Salamander Authors
 // SPDX-License-Identifier: GPL-2.0-or-later
 // CommentsTranslationProject: TRANSLATED
 
@@ -373,14 +373,13 @@ void AddValueToStdHistoryValues(char** historyArr, int historyItemsCount,
     {
         if (from == -1)
             from = historyItemsCount - 1;
-        char* text = (char*)malloc(strlen(value) + 1);
+        char* text = DupStr(value);
         if (text != NULL)
         {
             free(historyArr[from]);
             for (i = from - 1; i >= 0; i--)
                 historyArr[i + 1] = historyArr[i];
             historyArr[0] = text;
-            strcpy(historyArr[0], value);
         }
     }
 }
@@ -554,7 +553,7 @@ char* PrintTimeLeft(char* buf, CQuadWord const& secs)
     int off = 0;
     if (h > 0)
     {
-        int res = _snprintf_s(buf, 100, _TRUNCATE, ProgDlgHoursStr, h);
+        int res = _snprintf_s(buf, 100, _TRUNCATE, ProgDlgHoursStr.c_str(), h);
         if (res > 0)
             off += res;
     }
@@ -562,7 +561,7 @@ char* PrintTimeLeft(char* buf, CQuadWord const& secs)
     {
         if (off > 0 && off < 99)
             buf[off++] = ' ';
-        int res = _snprintf_s(buf + off, 100 - off, _TRUNCATE, ProgDlgMinutesStr, m);
+        int res = _snprintf_s(buf + off, 100 - off, _TRUNCATE, ProgDlgMinutesStr.c_str(), m);
         if (res > 0)
             off += res;
     }
@@ -570,7 +569,7 @@ char* PrintTimeLeft(char* buf, CQuadWord const& secs)
     {
         if (off > 0 && off < 99)
             buf[off++] = ' ';
-        int res = _snprintf_s(buf + off, 100 - off, _TRUNCATE, ProgDlgSecsStr, s);
+        int res = _snprintf_s(buf + off, 100 - off, _TRUNCATE, ProgDlgSecsStr.c_str(), s);
         if (res > 0)
             off += res;
     }
@@ -930,9 +929,7 @@ BOOL CNames::LoadFromClipboard(HWND hWindow)
 CDirectorySizes::CDirectorySizes(const char* path, BOOL caseSensitive)
     : Names(20, 50)
 {
-    Path = DupStr(path);
-    if (Path == NULL)
-        TRACE_E(LOW_MEMORY); // IsGood returns FALSE
+    Path = path;
     CaseSensitive = caseSensitive;
     NeedSort = FALSE;
 }
@@ -940,12 +937,6 @@ CDirectorySizes::CDirectorySizes(const char* path, BOOL caseSensitive)
 CDirectorySizes::~CDirectorySizes()
 {
     Clean();
-
-    if (Path != NULL)
-    {
-        free(Path);
-        Path = NULL;
-    }
 }
 
 void CDirectorySizes::Clean()
@@ -1132,7 +1123,7 @@ int CDirectorySizesHolder::GetIndex(const char* path)
     int i;
     for (i = 0; i < ItemsCount; i++)
     {
-        if (stricmp(Items[i]->Path, path) == 0)
+        if (stricmp(Items[i]->Path.c_str(), path) == 0)
             return i;
     }
     return -1;

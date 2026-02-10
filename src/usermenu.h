@@ -107,11 +107,11 @@ enum CUserMenuItemType
 
 struct CUserMenuItem
 {
-    char *ItemName,
-        *UMCommand,
-        *Arguments,
-        *InitDir,
-        *Icon;
+    std::string ItemName,
+        UMCommand,
+        Arguments,
+        InitDir,
+        Icon;
 
     int ThroughShell,
         CloseShell,
@@ -122,7 +122,7 @@ struct CUserMenuItem
 
     HICON UMIcon;
 
-    CUserMenuItem(char* name, char* umCommand, char* arguments, char* initDir, char* icon,
+    CUserMenuItem(const char* name, const char* umCommand, const char* arguments, const char* initDir, const char* icon,
                   int throughShell, int closeShell, int useWindow, int showInToolbar,
                   CUserMenuItemType type, CUserMenuIconDataArr* bkgndReaderData);
 
@@ -145,10 +145,9 @@ struct CUserMenuItem
     // searches ItemName for & and returns HotKey and TRUE when found
     BOOL GetHotKey(char* key);
 
-    BOOL Set(char* name, char* umCommand, char* arguments, char* initDir, char* icon);
+    BOOL Set(const char* name, const char* umCommand, const char* arguments, const char* initDir, const char* icon);
     void SetType(CUserMenuItemType type);
-    BOOL IsGood() { return ItemName != NULL && UMCommand != NULL &&
-                           Arguments != NULL && InitDir != NULL && Icon != NULL; }
+    BOOL IsGood() { return TRUE; }
 };
 
 //****************************************************************************

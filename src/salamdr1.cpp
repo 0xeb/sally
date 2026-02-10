@@ -1,4 +1,4 @@
-// SPDX-FileCopyrightText: 2023 Open Salamander Authors
+﻿// SPDX-FileCopyrightText: 2023 Open Salamander Authors
 // SPDX-License-Identifier: GPL-2.0-or-later
 // CommentsTranslationProject: TRANSLATED
 
@@ -176,23 +176,23 @@ BOOL ChangeDirectoryRequest = FALSE;
 
 BOOL SkipOneActivateRefresh = FALSE;
 
-const char* DirColumnStr = NULL;
+std::string DirColumnStr;
 int DirColumnStrLen = 0;
-const char* ColExtStr = NULL;
+std::string ColExtStr;
 int ColExtStrLen = 0;
 int TextEllipsisWidth = 0;
 int TextEllipsisWidthEnv = 0;
-const char* ProgDlgHoursStr = NULL;
-const char* ProgDlgMinutesStr = NULL;
-const char* ProgDlgSecsStr = NULL;
+std::string ProgDlgHoursStr;
+std::string ProgDlgMinutesStr;
+std::string ProgDlgSecsStr;
 
 char FolderTypeName[80] = "";
 int FolderTypeNameLen = 0;
-const char* UpDirTypeName = NULL;
+std::string UpDirTypeName;
 int UpDirTypeNameLen = 0;
-const char* CommonFileTypeName = NULL;
+std::string CommonFileTypeName;
 int CommonFileTypeNameLen = 0;
-const char* CommonFileTypeName2 = NULL;
+std::string CommonFileTypeName2;
 
 CPathBuffer WindowsDirectory; // Heap-allocated for long path support
 
@@ -818,59 +818,44 @@ BOOL SalamanderIsNotBusy(DWORD* lastIdleTime)
 
 BOOL InitPreloadedStrings()
 {
-    DirColumnStr = DupStr(LoadStr(IDS_DIRCOLUMN));
-    DirColumnStrLen = lstrlen(DirColumnStr);
+    DirColumnStr = LoadStr(IDS_DIRCOLUMN);
+    DirColumnStrLen = (int)DirColumnStr.length();
 
-    ColExtStr = DupStr(LoadStr(IDS_COLUMN_NAME_EXT));
-    ColExtStrLen = lstrlen(ColExtStr);
+    ColExtStr = LoadStr(IDS_COLUMN_NAME_EXT);
+    ColExtStrLen = (int)ColExtStr.length();
 
-    UpDirTypeName = DupStr(LoadStr(IDS_UPDIRTYPENAME));
-    UpDirTypeNameLen = lstrlen(UpDirTypeName);
+    UpDirTypeName = LoadStr(IDS_UPDIRTYPENAME);
+    UpDirTypeNameLen = (int)UpDirTypeName.length();
 
-    CommonFileTypeName = DupStr(LoadStr(IDS_COMMONFILETYPE));
-    CommonFileTypeNameLen = lstrlen(CommonFileTypeName);
-    CommonFileTypeName2 = DupStr(LoadStr(IDS_COMMONFILETYPE2));
+    CommonFileTypeName = LoadStr(IDS_COMMONFILETYPE);
+    CommonFileTypeNameLen = (int)CommonFileTypeName.length();
+    CommonFileTypeName2 = LoadStr(IDS_COMMONFILETYPE2);
 
-    ProgDlgHoursStr = DupStr(LoadStr(IDS_PROGDLGHOURS));
-    ProgDlgMinutesStr = DupStr(LoadStr(IDS_PROGDLGMINUTES));
-    ProgDlgSecsStr = DupStr(LoadStr(IDS_PROGDLGSECS));
+    ProgDlgHoursStr = LoadStr(IDS_PROGDLGHOURS);
+    ProgDlgMinutesStr = LoadStr(IDS_PROGDLGMINUTES);
+    ProgDlgSecsStr = LoadStr(IDS_PROGDLGSECS);
 
     return TRUE;
 }
 
 void ReleasePreloadedStrings()
 {
-    if (DirColumnStr != NULL)
-        free((void*)DirColumnStr);
-    if (ColExtStr != NULL)
-        free((void*)ColExtStr);
+    DirColumnStr.clear();
+    ColExtStr.clear();
 
-    if (UpDirTypeName != NULL)
-        free((void*)UpDirTypeName);
+    UpDirTypeName.clear();
 
-    if (CommonFileTypeName != NULL)
-        free((void*)CommonFileTypeName);
-    if (CommonFileTypeName2 != NULL)
-        free((void*)CommonFileTypeName2);
+    CommonFileTypeName.clear();
+    CommonFileTypeName2.clear();
 
-    if (ProgDlgHoursStr != NULL)
-        free((void*)ProgDlgHoursStr);
-    if (ProgDlgMinutesStr != NULL)
-        free((void*)ProgDlgMinutesStr);
-    if (ProgDlgSecsStr != NULL)
-        free((void*)ProgDlgSecsStr);
+    ProgDlgHoursStr.clear();
+    ProgDlgMinutesStr.clear();
+    ProgDlgSecsStr.clear();
 
-    DirColumnStr = NULL;
-    ColExtStr = NULL;
-
-    UpDirTypeName = NULL;
-
-    CommonFileTypeName = NULL;
-    CommonFileTypeName2 = NULL;
-
-    ProgDlgHoursStr = NULL;
-    ProgDlgMinutesStr = NULL;
-    ProgDlgSecsStr = NULL;
+    DirColumnStrLen = 0;
+    ColExtStrLen = 0;
+    UpDirTypeNameLen = 0;
+    CommonFileTypeNameLen = 0;
 }
 
 // ****************************************************************************
@@ -4714,7 +4699,7 @@ FIND_NEW_SLG_FILE:
                                                 if (data->GetPluginInterfaceForMenuExt()->NotEmpty())
                                                 {
                                                     CALL_STACK_MESSAGE4("CPluginInterfaceForMenuExt::ExecuteMenuItem(, , %d,) (%s v. %s)",
-                                                                        id, data->DLLName, data->Version);
+                                                                        id, data->DLLName.c_str(), data->Version.c_str());
 
                                                     // lower thread priority to "normal" (so operations do not overload the machine)
                                                     SetThreadPriority(GetCurrentThread(), THREAD_PRIORITY_NORMAL);
@@ -4765,7 +4750,7 @@ FIND_NEW_SLG_FILE:
                                                 activePanel->UserWorkedOnThisPath = TRUE;
                                                 activePanel->StoreSelection(); // store selection for Restore Selection command
                                                 activePanel->Pack(MainWindow->GetNonActivePanel(), pluginIndex,
-                                                                  data->Name, data->PackDlgDelFilesAfterPacking);
+                                                                  data->Name.c_str(), data->PackDlgDelFilesAfterPacking);
                                             }
                                             else
                                                 TRACE_E("Unexpected situation: type of active panel is not Disk!");
@@ -4783,14 +4768,12 @@ FIND_NEW_SLG_FILE:
                                                     activePanel->UserWorkedOnThisPath = TRUE;
                                                     activePanel->StoreSelection(); // store selection for Restore Selection command
                                                     activePanel->Unpack(MainWindow->GetNonActivePanel(), pluginIndex,
-                                                                        data->Name, data->UnpackDlgUnpackMask);
+                                                                        data->Name.c_str(), data->UnpackDlgUnpackMask.empty() ? NULL : data->UnpackDlgUnpackMask.c_str());
                                                 }
                                                 else
                                                     TRACE_E("Unexpected situation: type of active panel is not Disk!");
                                                 data->OpenUnpackDlg = FALSE;
-                                                if (data->UnpackDlgUnpackMask != NULL)
-                                                    free(data->UnpackDlgUnpackMask);
-                                                data->UnpackDlgUnpackMask = NULL;
+                                                data->UnpackDlgUnpackMask.clear();
                                             }
                                         }
                                         if (MainWindow != NULL && MainWindow->CanClose) // end of opening Pack/Unpack dialog

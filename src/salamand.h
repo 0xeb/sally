@@ -137,13 +137,13 @@ class CPathHistoryItem
 {
 protected:
     int Type;                             // type: 0 is a disk, 1 is an archive, 2 is FS
-    char* PathOrArchiveOrFSName;          // disk path or archive name or FS name
-    char* ArchivePathOrFSUserPart;        // path in an archive or the user part of an FS path
+    std::string PathOrArchiveOrFSName;    // disk path or archive name or FS name
+    std::string ArchivePathOrFSUserPart;  // path in an archive or the user part of an FS path
     HICON HIcon;                          // icon corresponding to the path (may be NULL); the icon will be destroyed in the destructor
     CPluginFSInterfaceAbstract* PluginFS; // only for Type==2: the last used interface for the FS path
 
     int TopIndex;      // top index at the time the panel state was saved
-    char* FocusedName; // focused item at the time the panel state was saved
+    std::string FocusedName; // focused item at the time the panel state was saved
 
 public:
     CPathHistoryItem(int type, const char* pathOrArchiveOrFSName,
@@ -254,13 +254,13 @@ protected:
     CFileHistoryItemTypeEnum Type; // how the file was accessed
     DWORD HandlerID;               // viewer/editor ID for repeating the action
     HICON HIcon;                   // icon associated with the file
-    char* FileName;                // file name
+    std::string FileName;          // file name
 
 public:
     CFileHistoryItem(CFileHistoryItemTypeEnum type, DWORD handlerID, const char* fileName);
     ~CFileHistoryItem();
 
-    BOOL IsGood() { return FileName != NULL; }
+    BOOL IsGood() { return !FileName.empty(); }
 
     // returns TRUE if the object was constructed from the specified data
     BOOL Equal(CFileHistoryItemTypeEnum type, DWORD handlerID, const char* fileName);
@@ -469,11 +469,12 @@ public:
 class CTruncatedString
 {
 protected:
-    char* Text;      // complete text
+    std::string Text;      // complete text
     int SubStrIndex; // index of the first character of the truncatable substring; -1 if it does not exist
     int SubStrLen;   // number of characters in the substring
 
-    char* TruncatedText; // truncated form of the text (if truncation was needed)
+    std::string TruncatedText; // truncated form of the text (if truncation was needed)
+    BOOL HasTruncated;         // TRUE if TruncatedText contains valid data
 
 public:
     CTruncatedString();
@@ -580,14 +581,14 @@ class CLanguage
 {
 public:
     // SLG file name (only name.spl)
-    char* FileName;
+    std::string FileName;
 
     // data retrieved from the SLG file
     WORD LanguageID;
-    WCHAR* AuthorW;
-    char* Web;
-    WCHAR* CommentW;
-    char* HelpDir;
+    std::wstring AuthorW;
+    std::string Web;
+    std::wstring CommentW;
+    std::string HelpDir;
 
 public:
     CLanguage();

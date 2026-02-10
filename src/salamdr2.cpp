@@ -1,4 +1,4 @@
-﻿// SPDX-FileCopyrightText: 2023 Open Salamander Authors
+// SPDX-FileCopyrightText: 2023 Open Salamander Authors
 // SPDX-License-Identifier: GPL-2.0-or-later
 // CommentsTranslationProject: TRANSLATED
 
@@ -2762,12 +2762,12 @@ BOOL SaveViewers(HKEY hKey, const char* name, CViewerMasks* viewerMasks)
             if (CreateKey(viewersKey, buf, subKey))
             {
                 SetValue(subKey, VIEWERS_MASKS_REG, REG_SZ, viewerMasks->At(i)->Masks->GetMasksString(), -1);
-                if (viewerMasks->At(i)->Command[0] != 0)
-                    SetValue(subKey, VIEWERS_COMMAND_REG, REG_SZ, viewerMasks->At(i)->Command, -1);
-                if (viewerMasks->At(i)->Arguments[0] != 0)
-                    SetValue(subKey, VIEWERS_ARGUMENTS_REG, REG_SZ, viewerMasks->At(i)->Arguments, -1);
-                if (viewerMasks->At(i)->InitDir[0] != 0)
-                    SetValue(subKey, VIEWERS_INITDIR_REG, REG_SZ, viewerMasks->At(i)->InitDir, -1);
+                if (!viewerMasks->At(i)->Command.empty())
+                    SetValue(subKey, VIEWERS_COMMAND_REG, REG_SZ, viewerMasks->At(i)->Command.c_str(), -1);
+                if (!viewerMasks->At(i)->Arguments.empty())
+                    SetValue(subKey, VIEWERS_ARGUMENTS_REG, REG_SZ, viewerMasks->At(i)->Arguments.c_str(), -1);
+                if (!viewerMasks->At(i)->InitDir.empty())
+                    SetValue(subKey, VIEWERS_INITDIR_REG, REG_SZ, viewerMasks->At(i)->InitDir.c_str(), -1);
                 SetValue(subKey, VIEWERS_TYPE_REG, REG_DWORD,
                          &viewerMasks->At(i)->ViewerType, sizeof(DWORD));
                 CloseKey(subKey);
@@ -2860,9 +2860,9 @@ BOOL SaveEditors(HKEY hKey, const char* name, CEditorMasks* editorMasks)
             if (CreateKey(editorKey, buf, subKey))
             {
                 SetValue(subKey, EDITORS_MASKS_REG, REG_SZ, editorMasks->At(i)->Masks->GetMasksString(), -1);
-                SetValue(subKey, EDITORS_COMMAND_REG, REG_SZ, editorMasks->At(i)->Command, -1);
-                SetValue(subKey, EDITORS_ARGUMENTS_REG, REG_SZ, editorMasks->At(i)->Arguments, -1);
-                SetValue(subKey, EDITORS_INITDIR_REG, REG_SZ, editorMasks->At(i)->InitDir, -1);
+                SetValue(subKey, EDITORS_COMMAND_REG, REG_SZ, editorMasks->At(i)->Command.c_str(), -1);
+                SetValue(subKey, EDITORS_ARGUMENTS_REG, REG_SZ, editorMasks->At(i)->Arguments.c_str(), -1);
+                SetValue(subKey, EDITORS_INITDIR_REG, REG_SZ, editorMasks->At(i)->InitDir.c_str(), -1);
                 CloseKey(subKey);
             }
             else
@@ -3080,58 +3080,27 @@ typedef DWORD(WINAPI* FSalamanderLanguageEntry)();
 
 CLanguage::CLanguage()
 {
-    FileName = NULL;
     LanguageID = 0;
-    AuthorW = NULL;
-    Web = NULL;
-    CommentW = NULL;
-    HelpDir = NULL;
 }
 
 void CLanguage::Free()
 {
-    if (FileName != NULL)
-    {
-        free(FileName);
-        FileName = NULL;
-    }
-    if (AuthorW != NULL)
-    {
-        free(AuthorW);
-        AuthorW = NULL;
-    }
-    if (Web != NULL)
-    {
-        free(Web);
-        Web = NULL;
-    }
-    if (CommentW != NULL)
-    {
-        free(CommentW);
-        CommentW = NULL;
-    }
-    if (HelpDir != NULL)
-    {
-        free(HelpDir);
-        HelpDir = NULL;
-    }
+    FileName.clear();
+    AuthorW.clear();
+    Web.clear();
+    CommentW.clear();
+    HelpDir.clear();
 }
 
 BOOL CLanguage::Init(const char* fileName, WORD languageID, const WCHAR* authorW,
                      const char* web, const WCHAR* commentW, const char* helpdir)
 {
     LanguageID = languageID;
-    FileName = DupStr(fileName);
-    AuthorW = DupStr(authorW);
-    Web = DupStr(web);
-    CommentW = DupStr(commentW);
-    HelpDir = DupStr(helpdir);
-    if (FileName == NULL || AuthorW == NULL || Web == NULL || CommentW == NULL || HelpDir == NULL)
-    {
-        TRACE_E(LOW_MEMORY);
-        Free();
-        return FALSE;
-    }
+    FileName = fileName;
+    AuthorW = authorW;
+    Web = web;
+    CommentW = commentW;
+    HelpDir = helpdir;
     return TRUE;
 }
 

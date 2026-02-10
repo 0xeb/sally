@@ -99,7 +99,7 @@ struct CHotPathItem
     {
         if (Name != NULL)
         {
-            free(Name);
+            /* Name is std::string */
             Name = NULL;
         }
         if (Path != NULL)
@@ -458,7 +458,7 @@ public:
 
     BOOL LockedUI;
     HWND LockedUIToolWnd;
-    char* LockedUIReason;
+    std::string LockedUIReason;
 
     CITaskBarList3 TaskBarList3; // controls progress on the taskbar since Windows 7
 
