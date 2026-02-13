@@ -2279,7 +2279,7 @@ void EnumFileNamesRemoveSourceUID(HWND hWnd);
 
 extern CRITICAL_SECTION ReadCDVolNameCS;   // critical section for data access
 extern UINT_PTR ReadCDVolNameReqUID;       // request UID (to identify if someone is still waiting for result)
-extern char ReadCDVolNameBuffer[MAX_PATH]; // IN/OUT buffer (root/volume_name)
+extern char ReadCDVolNameBuffer[SAL_MAX_LONG_PATH]; // IN/OUT buffer (root/volume_name)
 
 //******************************************************************************
 // functions for working with histories of recently used values in comboboxes

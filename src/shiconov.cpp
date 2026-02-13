@@ -488,10 +488,10 @@ BOOL IsNameInListOfDisabledCustomIconOverlays(const char* name)
 {
     if (Configuration.DisabledCustomIconOverlays != NULL)
     {
-        static char buf[MAX_PATH]; // called also from Bug Report - we don't want to burden the stack
+        static char buf[SAL_MAX_LONG_PATH]; // called also from Bug Report - we don't want to burden the stack
         const char* s = Configuration.DisabledCustomIconOverlays;
         char* d = buf;
-        char* end = buf + MAX_PATH;
+        char* end = buf + SAL_MAX_LONG_PATH;
         while (*s != 0)
         {
             if (*s == ';')

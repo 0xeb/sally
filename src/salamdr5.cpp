@@ -48,7 +48,7 @@ CRITICAL_SECTION OpenHtmlHelpCS; // critical section for OpenHtmlHelp()
 // non-blocking reading of volume-name from CD drive:
 CRITICAL_SECTION ReadCDVolNameCS;        // critical section for data access
 UINT_PTR ReadCDVolNameReqUID = 0;        // UID of request (to recognize if anyone is still waiting for result)
-char ReadCDVolNameBuffer[MAX_PATH] = ""; // IN/OUT buffer (root/volume_name)
+char ReadCDVolNameBuffer[SAL_MAX_LONG_PATH] = ""; // IN/OUT buffer (root/volume_name)
 
 struct CInitOpenHtmlHelpCS
 {
@@ -2193,12 +2193,12 @@ BOOL GetOurPathInRoamingAPPDATA(char* buf)
 
 BOOL CreateOurPathInRoamingAPPDATA(char* buf)
 {
-    static char path[MAX_PATH]; // called from exception handler, stack may be full
+    static char path[SAL_MAX_LONG_PATH]; // called from exception handler, stack may be full
     if (buf != NULL)
         buf[0] = 0;
     if (SHGetFolderPath(NULL, CSIDL_APPDATA, NULL, 0 /* SHGFP_TYPE_CURRENT */, path) == S_OK)
     {
-        if (SalPathAppend(path, "Open Salamander", MAX_PATH))
+        if (SalPathAppend(path, "Open Salamander", SAL_MAX_LONG_PATH))
         {
             SalLPCreateDirectory(path, NULL); // if it fails (e.g. already exists), we don't care...
             if (buf != NULL)

@@ -1777,7 +1777,7 @@ BOOL CDrivesList::BuildData(BOOL noTimeout, TDirectArray<CDriveData>* copyDrives
                 {
                     HANDLES(EnterCriticalSection(&ReadCDVolNameCS));
                     UINT_PTR uid = ++ReadCDVolNameReqUID;
-                    lstrcpyn(ReadCDVolNameBuffer, root, MAX_PATH);
+                    lstrcpyn(ReadCDVolNameBuffer, root, SAL_MAX_LONG_PATH);
                     HANDLES(LeaveCriticalSection(&ReadCDVolNameCS));
 
                     // create a thread in which we will find out the volume_name of the CD drive
@@ -2590,7 +2590,7 @@ BOOL CDrivesList::GetDriveBarToolTip(int index, char* text)
         root[0] = item->DriveText[0];
         HANDLES(EnterCriticalSection(&ReadCDVolNameCS));
         UINT_PTR uid = ++ReadCDVolNameReqUID;
-        lstrcpyn(ReadCDVolNameBuffer, root, MAX_PATH);
+        lstrcpyn(ReadCDVolNameBuffer, root, SAL_MAX_LONG_PATH);
         HANDLES(LeaveCriticalSection(&ReadCDVolNameCS));
 
         // create thread, in which we will find out the volume_name of the CD drive

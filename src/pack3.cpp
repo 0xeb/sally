@@ -1383,7 +1383,7 @@ const char* WINAPI
 PackExpExeName(unsigned int index, BOOL unpacker = FALSE)
 {
     // buffer for shortening the program name
-    static char PackExpExeName[MAX_PATH];
+    static char PackExpExeName[SAL_MAX_LONG_PATH];
     CPathBuffer buff; // Heap-allocated for long path support
     const char* exe;
     if (!unpacker)
@@ -1414,12 +1414,12 @@ PackExpExeName(unsigned int index, BOOL unpacker = FALSE)
     unsigned long src = 0, dst = 0;
     if (exe[src] != '"')
         buff[dst++] = '"';
-    while (exe[src] != '\0' && dst < MAX_PATH)
+    while (exe[src] != '\0' && dst < SAL_MAX_LONG_PATH)
         buff[dst++] = exe[src++];
     if (src == 0 || exe[src - 1] != '"')
         buff[dst++] = '"';
     buff[dst] = '\0';
-    if (!ExpandCommand(NULL, buff, PackExpExeName, MAX_PATH, FALSE))
+    if (!ExpandCommand(NULL, buff, PackExpExeName, SAL_MAX_LONG_PATH, FALSE))
         strcpy(PackExpExeName, buff);
     return PackExpExeName;
 }

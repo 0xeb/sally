@@ -144,7 +144,7 @@ class CSalamanderDirectory;
 struct CSalamanderDirectoryAddCache
 {
     int PathLen;               // number of valid characters in 'Path'
-    char Path[MAX_PATH];       // cached path
+    char Path[SAL_MAX_LONG_PATH]; // cached path
     CSalamanderDirectory* Dir; // pointer to the CSalamanderDirectory to which files and directories with the 'Path' path are being added
 };
 
