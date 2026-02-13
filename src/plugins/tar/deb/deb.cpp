@@ -4,6 +4,8 @@
 
 #include "precomp.h"
 
+#include <string>
+
 #include "tar.rh"
 #include "tar.rh2"
 #include "lang\lang.rh"
@@ -227,31 +229,25 @@ BOOL CDEBArchive::UnpackArchive(const char* targetPath, const char* archiveRoot,
 
     // and perform the actual extraction by name
     BOOL ret = FALSE;
-    char* path = (char*)malloc(strlen(targetPath) + max(sizeof(DEB_STREAM_NAME_CONTROL), sizeof(DEB_STREAM_NAME_DATA)) - 1 + 1 + 1);
-    if (path)
     {
+        std::string path;
         if (isControl)
         {
-            strcpy(path, targetPath);
-            if (path[0] && (path[strlen(path) - 1] != '\\'))
-                strcat(path, "\\");
-            strcat(path, DEB_STREAM_NAME_CONTROL);
-            ret = controlArchive->DoUnpackArchive(path, archiveRoot, controlNames);
+            path = targetPath;
+            if (!path.empty() && path.back() != '\\')
+                path += '\\';
+            path += DEB_STREAM_NAME_CONTROL;
+            ret = controlArchive->DoUnpackArchive(path.c_str(), archiveRoot, controlNames);
         }
 
         if (isData)
         {
-            strcpy(path, targetPath);
-            if (path[0] && (path[strlen(path) - 1] != '\\'))
-                strcat(path, "\\");
-            strcat(path, DEB_STREAM_NAME_DATA);
-            ret = dataArchive->DoUnpackArchive(path, archiveRoot, dataNames) && (isControl ? ret : TRUE);
+            path = targetPath;
+            if (!path.empty() && path.back() != '\\')
+                path += '\\';
+            path += DEB_STREAM_NAME_DATA;
+            ret = dataArchive->DoUnpackArchive(path.c_str(), archiveRoot, dataNames) && (isControl ? ret : TRUE);
         }
-        free(path);
-    }
-    else
-    {
-        SalamanderGeneral->ShowMessageBox(LoadStr(IDS_ERR_MEMORY), LoadStr(IDS_GZERR_TITLE), MSGBOX_ERROR);
     }
     return ret;
 }
@@ -286,33 +282,26 @@ BOOL CDEBArchive::UnpackWholeArchive(const char* mask, const char* targetPath)
     }
 
     BOOL ret = FALSE;
-    char* path = (char*)malloc(strlen(targetPath) + max(sizeof(DEB_STREAM_NAME_CONTROL), sizeof(DEB_STREAM_NAME_DATA)) - 1 + 1 + 1);
-
-    if (path)
     {
+        std::string path;
         // controlArchive is always present
         if (isControl)
         {
-            strcpy(path, targetPath);
-            if (path[0] && (path[strlen(path) - 1] != '\\'))
-                strcat(path, "\\");
-            strcat(path, DEB_STREAM_NAME_CONTROL);
-            ret = controlArchive->UnpackWholeArchive(mask, path);
+            path = targetPath;
+            if (!path.empty() && path.back() != '\\')
+                path += '\\';
+            path += DEB_STREAM_NAME_CONTROL;
+            ret = controlArchive->UnpackWholeArchive(mask, path.c_str());
         }
 
         if (isData && dataArchive)
         {
-            strcpy(path, targetPath);
-            if (path[0] && (path[strlen(path) - 1] != '\\'))
-                strcat(path, "\\");
-            strcat(path, DEB_STREAM_NAME_DATA);
-            ret = dataArchive->UnpackWholeArchive(mask, path) && (isControl ? ret : TRUE);
+            path = targetPath;
+            if (!path.empty() && path.back() != '\\')
+                path += '\\';
+            path += DEB_STREAM_NAME_DATA;
+            ret = dataArchive->UnpackWholeArchive(mask, path.c_str()) && (isControl ? ret : TRUE);
         }
-        free(path);
-    }
-    else
-    {
-        SalamanderGeneral->ShowMessageBox(LoadStr(IDS_ERR_MEMORY), LoadStr(IDS_GZERR_TITLE), MSGBOX_ERROR);
     }
     return ret;
 }

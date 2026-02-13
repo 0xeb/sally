@@ -4,6 +4,8 @@
 
 #include "precomp.h"
 
+#include <string>
+
 #include "lib/pvw32dll.h"
 #include "renderer.h"
 #include "pictview.h"
@@ -253,13 +255,8 @@ CImgPropDialog::DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
         SetDlgItemTextA(HWindow, IDC_IMGPROP_COMPR, PVW32DLL.PVGetErrorText(PVII->Compression));
         if (Comment)
         {
-            LPSTR s2 = (char*)malloc(strlen(PVII->Info2) + 2 + strlen(Comment) + 1);
-            if (s2)
-            {
-                sprintf(s2, "%s%s%s", PVII->Info2, *PVII->Info2 ? "\r\n" : "", Comment);
-                SetDlgItemTextA(HWindow, IDC_IMGPROP_COMMENT, s2);
-                free(s2);
-            }
+            std::string s2 = std::string(PVII->Info2) + (*PVII->Info2 ? "\r\n" : "") + Comment;
+            SetDlgItemTextA(HWindow, IDC_IMGPROP_COMMENT, s2.c_str());
         }
         else
         {
