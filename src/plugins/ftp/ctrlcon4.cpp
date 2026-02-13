@@ -289,7 +289,7 @@ void CSendCmdUserIfaceForListAndDownload::HandleESCWhenWaitingForFinish(HWND par
 BOOL CControlConnectionSocket::IsListCommandLIST_a()
 {
     HANDLES(EnterCriticalSection(&SocketCritSect));
-    BOOL ret = _stricmp(UseLIST_aCommand ? LIST_a_CMD_TEXT : (ListCommand != NULL && *ListCommand != 0 ? ListCommand : LIST_CMD_TEXT),
+    BOOL ret = _stricmp(UseLIST_aCommand ? LIST_a_CMD_TEXT : (!ListCommand.empty() ? ListCommand.c_str() : LIST_CMD_TEXT),
                         LIST_a_CMD_TEXT) == 0;
     HANDLES(LeaveCriticalSection(&SocketCritSect));
     return ret;
@@ -304,9 +304,7 @@ void CControlConnectionSocket::ToggleListCommandLIST_a()
             UseLIST_aCommand = FALSE;
         else
         {
-            if (ListCommand != NULL)
-                free(ListCommand);
-            ListCommand = NULL;
+            ListCommand.clear();
         }
     }
     else
@@ -337,7 +335,7 @@ BOOL CControlConnectionSocket::ListWorkingPath(HWND parent, const char* path, ch
     char listCmd[FTPCOMMAND_MAX_SIZE + 2];
 
     HANDLES(EnterCriticalSection(&SocketCritSect));
-    lstrcpyn(listCmd, UseLIST_aCommand ? LIST_a_CMD_TEXT : (ListCommand != NULL && *ListCommand != 0 ? ListCommand : LIST_CMD_TEXT),
+    lstrcpyn(listCmd, UseLIST_aCommand ? LIST_a_CMD_TEXT : (!ListCommand.empty() ? ListCommand.c_str() : LIST_CMD_TEXT),
              FTPCOMMAND_MAX_SIZE);
     BOOL usePassiveModeAux = UsePassiveMode;
     int logUID = LogUID; // log UID of this connection
@@ -487,7 +485,7 @@ BOOL CControlConnectionSocket::ListWorkingPath(HWND parent, const char* path, ch
                 //        }
                 HANDLES(EnterCriticalSection(&SocketCritSect));
                 lstrcpyn(hostTmp, Host, HOST_MAX_SIZE);
-                CFTPServerPathType pathType = ::GetFTPServerPathType(ServerFirstReply, ServerSystem, path);
+                CFTPServerPathType pathType = ::GetFTPServerPathType(ServerFirstReply.c_str(), ServerSystem.c_str(), path);
                 HANDLES(LeaveCriticalSection(&SocketCritSect));
 
                 userIface.InitWnd(NULL, hostTmp, path, pathType);
@@ -613,9 +611,7 @@ BOOL CControlConnectionSocket::ListWorkingPath(HWND parent, const char* path, ch
                         if (canRetry) // take over the message for the message box that announces the connection interruption
                         {
                             HANDLES(EnterCriticalSection(&SocketCritSect));
-                            if (ConnectionLostMsg != NULL)
-                                SalamanderGeneral->Free(ConnectionLostMsg);
-                            ConnectionLostMsg = SalamanderGeneral->DupStr(retryMsgBuf);
+                            ConnectionLostMsg = retryMsgBuf;
                             HANDLES(LeaveCriticalSection(&SocketCritSect));
                         }
                         break; // aborted
@@ -763,7 +759,7 @@ BOOL CControlConnectionSocket::ListWorkingPath(HWND parent, const char* path, ch
             lstrcpyn(hostTmp, Host, HOST_MAX_SIZE);
             unsigned short portTmp = Port;
             lstrcpyn(userTmp, User, USER_MAX_SIZE);
-            CFTPServerPathType pathType = ::GetFTPServerPathType(ServerFirstReply, ServerSystem, path);
+            CFTPServerPathType pathType = ::GetFTPServerPathType(ServerFirstReply.c_str(), ServerSystem.c_str(), path);
             HANDLES(LeaveCriticalSection(&SocketCritSect));
 
             ListingCache.RefreshOnPath(hostTmp, portTmp, userTmp, pathType, path);
@@ -777,7 +773,7 @@ BOOL CControlConnectionSocket::ListWorkingPath(HWND parent, const char* path, ch
                 lstrcpyn(hostTmp, Host, HOST_MAX_SIZE);
                 unsigned short portTmp = Port;
                 lstrcpyn(userTmp, User, USER_MAX_SIZE);
-                CFTPServerPathType pathType = ::GetFTPServerPathType(ServerFirstReply, ServerSystem, path);
+                CFTPServerPathType pathType = ::GetFTPServerPathType(ServerFirstReply.c_str(), ServerSystem.c_str(), path);
                 BOOL isFTPS = EncryptControlConnection == 1;
                 HANDLES(LeaveCriticalSection(&SocketCritSect));
 
@@ -1347,9 +1343,9 @@ BOOL CControlConnectionSocket::InitOperation(CFTPOperation* oper)
     CALL_STACK_MESSAGE1("CControlConnectionSocket::InitOperation()");
     HANDLES(EnterCriticalSection(&SocketCritSect));
     BOOL ret = oper->SetConnection(ProxyServer, Host, Port, User, Password, Account,
-                                   InitFTPCommands, UsePassiveMode,
-                                   UseLIST_aCommand ? LIST_a_CMD_TEXT : ListCommand,
-                                   ServerIP, ServerSystem, ServerFirstReply,
+                                   InitFTPCommands.c_str(), UsePassiveMode,
+                                   UseLIST_aCommand ? LIST_a_CMD_TEXT : ListCommand.c_str(),
+                                   ServerIP, ServerSystem.c_str(), ServerFirstReply.c_str(),
                                    UseListingsCache, HostIP);
     HANDLES(LeaveCriticalSection(&SocketCritSect));
     return ret;

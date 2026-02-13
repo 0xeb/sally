@@ -564,8 +564,8 @@ void CConnectAdvancedDlg::Transfer(CTransferInfo& ti)
             SendMessage(combo, CB_ADDSTRING, 0, (LPARAM)NLST_CMD_TEXT);
             SendMessage(combo, CB_ADDSTRING, 0, (LPARAM)LIST_a_CMD_TEXT);
             SendMessage(combo, CB_LIMITTEXT, FTPCOMMAND_MAX_SIZE, 0);
-            if (Server->ListCommand != NULL)
-                SendMessage(combo, WM_SETTEXT, 0, (LPARAM)Server->ListCommand);
+            if (!Server->ListCommand.empty())
+                SendMessage(combo, WM_SETTEXT, 0, (LPARAM)Server->ListCommand.c_str());
             else
                 SendMessage(combo, CB_SETCURSEL, 0, 0); // select the LIST_CMD_TEXT text
         }
@@ -575,24 +575,22 @@ void CConnectAdvancedDlg::Transfer(CTransferInfo& ti)
             SendMessage(combo, WM_GETTEXT, FTPCOMMAND_MAX_SIZE, (LPARAM)listCmd);
             if (strcmp(listCmd, LIST_CMD_TEXT) != 0)
             {
-                UpdateStr(Server->ListCommand, listCmd);
+                Server->ListCommand = listCmd;
             }
             else
             {
-                if (Server->ListCommand != NULL)
-                    free(Server->ListCommand);
-                Server->ListCommand = NULL;
+                Server->ListCommand.clear();
             }
         }
     }
     ti.EditLine(IDC_CONNECTTOPORT, Server->Port);
     if (ti.Type == ttDataToWindow)
-        ti.EditLine(IDE_INITFTPCOMMANDS, HandleNULLStr(Server->InitFTPCommands), FTP_MAX_PATH);
+        ti.EditLine(IDE_INITFTPCOMMANDS, Server->InitFTPCommands.c_str(), FTP_MAX_PATH);
     else
     {
         CPathBuffer initFTPCommands;
         ti.EditLine(IDE_INITFTPCOMMANDS, initFTPCommands, initFTPCommands.Size());
-        UpdateStr(Server->InitFTPCommands, initFTPCommands);
+        Server->InitFTPCommands = initFTPCommands;
     }
 
     ti.CheckBox(IDC_USEKEEPALIVE, Server->KeepConnectionAlive);

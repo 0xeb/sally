@@ -712,7 +712,7 @@ BOOL CSocket::OpenForListeningWithProxy(DWORD listenOnIP, unsigned short listenO
 class CGetHostByNameThread : public CThread
 {
 protected:
-    char* Address; // address being looked up
+    std::string Address; // address being looked up
     int HostUID;   // hostUID from the GetHostByAddress call that created this thread
     int SocketMsg; // Msg from the socket object that should receive the result
     int SocketUID; // UID from the socket object that should receive the result
@@ -721,7 +721,7 @@ public:
     CGetHostByNameThread(const char* address, int hostUID, int socketMsg,
                          int socketUID) : CThread("GetHostByName")
     {
-        Address = SalamanderGeneral->DupStr(address);
+        Address = address != NULL ? address : "";
         HostUID = hostUID;
         SocketMsg = socketMsg;
         SocketUID = socketUID;
@@ -729,20 +729,18 @@ public:
 
     virtual ~CGetHostByNameThread()
     {
-        if (Address != NULL)
-            SalamanderGeneral->Free(Address);
     }
 
     virtual unsigned Body()
     {
-        CALL_STACK_MESSAGE2("CGetHostByNameThread::Body(%s)", Address);
+        CALL_STACK_MESSAGE2("CGetHostByNameThread::Body(%s)", Address.c_str());
         // obtain the IP address by calling gethostbyname
         HOSTENT* host = NULL;
         int err = 0;
         DWORD ip = INADDR_NONE; // error
-        if (Address != NULL)
+        if (!Address.empty())
         {
-            host = gethostbyname(Address);
+            host = gethostbyname(Address.c_str());
             if (host == NULL)
                 err = WSAGetLastError();
             else

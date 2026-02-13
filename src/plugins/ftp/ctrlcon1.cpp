@@ -38,15 +38,15 @@ CControlConnectionSocket::CControlConnectionSocket() : Events(5, 5)
     Password[0] = 0;
     Account[0] = 0;
     UseListingsCache = TRUE;
-    InitFTPCommands = NULL;
+    InitFTPCommands.clear();
     UsePassiveMode = TRUE;
-    ListCommand = NULL;
+    ListCommand.clear();
     UseLIST_aCommand = FALSE;
 
     ServerIP = INADDR_NONE;
     CanSendOOBData = TRUE;
-    ServerSystem = NULL;
-    ServerFirstReply = NULL;
+    ServerSystem.clear();
+    ServerFirstReply.clear();
     HaveWorkingPath = FALSE;
     WorkingPath[0] = 0;
     CurrentTransferMode = ctrmUnknown;
@@ -67,7 +67,7 @@ CControlConnectionSocket::CControlConnectionSocket() : Events(5, 5)
 
     LogUID = -1;
 
-    ConnectionLostMsg = NULL;
+    ConnectionLostMsg.clear();
 
     OurWelcomeMsgDlg = NULL;
 
@@ -92,18 +92,8 @@ CControlConnectionSocket::~CControlConnectionSocket()
     if (KeepAliveFinishedEvent != NULL)
         HANDLES(CloseHandle(KeepAliveFinishedEvent));
 
-    if (ConnectionLostMsg != NULL)
-        SalamanderGeneral->Free(ConnectionLostMsg);
-
-    if (InitFTPCommands != NULL)
-        SalamanderGeneral->Free(InitFTPCommands);
-    if (ListCommand != NULL)
-        SalamanderGeneral->Free(ListCommand);
-
-    if (ServerSystem != NULL)
-        SalamanderGeneral->Free(ServerSystem);
-    if (ServerFirstReply != NULL)
-        SalamanderGeneral->Free(ServerFirstReply);
+    // std::string members (ConnectionLostMsg, InitFTPCommands, ListCommand,
+    // ServerSystem, ServerFirstReply) are automatically freed
 
     if (BytesToWrite != NULL)
         free(BytesToWrite);
@@ -381,13 +371,9 @@ void CControlConnectionSocket::SetConnectionParameters(const char* host, unsigne
     lstrcpyn(User, user, USER_MAX_SIZE);
     lstrcpyn(Password, password, PASSWORD_MAX_SIZE);
     UseListingsCache = useListingsCache;
-    if (InitFTPCommands != NULL)
-        SalamanderGeneral->Free(InitFTPCommands);
-    InitFTPCommands = SalamanderGeneral->DupStr(initFTPCommands);
+    InitFTPCommands = initFTPCommands != NULL ? initFTPCommands : "";
     UsePassiveMode = usePassiveMode;
-    if (ListCommand != NULL)
-        SalamanderGeneral->Free(ListCommand);
-    ListCommand = SalamanderGeneral->DupStr(listCommand);
+    ListCommand = listCommand != NULL ? listCommand : "";
     UseLIST_aCommand = FALSE;
     KeepAliveEnabled = keepAliveEnabled;
     KeepAliveSendEvery = keepAliveSendEvery;
@@ -1237,9 +1223,7 @@ MENU_TEMPLATE_ITEM MsgBoxButtons[] =
                                     state = sccsStartLoginScript; // send the login command sequence
 
                                     CopyStr(retryBuf, 700, reply, replySize); // store the first server reply (source of server version info)
-                                    if (ServerFirstReply != NULL)
-                                        SalamanderGeneral->Free(ServerFirstReply);
-                                    ServerFirstReply = SalamanderGeneral->DupStr(retryBuf);
+                                    ServerFirstReply = retryBuf != NULL ? retryBuf : "";
 
                                     SkipFTPReply(replySize);
                                     break;
@@ -2056,8 +2040,8 @@ MENU_TEMPLATE_ITEM MsgBoxButtons[] =
         // send the initial FTP commands
         HANDLES(EnterCriticalSection(&SocketCritSect));
         CPathBuffer cmdBuf;
-        if (InitFTPCommands != NULL && *InitFTPCommands != 0)
-            lstrcpyn(cmdBuf, InitFTPCommands, cmdBuf.Size());
+        if (!InitFTPCommands.empty())
+            lstrcpyn(cmdBuf, InitFTPCommands.c_str(), cmdBuf.Size());
         else
             cmdBuf[0] = 0;
         HANDLES(LeaveCriticalSection(&SocketCritSect));
@@ -2095,9 +2079,7 @@ MENU_TEMPLATE_ITEM MsgBoxButtons[] =
                                errBuf, 300, NULL))
             {
                 HANDLES(EnterCriticalSection(&SocketCritSect));
-                if (ServerSystem != NULL)
-                    SalamanderGeneral->Free(ServerSystem);
-                ServerSystem = SalamanderGeneral->DupStr(retryBuf);
+                ServerSystem = retryBuf != NULL ? retryBuf : "";
                 HANDLES(LeaveCriticalSection(&SocketCritSect));
             }
             else
@@ -2229,7 +2211,7 @@ void CControlConnectionSocket::ActivateWelcomeMsg()
 char* CControlConnectionSocket::AllocServerSystemReply()
 {
     HANDLES(EnterCriticalSection(&SocketCritSect));
-    char* ret = SalamanderGeneral->DupStr(HandleNULLStr(ServerSystem));
+    char* ret = SalamanderGeneral->DupStr(ServerSystem.c_str());
     HANDLES(LeaveCriticalSection(&SocketCritSect));
     return ret;
 }
@@ -2237,7 +2219,7 @@ char* CControlConnectionSocket::AllocServerSystemReply()
 char* CControlConnectionSocket::AllocServerFirstReply()
 {
     HANDLES(EnterCriticalSection(&SocketCritSect));
-    char* ret = SalamanderGeneral->DupStr(HandleNULLStr(ServerFirstReply));
+    char* ret = SalamanderGeneral->DupStr(ServerFirstReply.c_str());
     HANDLES(LeaveCriticalSection(&SocketCritSect));
     return ret;
 }

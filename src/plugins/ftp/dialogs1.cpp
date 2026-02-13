@@ -1094,18 +1094,18 @@ void CConnectDlg::SelChanged()
         AddToAdvancedStr(buf, 300, LoadStr(s->CompressData == 0 ? IDS_ADVSTRNOMODEZ : IDS_ADVSTRMODEZ));
     }
 
-    if (s->ListCommand != NULL)
+    if (!s->ListCommand.empty())
     {
         num[36] = 0;
-        _snprintf_s(num, 38, _TRUNCATE, LoadStr(IDS_ADVSTRLISTCOMMAND), s->ListCommand);
+        _snprintf_s(num, 38, _TRUNCATE, LoadStr(IDS_ADVSTRLISTCOMMAND), s->ListCommand.c_str());
         if (num[36] != 0)
             strcpy(num + 36, "...");
         AddToAdvancedStr(buf, 300, num);
     }
-    if (s->InitFTPCommands != NULL && *s->InitFTPCommands != 0)
+    if (!s->InitFTPCommands.empty())
     {
         num[36] = 0;
-        _snprintf_s(num, 38, _TRUNCATE, LoadStr(IDS_ADVSTRINITFTPCMDS), s->InitFTPCommands);
+        _snprintf_s(num, 38, _TRUNCATE, LoadStr(IDS_ADVSTRINITFTPCMDS), s->InitFTPCommands.c_str());
         if (num[36] != 0)
             strcpy(num + 36, "...");
         AddToAdvancedStr(buf, 300, num);
@@ -1641,8 +1641,8 @@ CConnectDlg::DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
                                                        s->UseServerSpeedLimit,
                                                        s->ServerSpeedLimit,
                                                        s->UseListingsCache,
-                                                       s->InitFTPCommands,
-                                                       s->ListCommand,
+                                                       s->InitFTPCommands.c_str(),
+                                                       s->ListCommand.c_str(),
                                                        s->KeepAliveSendEvery,
                                                        s->KeepAliveStopAfter,
                                                        s->KeepAliveCommand,

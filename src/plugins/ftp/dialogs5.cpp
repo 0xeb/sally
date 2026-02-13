@@ -115,7 +115,6 @@ COperationDlg::COperationDlg(HWND parent, HWND centerToWnd, CFTPOperation* oper,
 
     LastTimeEstimation = -1;
 
-    OperationsTextOrig = NULL;
     DisplayedDoneOrSkippedCount = -1;
     DisplayedTotalCount = -1;
 
@@ -211,8 +210,6 @@ COperationDlg::~COperationDlg()
         ImageList_Destroy(ItemsImageList);
     if (TitleText != NULL)
         SalamanderGeneral->Free(TitleText);
-    if (OperationsTextOrig != NULL)
-        SalamanderGeneral->Free(OperationsTextOrig);
 }
 
 void COperationDlg::ShowControlsAndChangeSize(BOOL simple)
@@ -390,12 +387,12 @@ BOOL COperationDlg::UpdateDataInDialog()
         COperationState operState = Oper->GetOperationState(FALSE);
         BOOL someDataActivityInLastPeriod = Oper->GetDataActivityInLastPeriod();
 
-        if (OperationsTextOrig != NULL &&
+        if (!OperationsTextOrig.empty() &&
             (doneOrSkippedCount != DisplayedDoneOrSkippedCount ||
              totalCount != DisplayedTotalCount))
         {
             char buf[200];
-            _snprintf_s(buf, _TRUNCATE, "%s (%d / %d)", OperationsTextOrig, doneOrSkippedCount, totalCount);
+            _snprintf_s(buf, _TRUNCATE, "%s (%d / %d)", OperationsTextOrig.c_str(), doneOrSkippedCount, totalCount);
             SetWindowText(GetDlgItem(HWindow, IDT_OPERATIONSTEXT), buf);
             DisplayedDoneOrSkippedCount = doneOrSkippedCount;
             DisplayedTotalCount = totalCount;

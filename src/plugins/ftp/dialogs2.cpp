@@ -884,8 +884,6 @@ void ShowWaitWindow(HWND hwnd, HWND parent)
 CWaitWindow::CWaitWindow(HWND hParent, BOOL showCloseButton) : CWindow(ooStatic)
 {
     HParent = hParent;
-    Text = NULL;
-    Caption = NULL;
     ShowCloseButton = showCloseButton;
     WindowClosePressed = FALSE;
     HasTimer = FALSE;
@@ -895,17 +893,11 @@ CWaitWindow::CWaitWindow(HWND hParent, BOOL showCloseButton) : CWindow(ooStatic)
 
 CWaitWindow::~CWaitWindow()
 {
-    if (Text != NULL)
-        SalamanderGeneral->Free(Text);
-    if (Caption != NULL)
-        SalamanderGeneral->Free(Caption);
 }
 
 void CWaitWindow::SetText(const char* text)
 {
-    if (Text != NULL)
-        SalamanderGeneral->Free(Text);
-    Text = SalamanderGeneral->DupStr(text);
+    Text = text != NULL ? text : "";
     if (HWindow != NULL && IsWindowVisible(HWindow))
     {
         InvalidateRect(HWindow, NULL, TRUE);
@@ -915,9 +907,7 @@ void CWaitWindow::SetText(const char* text)
 
 void CWaitWindow::SetCaption(const char* text)
 {
-    if (Caption != NULL)
-        SalamanderGeneral->Free(Caption);
-    Caption = SalamanderGeneral->DupStr(text);
+    Caption = text != NULL ? text : "";
 }
 
 #define WAITWINDOW_HMARGIN 25
@@ -934,7 +924,7 @@ HWND CWaitWindow::Create(DWORD showTime)
 
     WindowClosePressed = FALSE;
     HasTimer = FALSE;
-    if (Text == NULL)
+    if (Text.empty())
     {
         TRACE_E("Unexpected situation in CWaitWindow::Create(): text is not defined!");
         return NULL;
@@ -972,12 +962,12 @@ HWND CWaitWindow::Create(DWORD showTime)
         tR.top = 0;
         tR.right = 1;
         tR.bottom = 1;
-        DrawText(dc, Text, -1, &tR, DT_CALCRECT | DT_LEFT | DT_NOPREFIX);
+        DrawText(dc, Text.c_str(), -1, &tR, DT_CALCRECT | DT_LEFT | DT_NOPREFIX);
         if (tR.right + 2 * WAITWINDOW_HMARGIN > parW)
         {
             tR.right = parW - 2 * WAITWINDOW_HMARGIN;
             tR.bottom = 1;
-            DrawText(dc, Text, -1, &tR, DT_CALCRECT | DT_LEFT | DT_NOPREFIX | DT_WORDBREAK);
+            DrawText(dc, Text.c_str(), -1, &tR, DT_CALCRECT | DT_LEFT | DT_NOPREFIX | DT_WORDBREAK);
             NeedWrap = TRUE;
         }
         TextSize.cx = tR.right;
@@ -993,7 +983,7 @@ HWND CWaitWindow::Create(DWORD showTime)
 
     CreateEx(WS_EX_DLGMODALFRAME /*| WS_EX_TOOLWINDOW*/,
              SAVEBITS_CLASSNAME,
-             Caption == NULL ? LoadStr(IDS_FTPPLUGINTITLE) : Caption,
+             Caption.empty() ? LoadStr(IDS_FTPPLUGINTITLE) : Caption.c_str(),
              WS_BORDER | WS_OVERLAPPED | (ShowCloseButton ? WS_SYSMENU : 0),
              0, 0, width, height,
              HParent,
@@ -1133,7 +1123,7 @@ CWaitWindow::WindowProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
     case WM_ERASEBKGND:
     {
         LRESULT ret = CWindow::WindowProc(uMsg, wParam, lParam);
-        if (Text != NULL)
+        if (!Text.empty())
         {
             HDC dc = (HDC)wParam;
             RECT r;
@@ -1151,7 +1141,7 @@ CWaitWindow::WindowProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
             SetTextColor(dc, GetSysColor(COLOR_BTNTEXT));
             // do not clip so we survive a slight text extension that
             // may occur while calling SetText
-            DrawText(dc, Text, (int)strlen(Text), &r, DT_LEFT | DT_NOPREFIX | DT_NOCLIP | (NeedWrap ? DT_WORDBREAK : 0));
+            DrawText(dc, Text.c_str(), (int)Text.size(), &r, DT_LEFT | DT_NOPREFIX | DT_NOCLIP | (NeedWrap ? DT_WORDBREAK : 0));
             SetBkMode(dc, prevBkMode);
             if (hOldFont != NULL)
                 SelectObject(dc, hOldFont);
@@ -1218,7 +1208,6 @@ CListWaitWindow::CListWaitWindow(HWND hParent, CDataConnectionSocket* dataConnec
     OperStatusText = NULL;
     OperProgressBar = NULL;
 
-    Path = NULL;
     PathType = ftpsptEmpty;
 
     Status[0] = 0;
@@ -1235,29 +1224,23 @@ CListWaitWindow::CListWaitWindow(HWND hParent, CDataConnectionSocket* dataConnec
 
 CListWaitWindow::~CListWaitWindow()
 {
-    if (Path != NULL)
-        SalamanderGeneral->Free(Path);
 }
 
 void CListWaitWindow::SetText(const char* text)
 {
-    if (Text != NULL)
-        SalamanderGeneral->Free(Text);
-    Text = SalamanderGeneral->DupStr(text);
-    if (HWindow != NULL && Text != NULL)
-        SendDlgItemMessage(HWindow, IDT_ACTION, WM_SETTEXT, 0, (LPARAM)Text);
+    Text = text != NULL ? text : "";
+    if (HWindow != NULL && !Text.empty())
+        SendDlgItemMessage(HWindow, IDT_ACTION, WM_SETTEXT, 0, (LPARAM)Text.c_str());
 }
 
 void CListWaitWindow::SetPath(const char* path, CFTPServerPathType pathType)
 {
-    if (Path != NULL)
-        SalamanderGeneral->Free(Path);
-    Path = SalamanderGeneral->DupStr(path);
+    Path = path != NULL ? path : "";
     PathType = pathType;
-    if (PathOnFTPText != NULL && Path != NULL)
+    if (PathOnFTPText != NULL && !Path.empty())
     {
         PathOnFTPText->SetPathSeparator(FTPGetPathDelimiter(PathType));
-        PathOnFTPText->SetText(Path);
+        PathOnFTPText->SetText(Path.c_str());
     }
 }
 
@@ -1335,7 +1318,7 @@ HWND CListWaitWindow::Create(DWORD showTime)
 
     CreateEx(WS_EX_DLGMODALFRAME /*| WS_EX_TOOLWINDOW*/,
              SAVEBITS_CLASSNAME,
-             Caption == NULL ? LoadStr(IDS_FTPPLUGINTITLE) : Caption,
+             Caption.empty() ? LoadStr(IDS_FTPPLUGINTITLE) : Caption.c_str(),
              WS_BORDER | WS_OVERLAPPED | (ShowCloseButton ? WS_SYSMENU : 0),
              0, 0, 0, 0,
              HParent,
@@ -1378,12 +1361,12 @@ HWND CListWaitWindow::Create(DWORD showTime)
             OperProgressBar->SetSelfMoveSpeed(100);
         }
 
-        if (Text != NULL)
-            SendDlgItemMessage(HWindow, IDT_ACTION, WM_SETTEXT, 0, (LPARAM)Text);
-        if (PathOnFTPText != NULL && Path != NULL)
+        if (!Text.empty())
+            SendDlgItemMessage(HWindow, IDT_ACTION, WM_SETTEXT, 0, (LPARAM)Text.c_str());
+        if (PathOnFTPText != NULL && !Path.empty())
         {
             PathOnFTPText->SetPathSeparator(FTPGetPathDelimiter(PathType));
-            PathOnFTPText->SetText(Path);
+            PathOnFTPText->SetText(Path.c_str());
         }
         DataConnection->SetWindowWithStatus(HWindow, WM_APP_STATUSCHANGED);
         RefreshTimeAndStatusAndProgress(FALSE);

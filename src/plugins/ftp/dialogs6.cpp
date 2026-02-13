@@ -91,14 +91,12 @@ COperationDlg::DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
         char buf[100];
         if (GetWindowText(GetDlgItem(HWindow, IDT_OPERATIONSTEXT), buf, 100))
         {
-            if (OperationsTextOrig != NULL)
-                SalamanderGeneral->Free(OperationsTextOrig); // just in case...
-            OperationsTextOrig = SalamanderGeneral->DupStr(buf);
+            OperationsTextOrig = buf;
         }
 
         if (Source == NULL || Target == NULL || TimeLeft == NULL || Status == NULL ||
             Progress == NULL || ConsListView == NULL || ItemsListView == NULL ||
-            ElapsedTime == NULL || OperationsTextOrig == NULL ||
+            ElapsedTime == NULL || OperationsTextOrig.empty() ||
             !Oper->InitOperDlg(this))
         {
             DestroyWindow(HWindow); // error -> we will not open the dialog

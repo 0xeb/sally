@@ -464,8 +464,8 @@ public:
 class CWaitWindow : public CWindow
 {
 protected:
-    char* Caption;
-    char* Text;
+    std::string Caption;
+    std::string Text;
     SIZE TextSize;
     HWND HParent;
     BOOL ShowCloseButton;
@@ -535,7 +535,7 @@ protected:
     CGUIStaticTextAbstract* OperStatusText;
     CGUIProgressBarAbstract* OperProgressBar;
 
-    char* Path;
+    std::string Path;
     CFTPServerPathType PathType;
     char Status[100];
     char TimeLeft[20];
@@ -1132,7 +1132,7 @@ protected:
 
     DWORD LastTimeEstimation; // -1==invalid, otherwise rounded number of seconds until the operation finishes
 
-    char* OperationsTextOrig;        // original text of the "Operations:" listview title
+    std::string OperationsTextOrig;  // original text of the "Operations:" listview title
     int DisplayedDoneOrSkippedCount; // number of skipped+done items displayed after "Operations:" in the listview title (-1 = unknown)
     int DisplayedTotalCount;         // total number of items displayed after "Operations:" in the listview title (-1 = unknown)
 

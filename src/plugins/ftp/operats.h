@@ -2101,13 +2101,13 @@ protected:
     char* Password;               // password (NULL = unknown) WARNING: anonymous password (email) is already part of the string here
     char* Account;                // account info (see FTP command "ACCT") (NULL = unknown)
     BOOL RetryLoginWithoutAsking; // TRUE = the worker should try to reconnect even for "error" server replies (code "5xx"); FALSE = reconnect only for "transient-error" replies (code "4xx"); set later by the user when resolving the worker connection problem
-    char* InitFTPCommands;        // list of FTP commands to send to the server immediately after connecting (NULL = no commands)
+    std::string InitFTPCommands;  // list of FTP commands to send to the server immediately after connecting (empty = no commands)
     BOOL UsePassiveMode;          // TRUE/FALSE = passive/active data connection mode
     BOOL SizeCmdIsSupported;      // FALSE = the SIZE command received the server reply "not supported" (no point trying again)
-    char* ListCommand;            // command to obtain a listing of a path on this server (NULL = "LIST")
+    std::string ListCommand;      // command to obtain a listing of a path on this server (empty = "LIST")
     DWORD ServerIP;               // IP address of the FTP/Proxy server 'ConnectToHost' (==INADDR_NONE until the IP is known)
-    char* ServerSystem;           // server system (reply to the SYST command) - may also be NULL
-    char* ServerFirstReply;       // first server reply (often contains the FTP server version) - may also be NULL
+    std::string ServerSystem;     // server system (reply to the SYST command) - may also be empty
+    std::string ServerFirstReply; // first server reply (often contains the FTP server version) - may also be empty
     BOOL UseListingsCache;        // TRUE = the user wants to store listings in the cache for this connection
     char* ListingServerType;      // server type for parsing listings: NULL = autodetect; otherwise the server type name (without the optional leading '*'; if it stops existing, it switches to autodetect)
     BOOL EncryptControlConnection;
@@ -2400,11 +2400,11 @@ public:
     // stores the log message in the 'buf' buffer (of size 'bufSize')
     void GetConnectLogMsg(BOOL isReconnect, char* buf, int bufSize, int attemptNumber, const char* dateTime);
 
-    // if ServerSystem == NULL, sets ServerSystem to the string 'reply'
+    // if ServerSystem is empty, sets ServerSystem to the string 'reply'
     // of length 'replySize'
     void SetServerSystem(const char* reply, int replySize);
 
-    // if ServerFirstReply == NULL, sets ServerFirstReply to the string 'reply'
+    // if ServerFirstReply is empty, sets ServerFirstReply to the string 'reply'
     // of length 'replySize'
     void SetServerFirstReply(const char* reply, int replySize);
 
@@ -2619,7 +2619,7 @@ public:
     // sets SizeCmdIsSupported (in the critical section)
     void SetSizeCmdIsSupported(BOOL sizeCmdIsSupported);
 
-    // returns the listing command (if ListCommand == NULL, returns "LIST\r\n"), the command already has
+    // returns the listing command (if ListCommand is empty, returns "LIST\r\n"), the command already has
     // CRLF at the end; 'buf' (must not be NULL) is a buffer of size 'bufSize'
     void GetListCommand(char* buf, int bufSize);
 

@@ -220,7 +220,7 @@ void CControlConnectionSocket::DownloadOneFile(HWND parent, const char* fileName
 
                     HANDLES(EnterCriticalSection(&SocketCritSect));
                     lstrcpyn(hostBuf, Host, HOST_MAX_SIZE);
-                    CFTPServerPathType pathType = ::GetFTPServerPathType(ServerFirstReply, ServerSystem, workPath);
+                    CFTPServerPathType pathType = ::GetFTPServerPathType(ServerFirstReply.c_str(), ServerSystem.c_str(), workPath);
                     HANDLES(LeaveCriticalSection(&SocketCritSect));
 
                     PrepareFTPCommand(cmdBuf, cmdBuf.Size(), logBuf, logBuf.Size(),
@@ -382,9 +382,7 @@ void CControlConnectionSocket::DownloadOneFile(HWND parent, const char* fileName
                                 if (canRetry) // adopt the message for the message box that reports the connection interruption
                                 {
                                     HANDLES(EnterCriticalSection(&SocketCritSect));
-                                    if (ConnectionLostMsg != NULL)
-                                        SalamanderGeneral->Free(ConnectionLostMsg);
-                                    ConnectionLostMsg = SalamanderGeneral->DupStr(retryMsgBuf);
+                                    ConnectionLostMsg = retryMsgBuf;
                                     HANDLES(LeaveCriticalSection(&SocketCritSect));
                                 }
                             }

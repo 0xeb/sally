@@ -614,15 +614,15 @@ protected:
     char Password[PASSWORD_MAX_SIZE];
     char Account[ACCOUNT_MAX_SIZE];
     int UseListingsCache;
-    char* InitFTPCommands;
+    std::string InitFTPCommands;
     BOOL UsePassiveMode;
-    char* ListCommand;
+    std::string ListCommand;
     BOOL UseLIST_aCommand; // TRUE = ignore ListCommand, use "LIST -a" (list hidden files (UNIX))
 
     DWORD ServerIP;                           // server IP address (==INADDR_NONE until the IP is known)
     BOOL CanSendOOBData;                      // FALSE if the server does not support OOB data (used when sending abort commands)
-    char* ServerSystem;                       // server system (reply to SYST command) - may also be NULL
-    char* ServerFirstReply;                   // first server reply (often contains the FTP server version) - may also be NULL
+    std::string ServerSystem;                 // server system (reply to SYST command) - may also be empty
+    std::string ServerFirstReply;             // first server reply (often contains the FTP server version) - may also be empty
     BOOL HaveWorkingPath;                     // TRUE if WorkingPath is valid
     CPathBuffer WorkingPath;           // current working directory on the FTP server
     CCurrentTransferMode CurrentTransferMode; // current transfer mode on the FTP server (memory of the last FTP "TYPE" command)
@@ -643,9 +643,9 @@ protected:
 
     int LogUID; // log UID for this connection (-1 until the log is created)
 
-    // if not NULL, this is the error message explaining the disconnection reason in a detached FS
+    // if not empty, this is the error message explaining the disconnection reason in a detached FS
     // (displayed in a message box when the FS is connected into a panel)
-    char* ConnectionLostMsg;
+    std::string ConnectionLostMsg;
 
     HWND OurWelcomeMsgDlg; // handle of the welcome-message window (no synchronization needed, accessed only from the main
                            // thread) - NULL = not opened yet; note: the window may already be closed

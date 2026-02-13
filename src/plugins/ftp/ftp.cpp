@@ -1136,8 +1136,8 @@ void CFTPServer::Init()
     UseServerSpeedLimit = 2;
     ServerSpeedLimit = 2;
     UseListingsCache = 2;
-    InitFTPCommands = NULL;
-    ListCommand = NULL;
+    InitFTPCommands.clear();
+    ListCommand.clear();
     EncryptControlConnection = EncryptDataConnection = 0;
     CompressData = -1;
     // WARNING: default values here must match the default values used in the Save() method
@@ -1160,12 +1160,10 @@ void CFTPServer::Release()
     }
     if (TargetPanelPath != NULL)
         SalamanderGeneral->Free(TargetPanelPath);
-    if (InitFTPCommands != NULL)
-        SalamanderGeneral->Free(InitFTPCommands);
+    // std::string members (InitFTPCommands, ListCommand) are automatically freed
     if (ServerType != NULL)
         SalamanderGeneral->Free(ServerType);
-    if (ListCommand != NULL)
-        SalamanderGeneral->Free(ListCommand);
+    // ListCommand is std::string, automatically freed
     Init();
 }
 
@@ -1200,9 +1198,9 @@ CFTPServer::MakeCopy()
         n->MaxConcurrentConnections = MaxConcurrentConnections;
         n->UseServerSpeedLimit = UseServerSpeedLimit;
         n->ServerSpeedLimit = ServerSpeedLimit;
-        n->InitFTPCommands = SalamanderGeneral->DupStr(InitFTPCommands);
+        n->InitFTPCommands = InitFTPCommands;
         n->UseListingsCache = UseListingsCache;
-        n->ListCommand = SalamanderGeneral->DupStr(ListCommand);
+        n->ListCommand = ListCommand;
         n->EncryptControlConnection = EncryptControlConnection;
         n->EncryptDataConnection = EncryptDataConnection;
         n->CompressData = CompressData;
@@ -1306,9 +1304,9 @@ BOOL CFTPServer::Set(const char* itemName,
     MaxConcurrentConnections = maxConcurrentConnections;
     UseServerSpeedLimit = useServerSpeedLimit;
     ServerSpeedLimit = serverSpeedLimit;
-    UpdateStr(InitFTPCommands, initFTPCommands, &err);
+    InitFTPCommands = initFTPCommands != NULL ? initFTPCommands : "";
     UseListingsCache = useListingsCache;
-    UpdateStr(ListCommand, listCommand, &err);
+    ListCommand = listCommand != NULL ? listCommand : "";
     EncryptControlConnection = encryptControlConnection;
     EncryptDataConnection = encryptDataConnection;
     CompressData = compressData;
@@ -1534,8 +1532,8 @@ BOOL CFTPServer::Load(HWND parent, HKEY regKey, CSalamanderRegistryAbstract* reg
     useServerSpeedLimit = UseServerSpeedLimit;
     serverSpeedLimit = ServerSpeedLimit;
     useListingsCache = UseListingsCache;
-    strcpy(initFTPCommands, HandleNULLStr(InitFTPCommands));
-    strcpy(listCommand, HandleNULLStr(ListCommand));
+    strcpy(initFTPCommands, InitFTPCommands.c_str());
+    strcpy(listCommand, ListCommand.c_str());
     encryptControlConnection = EncryptControlConnection;
     encryptDataConnection = EncryptDataConnection;
     compressData = CompressData;
@@ -1721,10 +1719,10 @@ void CFTPServer::Save(HWND parent, HKEY regKey, CSalamanderRegistryAbstract* reg
     }
     if (UseListingsCache != 2)
         registry->SetValue(regKey, CONFIG_FTPSRVUSELISTINGSCACHE, REG_DWORD, &UseListingsCache, sizeof(DWORD));
-    if (IsNotEmptyStr(InitFTPCommands))
-        registry->SetValue(regKey, CONFIG_FTPSRVINITFTPCMDS, REG_SZ, InitFTPCommands, -1);
-    if (IsNotEmptyStr(ListCommand))
-        registry->SetValue(regKey, CONFIG_FTPSRVLISTCMD, REG_SZ, ListCommand, -1);
+    if (!InitFTPCommands.empty())
+        registry->SetValue(regKey, CONFIG_FTPSRVINITFTPCMDS, REG_SZ, InitFTPCommands.c_str(), -1);
+    if (!ListCommand.empty())
+        registry->SetValue(regKey, CONFIG_FTPSRVLISTCMD, REG_SZ, ListCommand.c_str(), -1);
 
     if (EncryptControlConnection != 0)
         registry->SetValue(regKey, CONFIG_FTPSRVENCRYPTCONTROLCONNECTION, REG_DWORD, &EncryptControlConnection, sizeof(DWORD));

@@ -992,7 +992,7 @@ CControlConnectionSocket::GetFTPServerPathType(const char* path)
     CALL_STACK_MESSAGE2("CControlConnectionSocket::GetFTPServerPathType(%s)", path);
 
     HANDLES(EnterCriticalSection(&SocketCritSect));
-    CFTPServerPathType type = ::GetFTPServerPathType(ServerFirstReply, ServerSystem, path);
+    CFTPServerPathType type = ::GetFTPServerPathType(ServerFirstReply.c_str(), ServerSystem.c_str(), path);
     HANDLES(LeaveCriticalSection(&SocketCritSect));
 
     return type;
@@ -1004,7 +1004,7 @@ BOOL CControlConnectionSocket::IsServerSystem(const char* systemName)
 
     HANDLES(EnterCriticalSection(&SocketCritSect));
     char sysName[201];
-    FTPGetServerSystem(ServerSystem, sysName);
+    FTPGetServerSystem(ServerSystem.c_str(), sysName);
     HANDLES(LeaveCriticalSection(&SocketCritSect));
 
     return _stricmp(sysName, systemName) == 0;
@@ -1163,7 +1163,7 @@ BOOL CControlConnectionSocket::ChangeWorkingPath(BOOL notInPanel, BOOL leftPanel
         lstrcpyn(hostTmp, Host, HOST_MAX_SIZE);
         unsigned short portTmp = Port;
         char listCmd[FTPCOMMAND_MAX_SIZE + 2];
-        lstrcpyn(listCmd, UseLIST_aCommand ? LIST_a_CMD_TEXT : (ListCommand != NULL && *ListCommand != 0 ? ListCommand : LIST_CMD_TEXT),
+        lstrcpyn(listCmd, UseLIST_aCommand ? LIST_a_CMD_TEXT : (!ListCommand.empty() ? ListCommand.c_str() : LIST_CMD_TEXT),
                  FTPCOMMAND_MAX_SIZE);
         strcat(listCmd, "\r\n");
         BOOL isFTPS = EncryptControlConnection == 1;
@@ -1558,9 +1558,7 @@ void CControlConnectionSocket::GetConnectionFromWorker(CFTPWorker* workerWithCon
             workerWithCon->ReadBytesCount = 0;
             workerWithCon->ReadBytesOffset = 0;
             workerWithCon->ReadBytesAllocatedSize = 0;
-            if (ConnectionLostMsg != NULL)
-                SalamanderGeneral->Free(ConnectionLostMsg);
-            ConnectionLostMsg = NULL;
+            ConnectionLostMsg.clear();
             int logUID = LogUID; // log UID of this connection
 
             HANDLES(LeaveCriticalSection(&workerWithCon->SocketCritSect));

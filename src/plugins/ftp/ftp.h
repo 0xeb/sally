@@ -504,7 +504,7 @@ struct CFTPServer
     int ProxyServerUID;              // proxy server: -2 = default, -1 = not used, otherwise the proxy server UID from Config.FTPProxyServerList
     char* TargetPanelPath;           // if not NULL or "", the target path in the panel should be set (max. MAX_PATH-1 characters)
     char* ServerType;                // server type (for listing) - NULL == auto-detect, otherwise a textual name (format see CServerType::TypeName; the server list will gradually expand) (max. SERVERTYPE_MAX_SIZE-1 characters)
-    char* ListCommand;               // command for listing - NULL == LIST_CMD_TEXT, otherwise the command text
+    std::string ListCommand;         // command for listing - empty == LIST_CMD_TEXT, otherwise the command text
     int TransferMode;                // 0 - default, 1 - binary, 2 - ascii, 3 - auto (uses Config.ASCIIFileMasks)
     int Port;                        // port of the server we connect to (standard FTP port is IPPORT_FTP)
     int UsePassiveMode;              // 0 - PORT mode, 1 - PASV mode, 2 - according to configuration (Config.PassiveMode)
@@ -517,7 +517,7 @@ struct CFTPServer
     int UseServerSpeedLimit;         // 1 = use the ServerSpeedLimit limit; 2 = default limit, 0 = no limit
     double ServerSpeedLimit;         // total speed limit for this server
     int UseListingsCache;            // cache for viewed files and listings: 2 = default setting, 1 = use cache, 0 = do not use cache
-    char* InitFTPCommands;           // list of FTP commands to send to the server immediately after connecting
+    std::string InitFTPCommands;     // list of FTP commands to send to the server immediately after connecting
     int EncryptControlConnection;    // 0 - no, 1 - yes
     int EncryptDataConnection;       // 0 - no, 1 - yes
     int CompressData;                // 0 - no; 1-9 - zlib levels; -1 - default, based on configuration
@@ -589,8 +589,8 @@ struct CFTPServer
                    src.UseServerSpeedLimit,
                    src.ServerSpeedLimit,
                    src.UseListingsCache,
-                   src.InitFTPCommands,
-                   src.ListCommand,
+                   src.InitFTPCommands.c_str(),
+                   src.ListCommand.c_str(),
                    src.KeepAliveSendEvery,
                    src.KeepAliveStopAfter,
                    src.KeepAliveCommand,

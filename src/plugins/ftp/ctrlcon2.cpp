@@ -441,11 +441,11 @@ void CControlConnectionSocket::CheckCtrlConClose(BOOL notInPanel, BOOL leftPanel
         }
     }
     int logUID = LogUID;
-    char* auxConnectionLostMsg = ConnectionLostMsg;
+    std::string auxConnectionLostMsg = ConnectionLostMsg;
     HANDLES(LeaveCriticalSection(&EventCritSect));
 
-    if (found ||                      // the ccsevClosed event is waiting for us—the user still does not know that the connection is closed
-        auxConnectionLostMsg != NULL) // we cached the message captured when the connection closed (at that moment it only went into the log)
+    if (found ||                           // the ccsevClosed event is waiting for usï¿½the user still does not know that the connection is closed
+        !auxConnectionLostMsg.empty()) // we cached the message captured when the connection closed (at that moment it only went into the log)
     {
         char errBuf[300];
         errBuf[0] = 0;
@@ -478,15 +478,14 @@ void CControlConnectionSocket::CheckCtrlConClose(BOOL notInPanel, BOOL leftPanel
 
             if (errBuf[0] == 0)
             {
-                if (auxConnectionLostMsg != NULL) // we cached the message captured when the connection closed (at that moment it only went into the log)
-                {                                 // show it again in a message box
+                if (!auxConnectionLostMsg.empty()) // we cached the message captured when the connection closed (at that moment it only went into the log)
+                {                                  // show it again in a message box
                     HANDLES(EnterCriticalSection(&SocketCritSect));
-                    if (ConnectionLostMsg != NULL)
-                        lstrcpyn(errBuf, ConnectionLostMsg, 300);
+                    if (!ConnectionLostMsg.empty())
+                        lstrcpyn(errBuf, ConnectionLostMsg.c_str(), 300);
                     else
                         errBuf[0] = 0;
-                    SalamanderGeneral->Free(ConnectionLostMsg); // it is no longer needed
-                    ConnectionLostMsg = NULL;
+                    ConnectionLostMsg.clear(); // it is no longer needed
                     HANDLES(LeaveCriticalSection(&SocketCritSect));
                 }
                 else
@@ -506,21 +505,18 @@ void CControlConnectionSocket::CheckCtrlConClose(BOOL notInPanel, BOOL leftPanel
         else // we cached the message captured when the connection closed (at that moment it only went into the log)
         {    // show it again in a message box
             HANDLES(EnterCriticalSection(&SocketCritSect));
-            if (ConnectionLostMsg != NULL)
-                lstrcpyn(errBuf, ConnectionLostMsg, 300);
+            if (!ConnectionLostMsg.empty())
+                lstrcpyn(errBuf, ConnectionLostMsg.c_str(), 300);
             else
                 errBuf[0] = 0;
-            SalamanderGeneral->Free(ConnectionLostMsg); // it is no longer needed
-            ConnectionLostMsg = NULL;
+            ConnectionLostMsg.clear(); // it is no longer needed
             HANDLES(LeaveCriticalSection(&SocketCritSect));
         }
 
         if (quiet)
         {
             HANDLES(EnterCriticalSection(&SocketCritSect));
-            if (ConnectionLostMsg != NULL)
-                SalamanderGeneral->Free(ConnectionLostMsg);
-            ConnectionLostMsg = SalamanderGeneral->DupStr(errBuf);
+            ConnectionLostMsg = errBuf;
             HANDLES(LeaveCriticalSection(&SocketCritSect));
         }
         else
@@ -728,7 +724,7 @@ BOOL CControlConnectionSocket::Write(const char* buffer, int bytesToWrite, DWORD
                 }
             }
         }
-        else // not everything has been sent yet — incorrect use of Write
+        else // not everything has been sent yet ï¿½ incorrect use of Write
         {
             TRACE_E("Incorrect use of CControlConnectionSocket::Write(): called again before waiting for ccsevWriteDone event.");
         }
@@ -1171,7 +1167,7 @@ void CControlConnectionSocket::ReceiveNetEvent(LPARAM lParam, int index)
                 {
                     // May occur: the main thread manages to call CloseSocket() before FD_WRITE is delivered
                     //TRACE_E("Unexpected situation in CControlConnectionSocket::ReceiveNetEvent(FD_WRITE): Socket is not connected.");
-                    BytesToWriteCount = 0; // error — reset the buffer
+                    BytesToWriteCount = 0; // error ï¿½ reset the buffer
                     BytesToWriteOffset = 0;
                     // do not generate an event for this unexpected error (solution: the user presses ESC)
                 }
@@ -1181,7 +1177,7 @@ void CControlConnectionSocket::ReceiveNetEvent(LPARAM lParam, int index)
         {
             genEvent = TRUE;
             err = eventError;
-            BytesToWriteCount = 0; // error — reset the buffer
+            BytesToWriteCount = 0; // error ï¿½ reset the buffer
             BytesToWriteOffset = 0;
         }
         if (genEvent && (KeepAliveMode == kamProcessing || KeepAliveMode == kamWaitingForEndOfProcessing))
@@ -1391,7 +1387,7 @@ public:
 
             SetForegroundWindow(dlg);
 
-            // Message loop – wait until the modeless dialog ends
+            // Message loop ï¿½ wait until the modeless dialog ends
             MSG msg;
             while (GetMessage(&msg, NULL, 0, 0))
             {

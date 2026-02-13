@@ -3563,13 +3563,13 @@ CFTPOperation::CFTPOperation()
     Password = NULL;
     Account = NULL;
     RetryLoginWithoutAsking = FALSE;
-    InitFTPCommands = NULL;
+    InitFTPCommands.clear();
     UsePassiveMode = FALSE;
     SizeCmdIsSupported = TRUE; // we will try it on the server at least once
-    ListCommand = NULL;
+    ListCommand.clear();
     ServerIP = INADDR_NONE;
-    ServerSystem = NULL;
-    ServerFirstReply = NULL;
+    ServerSystem.clear();
+    ServerFirstReply.clear();
     UseListingsCache = FALSE;
     ListingServerType = NULL;
 
@@ -3668,14 +3668,8 @@ CFTPOperation::~CFTPOperation()
         SalamanderGeneral->Free(Password);
     if (Account != NULL)
         SalamanderGeneral->Free(Account);
-    if (InitFTPCommands != NULL)
-        SalamanderGeneral->Free(InitFTPCommands);
-    if (ListCommand != NULL)
-        SalamanderGeneral->Free(ListCommand);
-    if (ServerSystem != NULL)
-        SalamanderGeneral->Free(ServerSystem);
-    if (ServerFirstReply != NULL)
-        SalamanderGeneral->Free(ServerFirstReply);
+    // std::string members (InitFTPCommands, ListCommand, ServerSystem, ServerFirstReply)
+    // are automatically freed
     if (ListingServerType != NULL)
         SalamanderGeneral->Free(ListingServerType);
     if (SourcePath != NULL)

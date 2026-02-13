@@ -94,12 +94,12 @@ BOOL CFTPOperation::SetConnection(CFTPProxyServer* proxyServer, const char* host
     User = SalamanderGeneral->DupStr((user != NULL && *user == 0) ? NULL : user); // remains NULL if it is NULL
     Password = SalamanderGeneral->DupStr((password != NULL && *password == 0) ? NULL : password);
     Account = SalamanderGeneral->DupStr((account != NULL && *account == 0) ? NULL : account);
-    InitFTPCommands = SalamanderGeneral->DupStr((initFTPCommands != NULL && *initFTPCommands == 0) ? NULL : initFTPCommands);
+    InitFTPCommands = (initFTPCommands != NULL && *initFTPCommands != 0) ? initFTPCommands : "";
     UsePassiveMode = usePassiveMode;
     SizeCmdIsSupported = TRUE;
-    ListCommand = SalamanderGeneral->DupStr(listCommand);
-    ServerSystem = SalamanderGeneral->DupStr(serverSystem);
-    ServerFirstReply = SalamanderGeneral->DupStr(serverFirstReply);
+    ListCommand = listCommand != NULL ? listCommand : "";
+    ServerSystem = serverSystem != NULL ? serverSystem : "";
+    ServerFirstReply = serverFirstReply != NULL ? serverFirstReply : "";
     ServerIP = serverIP;
     UseListingsCache = useListingsCache;
     HostIP = hostIP;
@@ -806,11 +806,11 @@ void CFTPOperation::SetServerSystem(const char* reply, int replySize)
 {
     CALL_STACK_MESSAGE2("CFTPOperation::SetServerSystem(, %d)", replySize);
     HANDLES(EnterCriticalSection(&OperCritSect));
-    if (ServerSystem == NULL)
+    if (ServerSystem.empty())
     {
         char buf[700];
         CopyStr(buf, 700, reply, replySize); // store the first server reply (source of information about the server version)
-        ServerSystem = SalamanderGeneral->DupStr(buf);
+        ServerSystem = buf;
     }
     HANDLES(LeaveCriticalSection(&OperCritSect));
 }
@@ -819,11 +819,11 @@ void CFTPOperation::SetServerFirstReply(const char* reply, int replySize)
 {
     CALL_STACK_MESSAGE2("CFTPOperation::SetServerFirstReply(, %d)", replySize);
     HANDLES(EnterCriticalSection(&OperCritSect));
-    if (ServerFirstReply == NULL)
+    if (ServerFirstReply.empty())
     {
         char buf[700];
         CopyStr(buf, 700, reply, replySize); // store the first server reply (source of information about the server version)
-        ServerFirstReply = SalamanderGeneral->DupStr(buf);
+        ServerFirstReply = buf;
     }
     HANDLES(LeaveCriticalSection(&OperCritSect));
 }
@@ -918,7 +918,7 @@ void CFTPOperation::GetInitFTPCommands(char* buf, int bufSize)
 {
     CALL_STACK_MESSAGE1("CFTPOperation::GetInitFTPCommands(,)");
     HANDLES(EnterCriticalSection(&OperCritSect));
-    lstrcpyn(buf, InitFTPCommands != NULL ? InitFTPCommands : "", bufSize);
+    lstrcpyn(buf, InitFTPCommands.c_str(), bufSize);
     HANDLES(LeaveCriticalSection(&OperCritSect));
 }
 
@@ -1693,7 +1693,7 @@ CFTPOperation::GetFTPServerPathType(const char* path)
     CALL_STACK_MESSAGE2("CFTPOperation::GetFTPServerPathType(%s)", path);
 
     HANDLES(EnterCriticalSection(&OperCritSect));
-    CFTPServerPathType type = ::GetFTPServerPathType(ServerFirstReply, ServerSystem, path);
+    CFTPServerPathType type = ::GetFTPServerPathType(ServerFirstReply.c_str(), ServerSystem.c_str(), path);
     HANDLES(LeaveCriticalSection(&OperCritSect));
 
     return type;
@@ -1705,7 +1705,7 @@ BOOL CFTPOperation::IsServerSystem(const char* systemName)
 
     HANDLES(EnterCriticalSection(&OperCritSect));
     char sysName[201];
-    FTPGetServerSystem(ServerSystem, sysName);
+    FTPGetServerSystem(ServerSystem.c_str(), sysName);
     HANDLES(LeaveCriticalSection(&OperCritSect));
 
     return _stricmp(sysName, systemName) == 0;
@@ -1767,7 +1767,7 @@ void CFTPOperation::GetListCommand(char* buf, int bufSize)
 {
     CALL_STACK_MESSAGE2("CFTPOperation::GetListCommand(, %d)", bufSize);
     HANDLES(EnterCriticalSection(&OperCritSect));
-    lstrcpyn(buf, (ListCommand != NULL && *ListCommand != 0 ? ListCommand : LIST_CMD_TEXT), bufSize);
+    lstrcpyn(buf, (!ListCommand.empty() ? ListCommand.c_str() : LIST_CMD_TEXT), bufSize);
     if (bufSize > 2 && bufSize > (int)strlen(buf) + 2)
         strcat(buf, "\r\n");
     HANDLES(LeaveCriticalSection(&OperCritSect));
@@ -1794,7 +1794,7 @@ char* CFTPOperation::AllocServerSystemReply()
 {
     CALL_STACK_MESSAGE1("CFTPOperation::AllocServerSystemReply()");
     HANDLES(EnterCriticalSection(&OperCritSect));
-    char* ret = SalamanderGeneral->DupStr(HandleNULLStr(ServerSystem));
+    char* ret = SalamanderGeneral->DupStr(ServerSystem.c_str());
     HANDLES(LeaveCriticalSection(&OperCritSect));
     return ret;
 }
@@ -1803,7 +1803,7 @@ char* CFTPOperation::AllocServerFirstReply()
 {
     CALL_STACK_MESSAGE1("CFTPOperation::AllocServerFirstReply()");
     HANDLES(EnterCriticalSection(&OperCritSect));
-    char* ret = SalamanderGeneral->DupStr(HandleNULLStr(ServerFirstReply));
+    char* ret = SalamanderGeneral->DupStr(ServerFirstReply.c_str());
     HANDLES(LeaveCriticalSection(&OperCritSect));
     return ret;
 }

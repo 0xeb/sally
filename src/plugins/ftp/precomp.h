@@ -15,6 +15,7 @@
 #include <process.h>
 #include <commctrl.h>
 #include <ostream> // for version 2.5 beta 7 and newer
+#include <string>
 #include <stdio.h>
 #include <time.h>
 
