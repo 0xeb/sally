@@ -456,3 +456,22 @@ add_test(NAME gtest_e2e_worker COMMAND gtest_e2e_worker)
 set_target_properties(gtest_e2e_worker PROPERTIES
     RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/tests"
 )
+
+# Wide worker operations integration tests (compression, encryption, dir info, long paths, Unicode)
+add_executable(gtest_worker_wide
+    gtest_worker_wide.cpp
+)
+
+target_compile_definitions(gtest_worker_wide PRIVATE
+    WIN32 _WINDOWS _CRT_SECURE_NO_WARNINGS UNICODE _UNICODE
+)
+
+target_link_libraries(gtest_worker_wide
+    GTest::gtest GTest::gtest_main
+)
+
+add_test(NAME gtest_worker_wide COMMAND gtest_worker_wide)
+
+set_target_properties(gtest_worker_wide PROPERTIES
+    RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/tests"
+)
