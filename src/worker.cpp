@@ -1999,235 +1999,41 @@ BOOL DoCopySecurity(const char* sourceName, const char* targetName, DWORD* err, 
     return ret;
 }
 
+// Forward declarations for wide versions (defined below)
+DWORD CompressFileW(const wchar_t* fileName, DWORD attrs);
+DWORD UncompressFileW(const wchar_t* fileName, DWORD attrs);
+DWORD MyEncryptFileW(IWorkerObserver& observer, const wchar_t* fileName, const char* fileNameA,
+                     DWORD attrs, DWORD finalAttrs, CWorkerState& workerState, BOOL& cancelOper, BOOL preserveDate);
+DWORD MyDecryptFileW(const wchar_t* fileName, DWORD attrs, BOOL preserveDate);
+
+// ANSI wrapper — delegates to wide version
 DWORD CompressFile(char* fileName, DWORD attrs)
 {
-    DWORD ret = ERROR_SUCCESS;
-    if (attrs & FILE_ATTRIBUTE_COMPRESSED)
-        return ret; // already compressed
-
-    // if the path ends with a space or dot, we must append '\\', otherwise CreateFile
-    // trims the spaces/dots and works with a different path
-    const char* fileNameCrFile = fileName;
-    CPathBuffer fileNameCrFileCopy; // Heap-allocated for long path support
-    MakeCopyWithBackslashIfNeeded(fileNameCrFile, fileNameCrFileCopy);
-
-    BOOL attrsChange = FALSE;
-    if (attrs & FILE_ATTRIBUTE_READONLY)
-    {
-        attrsChange = TRUE;
-        SalLPSetFileAttributes(fileNameCrFile, attrs & ~FILE_ATTRIBUTE_READONLY);
-    }
-    HANDLE file = SalCreateFileH(fileNameCrFile, FILE_READ_DATA | FILE_WRITE_DATA,
-                                 FILE_SHARE_READ | FILE_SHARE_WRITE, NULL,
-                                 OPEN_EXISTING, FILE_FLAG_BACKUP_SEMANTICS, NULL);
-    if (file == INVALID_HANDLE_VALUE)
-        ret = GetLastError();
-    else
-    {
-        USHORT state = COMPRESSION_FORMAT_DEFAULT;
-        ULONG length;
-        if (!DeviceIoControl(file, FSCTL_SET_COMPRESSION, &state,
-                             sizeof(USHORT), NULL, 0, &length, FALSE))
-            ret = GetLastError();
-        HANDLES(CloseHandle(file));
-    }
-    if (attrsChange)
-        SalLPSetFileAttributes(fileNameCrFile, attrs); // revert to the original attributes (on error the attributes would remain nonsensically changed)
-    return ret;
+    return CompressFileW(AnsiToWide(fileName).c_str(), attrs);
 }
 
+// ANSI wrapper — delegates to wide version
 DWORD UncompressFile(char* fileName, DWORD attrs)
 {
-    DWORD ret = ERROR_SUCCESS;
-    if ((attrs & FILE_ATTRIBUTE_COMPRESSED) == 0)
-        return ret; // not compressed
-
-    // if the path ends with a space or dot, we must append '\\', otherwise CreateFile
-    // trims the spaces/dots and works with a different path
-    const char* fileNameCrFile = fileName;
-    CPathBuffer fileNameCrFileCopy; // Heap-allocated for long path support
-    MakeCopyWithBackslashIfNeeded(fileNameCrFile, fileNameCrFileCopy);
-
-    BOOL attrsChange = FALSE;
-    if (attrs & FILE_ATTRIBUTE_READONLY)
-    {
-        attrsChange = TRUE;
-        SalLPSetFileAttributes(fileNameCrFile, attrs & ~FILE_ATTRIBUTE_READONLY);
-    }
-
-    HANDLE file = SalCreateFileH(fileNameCrFile, FILE_READ_DATA | FILE_WRITE_DATA,
-                                 FILE_SHARE_READ | FILE_SHARE_WRITE,
-                                 NULL, OPEN_EXISTING, FILE_FLAG_BACKUP_SEMANTICS, NULL);
-    if (file == INVALID_HANDLE_VALUE)
-        ret = GetLastError();
-    else
-    {
-        USHORT state = COMPRESSION_FORMAT_NONE;
-        ULONG length;
-        if (!DeviceIoControl(file, FSCTL_SET_COMPRESSION, &state,
-                             sizeof(USHORT), NULL, 0, &length, FALSE))
-            ret = GetLastError();
-        HANDLES(CloseHandle(file));
-    }
-    if (attrsChange)
-        SalLPSetFileAttributes(fileNameCrFile, attrs); // revert to the original attributes (on error the attributes would remain nonsensically changed)
-    return ret;
+    return UncompressFileW(AnsiToWide(fileName).c_str(), attrs);
 }
 
+// ANSI wrapper — delegates to wide version
 DWORD MyEncryptFile(IWorkerObserver& observer, char* fileName, DWORD attrs, DWORD finalAttrs,
                     CWorkerState& workerState, BOOL& cancelOper, BOOL preserveDate)
 {
-    DWORD retEnc = ERROR_SUCCESS;
-    cancelOper = FALSE;
-    if (attrs & FILE_ATTRIBUTE_ENCRYPTED)
-        return retEnc; // already encrypted
-
-    // if the path ends with a space or dot, we must append '\\', otherwise CreateFile
-    // trims the spaces/dots and works with a different path
-    const char* fileNameCrFile = fileName;
-    CPathBuffer fileNameCrFileCopy; // Heap-allocated for long path support
-    MakeCopyWithBackslashIfNeeded(fileNameCrFile, fileNameCrFileCopy);
-
-    // if the file has the SYSTEM attribute, the EncryptFile API function reports "access denied"; handle it:
-    if ((attrs & FILE_ATTRIBUTE_SYSTEM) && (finalAttrs & FILE_ATTRIBUTE_SYSTEM))
-    { // if it has and will keep the SYSTEM attribute, ask the user whether they really mean it
-        if (!workerState.EncryptSystemAll)
-        {
-            observer.WaitIfSuspended(); // if we should be in suspend mode, wait ...
-            if (observer.IsCancelled())
-                return retEnc;
-
-            if (workerState.SkipAllEncryptSystem)
-                return retEnc;
-
-            int ret = IDCANCEL;
-            ret = observer.AskHiddenOrSystemById(IDS_CONFIRMSFILEENCRYPT, fileName, IDS_ENCRYPTSFILE);
-            switch (ret)
-            {
-            case IDB_ALL:
-                workerState.EncryptSystemAll = TRUE;
-            case IDYES:
-                break;
-
-            case IDB_SKIPALL:
-                workerState.SkipAllEncryptSystem = TRUE;
-            case IDB_SKIP:
-                return retEnc;
-
-            case IDCANCEL:
-            {
-                cancelOper = TRUE;
-                return retEnc;
-            }
-            }
-        }
-    }
-
-    BOOL attrsChange = FALSE;
-    if (attrs & (FILE_ATTRIBUTE_SYSTEM | FILE_ATTRIBUTE_READONLY))
-    {
-        attrsChange = TRUE;
-        SalLPSetFileAttributes(fileNameCrFile, attrs & ~(FILE_ATTRIBUTE_SYSTEM | FILE_ATTRIBUTE_READONLY));
-    }
-    if (preserveDate)
-    {
-        HANDLE file;
-        file = SalCreateFileH(fileNameCrFile, GENERIC_READ,
-                              FILE_SHARE_READ | FILE_SHARE_WRITE,
-                              NULL, OPEN_EXISTING,
-                              (attrs & FILE_ATTRIBUTE_DIRECTORY) ? FILE_FLAG_BACKUP_SEMANTICS : 0, NULL);
-        if (file != INVALID_HANDLE_VALUE)
-        {
-            FILETIME ftCreated, /*ftAccessed,*/ ftModified;
-            GetFileTime(file, &ftCreated, NULL /*&ftAccessed*/, &ftModified);
-            HANDLES(CloseHandle(file));
-
-            if (!EncryptFile(fileNameCrFile))
-                retEnc = GetLastError();
-
-            file = SalCreateFileH(fileNameCrFile, GENERIC_WRITE,
-                                  FILE_SHARE_READ | FILE_SHARE_WRITE,
-                                  NULL, OPEN_EXISTING,
-                                  (attrs & FILE_ATTRIBUTE_DIRECTORY) ? FILE_FLAG_BACKUP_SEMANTICS : 0, NULL);
-            if (file != INVALID_HANDLE_VALUE)
-            {
-                SetFileTime(file, &ftCreated, NULL /*&ftAccessed*/, &ftModified);
-                HANDLES(CloseHandle(file));
-            }
-        }
-        else
-            retEnc = GetLastError();
-    }
-    else
-    {
-        if (!EncryptFile(fileNameCrFile))
-            retEnc = GetLastError();
-    }
-    if (attrsChange)
-        SalLPSetFileAttributes(fileNameCrFile, attrs); // revert to the original attributes (on error the attributes would remain nonsensically changed)
-    return retEnc;
+    return MyEncryptFileW(observer, AnsiToWide(fileName).c_str(), fileName, attrs, finalAttrs,
+                          workerState, cancelOper, preserveDate);
 }
 
+// ANSI wrapper — delegates to wide version
 DWORD MyDecryptFile(char* fileName, DWORD attrs, BOOL preserveDate)
 {
-    DWORD ret = ERROR_SUCCESS;
-    if ((attrs & FILE_ATTRIBUTE_ENCRYPTED) == 0)
-        return ret; // not encrypted
-
-    // if the path ends with a space or dot, we must append '\\', otherwise CreateFile
-    // trims the spaces/dots and works with a different path
-    const char* fileNameCrFile = fileName;
-    CPathBuffer fileNameCrFileCopy; // Heap-allocated for long path support
-    MakeCopyWithBackslashIfNeeded(fileNameCrFile, fileNameCrFileCopy);
-
-    BOOL attrsChange = FALSE;
-    if (attrs & FILE_ATTRIBUTE_READONLY)
-    {
-        attrsChange = TRUE;
-        SalLPSetFileAttributes(fileNameCrFile, attrs & ~FILE_ATTRIBUTE_READONLY);
-    }
-    if (preserveDate)
-    {
-        HANDLE file;
-        file = SalCreateFileH(fileNameCrFile, GENERIC_READ,
-                              FILE_SHARE_READ | FILE_SHARE_WRITE,
-                              NULL, OPEN_EXISTING,
-                              (attrs & FILE_ATTRIBUTE_DIRECTORY) ? FILE_FLAG_BACKUP_SEMANTICS : 0, NULL);
-        if (file != INVALID_HANDLE_VALUE)
-        {
-            FILETIME ftCreated, /*ftAccessed,*/ ftModified;
-            GetFileTime(file, &ftCreated, NULL /*&ftAccessed*/, &ftModified);
-            HANDLES(CloseHandle(file));
-
-            if (!DecryptFile(fileNameCrFile, 0))
-                ret = GetLastError();
-
-            file = SalCreateFileH(fileNameCrFile, GENERIC_WRITE,
-                                  FILE_SHARE_READ | FILE_SHARE_WRITE,
-                                  NULL, OPEN_EXISTING,
-                                  (attrs & FILE_ATTRIBUTE_DIRECTORY) ? FILE_FLAG_BACKUP_SEMANTICS : 0, NULL);
-            if (file != INVALID_HANDLE_VALUE)
-            {
-                SetFileTime(file, &ftCreated, NULL /*&ftAccessed*/, &ftModified);
-                HANDLES(CloseHandle(file));
-            }
-        }
-        else
-            ret = GetLastError();
-    }
-    else
-    {
-        if (!DecryptFile(fileNameCrFile, 0))
-            ret = GetLastError();
-    }
-    if (attrsChange)
-        SalLPSetFileAttributes(fileNameCrFile, attrs); // revert to the original attributes (on error the attributes would remain nonsensically changed)
-    return ret;
+    return MyDecryptFileW(AnsiToWide(fileName).c_str(), attrs, preserveDate);
 }
 
 // --- Wide versions of compression/encryption helpers ---
-// These are the real implementations; the ANSI versions above will eventually
-// become thin wrappers that convert and call these.
+// These are the real implementations; the ANSI versions above are thin wrappers.
 
 DWORD CompressFileW(const wchar_t* fileName, DWORD attrs)
 {
