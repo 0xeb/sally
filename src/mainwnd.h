@@ -74,39 +74,28 @@ protected:
 
 struct CHotPathItem
 {
-    // Name and Path are allocated to save memory (people expect unlimited hot paths)
+    // Name and Path use std::string to support unlimited length
     // moreover, in the case of Path, MAX_PATH would be too small (escaping + variables)
-    char* Name;   // name under which the path appears in the menu
-    char* Path;   // path escaped (double '$' characters) for variables like $(SalDir), etc.
-    BOOL Visible; // is the path present in the ChangeDrive menu
+    std::string Name; // name under which the path appears in the menu
+    std::string Path; // path escaped (double '$' characters) for variables like $(SalDir), etc.
+    BOOL Visible;     // is the path present in the ChangeDrive menu
 
     CHotPathItem()
     {
-        Name = NULL;
-        Path = NULL;
         Visible = TRUE;
     }
 
     void CopyFrom(const CHotPathItem* src)
     {
-        Empty();
-        Name = DupStr(src->Name);
-        Path = DupStr(src->Path);
+        Name = src->Name;
+        Path = src->Path;
         Visible = src->Visible;
     }
 
     void Empty()
     {
-        if (Name != NULL)
-        {
-            /* Name is std::string */
-            Name = NULL;
-        }
-        if (Path != NULL)
-        {
-            free(Path);
-            Path = NULL;
-        }
+        Name.clear();
+        Path.clear();
         Visible = TRUE;
     }
 };
@@ -138,12 +127,8 @@ public:
     // sets the attributes
     void Set(DWORD index, const char* name, const char* path)
     {
-        if (Items[index].Name != NULL)
-            free(Items[index].Name);
-        if (Items[index].Path != NULL)
-            free(Items[index].Path);
-        Items[index].Name = DupStr(name);
-        Items[index].Path = DupStr(path);
+        Items[index].Name = name ? name : "";
+        Items[index].Path = path ? path : "";
     }
 
     void Set(DWORD index, const char* name, const char* path, BOOL visible)
@@ -154,9 +139,7 @@ public:
 
     void SetPath(DWORD index, const char* path)
     {
-        if (Items[index].Path != NULL)
-            free(Items[index].Path);
-        Items[index].Path = DupStr(path);
+        Items[index].Path = path ? path : "";
     }
 
     void SetVisible(DWORD index, BOOL visible)
@@ -166,7 +149,7 @@ public:
 
     void GetName(int index, char* buffer, int bufferSize)
     {
-        if (index < 0 || index >= HOT_PATHS_COUNT || Items[index].Name == NULL)
+        if (index < 0 || index >= HOT_PATHS_COUNT || Items[index].Name.empty())
         {
             if (bufferSize > 0)
                 *buffer = 0;
@@ -174,13 +157,13 @@ public:
         else
         {
             if (bufferSize > 0)
-                lstrcpyn(buffer, Items[index].Name, bufferSize);
+                lstrcpyn(buffer, Items[index].Name.c_str(), bufferSize);
         }
     }
 
     void GetPath(int index, char* buffer, int bufferSize)
     {
-        if (index < 0 || index >= HOT_PATHS_COUNT || Items[index].Path == NULL)
+        if (index < 0 || index >= HOT_PATHS_COUNT || Items[index].Path.empty())
         {
             if (bufferSize > 0)
                 *buffer = 0;
@@ -188,22 +171,22 @@ public:
         else
         {
             if (bufferSize > 0)
-                lstrcpyn(buffer, Items[index].Path, bufferSize);
+                lstrcpyn(buffer, Items[index].Path.c_str(), bufferSize);
         }
     }
 
     int GetNameLen(int index)
     {
-        if (index >= 0 && index < HOT_PATHS_COUNT && Items[index].Name != NULL)
-            return lstrlen(Items[index].Name);
+        if (index >= 0 && index < HOT_PATHS_COUNT && !Items[index].Name.empty())
+            return (int)Items[index].Name.length();
         else
             return 0;
     }
 
     int GetPathLen(int index)
     {
-        if (index >= 0 && index < HOT_PATHS_COUNT && Items[index].Path != NULL)
-            return lstrlen(Items[index].Path);
+        if (index >= 0 && index < HOT_PATHS_COUNT && !Items[index].Path.empty())
+            return (int)Items[index].Path.length();
         else
             return 0;
     }

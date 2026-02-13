@@ -69,7 +69,7 @@ const char* SALAMANDER_HOTPATHS_VISIBLE = "Visible";
 
 BOOL CHotPathItems::SwapItems(int index1, int index2)
 {
-    // CHotPathItem has no destructor, so we can assign it directly to a local variable
+    // CHotPathItem uses std::string members, temp copy is fine with default copy/move
     CHotPathItem item = Items[index1];
     Items[index1] = Items[index2];
     Items[index2] = item;
@@ -199,10 +199,10 @@ BOOL CHotPathItems::Save(HKEY hKey)
         {
             const char* name = "";
             if (GetNameLen(i) > 0)
-                name = Items[i].Name;
+                name = Items[i].Name.c_str();
             const char* path = "";
             if (GetPathLen(i) > 0)
-                path = Items[i].Path;
+                path = Items[i].Path.c_str();
             DWORD visible = Items[i].Visible;
 
             if (*name == 0 && *path == 0 && visible == TRUE)
