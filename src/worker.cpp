@@ -6907,7 +6907,8 @@ BOOL DoCreateDir(IWorkerObserver& observer, char* name, DWORD attr,
     CQuadWord lastTransferredFileSize;
     script->GetTFS(&lastTransferredFileSize);
 
-    BOOL invalidName = FileNameIsInvalid(name, TRUE, ignInvalidName);
+    BOOL invalidName = !nameW.empty() ? FileNameIsInvalidW(nameW.c_str(), TRUE, ignInvalidName)
+                                      : FileNameIsInvalid(name, TRUE, ignInvalidName);
 
     // if the path ends with a space/dot, we must append '\\'; otherwise SetFileAttributes
     // and RemoveDirectory trim the spaces/dots and operate on a different path
@@ -6971,13 +6972,15 @@ BOOL DoCreateDir(IWorkerObserver& observer, char* name, DWORD attr,
                         newAttr |= FILE_ATTRIBUTE_ENCRYPTED;
                     }
                     DWORD changeAttrErr = NO_ERROR;
-                    DWORD currentAttrs = SalGetFileAttributes(name);
+                    DWORD currentAttrs = !nameCrDirW.empty() ? GetFileAttributesW(nameCrDirW.c_str())
+                                                             : SalGetFileAttributes(name);
                     if (currentAttrs != INVALID_FILE_ATTRIBUTES)
                     {
                         if ((newAttr & FILE_ATTRIBUTE_COMPRESSED) != (currentAttrs & FILE_ATTRIBUTE_COMPRESSED) &&
                             (newAttr & FILE_ATTRIBUTE_COMPRESSED) == 0)
                         {
-                            changeAttrErr = UncompressFile(name, currentAttrs);
+                            changeAttrErr = !nameCrDirW.empty() ? UncompressFileW(nameCrDirW.c_str(), currentAttrs)
+                                                                : UncompressFile(name, currentAttrs);
                         }
                         if (changeAttrErr == NO_ERROR &&
                             (newAttr & FILE_ATTRIBUTE_ENCRYPTED) != (currentAttrs & FILE_ATTRIBUTE_ENCRYPTED))
@@ -6985,8 +6988,10 @@ BOOL DoCreateDir(IWorkerObserver& observer, char* name, DWORD attr,
                             BOOL dummyCancelOper = FALSE;
                             if (newAttr & FILE_ATTRIBUTE_ENCRYPTED)
                             {
-                                changeAttrErr = MyEncryptFile(observer, name, currentAttrs, 0 /* allow encrypting directories with the SYSTEM attribute */,
-                                                              workerState, dummyCancelOper, FALSE);
+                                changeAttrErr = !nameCrDirW.empty() ? MyEncryptFileW(observer, nameCrDirW.c_str(), name, currentAttrs, 0 /* allow encrypting directories with the SYSTEM attribute */,
+                                                                                     workerState, dummyCancelOper, FALSE)
+                                                                    : MyEncryptFile(observer, name, currentAttrs, 0 /* allow encrypting directories with the SYSTEM attribute */,
+                                                                                    workerState, dummyCancelOper, FALSE);
 
                                 if ( //(WindowsVistaAndLater || script->TargetPathSupEFS) &&  // complain regardless of OS version and EFS support; originally directories on FAT could not be encrypted before Vista, we behave the same (to match Explorer, the Encrypted attribute is not that important)
                                     !workerState.DirCrLossEncrAll && changeAttrErr != ERROR_SUCCESS)
@@ -7033,13 +7038,15 @@ BOOL DoCreateDir(IWorkerObserver& observer, char* name, DWORD attr,
                                 }
                             }
                             else
-                                changeAttrErr = MyDecryptFile(name, currentAttrs, FALSE);
+                                changeAttrErr = !nameCrDirW.empty() ? MyDecryptFileW(nameCrDirW.c_str(), currentAttrs, FALSE)
+                                                                    : MyDecryptFile(name, currentAttrs, FALSE);
                         }
                         if (changeAttrErr == NO_ERROR &&
                             (newAttr & FILE_ATTRIBUTE_COMPRESSED) != (currentAttrs & FILE_ATTRIBUTE_COMPRESSED) &&
                             (newAttr & FILE_ATTRIBUTE_COMPRESSED) != 0)
                         {
-                            changeAttrErr = CompressFile(name, currentAttrs);
+                            changeAttrErr = !nameCrDirW.empty() ? CompressFileW(nameCrDirW.c_str(), currentAttrs)
+                                                                : CompressFile(name, currentAttrs);
                         }
                     }
                     else
@@ -7057,7 +7064,8 @@ BOOL DoCreateDir(IWorkerObserver& observer, char* name, DWORD attr,
                 if (script->CopyAttrs) // verify whether the source file attributes were preserved
                 {
                     DWORD curAttrs;
-                    curAttrs = SalGetFileAttributes(name);
+                    curAttrs = !nameCrDirW.empty() ? GetFileAttributesW(nameCrDirW.c_str())
+                                                   : SalGetFileAttributes(name);
                     if (curAttrs == INVALID_FILE_ATTRIBUTES || (curAttrs & DISPLAYED_ATTRIBUTES) != (newAttr & DISPLAYED_ATTRIBUTES))
                     {                                                              // attributes probably did not transfer; warn the user
                         observer.WaitIfSuspended(); // if we should be in suspend mode, wait ...
@@ -7138,7 +7146,8 @@ BOOL DoCreateDir(IWorkerObserver& observer, char* name, DWORD attr,
             if (err == ERROR_ALREADY_EXISTS ||
                 err == ERROR_FILE_EXISTS)
             {
-                DWORD attr2 = SalGetFileAttributes(name);
+                DWORD attr2 = !nameCrDirW.empty() ? GetFileAttributesW(nameCrDirW.c_str())
+                                                  : SalGetFileAttributes(name);
                 if (attr2 & FILE_ATTRIBUTE_DIRECTORY) // "directory overwrite"
                 {
                     if (workerState.CnfrmDirOver && !workerState.DirOverwriteAll) // should we ask the user about overwriting the directory?
