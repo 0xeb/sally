@@ -211,7 +211,7 @@ GetString(char* buffer, DWORD size, const char* textData)
 }
 
 const char*
-GetStringAlloc(char*& buffer, const char* textData)
+GetStringAlloc(std::string& buffer, const char* textData)
 {
     CALL_STACK_MESSAGE_NONE
     const char* sour = textData;
@@ -227,9 +227,7 @@ GetStringAlloc(char*& buffer, const char* textData)
     }
     if (*sour != '"')
     {
-        if (buffer)
-            free(buffer);
-        buffer = NULL;
+        buffer.clear();
         return sour;
     }
     sour++;
@@ -247,8 +245,8 @@ GetStringAlloc(char*& buffer, const char* textData)
         len++;
     }
     // copy the string
-    buffer = (char*)realloc(buffer, len + 1);
-    char* dest = buffer;
+    buffer.resize(len);
+    char* dest = &buffer[0];
     sour = save;
     while (*sour)
     {
@@ -259,7 +257,6 @@ GetStringAlloc(char*& buffer, const char* textData)
     }*/
         *dest++ = *sour++;
     }
-    *dest = 0;
     return sour;
 }
 
@@ -1081,7 +1078,7 @@ BOOL CZipPack::ExportSFXSettings(CFile* outFile, CSfxSettings* settings)
 
     if (WriteSFXComment(outFile, SFX_COMMENT_MBOX))
         return FALSE;
-    const char* str = settings->MBoxText ? settings->MBoxText : "";
+    const char* str = settings->MBoxText.c_str();
     sprintf(buf1, "%s=\"", SFX_MBOXTEXT);
     if (Write(outFile, buf1, lstrlen(buf1), NULL))
         return FALSE;

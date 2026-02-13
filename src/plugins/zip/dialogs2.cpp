@@ -643,7 +643,7 @@ BOOL CAdvancedSEDialog::OnChangeLanguage(WORD wNotifyCode, WORD wID, HWND hwndCt
                         lstrcmpi(CurrentSfxLang->ButtonText, TmpSfxSettings.ExtractBtnText) == 0 &&
                         lstrcmpi(CurrentSfxLang->Vendor, TmpSfxSettings.Vendor) == 0 &&
                         lstrcmpi(CurrentSfxLang->WWW, TmpSfxSettings.WWW) == 0 &&
-                        (TmpSfxSettings.MBoxText == NULL || *TmpSfxSettings.MBoxText == 0) &&
+                        (TmpSfxSettings.MBoxText.empty()) &&
                         *TmpSfxSettings.MBoxTitle == 0)
                     {
                         goto REPLACE;
@@ -1639,7 +1639,7 @@ BOOL CAdvancedSEDialog::LoadFavSettings(CSfxSettings* sfxSettings)
     lstrcpy(TmpSfxSettings.Text, sfxSettings->Text);
     lstrcpy(TmpSfxSettings.Title, sfxSettings->Title);
     TmpSfxSettings.MBoxStyle = sfxSettings->MBoxStyle;
-    TmpSfxSettings.SetMBoxText(sfxSettings->MBoxText);
+    TmpSfxSettings.SetMBoxText(sfxSettings->MBoxText.c_str());
     lstrcpy(TmpSfxSettings.MBoxTitle, sfxSettings->MBoxTitle);
     lstrcpy(TmpSfxSettings.TargetDir, sfxSettings->TargetDir);
     lstrcpy(TmpSfxSettings.ExtractBtnText, sfxSettings->ExtractBtnText);
@@ -1796,7 +1796,7 @@ BOOL CSfxTextsDialog::OnInit(WPARAM wParam, LPARAM lParam)
     SendDlgItemMessage(Dlg, IDC_MBOXICON, CB_ADDSTRING, 0, (LPARAM)LoadStr(IDS_LONGMESSAGE));
     SendDlgItemMessage(Dlg, IDC_MBOXICON, CB_SETITEMDATA, i++, SE_LONGMESSAGE);
 
-    ResetControls(SfxSettings->MBoxStyle, SfxSettings->MBoxTitle, SfxSettings->MBoxText,
+    ResetControls(SfxSettings->MBoxStyle, SfxSettings->MBoxTitle, SfxSettings->MBoxText.c_str(),
                   SfxSettings->Title, SfxSettings->Text, SfxSettings->ExtractBtnText,
                   SfxSettings->Vendor, SfxSettings->WWW);
 
@@ -1931,10 +1931,14 @@ BOOL CSfxTextsDialog::OnOK(WORD wNotifyCode, WORD wID, HWND hwndCtl)
     }
 
     int l = (int)SendDlgItemMessage(Dlg, IDC_MBOXTEXT, WM_GETTEXTLENGTH, 0, 0) + 1;
-    settings.MBoxText = (char*)realloc(settings.MBoxText, l);
-    SendDlgItemMessage(Dlg, IDC_MBOXTEXT, WM_GETTEXT, l, (LPARAM)settings.MBoxText);
+    {
+        std::string buf(l, '\0');
+        SendDlgItemMessage(Dlg, IDC_MBOXTEXT, WM_GETTEXT, l, (LPARAM)&buf[0]);
+        buf.resize(strlen(buf.c_str()));
+        settings.MBoxText = std::move(buf);
+    }
     SendDlgItemMessage(Dlg, IDC_MBOXTITLE, WM_GETTEXT, SE_MAX_TITLE, (LPARAM)settings.MBoxTitle);
-    if (!lstrlen(settings.MBoxTitle) && lstrlen(settings.MBoxText))
+    if (!lstrlen(settings.MBoxTitle) && !settings.MBoxText.empty())
     {
         SalamanderGeneral->SalMessageBox(Dlg, LoadStr(IDS_ERRBADMBOXTITLE), LoadStr(IDS_ERROR), MB_OK | MB_ICONEXCLAMATION);
         return TRUE;

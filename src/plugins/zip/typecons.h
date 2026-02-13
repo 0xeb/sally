@@ -246,7 +246,7 @@ struct CSfxSettings
     char IconFile[MAX_PATH];
     DWORD IconIndex;
     UINT MBoxStyle;
-    char* MBoxText;
+    std::string MBoxText;
     char MBoxTitle[SE_MAX_TITLE];
     char WaitFor[MAX_PATH];
 
@@ -264,7 +264,6 @@ struct CSfxSettings
         *IconFile = 0;
         IconIndex = 0;
         MBoxStyle = MB_OK;
-        MBoxText = NULL;
         *MBoxTitle = 0;
         *WaitFor = 0;
     }
@@ -283,16 +282,12 @@ struct CSfxSettings
         strcpy(IconFile, origin.IconFile);
         IconIndex = origin.IconIndex;
         MBoxStyle = origin.MBoxStyle;
-        MBoxText = DupStr(origin.MBoxText);
+        MBoxText = origin.MBoxText;
         strcpy(MBoxTitle, origin.MBoxTitle);
         strcpy(WaitFor, origin.WaitFor);
     }
 
-    ~CSfxSettings()
-    {
-        if (MBoxText)
-            free(MBoxText);
-    }
+    ~CSfxSettings() {}
 
     CSfxSettings& operator=(const CSfxSettings& origin)
     {
@@ -308,33 +303,15 @@ struct CSfxSettings
         strcpy(IconFile, origin.IconFile);
         IconIndex = origin.IconIndex;
         MBoxStyle = origin.MBoxStyle;
-        if (MBoxText)
-            free(MBoxText);
-        MBoxText = DupStr(origin.MBoxText);
+        MBoxText = origin.MBoxText;
         strcpy(MBoxTitle, origin.MBoxTitle);
         strcpy(WaitFor, origin.WaitFor);
         return *this;
     }
 
-    char* SetMBoxText(const char* text)
+    void SetMBoxText(const char* text)
     {
-        if (MBoxText)
-            free(MBoxText);
-        MBoxText = DupStr(text);
-        return MBoxText;
-    }
-
-private:
-    char* DupStr(const char* str)
-    {
-        if (str)
-        {
-            char* ret = (char*)malloc(strlen(str) + 1);
-            strcpy(ret, str);
-            return ret;
-        }
-        else
-            return NULL;
+        MBoxText = text ? text : "";
     }
 };
 

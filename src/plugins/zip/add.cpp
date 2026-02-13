@@ -2617,9 +2617,9 @@ int CZipPack::WriteSfxExecutable(const char* sfxFile, const char* sfxPackage, BO
     }
     l = lstrlen(Options.SfxSettings.MBoxTitle);
     ArchiveDataOffs += ++l;
-    if (Options.SfxSettings.MBoxText)
+    if (!Options.SfxSettings.MBoxText.empty())
     {
-        l = lstrlen(Options.SfxSettings.MBoxText);
+        l = lstrlen(Options.SfxSettings.MBoxText.c_str());
         ArchiveDataOffs += ++l;
     }
     else
@@ -2722,16 +2722,16 @@ BOOL CZipPack::WriteSFXHeader(const char* archName, QWORD eoCentrDirOffs, DWORD 
             offs += 1; // add a character to separate the subkey and value
     }
     header.MBoxStyle = (lstrlen(Options.SfxSettings.MBoxTitle) ||
-                        Options.SfxSettings.MBoxText && lstrlen(Options.SfxSettings.MBoxText))
+                        !Options.SfxSettings.MBoxText.empty() && lstrlen(Options.SfxSettings.MBoxText.c_str()))
                            ? Options.SfxSettings.MBoxStyle
                            : -1;
     header.MBoxTitleOffs = offs;
     l = lstrlen(Options.SfxSettings.MBoxTitle);
     offs += ++l;
     header.MBoxTextOffs = offs;
-    if (Options.SfxSettings.MBoxText)
+    if (!Options.SfxSettings.MBoxText.empty())
     {
-        l = lstrlen(Options.SfxSettings.MBoxText);
+        l = lstrlen(Options.SfxSettings.MBoxText.c_str());
         offs += ++l;
     }
     else
@@ -2814,7 +2814,7 @@ BOOL CZipPack::WriteSFXHeader(const char* archName, QWORD eoCentrDirOffs, DWORD 
     }
     if (Write(TempFile, Options.SfxSettings.MBoxTitle, lstrlen(Options.SfxSettings.MBoxTitle) + 1, NULL))
         return FALSE;
-    const char* str = Options.SfxSettings.MBoxText ? Options.SfxSettings.MBoxText : "";
+    const char* str = Options.SfxSettings.MBoxText.c_str();
     if (Write(TempFile, str, lstrlen(str) + 1, NULL))
         return FALSE;
     str = Options.SfxSettings.Flags & SE_REMOVEAFTER ? Options.SfxSettings.WaitFor : "";

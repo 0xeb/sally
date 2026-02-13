@@ -123,16 +123,16 @@ BOOL WriteSFXHeader()
             offs += 1; // add a separator character between the subkey and value
     }
     header.MBoxStyle = (lstrlen(Settings.MBoxTitle) ||
-                        Settings.MBoxText && lstrlen(Settings.MBoxText))
+                        !Settings.MBoxText.empty())
                            ? Settings.MBoxStyle
                            : -1;
     header.MBoxTitleOffs = offs;
     l = lstrlen(Settings.MBoxTitle);
     offs += ++l;
     header.MBoxTextOffs = offs;
-    if (Settings.MBoxText)
+    if (!Settings.MBoxText.empty())
     {
-        l = lstrlen(Settings.MBoxText);
+        l = lstrlen(Settings.MBoxText.c_str());
         offs += ++l;
     }
     else
@@ -213,7 +213,7 @@ BOOL WriteSFXHeader()
     }
     if (!Write(ExeFile, Settings.MBoxTitle, lstrlen(Settings.MBoxTitle) + 1))
         return FALSE;
-    const char* str = Settings.MBoxText ? Settings.MBoxText : "";
+    const char* str = Settings.MBoxText.c_str();
     if (!Write(ExeFile, str, lstrlen(str) + 1))
         return FALSE;
     str = Settings.Flags & SE_REMOVEAFTER ? Settings.WaitFor : "";

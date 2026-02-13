@@ -2383,7 +2383,15 @@ DWORD ExpandSfxSettings(CSfxSettings* settings, void* buffer, DWORD size)
     GET_STRING(settings->IconFile);
     GET_DWORD(settings->IconIndex);
     GET_DWORD(settings->MBoxStyle);
-    GET_STRING_ALLOC(settings->MBoxText);
+    {
+        DWORD s;
+        GET_DWORD(s);
+        if (size < s)
+            return -1;
+        size -= s;
+        settings->MBoxText.assign(ptr, s);
+        ptr += s;
+    }
     GET_STRING(settings->MBoxTitle);
     GET_STRING(settings->WaitFor);
     if (size > 0)
@@ -2442,7 +2450,7 @@ DWORD PackSfxSettings(CSfxSettings* settings, char*& buffer, DWORD& size)
     PUT_STRING(settings->IconFile);
     PUT_DWORD(settings->IconIndex);
     PUT_DWORD(settings->MBoxStyle);
-    PUT_STRING(settings->MBoxText);
+    PUT_STRING(settings->MBoxText.c_str());
     PUT_STRING(settings->MBoxTitle);
     PUT_STRING(settings->WaitFor);
     PUT_STRING(settings->Vendor);
