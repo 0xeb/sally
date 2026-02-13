@@ -1482,20 +1482,17 @@ void GetFileOverwriteInfo(char* buff, int buffLen, HANDLE file, const char* file
     _snprintf_s(buff, buffLen, _TRUNCATE, "%s, %s, %s%s", number, date, time, attr);
 }
 
-void GetDirInfo(char* buffer, const char* dir)
+// Wide version of GetDirInfo — uses native wide APIs
+void GetDirInfoW(char* buffer, const wchar_t* dir)
 {
-    const char* dirFindFirst = dir;
-    CPathBuffer dirFindFirstCopy; // Heap-allocated for long path support
-    MakeCopyWithBackslashIfNeeded(dirFindFirst, dirFindFirstCopy);
+    std::wstring dirPath = MakeCopyWithBackslashIfNeededW(dir);
 
     BOOL ok = FALSE;
     FILETIME lastWrite;
-    if (NameEndsWithBackslash(dirFindFirst))
-    { // FindFirstFile fails for a dir ending with a backslash (used for invalid directory names),
-        // so in this situation we handle it through CreateFile and GetFileTime
-        // Using SalCreateFileH for long path support (paths > 260 chars)
-        HANDLE file = SalCreateFileH(dirFindFirst, GENERIC_READ, FILE_SHARE_READ | FILE_SHARE_WRITE,
-                                     NULL, OPEN_EXISTING, FILE_FLAG_BACKUP_SEMANTICS, NULL);
+    if (NameEndsWithBackslashW(dirPath.c_str()))
+    {
+        HANDLE file = CreateFileW(dirPath.c_str(), GENERIC_READ, FILE_SHARE_READ | FILE_SHARE_WRITE,
+                                  NULL, OPEN_EXISTING, FILE_FLAG_BACKUP_SEMANTICS, NULL);
         if (file != INVALID_HANDLE_VALUE)
         {
             if (GetFileTime(file, NULL, NULL, &lastWrite))
@@ -1505,8 +1502,8 @@ void GetDirInfo(char* buffer, const char* dir)
     }
     else
     {
-        WIN32_FIND_DATA data;
-        HANDLE find = SalFindFirstFileH(dirFindFirst, &data);
+        WIN32_FIND_DATAW data;
+        HANDLE find = FindFirstFileW(dirPath.c_str(), &data);
         if (find != INVALID_HANDLE_VALUE)
         {
             HANDLES(FindClose(find));
@@ -1534,6 +1531,12 @@ void GetDirInfo(char* buffer, const char* dir)
     }
     else
         buffer[0] = 0;
+}
+
+// ANSI wrapper — delegates to wide version
+void GetDirInfo(char* buffer, const char* dir)
+{
+    GetDirInfoW(buffer, AnsiToWide(dir).c_str());
 }
 
 BOOL IsDirectoryEmpty(const char* name) // directories/subdirectories contain no files
@@ -6960,7 +6963,10 @@ BOOL DoCreateDir(IWorkerObserver& observer, char* name, DWORD attr,
                     {
                         char sAttr[101], tAttr[101];
                         GetDirInfo(sAttr, sourceDir);
-                        GetDirInfo(tAttr, name);
+                        if (!nameW.empty())
+                            GetDirInfoW(tAttr, nameW.c_str());
+                        else
+                            GetDirInfo(tAttr, name);
 
                         observer.WaitIfSuspended(); // if we should be in suspend mode, wait ...
                         if (observer.IsCancelled())
