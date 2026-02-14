@@ -758,6 +758,32 @@ DWORD COperation::GetSourceAttributes() const
     }
 }
 
+// Clears read-only attribute on target file - uses TargetNameW if available
+BOOL COperation::ClearTargetReadOnly(DWORD attr) const
+{
+    if (HasWideTarget())
+    {
+        return ClearReadOnlyAttrW(TargetNameW.c_str(), attr);
+    }
+    else
+    {
+        return ClearReadOnlyAttr(TargetName, attr);
+    }
+}
+
+// Clears read-only attribute on source file - uses SourceNameW if available
+BOOL COperation::ClearSourceReadOnly(DWORD attr) const
+{
+    if (HasWideSource())
+    {
+        return ClearReadOnlyAttrW(SourceNameW.c_str(), attr);
+    }
+    else
+    {
+        return ClearReadOnlyAttr(SourceName, attr);
+    }
+}
+
 // Wraps CreateFileW + DeviceIoControl(FSCTL_SET_COMPRESSION) for platform abstraction.
 DWORD COperation::SetCompressionW(const wchar_t* path, USHORT compressionFormat)
 {
@@ -3766,7 +3792,7 @@ void DoCopyFileLoopOrig(HANDLE& in, HANDLE& out, void* buffer, int& limitBufferS
 
                 HANDLES(CloseHandle(out));
                 out = NULL;
-                ClearReadOnlyAttr(op->TargetName); // if it somehow became read-only (should never happen), so we know how to handle it
+                op->ClearTargetReadOnly(); // if it somehow became read-only (should never happen), so we know how to handle it
                 if (op->DeleteTargetFile())
                 {
                     HANDLES(CloseHandle(in));
@@ -4737,7 +4763,7 @@ void DoCopyFileLoopAsync(CAsyncCopyParams* asyncPar, HANDLE& in, HANDLE& out, vo
                 {
                     HANDLES(CloseHandle(out));
                     out = NULL;
-                    ClearReadOnlyAttr(op->TargetName); // in case it was created as read-only (should never happen) so we can handle it
+                    op->ClearTargetReadOnly(); // in case it was created as read-only (should never happen) so we can handle it
                     if (op->DeleteTargetFile())
                     {
                         HANDLES(CloseHandle(in));
@@ -5039,7 +5065,7 @@ COPY_AGAIN:
 
                             HANDLES(CloseHandle(out));
                             out = INVALID_HANDLE_VALUE;
-                            ClearReadOnlyAttr(op->TargetName); // in case it was created as read-only (should never happen) so we can handle it
+                            op->ClearTargetReadOnly(); // in case it was created as read-only (should never happen) so we can handle it
                             if (op->DeleteTargetFile())
                             {
                                 skipAllocWholeFileOnStart = TRUE;
@@ -5345,7 +5371,7 @@ COPY_AGAIN:
                             {
                             COPY_ERROR_2:
 
-                                ClearReadOnlyAttr(op->TargetName); // the file must not be read-only if it is to be deleted
+                                op->ClearTargetReadOnly(); // the file must not be read-only if it is to be deleted
                                 op->DeleteTargetFile();
                                 return FALSE;
                             }
@@ -5578,7 +5604,7 @@ COPY_AGAIN:
                             {
                                 if (targetCannotOpenForWrite || mustDeleteFileBeforeOverwrite == 1 /* yes */)
                                 { // the file must be deleted first
-                                    BOOL chAttr = ClearReadOnlyAttr(op->TargetName, attr);
+                                    BOOL chAttr = op->ClearTargetReadOnly(attr);
 
                                     if (!tgtNameCaseCorrected)
                                     {
@@ -6239,10 +6265,7 @@ BOOL DoMoveFile(COperation* op, IWorkerObserver& observer, void* buffer,
                         }
                     }
 
-                    if (op->HasWideTarget())
-                        ClearReadOnlyAttrW(op->TargetNameW.c_str(), attr); // make sure it can be deleted ...
-                    else
-                        ClearReadOnlyAttr(op->TargetName, attr);
+                    op->ClearTargetReadOnly(attr); // make sure it can be deleted ...
                     while (1)
                     {
                         if (op->DeleteTargetFile())
@@ -6349,10 +6372,7 @@ BOOL DoMoveFile(COperation* op, IWorkerObserver& observer, void* buffer,
                                    workerState, copyADS, copyAsEncrypted, TRUE, asyncPar);
         if (notError && !skip) // still need to clean up the file from the source
         {
-            if (op->HasWideSource())
-                ClearReadOnlyAttrW(op->SourceNameW.c_str()); // ensure it can be deleted
-            else
-                ClearReadOnlyAttr(op->SourceName);
+            op->ClearSourceReadOnly(); // ensure it can be deleted
             while (1)
             {
                 if (op->DeleteSourceFile())
@@ -6393,7 +6413,8 @@ BOOL DoDeleteFile(IWorkerObserver& observer, char* name, const CQuadWord& size, 
 {
     // if the path ends with a space/dot it is invalid and we must not delete it,
     // DeleteFile would trim the spaces/dots and remove a different file
-    BOOL invalidName = FileNameIsInvalid(name, TRUE);
+    BOOL invalidName = !nameW.empty() ? FileNameIsInvalidW(nameW.c_str(), TRUE)
+                                      : FileNameIsInvalid(name, TRUE);
 
     DWORD err;
     while (1)
@@ -6430,7 +6451,10 @@ BOOL DoDeleteFile(IWorkerObserver& observer, char* name, const CQuadWord& size, 
                     }
                 }
             }
-            ClearReadOnlyAttr(name, attr); // ensure it can be deleted
+            if (!nameW.empty())
+                ClearReadOnlyAttrW(nameW.c_str(), attr);
+            else
+                ClearReadOnlyAttr(name, attr); // ensure it can be deleted
 
             err = ERROR_SUCCESS;
             BOOL useRecycleBin;
