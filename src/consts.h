@@ -102,6 +102,7 @@ std::wstring SalGetTempFileNameW(const wchar_t* path, const wchar_t* prefix, boo
 // we wrote our own (if an error occurs during MoveFile, it tries to clear read-only, perform the operation,
 // and then set it back)
 BOOL SalMoveFile(const char* srcName, const char* destName);
+BOOL SalMoveFileW(const wchar_t* srcName, const wchar_t* destName);
 
 // Variant of Windows GetFileSize (has simpler error handling); 'file' is an open
 // file for calling GetFileSize(); returns the obtained file size in 'size'; returns success,

@@ -1488,33 +1488,26 @@ BOOL FileNameIsInvalidW(const wchar_t* name, BOOL isFullName, BOOL ignInvalidNam
     return nameLen > 0 && (name[nameLen - 1] <= L' ' || name[nameLen - 1] == L'.');
 }
 
-BOOL SalMoveFile(const char* srcName, const char* destName)
+BOOL SalMoveFileW(const wchar_t* srcName, const wchar_t* destName)
 {
-    // if name ends with space/dot, we must append '\\', otherwise MoveFile
-    // trims spaces/dots and thus works with different name
-    CPathBuffer srcNameCopy; // Heap-allocated for long path support
-    MakeCopyWithBackslashIfNeeded(srcName, srcNameCopy);
-    CPathBuffer destNameCopy; // Heap-allocated for long path support
-    MakeCopyWithBackslashIfNeeded(destName, destNameCopy);
-
-    if (!MoveFileA(gFileSystem, srcName, destName).success)
+    if (!gFileSystem->MoveFile(srcName, destName).success)
     {
         DWORD err = GetLastError();
         if (err == ERROR_ACCESS_DENIED)
         { // could be a Novell problem (MoveFile returns error for files with read-only attribute)
-            DWORD attr = GetFileAttributesW(AnsiToWide(srcName).c_str());
+            DWORD attr = GetFileAttributesW(srcName);
             if (attr != 0xFFFFFFFF && (attr & FILE_ATTRIBUTE_READONLY))
             {
-                SetFileAttributesW(AnsiToWide(srcName).c_str(), FILE_ATTRIBUTE_ARCHIVE);
-                if (MoveFileA(gFileSystem, srcName, destName).success)
+                SetFileAttributesW(srcName, FILE_ATTRIBUTE_ARCHIVE);
+                if (gFileSystem->MoveFile(srcName, destName).success)
                 {
-                    SetFileAttributesW(AnsiToWide(destName).c_str(), attr);
+                    SetFileAttributesW(destName, attr);
                     return TRUE;
                 }
                 else
                 {
                     err = GetLastError();
-                    SetFileAttributesW(AnsiToWide(srcName).c_str(), attr);
+                    SetFileAttributesW(srcName, attr);
                 }
             }
             SetLastError(err);
@@ -1522,6 +1515,11 @@ BOOL SalMoveFile(const char* srcName, const char* destName)
         return FALSE;
     }
     return TRUE;
+}
+
+BOOL SalMoveFile(const char* srcName, const char* destName)
+{
+    return SalMoveFileW(AnsiToWide(srcName).c_str(), AnsiToWide(destName).c_str());
 }
 
 void RecognizeFileType(HWND parent, const char* pattern, int patternLen, BOOL forceText,
