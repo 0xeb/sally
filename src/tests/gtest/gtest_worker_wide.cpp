@@ -1001,3 +1001,121 @@ TEST_F(AdsTest, DirectoryADS)
     }
     EXPECT_TRUE(foundDirStream) << "Expected :dirstream:$DATA on directory";
 }
+
+// ---- NTFS Security tests ----
+// These test the same Win32 security API patterns used by DoCopySecurity
+
+#include <aclapi.h>
+
+class SecurityTest : public ::testing::Test
+{
+protected:
+    fs::path tempDir;
+
+    void SetUp() override
+    {
+        tempDir = fs::temp_directory_path() / L"sal_security_test";
+        fs::create_directories(tempDir);
+    }
+
+    void TearDown() override
+    {
+        std::error_code ec;
+        fs::remove_all(tempDir, ec);
+    }
+};
+
+TEST_F(SecurityTest, GetNamedSecurityInfoW_BasicFile)
+{
+    fs::path file = tempDir / "test.txt";
+    HANDLE h = CreateFileW(file.c_str(), GENERIC_WRITE, 0, NULL,
+                           CREATE_NEW, FILE_ATTRIBUTE_NORMAL, NULL);
+    ASSERT_NE(h, INVALID_HANDLE_VALUE);
+    CloseHandle(h);
+
+    PSID owner = NULL;
+    PSECURITY_DESCRIPTOR sd = NULL;
+    DWORD err = GetNamedSecurityInfoW((LPWSTR)file.c_str(), SE_FILE_OBJECT,
+                                      OWNER_SECURITY_INFORMATION, &owner, NULL, NULL, NULL, &sd);
+    EXPECT_EQ(err, ERROR_SUCCESS);
+    EXPECT_NE(owner, nullptr);
+    EXPECT_NE(sd, nullptr);
+    if (sd)
+        LocalFree(sd);
+}
+
+TEST_F(SecurityTest, CopySecurityDescriptor_FileToFile)
+{
+    // Create source and target files
+    fs::path source = tempDir / "source.txt";
+    fs::path target = tempDir / "target.txt";
+    for (auto& p : {source, target})
+    {
+        HANDLE h = CreateFileW(p.c_str(), GENERIC_WRITE, 0, NULL,
+                               CREATE_NEW, FILE_ATTRIBUTE_NORMAL, NULL);
+        ASSERT_NE(h, INVALID_HANDLE_VALUE);
+        CloseHandle(h);
+    }
+
+    // Read security from source
+    PSID owner = NULL;
+    PACL dacl = NULL;
+    PSECURITY_DESCRIPTOR sd = NULL;
+    DWORD err = GetNamedSecurityInfoW((LPWSTR)source.c_str(), SE_FILE_OBJECT,
+                                      OWNER_SECURITY_INFORMATION | DACL_SECURITY_INFORMATION,
+                                      &owner, NULL, &dacl, NULL, &sd);
+    ASSERT_EQ(err, ERROR_SUCCESS);
+
+    // Apply to target (same pattern as DoCopySecurity)
+    err = SetNamedSecurityInfoW((LPWSTR)target.c_str(), SE_FILE_OBJECT,
+                                OWNER_SECURITY_INFORMATION | DACL_SECURITY_INFORMATION,
+                                owner, NULL, dacl, NULL);
+    EXPECT_EQ(err, ERROR_SUCCESS);
+    if (sd)
+        LocalFree(sd);
+}
+
+TEST_F(SecurityTest, UnicodeFilename_SecurityInfo)
+{
+    fs::path file = tempDir / L"\x65E5\x672C\x8A9E.txt"; // 日本語.txt
+    HANDLE h = CreateFileW(file.c_str(), GENERIC_WRITE, 0, NULL,
+                           CREATE_NEW, FILE_ATTRIBUTE_NORMAL, NULL);
+    ASSERT_NE(h, INVALID_HANDLE_VALUE);
+    CloseHandle(h);
+
+    PSID owner = NULL;
+    PSECURITY_DESCRIPTOR sd = NULL;
+    DWORD err = GetNamedSecurityInfoW((LPWSTR)file.c_str(), SE_FILE_OBJECT,
+                                      OWNER_SECURITY_INFORMATION, &owner, NULL, NULL, NULL, &sd);
+    EXPECT_EQ(err, ERROR_SUCCESS);
+    EXPECT_NE(owner, nullptr);
+    if (sd)
+        LocalFree(sd);
+}
+
+TEST_F(SecurityTest, LongPath_SecurityInfo)
+{
+    // Build path exceeding MAX_PATH
+    std::wstring longDir = L"\\\\?\\" + tempDir.wstring();
+    for (int i = 0; i < 15; i++)
+    {
+        longDir += L"\\sec_pad_" + std::to_wstring(i);
+        CreateDirectoryW(longDir.c_str(), NULL);
+    }
+
+    std::wstring longFile = longDir + L"\\secure.txt";
+    HANDLE h = CreateFileW(longFile.c_str(), GENERIC_WRITE, 0, NULL,
+                           CREATE_NEW, FILE_ATTRIBUTE_NORMAL, NULL);
+    if (h == INVALID_HANDLE_VALUE)
+        GTEST_SKIP() << "Cannot create long-path file";
+    CloseHandle(h);
+
+    PSID owner = NULL;
+    PSECURITY_DESCRIPTOR sd = NULL;
+    DWORD err = GetNamedSecurityInfoW((LPWSTR)longFile.c_str(), SE_FILE_OBJECT,
+                                      OWNER_SECURITY_INFORMATION, &owner, NULL, NULL, NULL, &sd);
+    EXPECT_EQ(err, ERROR_SUCCESS);
+    EXPECT_NE(owner, nullptr);
+    if (sd)
+        LocalFree(sd);
+}
