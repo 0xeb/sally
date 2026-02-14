@@ -3361,15 +3361,15 @@ BOOL SyncOrAsyncDeviceIoControl(CAsyncCopyParams* asyncPar, HANDLE hDevice, DWOR
 
 // Sets compression/encryption attributes on the target file.
 // DeviceIoControl (FSCTL_SET_COMPRESSION) operates on open HANDLE — handle-based, wrapping not needed.
-// SalGetFileAttributes, SalCreateFileH, EncryptFile, DecryptFile use ANSI paths with Sal* long-path wrappers.
-// TODO: migrate to wide paths when COperation wrapping is extended to SetCompressAndEncryptedAttrs callers.
+// Uses wide APIs (GetFileAttributesW, EncryptFileW, DecryptFileW, CreateFileW) when nameW is available.
 void SetCompressAndEncryptedAttrs(const char* name, DWORD attr, HANDLE* out, BOOL openAlsoForRead,
-                                  BOOL* encryptionNotSupported, CAsyncCopyParams* asyncPar)
+                                  BOOL* encryptionNotSupported, CAsyncCopyParams* asyncPar,
+                                  const std::wstring& nameW = std::wstring())
 {
     if (*out != INVALID_HANDLE_VALUE)
     {
         DWORD err = NO_ERROR;
-        DWORD curAttr = SalGetFileAttributes(name);
+        DWORD curAttr = !nameW.empty() ? GetFileAttributesW(nameW.c_str()) : SalGetFileAttributes(name);
         if ((curAttr == INVALID_FILE_ATTRIBUTES ||
              (attr & FILE_ATTRIBUTE_COMPRESSED) != (curAttr & FILE_ATTRIBUTE_COMPRESSED)) &&
             (attr & FILE_ATTRIBUTE_COMPRESSED) == 0)
@@ -3389,7 +3389,8 @@ void SetCompressAndEncryptedAttrs(const char* name, DWORD attr, HANDLE* out, BOO
             HANDLES(CloseHandle(*out)); // close the file; otherwise we cannot change its encrypted attribute
             if (attr & FILE_ATTRIBUTE_ENCRYPTED)
             {
-                if (!EncryptFile(name))
+                BOOL ok = !nameW.empty() ? EncryptFileW(nameW.c_str()) : EncryptFile(name);
+                if (!ok)
                 {
                     err = GetLastError();
                     if (encryptionNotSupported != NULL)
@@ -3398,23 +3399,36 @@ void SetCompressAndEncryptedAttrs(const char* name, DWORD attr, HANDLE* out, BOO
             }
             else
             {
-                if (!DecryptFile(name, 0))
+                BOOL ok = !nameW.empty() ? DecryptFileW(nameW.c_str(), 0) : DecryptFile(name, 0);
+                if (!ok)
                     err = GetLastError();
             }
             if (err != NO_ERROR)
                 TRACE_I("SetCompressAndEncryptedAttrs(): Unable to set Encrypted attribute for " << name << "! error=" << GetErrorText(err));
             // reopen the existing file to continue writing
-            *out = SalCreateFileH(name, GENERIC_WRITE | (openAlsoForRead ? GENERIC_READ : 0), 0, NULL, OPEN_ALWAYS,
-                                  asyncPar->GetOverlappedFlag() | FILE_FLAG_SEQUENTIAL_SCAN, NULL);
-            if (openAlsoForRead && *out == INVALID_HANDLE_VALUE) // problem: reopening failed, try write-only
+            if (!nameW.empty())
             {
-                *out = SalCreateFileH(name, GENERIC_WRITE, 0, NULL, OPEN_ALWAYS,
+                *out = CreateFileW(nameW.c_str(), GENERIC_WRITE | (openAlsoForRead ? GENERIC_READ : 0), 0, NULL, OPEN_ALWAYS,
+                                   asyncPar->GetOverlappedFlag() | FILE_FLAG_SEQUENTIAL_SCAN, NULL);
+                if (openAlsoForRead && *out == INVALID_HANDLE_VALUE)
+                    *out = CreateFileW(nameW.c_str(), GENERIC_WRITE, 0, NULL, OPEN_ALWAYS,
+                                       asyncPar->GetOverlappedFlag() | FILE_FLAG_SEQUENTIAL_SCAN, NULL);
+            }
+            else
+            {
+                *out = SalCreateFileH(name, GENERIC_WRITE | (openAlsoForRead ? GENERIC_READ : 0), 0, NULL, OPEN_ALWAYS,
                                       asyncPar->GetOverlappedFlag() | FILE_FLAG_SEQUENTIAL_SCAN, NULL);
+                if (openAlsoForRead && *out == INVALID_HANDLE_VALUE)
+                    *out = SalCreateFileH(name, GENERIC_WRITE, 0, NULL, OPEN_ALWAYS,
+                                          asyncPar->GetOverlappedFlag() | FILE_FLAG_SEQUENTIAL_SCAN, NULL);
             }
             if (*out == INVALID_HANDLE_VALUE) // still a problem: cannot reopen; delete it + report an error
             {
                 err = GetLastError();
-                DeleteFileA(gFileSystem, name);
+                if (!nameW.empty())
+                    DeleteFileW(nameW.c_str());
+                else
+                    DeleteFileA(gFileSystem, name);
                 SetLastError(err);
             }
         }
@@ -4885,7 +4899,7 @@ COPY_AGAIN:
                     if (script->CopyAttrs)
                     {
                         fileAttrs = lossEncryptionAttr ? (op->Attr & ~FILE_ATTRIBUTE_ENCRYPTED) : op->Attr;
-                        SetCompressAndEncryptedAttrs(op->TargetName, fileAttrs, &out, TRUE, NULL, asyncPar);
+                        SetCompressAndEncryptedAttrs(op->TargetName, fileAttrs, &out, TRUE, NULL, asyncPar, op->TargetNameW);
                     }
 
                     if (out != INVALID_HANDLE_VALUE && (fileAttrs & FILE_ATTRIBUTE_ENCRYPTED))
@@ -5642,7 +5656,7 @@ COPY_AGAIN:
                                     {
                                         encryptionNotSupported = FALSE;
                                         SetCompressAndEncryptedAttrs(op->TargetName, (!lossEncryptionAttr && copyAsEncrypted ? FILE_ATTRIBUTE_ENCRYPTED : 0) | (script->CopyAttrs ? (op->Attr & (FILE_ATTRIBUTE_COMPRESSED | (lossEncryptionAttr ? 0 : FILE_ATTRIBUTE_ENCRYPTED))) : 0),
-                                                                     &out, script->CopyAttrs, &encryptionNotSupported, asyncPar);
+                                                                     &out, script->CopyAttrs, &encryptionNotSupported, asyncPar, op->TargetNameW);
                                         if (encryptionNotSupported) // unable to apply the Encrypted attribute, ask the user what to do...
                                         {
                                             if (workerState.FileOutLossEncrAll)
