@@ -830,8 +830,8 @@ BOOL _ReadDirectoryTree(HWND parent, CPathBuffer& path, char* name, CSalamanderD
     strcpy(end, name);
     strcat(end, "\\*");
 
-    WIN32_FIND_DATA file;
-    HANDLE find = SalFindFirstFileH(path, &file);
+    WIN32_FIND_DATAW file;
+    HANDLE find = HANDLES_Q(FindFirstFileW(AnsiToWide(path).c_str(), &file));
     *end = 0; // restore the path
     if (find == INVALID_HANDLE_VALUE)
     {
@@ -880,9 +880,12 @@ BOOL _ReadDirectoryTree(HWND parent, CPathBuffer& path, char* name, CSalamanderD
         do
         {
             if (file.cFileName[0] == 0 ||
-                file.cFileName[0] == '.' &&
-                    (file.cFileName[1] == 0 || (file.cFileName[1] == '.' && file.cFileName[2] == 0)))
+                file.cFileName[0] == L'.' &&
+                    (file.cFileName[1] == 0 || (file.cFileName[1] == L'.' && file.cFileName[2] == 0)))
                 continue; // "." a ".."
+
+            char cFileNameA[MAX_PATH];
+            WideCharToMultiByte(CP_ACP, 0, file.cFileName, -1, cFileNameA, MAX_PATH, NULL, NULL);
 
             static DWORD lastBreakCheck = 0;
             if (containsDirLinks != NULL && GetTickCount() - lastBreakCheck > 200)
@@ -907,7 +910,7 @@ BOOL _ReadDirectoryTree(HWND parent, CPathBuffer& path, char* name, CSalamanderD
                     (file.dwFileAttributes & FILE_ATTRIBUTE_REPARSE_POINT) != 0) // it's a link
                 {                                                                // for a symlink determine the target file size
                     CQuadWord size;
-                    if (SalPathAppend(path, file.cFileName, path.Size()))
+                    if (SalPathAppend(path, cFileNameA, path.Size()))
                     { // only if the path is not too long (any resulting error will be reported during enumeration)
                         if (GetLinkTgtFileSize(parent, path, NULL, &size, &cancel, errGetFileSizeOfLnkTgtIgnAll))
                             newF.Size = size;
@@ -920,7 +923,7 @@ BOOL _ReadDirectoryTree(HWND parent, CPathBuffer& path, char* name, CSalamanderD
                     *end2 = 0; // restore 'path' to its original state
                 }
 
-                newF.Name = !cancel ? DupStr(file.cFileName) : NULL;
+                newF.Name = !cancel ? DupStr(cFileNameA) : NULL;
                 newF.DosName = NULL;
                 if (cancel || newF.Name == NULL)
                 {
@@ -945,7 +948,9 @@ BOOL _ReadDirectoryTree(HWND parent, CPathBuffer& path, char* name, CSalamanderD
 
                 if (file.cAlternateFileName[0] != 0)
                 {
-                    newF.DosName = DupStr(file.cAlternateFileName);
+                    char cAltNameA[14];
+                    WideCharToMultiByte(CP_ACP, 0, file.cAlternateFileName, -1, cAltNameA, 14, NULL, NULL);
+                    newF.DosName = DupStr(cAltNameA);
                     if (newF.DosName == NULL)
                     {
                         free(newF.Name);
@@ -989,13 +994,13 @@ BOOL _ReadDirectoryTree(HWND parent, CPathBuffer& path, char* name, CSalamanderD
                     {
                         *containsDirLinks = 1; // after finding one simulate an error to end the search immediately
                         *end2 = 0;
-                        _snprintf_s(linkName, MAX_PATH, _TRUNCATE, "%s\\%s", path.Get(), file.cFileName); // truncation is fine, it is only for the message text
+                        _snprintf_s(linkName, MAX_PATH, _TRUNCATE, "%s\\%s", path.Get(), cFileNameA); // truncation is fine, it is only for the message text
                         ok = FALSE;
                         testFindNextErr = FALSE;
                         break;
                     }
                 }
-                if (!_ReadDirectoryTree(parent, path, file.cFileName, salDir, errorOccured, getLinkTgtFileSize,
+                if (!_ReadDirectoryTree(parent, path, cFileNameA, salDir, errorOccured, getLinkTgtFileSize,
                                         errGetFileSizeOfLnkTgtIgnAll, containsDirLinks, linkName))
                 {
                     ok = FALSE;
@@ -1023,7 +1028,7 @@ BOOL _ReadDirectoryTree(HWND parent, CPathBuffer& path, char* name, CSalamanderD
                     }
                 }
             }
-        } while (FindNextFile(find, &file));
+        } while (FindNextFileW(find, &file));
         DWORD err = GetLastError();
         HANDLES(FindClose(find));
         *end = 0; // restore the path
@@ -1601,7 +1606,7 @@ _PACK_AGAIN:
                 performPack = (msgBoxRed == IDYES);
                 if (msgBoxRed == IDNO) // OVERWRITE
                 {
-                    ClearReadOnlyAttr(fileBuf); // so it can be deleted...
+                    ClearReadOnlyAttrW(AnsiToWide(fileBuf).c_str()); // so it can be deleted...
                     if (!gFileSystem->DeleteFile(AnsiToWide(fileBuf).c_str()).success)
                     {
                         DWORD err = GetLastError();
@@ -1826,7 +1831,7 @@ void CFilesWindow::Unpack(CFilesWindow* target, int pluginIndex, const char* plu
                                 {
                                     while (1)
                                     {
-                                        ClearReadOnlyAttr(name); // allow deletion of read-only files too
+                                        ClearReadOnlyAttrW(AnsiToWide(name).c_str()); // allow deletion of read-only files too
                                         if (!gFileSystem->DeleteFile(AnsiToWide(name).c_str()).success && !skipAll)
                                         {
                                             DWORD err = GetLastError();

@@ -372,8 +372,8 @@ void CFilesWindow::DragDropToArcOrFS(CTmpDragDropOperData* data)
     char* end = path + strlen(path);
     SalPathAppend(path, "*", path.Size());
     CPathBuffer text;
-    WIN32_FIND_DATA file;
-    HANDLE find = SalFindFirstFileH(path, &file);
+    WIN32_FIND_DATAW file;
+    HANDLE find = HANDLES_Q(FindFirstFileW(AnsiToWide(path).c_str(), &file));
     *end = 0; // fix the path
     if (find == INVALID_HANDLE_VALUE)
     {
@@ -406,12 +406,14 @@ void CFilesWindow::DragDropToArcOrFS(CTmpDragDropOperData* data)
 
         do
         {
-            if (file.cFileName[0] == 0 || file.cFileName[0] == '.' && (file.cFileName[1] == 0 ||
-                                                                       (file.cFileName[1] == '.' && file.cFileName[2] == 0)))
+            if (file.cFileName[0] == 0 || file.cFileName[0] == L'.' && (file.cFileName[1] == 0 ||
+                                                                        (file.cFileName[1] == L'.' && file.cFileName[2] == 0)))
                 continue; // "." and ".."
 
+            char cFileNameA[MAX_PATH];
+            WideCharToMultiByte(CP_ACP, 0, file.cFileName, -1, cFileNameA, MAX_PATH, NULL, NULL);
             int foundIndex;
-            if (ContainsString(&data->Data->Names, file.cFileName, &foundIndex))
+            if (ContainsString(&data->Data->Names, cFileNameA, &foundIndex))
             {
                 if (nameFound[foundIndex] == FALSE)
                     nameFound[foundIndex] = TRUE;
@@ -421,7 +423,7 @@ void CFilesWindow::DragDropToArcOrFS(CTmpDragDropOperData* data)
             else
                 continue; // user is not interested in this file/directory (name wasn't in the data object)
 
-            newF.Name = DupStr(file.cFileName);
+            newF.Name = DupStr(cFileNameA);
             newF.DosName = NULL;
             if (newF.Name == NULL)
             {
@@ -446,7 +448,9 @@ void CFilesWindow::DragDropToArcOrFS(CTmpDragDropOperData* data)
 
             if (file.cAlternateFileName[0] != 0)
             {
-                newF.DosName = DupStr(file.cAlternateFileName);
+                char cAltNameA[14];
+                WideCharToMultiByte(CP_ACP, 0, file.cAlternateFileName, -1, cAltNameA, 14, NULL, NULL);
+                newF.DosName = DupStr(cAltNameA);
                 if (newF.DosName == NULL)
                 {
                     free(newF.Name);
@@ -484,7 +488,7 @@ void CFilesWindow::DragDropToArcOrFS(CTmpDragDropOperData* data)
                 testFindNextErr = FALSE;
                 break;
             }
-        } while (FindNextFile(find, &file));
+        } while (FindNextFileW(find, &file));
         DWORD err = GetLastError();
         HANDLES(FindClose(find));
 
@@ -549,7 +553,8 @@ void CFilesWindow::DragDropToArcOrFS(CTmpDragDropOperData* data)
                 BOOL haveSize = FALSE;
                 CQuadWord size;
                 DWORD err;
-                HANDLE hFile = SalCreateFileH(data->ArchiveOrFSName, GENERIC_READ, 0, NULL, OPEN_EXISTING, 0, NULL);
+                std::wstring archiveW = AnsiToWide(data->ArchiveOrFSName);
+                HANDLE hFile = HANDLES_Q(CreateFileW(archiveW.c_str(), GENERIC_READ, 0, NULL, OPEN_EXISTING, 0, NULL));
                 if (hFile != INVALID_HANDLE_VALUE)
                 {
                     haveSize = SalGetFileSize(hFile, size, err);
@@ -565,9 +570,9 @@ void CFilesWindow::DragDropToArcOrFS(CTmpDragDropOperData* data)
                     DWORD nullFileAttrs;
                     if (nullFile)
                     {
-                        nullFileAttrs = SalGetFileAttributes(data->ArchiveOrFSName);
-                        ClearReadOnlyAttr(data->ArchiveOrFSName, nullFileAttrs); // to allow deletion even if read-only
-                        DeleteFileA(gFileSystem, data->ArchiveOrFSName);
+                        nullFileAttrs = GetFileAttributesW(archiveW.c_str());
+                        ClearReadOnlyAttrW(archiveW.c_str(), nullFileAttrs); // to allow deletion even if read-only
+                        gFileSystem->DeleteFile(archiveW.c_str());
                     }
                     //---  actual packing
                     EnvSetCurrentDirectoryA(gEnvironment, data->Data->SrcPath);
@@ -578,9 +583,9 @@ void CFilesWindow::DragDropToArcOrFS(CTmpDragDropOperData* data)
                         if (nullFile && // zero-length file might have had a different compressed attribute, set archive accordingly
                             nullFileAttrs != INVALID_FILE_ATTRIBUTES)
                         {
-                            HANDLE hFile2 = SalCreateFileH(data->ArchiveOrFSName, GENERIC_READ | GENERIC_WRITE,
+                            HANDLE hFile2 = HANDLES_Q(CreateFileW(archiveW.c_str(), GENERIC_READ | GENERIC_WRITE,
                                                                  0, NULL, OPEN_EXISTING,
-                                                                 0, NULL);
+                                                                 0, NULL));
                             if (hFile2 != INVALID_HANDLE_VALUE)
                             {
                                 // restore the "compressed" flag; on FAT and FAT32 it simply won't succeed
@@ -589,7 +594,7 @@ void CFilesWindow::DragDropToArcOrFS(CTmpDragDropOperData* data)
                                 DeviceIoControl(hFile2, FSCTL_SET_COMPRESSION, &state,
                                                 sizeof(USHORT), NULL, 0, &length, FALSE);
                                 HANDLES(CloseHandle(hFile2));
-                                SalLPSetFileAttributes(data->ArchiveOrFSName, nullFileAttrs);
+                                SetFileAttributesW(archiveW.c_str(), nullFileAttrs);
                             }
                         }
                     }
@@ -597,9 +602,9 @@ void CFilesWindow::DragDropToArcOrFS(CTmpDragDropOperData* data)
                     {
                         if (nullFile) // operation failed, we must recreate it
                         {
-                            HANDLE hFile2 = SalCreateFileH(data->ArchiveOrFSName, GENERIC_READ | GENERIC_WRITE,
+                            HANDLE hFile2 = HANDLES_Q(CreateFileW(archiveW.c_str(), GENERIC_READ | GENERIC_WRITE,
                                                                  0, NULL, OPEN_ALWAYS,
-                                                                 0, NULL);
+                                                                 0, NULL));
                             if (hFile2 != INVALID_HANDLE_VALUE)
                             {
                                 if (nullFileAttrs != INVALID_FILE_ATTRIBUTES)
@@ -612,7 +617,7 @@ void CFilesWindow::DragDropToArcOrFS(CTmpDragDropOperData* data)
                                 }
                                 HANDLES(CloseHandle(hFile2));
                                 if (nullFileAttrs != INVALID_FILE_ATTRIBUTES)
-                                    SalLPSetFileAttributes(data->ArchiveOrFSName, nullFileAttrs);
+                                    SetFileAttributesW(archiveW.c_str(), nullFileAttrs);
                             }
                         }
                     }

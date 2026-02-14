@@ -89,12 +89,12 @@ void CFilesWindow::Execute(int index)
             {
                 lstrcpy(fullPath, GetPath());
                 if (SalPathAppend(fullPath, file->Name, fullPath.Size()) &&
-                    SalGetFileAttributes(fullPath) == INVALID_FILE_ATTRIBUTES &&
+                    GetFileAttributesW(AnsiToWide(fullPath).c_str()) == INVALID_FILE_ATTRIBUTES &&
                     GetLastError() == ERROR_FILE_NOT_FOUND)
                 {
                     lstrcpy(fullPath, GetPath());
                     if (SalPathAppend(fullPath, file->DosName, fullPath.Size()) &&
-                        SalGetFileAttributes(fullPath) != INVALID_FILE_ATTRIBUTES)
+                        GetFileAttributesW(AnsiToWide(fullPath).c_str()) != INVALID_FILE_ATTRIBUTES)
                     { // when full name is not available (problem converting from multibyte to UNICODE), we'll use DOS name
                         fileName = file->DosName;
                     }
@@ -147,7 +147,7 @@ void CFilesWindow::Execute(int index)
                                         err = CheckPath(TRUE, fullName); // fullName is a full path (links support no other)
                                         if (err == ERROR_SUCCESS)
                                         {
-                                            DWORD attr = SalGetFileAttributes(fullName); // obtained here because data.dwFileAttributes isn't filled
+                                            DWORD attr = GetFileAttributesW(AnsiToWide(fullName).c_str()); // obtained here because data.dwFileAttributes isn't filled
                                             if (attr != INVALID_FILE_ATTRIBUTES && (attr & FILE_ATTRIBUTE_DIRECTORY))
                                             {
                                                 linkIsDir = TRUE; // OK we try change-path-to-disk
@@ -347,8 +347,8 @@ void CFilesWindow::Execute(int index)
                     repPointType == 2 /* JUNCTION POINT */ &&
                     SalPathAppend(fullName, "*", fullName.Size()))
                 {
-                    WIN32_FIND_DATA fileData;
-                    HANDLE search = SalFindFirstFileH(fullName, &fileData);
+                    WIN32_FIND_DATAW fileData;
+                    HANDLE search = HANDLES_Q(FindFirstFileW(AnsiToWide(fullName).c_str(), &fileData));
                     DWORD err = GetLastError();
                     CutDirectory(fullName);
                     if (search != INVALID_HANDLE_VALUE)
@@ -2086,8 +2086,9 @@ BOOL CFilesWindow::ChangePathToArchive(const char* archive, const char* archiveP
             {
                 // retrieve file info (does it exist?, size, date & time)
                 DWORD err2 = NO_ERROR;
-                HANDLE file = SalCreateFileH(archive, GENERIC_READ, FILE_SHARE_READ | FILE_SHARE_WRITE,
-                                                   NULL, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, NULL);
+                std::wstring archiveW = AnsiToWide(archive);
+                HANDLE file = HANDLES_Q(CreateFileW(archiveW.c_str(), GENERIC_READ, FILE_SHARE_READ | FILE_SHARE_WRITE,
+                                                   NULL, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, NULL));
                 if (file != INVALID_HANDLE_VALUE)
                 {
                     GetFileTime(file, NULL, NULL, &archiveDate);
@@ -2220,8 +2221,8 @@ BOOL CFilesWindow::ChangePathToArchive(const char* archive, const char* archiveP
             DWORD err;
             if ((err = CheckPath(!isRefresh)) == ERROR_SUCCESS) // no need to restore network connections here ...
             {
-                HANDLE file = SalCreateFileH(archive, GENERIC_READ, FILE_SHARE_READ | FILE_SHARE_WRITE,
-                                                   NULL, OPEN_EXISTING, 0, NULL);
+                HANDLE file = HANDLES_Q(CreateFileW(AnsiToWide(archive).c_str(), GENERIC_READ, FILE_SHARE_READ | FILE_SHARE_WRITE,
+                                                   NULL, OPEN_EXISTING, 0, NULL));
                 if (file != INVALID_HANDLE_VALUE)
                 {
                     SalGetFileSize(file, archiveSize, err);
