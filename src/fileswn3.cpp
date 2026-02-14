@@ -340,7 +340,7 @@ BOOL CFilesWindow::ReadDirectory(HWND parent, BOOL isRefresh)
                 BOOL showErr = TRUE;
                 if (err == ERROR_INVALID_PARAMETER || err == ERROR_NOT_READY)
                 {
-                    DWORD attrs = SalGetFileAttributes(GetPath());
+                    DWORD attrs = GetFileAttributesW(AnsiToWide(GetPath()).c_str());
                     if (attrs != INVALID_FILE_ATTRIBUTES &&
                         (attrs & FILE_ATTRIBUTE_DIRECTORY) &&
                         (attrs & FILE_ATTRIBUTE_REPARSE_POINT))
@@ -1758,11 +1758,11 @@ BOOL IsWin64RedirectedDirAux(const char* subDir, const char* redirectedDir, cons
     {
         strcpy(winDirEnd, redirectedDir);
 
-        WIN32_FIND_DATA find;
+        WIN32_FIND_DATAW find;
         HANDLE h;
         if (failIfDirWithSameNameExists)
         {
-            h = SalFindFirstFileH(winDir, &find);
+            h = HANDLES_Q(FindFirstFileW(AnsiToWide(winDir).c_str(), &find));
             if (h != INVALID_HANDLE_VALUE)
             {
                 HANDLES(FindClose(h));
@@ -1771,7 +1771,7 @@ BOOL IsWin64RedirectedDirAux(const char* subDir, const char* redirectedDir, cons
         }
 
         strcat(winDirEnd, "\\*");
-        h = SalFindFirstFileH(winDir, &find);
+        h = HANDLES_Q(FindFirstFileW(AnsiToWide(winDir).c_str(), &find));
         if (h != INVALID_HANDLE_VALUE)
         {
             HANDLES(FindClose(h));
@@ -2263,7 +2263,7 @@ CHANGE_AGAIN:
                         }
                         if (copyLen > 0 && (copy[copyLen - 1] <= ' ' || copy[copyLen - 1] == '.'))
                         {
-                            copyAttr = SalGetFileAttributes(copy);
+                            copyAttr = GetFileAttributesW(AnsiToWide(copy).c_str());
                             pathEndsWithSpaceOrDot = copyAttr != INVALID_FILE_ATTRIBUTES;
                         }
                         else
@@ -2271,10 +2271,10 @@ CHANGE_AGAIN:
                             pathEndsWithSpaceOrDot = FALSE;
                         }
 
-                        WIN32_FIND_DATA find;
+                        WIN32_FIND_DATAW find;
                         HANDLE h;
                         if (!pathEndsWithSpaceOrDot)
-                            h = SalFindFirstFileH(copy, &find);
+                            h = HANDLES_Q(FindFirstFileW(AnsiToWide(copy).c_str(), &find));
                         else
                             h = INVALID_HANDLE_VALUE;
                         DWORD err;
@@ -2301,7 +2301,7 @@ CHANGE_AGAIN:
                                     }
                                     else
                                     {
-                                        h = SalFindFirstFileH(copy, &find);
+                                        h = HANDLES_Q(FindFirstFileW(AnsiToWide(copy).c_str(), &find));
                                         if (h != INVALID_HANDLE_VALUE)
                                             break; // we've found an accessible component, continuing...
                                         err = GetLastError();
@@ -2314,7 +2314,7 @@ CHANGE_AGAIN:
                                 {
                                     if ((int)strlen(copy) < copy.Size() - 10 && SalPathAppend(copy, "*.*", copy.Size()))
                                     {
-                                        h = SalFindFirstFileH(copy, &find);
+                                        h = HANDLES_Q(FindFirstFileW(AnsiToWide(copy).c_str(), &find));
                                         CutDirectory(copy);
                                         if (h != INVALID_HANDLE_VALUE) // the path can be listed
                                         {
@@ -2354,14 +2354,16 @@ CHANGE_AGAIN:
                             if (h != INVALID_HANDLE_VALUE)
                             {
                                 HANDLES(FindClose(h));
-                                int len2 = (int)strlen(find.cFileName); // must fit (only the size of letters is changed - result of FindFirstFile)
-                                if ((int)strlen(st + 1) != len2)        // it does e.g. for "aaa  " returns "aaa", reproduce: Paste (text without quotes): "   "   %TEMP%\aaa   "   "
+                                char cFileNameA[MAX_PATH];
+                                WideCharToMultiByte(CP_ACP, 0, find.cFileName, -1, cFileNameA, MAX_PATH, NULL, NULL);
+                                int len2 = (int)strlen(cFileNameA); // must fit (only the size of letters is changed - result of FindFirstFile)
+                                if ((int)strlen(st + 1) != len2)    // it does e.g. for "aaa  " returns "aaa", reproduce: Paste (text without quotes): "   "   %TEMP%\aaa   "   "
                                 {
                                     TRACE_E("CFilesWindow::ChangeDir(): unexpected situation: FindFirstFile returned name with "
                                             "different length: \""
-                                            << find.cFileName << "\" for \"" << (st + 1) << "\"");
+                                            << cFileNameA << "\" for \"" << (st + 1) << "\"");
                                 }
-                                memcpy(st + 1, find.cFileName, len2);
+                                memcpy(st + 1, cFileNameA, len2);
                                 st += 1 + len2;
                                 *st = 0;
                             }
@@ -2442,7 +2444,7 @@ CHANGE_AGAIN:
                                     // Note: drive is initialized from copy in constructor
                                     if (CutDirectory(drive))
                                     {
-                                        DWORD attrs = SalGetFileAttributes(drive);
+                                        DWORD attrs = GetFileAttributesW(AnsiToWide(drive).c_str());
                                         if (attrs != INVALID_FILE_ATTRIBUTES &&
                                             (attrs & FILE_ATTRIBUTE_DIRECTORY) &&
                                             (attrs & FILE_ATTRIBUTE_REPARSE_POINT))
