@@ -2652,11 +2652,11 @@ BOOL MakeFileAvailOfflineIfOneDriveOnWin81(HWND parent, const char *name)
     if (CutDirectory(path, &cutName) && SalPathIsPrefix(OneDrivePath, path)) // we handle this only under OneDrive folder
     {
       BOOL makeOffline = FALSE;
-      WIN32_FIND_DATA findData;
-      HANDLE hFind = SalLPFindFirstFileA(name, &findData);
+      WIN32_FIND_DATAW findData;
+      HANDLE hFind = HANDLES_Q(FindFirstFileW(AnsiToWide(name).c_str(), &findData));
       if (hFind != INVALID_HANDLE_VALUE)
       {
-        makeOffline = IsFilePlaceholder(&findData);
+        makeOffline = IsFilePlaceholderW(&findData);
         FindClose(hFind);
       }
 
