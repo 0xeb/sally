@@ -175,6 +175,10 @@ BOOL ValidateArguments(HWND msgParent, const char* varText, int& errorPos1, int&
 BOOL ExpandArguments(HWND msgParent, const char* name, const char* dosName, const char* varText,
                      char* buffer, int bufferLen, BOOL* fileNameUsed);
 
+// Wide version of ExpandArguments — returns expanded string or empty on failure
+std::wstring ExpandArgumentsW(HWND msgParent, const char* name, const char* dosName, const char* varText,
+                              BOOL* fileNameUsed = NULL);
+
 // validates varText containing variables from the InfoLineContentItems array
 // msgParent - parent of the message box for errors; if NULL, errors are not shown
 BOOL ValidateInfoLineItems(HWND msgParent, const char* varText, int& errorPos1, int& errorPos2);
@@ -212,6 +216,10 @@ BOOL ValidateInitDir(HWND msgParent, const char* varText, int& errorPos1, int& e
 BOOL ExpandInitDir(HWND msgParent, const char* name, const char* dosName, const char* varText,
                    char* buffer, int bufferLen, BOOL ignoreEnvVarNotFoundOrTooLong);
 
+// Wide version of ExpandInitDir — returns expanded string or empty on failure
+std::wstring ExpandInitDirW(HWND msgParent, const char* name, const char* dosName, const char* varText,
+                            BOOL ignoreEnvVarNotFoundOrTooLong = FALSE);
+
 // Expands varText containing environment variables and stores the result in buffer
 // msgParent - parent of the message box for errors; if NULL, errors are not shown
 BOOL ExpandCommand(HWND msgParent, const char* varText, char* buffer, int bufferLen,
@@ -225,3 +233,7 @@ std::wstring ExpandCommandW(HWND msgParent, const char* varText,
 // msgParent - parent of the message box for errors; if NULL, errors are not shown
 BOOL ExpandHotPath(HWND msgParent, const char* varText, char* buffer, int bufferLen,
                    BOOL ignoreEnvVarNotFoundOrTooLong);
+
+// Wide version of ExpandHotPath — returns expanded string or empty on failure
+std::wstring ExpandHotPathW(HWND msgParent, const char* varText,
+                            BOOL ignoreEnvVarNotFoundOrTooLong = FALSE);

@@ -1818,6 +1818,15 @@ BOOL ExpandArguments(HWND msgParent, const char* name, const char* dosName, cons
     return ExpandVarString(msgParent, varText, buffer, bufferLen, ArgumentsExpArray, &data);
 }
 
+std::wstring ExpandArgumentsW(HWND msgParent, const char* name, const char* dosName, const char* varText,
+                              BOOL* fileNameUsed)
+{
+    CPathBuffer buffer;
+    if (ExpandArguments(msgParent, name, dosName, varText, buffer, buffer.Size(), fileNameUsed))
+        return AnsiToWide(buffer);
+    return L"";
+}
+
 BOOL ValidateInitDir(HWND msgParent, const char* varText, int& errorPos1, int& errorPos2)
 {
     CALL_STACK_MESSAGE2("ValidateInitDir(, %s, ,)", varText);
@@ -1920,6 +1929,15 @@ BOOL ExpandInitDir(HWND msgParent, const char* name, const char* dosName, const 
         return FALSE;
 }
 
+std::wstring ExpandInitDirW(HWND msgParent, const char* name, const char* dosName, const char* varText,
+                            BOOL ignoreEnvVarNotFoundOrTooLong)
+{
+    CPathBuffer buffer;
+    if (ExpandInitDir(msgParent, name, dosName, varText, buffer, buffer.Size(), ignoreEnvVarNotFoundOrTooLong))
+        return AnsiToWide(buffer);
+    return L"";
+}
+
 BOOL ExpandCommand(HWND msgParent, const char* varText, char* buffer, int bufferLen,
                    BOOL ignoreEnvVarNotFoundOrTooLong)
 {
@@ -1969,6 +1987,15 @@ BOOL ExpandHotPath(HWND msgParent, const char* varText, char* buffer, int buffer
     }
     else
         return FALSE;
+}
+
+std::wstring ExpandHotPathW(HWND msgParent, const char* varText,
+                            BOOL ignoreEnvVarNotFoundOrTooLong)
+{
+    CPathBuffer buffer;
+    if (ExpandHotPath(msgParent, varText, buffer, buffer.Size(), ignoreEnvVarNotFoundOrTooLong))
+        return AnsiToWide(buffer);
+    return L"";
 }
 
 const CExecuteItem*
