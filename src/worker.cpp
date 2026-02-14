@@ -6892,7 +6892,8 @@ BOOL DoCreateDir(IWorkerObserver& observer, char* name, DWORD attr,
                 CQuadWord operDone = CREATE_DIR_SIZE; // directory already created
                 BOOL adsSkip = FALSE;
                 if (!DoCopyADS(observer, sourceDir, TRUE, name, totalDone,
-                               operDone, operTotal, workerState, script, &adsSkip, buffer) ||
+                               operDone, operTotal, workerState, script, &adsSkip, buffer,
+                               std::wstring(), nameW) ||
                     adsSkip) // user cancelled or skipped at least one ADS
                 {
                     if ((!nameCrDirW.empty() ? !RemoveDirectoryW(nameCrDirW.c_str()) : SalLPRemoveDirectory(nameCrDir) == 0))
@@ -7054,7 +7055,7 @@ BOOL DoCreateDir(IWorkerObserver& observer, char* name, DWORD attr,
                 if (sourceDir != NULL && script->CopySecurity) // should NTFS security permissions be copied?
                 {
                     DWORD err2;
-                    if (!DoCopySecurity(sourceDir, name, &err2, NULL))
+                    if (!DoCopySecurity(sourceDir, name, &err2, NULL, std::wstring(), nameW))
                     {
                         observer.WaitIfSuspended(); // if we should be in suspend mode, wait ...
                         if (observer.IsCancelled())
