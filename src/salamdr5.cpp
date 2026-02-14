@@ -159,7 +159,7 @@ CPF_AGAIN:
     ThreadCheckState[i] |= ctsCanTerminate; // main thread can now terminate
 
     // this can freeze here, and that's why we do all this hassle around it
-    BOOL threadValid = (SalGetFileAttributes(threadPath) != 0xFFFFFFFF);
+    BOOL threadValid = (GetFileAttributesW(AnsiToWide(threadPath).c_str()) != 0xFFFFFFFF);
     DWORD error = GetLastError();
     if (!threadValid && error == ERROR_INVALID_PARAMETER) // reported on root of removable media (CD/DVD, ZIP)
         error = ERROR_NOT_READY;                          // a bit dirty, but it's simply a "not ready" problem and not "invalid parameter" ;-)
@@ -176,8 +176,8 @@ CPF_AGAIN:
         if (GetDriveType(root) == DRIVE_FIXED)
         {
             SalPathAppend(threadPath, "*", threadPath.Size());
-            WIN32_FIND_DATA data;
-            HANDLE find = SalFindFirstFileH(threadPath, &data);
+            WIN32_FIND_DATAW data;
+            HANDLE find = HANDLES_Q(FindFirstFileW(AnsiToWide(threadPath).c_str(), &data));
             if (find != INVALID_HANDLE_VALUE)
             {
                 // path is probably OK after all (cannot be used without test for fixed disk, unfortunately FindFirstFile
@@ -335,7 +335,7 @@ RETRY:
             }
             if (runAsMainThread) // not network -> in main thread
             {
-                valid = (SalGetFileAttributes(path) != 0xFFFFFFFF); // test directory accessibility
+                valid = (GetFileAttributesW(AnsiToWide(path).c_str()) != 0xFFFFFFFF); // test directory accessibility
                 if (!valid)
                     lastError = GetLastError();
                 else
@@ -366,7 +366,7 @@ RETRY:
                 {
                     TRACE_E("Unable to start CheckPath thread.");
                     ThreadCheckState[freeThreadIndex] = ctsNotRunning;
-                    valid = (SalGetFileAttributes(path) != 0xFFFFFFFF); // test directory accessibility
+                    valid = (GetFileAttributesW(AnsiToWide(path).c_str()) != 0xFFFFFFFF); // test directory accessibility
                     if (!valid)
                         lastError = GetLastError();
                     else
@@ -836,8 +836,7 @@ PARSE_AGAIN:
                 int len2 = (int)strlen(path);
                 if (path[len2 - 1] != '\\') // paths ending with backslash behave differently (classic and UNC): UNC returns success, classic ERROR_INVALID_NAME: extracting from archive on UNC path to path "" reported unknown archive (PackerFormatConfig.PackIsArchive received e.g. "...test.zip\\" instead of "...test.zip")
                 {
-                    // SalGetFileAttributes supports long paths via SalLPGetFileAttributes
-                    DWORD attrs = SalGetFileAttributes(path);
+                    DWORD attrs = GetFileAttributesW(AnsiToWide(path).c_str());
                     if (attrs != 0xFFFFFFFF) // this part of path exists
                     {
                         if ((attrs & FILE_ATTRIBUTE_DIRECTORY) == 0) // it's a file
@@ -1503,19 +1502,19 @@ BOOL SalMoveFile(const char* srcName, const char* destName)
         DWORD err = GetLastError();
         if (err == ERROR_ACCESS_DENIED)
         { // could be a Novell problem (MoveFile returns error for files with read-only attribute)
-            DWORD attr = SalGetFileAttributes(srcName);
+            DWORD attr = GetFileAttributesW(AnsiToWide(srcName).c_str());
             if (attr != 0xFFFFFFFF && (attr & FILE_ATTRIBUTE_READONLY))
             {
-                SalLPSetFileAttributes(srcName, FILE_ATTRIBUTE_ARCHIVE);
+                SetFileAttributesW(AnsiToWide(srcName).c_str(), FILE_ATTRIBUTE_ARCHIVE);
                 if (MoveFileA(gFileSystem, srcName, destName).success)
                 {
-                    SalLPSetFileAttributes(destName, attr);
+                    SetFileAttributesW(AnsiToWide(destName).c_str(), attr);
                     return TRUE;
                 }
                 else
                 {
                     err = GetLastError();
-                    SalLPSetFileAttributes(srcName, attr);
+                    SetFileAttributesW(AnsiToWide(srcName).c_str(), attr);
                 }
             }
             SetLastError(err);
@@ -1738,8 +1737,8 @@ BOOL SalGetFileSize(HANDLE file, CQuadWord& size, DWORD& err)
 
 BOOL SalGetFileSize2(const char* fileName, CQuadWord& size, DWORD* err)
 {
-    HANDLE hFile = SalCreateFileH(fileName, 0, FILE_SHARE_READ | FILE_SHARE_WRITE | FILE_SHARE_DELETE,
-                                        NULL, OPEN_EXISTING, 0, NULL);
+    HANDLE hFile = HANDLES_Q(CreateFileW(AnsiToWide(fileName).c_str(), 0, FILE_SHARE_READ | FILE_SHARE_WRITE | FILE_SHARE_DELETE,
+                                        NULL, OPEN_EXISTING, 0, NULL));
     if (hFile != INVALID_HANDLE_VALUE)
     {
         DWORD dummyErr;

@@ -620,15 +620,15 @@ BOOL FileExists(const char* fileName)
     //
     // j.r. FIXME: discuss with Petr; I tried removing the file's right to read
     // attributes, but SalGetFileAttributes() still does not report an error. How is that possible?
-    DWORD attr = SalGetFileAttributes(fileName);
+    DWORD attr = GetFileAttributesW(AnsiToWide(fileName).c_str());
     return (attr != INVALID_FILE_ATTRIBUTES && (attr & FILE_ATTRIBUTE_DIRECTORY) == 0);
 }
 
 BOOL DirExists(const char* dirName)
 {
     // j.r. FIXME: discuss with Petr; I tried removing the file's right to read
-    // attributes, but SalGetFileAttributes() still does not report an error. How is that possible?
-    DWORD attr = SalGetFileAttributes(dirName);
+    // attributes, but GetFileAttributesW() still does not report an error. How is that possible?
+    DWORD attr = GetFileAttributesW(AnsiToWide(dirName).c_str());
     return (attr != INVALID_FILE_ATTRIBUTES && (attr & FILE_ATTRIBUTE_DIRECTORY) != 0);
 }
 
@@ -1404,15 +1404,15 @@ BOOL GetReparsePointDestination(const char* repPointDir, char* repPointDstBuf, D
     CPathBuffer repPointDirCrFileCopy; // Heap-allocated for long path support
     MakeCopyWithBackslashIfNeeded(repPointDirCrFile, repPointDirCrFileCopy);
 
-    DWORD attrs = SalLPGetFileAttributes(repPointDirCrFile);
+    DWORD attrs = GetFileAttributesW(AnsiToWide(repPointDirCrFile).c_str());
     if (attrs == 0xffffffff || (attrs & FILE_ATTRIBUTE_REPARSE_POINT) == 0)
     {
         //    TRACE_I("GetReparsePointDestination(): Reparse point not found: " << repPointDir);
         return FALSE;
     }
 
-    HANDLE file = SalCreateFileH(repPointDirCrFile, 0 /*GENERIC_READ*/, 0, 0, OPEN_EXISTING,
-                                       FILE_FLAG_BACKUP_SEMANTICS | FILE_FLAG_OPEN_REPARSE_POINT, NULL);
+    HANDLE file = HANDLES_Q(CreateFileW(AnsiToWide(repPointDirCrFile).c_str(), 0 /*GENERIC_READ*/, 0, 0, OPEN_EXISTING,
+                                       FILE_FLAG_BACKUP_SEMANTICS | FILE_FLAG_OPEN_REPARSE_POINT, NULL));
     if (file == INVALID_HANDLE_VALUE)
     {
         DWORD err = GetLastError();
@@ -2925,8 +2925,8 @@ BOOL ImportConfiguration(HWND hParent, const char* fileName, BOOL ignoreIfNotExi
 {
     TRACE_I("ImportConfiguration(): begin");
     DWORD err = 0;
-    HANDLE file = SalCreateFileH(fileName, GENERIC_READ, FILE_SHARE_READ, NULL,
-                                       OPEN_EXISTING, 0, 0);
+    HANDLE file = HANDLES_Q(CreateFileW(AnsiToWide(fileName).c_str(), GENERIC_READ, FILE_SHARE_READ, NULL,
+                                       OPEN_EXISTING, 0, 0));
     if (file == INVALID_HANDLE_VALUE)
     {
         err = GetLastError();

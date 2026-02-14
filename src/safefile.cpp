@@ -45,7 +45,7 @@ BOOL CSalamanderSafeFile::SafeFileOpen(SAFE_FILE* file,
     HANDLE hFile;
     do
     {
-        hFile = SalCreateFileH(fileName, dwDesiredAccess, dwShareMode, NULL, dwCreationDisposition, dwFlagsAndAttributes, NULL);
+        hFile = HANDLES_Q(CreateFileW(AnsiToWide(fileName).c_str(), dwDesiredAccess, dwShareMode, NULL, dwCreationDisposition, dwFlagsAndAttributes, NULL));
         if (hFile == INVALID_HANDLE_VALUE)
         {
             DWORD dlgRet;
@@ -133,21 +133,24 @@ CSalamanderSafeFile::SafeFileCreate(const char* fileName,
     HANDLE hFile;
     while (1)
     {
-        attrs = SalGetFileAttributes(fileName);
+        attrs = GetFileAttributesW(AnsiToWide(fileName).c_str());
         if (attrs == 0xFFFFFFFF)
             break;
 
-        // it already exists; we’ll check whether it’s just a collision with a DOS-style name (the full name of the existing file/directory is different)
+        // it already exists; we'll check whether it's just a collision with a DOS-style name (the full name of the existing file/directory is different)
         if (!isDir)
         {
-            WIN32_FIND_DATA data;
-            HANDLE find = SalFindFirstFileH(fileName, &data);
+            WIN32_FIND_DATAW data;
+            HANDLE find = HANDLES_Q(FindFirstFileW(AnsiToWide(fileName).c_str(), &data));
             if (find != INVALID_HANDLE_VALUE)
             {
                 HANDLES(FindClose(find));
                 const char* tgtName = SalPathFindFileName(fileName);
-                if (StrICmp(tgtName, data.cAlternateFileName) == 0 && // match only for the DOS name
-                    StrICmp(tgtName, data.cFileName) != 0)            // (the full name is different)
+                char cFileNameA[MAX_PATH], cAltNameA[14];
+                WideCharToMultiByte(CP_ACP, 0, data.cFileName, -1, cFileNameA, MAX_PATH, NULL, NULL);
+                WideCharToMultiByte(CP_ACP, 0, data.cAlternateFileName, -1, cAltNameA, 14, NULL, NULL);
+                if (StrICmp(tgtName, cAltNameA) == 0 &&    // match only for the DOS name
+                    StrICmp(tgtName, cFileNameA) != 0)      // (the full name is different)
                 {
                     // rename ("clean up") the file/directory with the conflicting DOS name to a temporary 8.3 name (which doesn't require an extra DOS name)
                     CPathBuffer tmpName;       // Heap-allocated for long path support
@@ -156,7 +159,7 @@ CSalamanderSafeFile::SafeFileCreate(const char* fileName,
                     CutDirectory(tmpName);
                     SalPathAddBackslash(tmpName, tmpName.Size());
                     char* tmpNamePart = tmpName + strlen(tmpName);
-                    if (SalPathAppend(tmpName, data.cFileName, tmpName.Size()))
+                    if (SalPathAppend(tmpName, cFileNameA, tmpName.Size()))
                     {
                         strcpy(origFullName, tmpName);
                         DWORD num = (GetTickCount() / 10) % 0xFFF;
@@ -286,8 +289,8 @@ CSalamanderSafeFile::SafeFileCreate(const char* fileName,
                 else
                 {
                     char fibuffer[500];
-                    HANDLE file2 = SalCreateFileH(fileName, 0, FILE_SHARE_READ | FILE_SHARE_WRITE, NULL,
-                                                        OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, NULL);
+                    HANDLE file2 = HANDLES_Q(CreateFileW(AnsiToWide(fileName).c_str(), 0, FILE_SHARE_READ | FILE_SHARE_WRITE, NULL,
+                                                        OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, NULL));
                     if (file2 != INVALID_HANDLE_VALUE)
                     {
                         GetFileOverwriteInfo(fibuffer, _countof(fibuffer), file2, fileName);
@@ -394,7 +397,7 @@ CSalamanderSafeFile::SafeFileCreate(const char* fileName,
             // does the path already exist?
             while (1)
             {
-                attrs = SalGetFileAttributes(namecopy);
+                attrs = GetFileAttributesW(AnsiToWide(namecopy).c_str());
                 if (attrs != 0xFFFFFFFF)
                 {
                     // yes - proceed to create the file
@@ -495,7 +498,7 @@ CSalamanderSafeFile::SafeFileCreate(const char* fileName,
                 break;
             while (1)
             {
-                attrs = SalGetFileAttributes(namecpy2);
+                attrs = GetFileAttributesW(AnsiToWide(namecpy2).c_str());
                 if (attrs != 0xFFFFFFFF)
                 {
                     // do we have a directory or a file?
@@ -919,8 +922,8 @@ BOOL CSalamanderSafeFile::SafeFileRead(SAFE_FILE* file, LPVOID lpBuffer,
                     HANDLES(CloseHandle(file->HFile)); // close the invalid handle because we could not read from it anyway
                 }
 
-                file->HFile = SalCreateFileH(file->FileName, file->dwDesiredAccess, file->dwShareMode, NULL,
-                                                   file->dwCreationDisposition, file->dwFlagsAndAttributes, NULL);
+                file->HFile = HANDLES_Q(CreateFileW(AnsiToWide(file->FileName).c_str(), file->dwDesiredAccess, file->dwShareMode, NULL,
+                                                   file->dwCreationDisposition, file->dwFlagsAndAttributes, NULL));
                 if (file->HFile != INVALID_HANDLE_VALUE) // opened; now set the offset
                 {
                 SEEK:
@@ -1003,8 +1006,8 @@ BOOL CSalamanderSafeFile::SafeFileWrite(SAFE_FILE* file, LPVOID lpBuffer,
                     HANDLES(CloseHandle(file->HFile)); // close the invalid handle because we could not read from it anyway
                 }
 
-                file->HFile = SalCreateFileH(file->FileName, file->dwDesiredAccess, file->dwShareMode, NULL,
-                                                   file->dwCreationDisposition, file->dwFlagsAndAttributes, NULL);
+                file->HFile = HANDLES_Q(CreateFileW(AnsiToWide(file->FileName).c_str(), file->dwDesiredAccess, file->dwShareMode, NULL,
+                                                   file->dwCreationDisposition, file->dwFlagsAndAttributes, NULL));
                 if (file->HFile != INVALID_HANDLE_VALUE) // opened; now set the offset
                 {
                     //SEEK:

@@ -9,6 +9,7 @@
 #include "plugins.h"
 #include "pack.h"
 #include "common/IFileSystem.h"
+#include "common/unicode/helpers.h"
 
 //
 // ****************************************************************************
@@ -451,8 +452,8 @@ BOOL PackUniversalCompress(HWND parent, const char* command, TPackErrorTable* co
     // meanwhile check whether the long name did not vanish -> if the short one
     // remained, rename it to the original long one
     if (DOSArchiveFileName[0] != 0 &&
-        SalGetFileAttributes(archiveFileName) == 0xFFFFFFFF &&
-        SalGetFileAttributes(DOSArchiveFileName) != 0xFFFFFFFF)
+        GetFileAttributesW(AnsiToWide(archiveFileName).c_str()) == 0xFFFFFFFF &&
+        GetFileAttributesW(AnsiToWide(DOSArchiveFileName).c_str()) != 0xFFFFFFFF)
     {
         SalMoveFile(DOSArchiveFileName, archiveFileName); // if it fails, we don't care...
     }
@@ -494,34 +495,36 @@ BOOL PackUniversalCompress(HWND parent, const char* command, TPackErrorTable* co
         if (ext < path || *ext == '\\')
             ext = path + strlen(path); // for "name" or "path\\name" there is no extension; in Windows ".cvspass" is an extension
         strcpy(ext, ".*");
-        WIN32_FIND_DATA findData;
+        WIN32_FIND_DATAW findData;
         int i;
         for (i = 0; i < 2; i++)
         {
-            HANDLE find = SalFindFirstFileH(path, &findData);
+            HANDLE find = HANDLES_Q(FindFirstFileW(AnsiToWide(path).c_str(), &findData));
             if (find != INVALID_HANDLE_VALUE)
             {
                 do
                 {
-                    strcpy(srcName, findData.cFileName);
+                    char cFileNameA[MAX_PATH];
+                    WideCharToMultiByte(CP_ACP, 0, findData.cFileName, -1, cFileNameA, MAX_PATH, NULL, NULL);
+                    strcpy(srcName, cFileNameA);
                     const char* dst;
-                    if (StrICmp(tmpOrigName, findData.cFileName) == 0)
+                    if (StrICmp(tmpOrigName, cFileNameA) == 0)
                         dst = archiveFileName;
                     else
                     {
-                        char* srcExt = findData.cFileName + strlen(findData.cFileName);
-                        //            while (--srcExt > findData.cFileName && *srcExt != '.');
-                        while (--srcExt >= findData.cFileName && *srcExt != '.')
+                        char* srcExt = cFileNameA + strlen(cFileNameA);
+                        //            while (--srcExt > cFileNameA && *srcExt != '.');
+                        while (--srcExt >= cFileNameA && *srcExt != '.')
                             ;
-                        //            if (srcExt == findData.cFileName) srcExt = findData.cFileName + strlen(findData.cFileName);  // ".cvspass" is an extension in Windows ...
-                        if (srcExt < findData.cFileName)
-                            srcExt = findData.cFileName + strlen(findData.cFileName);
+                        //            if (srcExt == cFileNameA) srcExt = cFileNameA + strlen(cFileNameA);  // ".cvspass" is an extension in Windows ...
+                        if (srcExt < cFileNameA)
+                            srcExt = cFileNameA + strlen(cFileNameA);
                         strcpy(dstExt, srcExt);
                         dst = dstNameBuf;
                     }
                     if (i == 0)
                     {
-                        if (SalGetFileAttributes(dst) != 0xffffffff)
+                        if (GetFileAttributesW(AnsiToWide(dst).c_str()) != INVALID_FILE_ATTRIBUTES)
                         {
                             HANDLES(FindClose(find)); // this name already exists with some extension, searching further
                             (*PackErrorHandlerPtr)(parent, IDS_PACKERR_UNABLETOREN, src.Get(), dst);
@@ -536,7 +539,7 @@ BOOL PackUniversalCompress(HWND parent, const char* command, TPackErrorTable* co
                             TRACE_E("Error (" << err << ") in SalMoveFile(" << src << ", " << dst << ").");
                         }
                     }
-                } while (FindNextFile(find, &findData));
+                } while (FindNextFileW(find, &findData));
                 HANDLES(FindClose(find)); // this name already exists with some extension, searching further
             }
         }
@@ -735,7 +738,7 @@ BOOL PackDelFromArc(HWND parent, CFilesWindow* panel, const char* archiveFileNam
     }
 
     // take the attributes in case we need them later
-    DWORD fileAttrs = SalGetFileAttributes(archiveFileName);
+    DWORD fileAttrs = GetFileAttributesW(AnsiToWide(archiveFileName).c_str());
     if (fileAttrs == 0xFFFFFFFF)
         fileAttrs = FILE_ATTRIBUTE_ARCHIVE;
 
@@ -750,8 +753,8 @@ BOOL PackDelFromArc(HWND parent, CFilesWindow* panel, const char* archiveFileNam
     // meanwhile, check whether the long name did not vanish -> if the short one
     // remained, rename it to the original long name
     if (DOSArchiveFileName[0] != 0 &&
-        SalGetFileAttributes(archiveFileName) == 0xFFFFFFFF &&
-        SalGetFileAttributes(DOSArchiveFileName) != 0xFFFFFFFF)
+        GetFileAttributesW(AnsiToWide(archiveFileName).c_str()) == 0xFFFFFFFF &&
+        GetFileAttributesW(AnsiToWide(DOSArchiveFileName).c_str()) != 0xFFFFFFFF)
     {
         SalMoveFile(DOSArchiveFileName, archiveFileName); // if it fails, we don't care...
     }
@@ -762,8 +765,8 @@ BOOL PackDelFromArc(HWND parent, CFilesWindow* panel, const char* archiveFileNam
     }
 
     // if deleting removed the archive, create a zero-length file
-    HANDLE tmpHandle = SalCreateFileH(archiveFileName, GENERIC_READ, 0, NULL,
-                                            OPEN_ALWAYS, fileAttrs, NULL);
+    HANDLE tmpHandle = HANDLES_Q(CreateFileW(AnsiToWide(archiveFileName).c_str(), GENERIC_READ, 0, NULL,
+                                            OPEN_ALWAYS, fileAttrs, NULL));
     if (tmpHandle != INVALID_HANDLE_VALUE)
         HANDLES(CloseHandle(tmpHandle));
 

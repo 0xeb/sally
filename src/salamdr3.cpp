@@ -1398,28 +1398,30 @@ void SetCurrentDirectoryToSystem()
 void _RemoveTemporaryDir(const char* dir)
 {
     CPathBuffer path;
-    WIN32_FIND_DATA file;
+    WIN32_FIND_DATAW file;
     strcpy(path, dir);
     char* end = path + strlen(path);
     if (*(end - 1) != '\\')
         *end++ = '\\';
     strcpy(end, "*");
-    HANDLE find = SalFindFirstFileH(path, &file);
+    HANDLE find = HANDLES_Q(FindFirstFileW(AnsiToWide(path).c_str(), &file));
     if (find != INVALID_HANDLE_VALUE)
     {
         do
         {
-            if (file.cFileName[0] != 0 && strcmp(file.cFileName, "..") && strcmp(file.cFileName, ".") &&
-                (end - (char*)path) + strlen(file.cFileName) < path.Size() - 2)
+            char cFileNameA[MAX_PATH];
+            WideCharToMultiByte(CP_ACP, 0, file.cFileName, -1, cFileNameA, MAX_PATH, NULL, NULL);
+            if (cFileNameA[0] != 0 && strcmp(cFileNameA, "..") && strcmp(cFileNameA, ".") &&
+                (end - (char*)path) + strlen(cFileNameA) < path.Size() - 2)
             {
-                strcpy(end, file.cFileName);
-                ClearReadOnlyAttr(path, file.dwFileAttributes);
+                strcpy(end, cFileNameA);
+                ClearReadOnlyAttrW(AnsiToWide(path).c_str(), file.dwFileAttributes);
                 if (file.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY)
                     _RemoveTemporaryDir(path);
                 else
                     gFileSystem->DeleteFile(AnsiToWide(path).c_str());
             }
-        } while (FindNextFile(find, &file));
+        } while (FindNextFileW(find, &file));
         HANDLES(FindClose(find));
     }
     *(end - 1) = 0;
@@ -1434,7 +1436,7 @@ void RemoveTemporaryDir(const char* dir)
         _RemoveTemporaryDir(dir);
     SetCurrentDirectoryToSystem(); // must leave it, otherwise it won't be deletable
 
-    ClearReadOnlyAttr(dir);
+    ClearReadOnlyAttrW(AnsiToWide(dir).c_str());
     SalLPRemoveDirectory(dir);
 }
 
@@ -1443,28 +1445,30 @@ void RemoveTemporaryDir(const char* dir)
 void _RemoveEmptyDirs(const char* dir)
 {
     CPathBuffer path;
-    WIN32_FIND_DATA file;
+    WIN32_FIND_DATAW file;
     strcpy(path, dir);
     char* end = path + strlen(path);
     if (*(end - 1) != '\\')
         *end++ = '\\';
     strcpy(end, "*");
-    HANDLE find = SalFindFirstFileH(path, &file);
+    HANDLE find = HANDLES_Q(FindFirstFileW(AnsiToWide(path).c_str(), &file));
     if (find != INVALID_HANDLE_VALUE)
     {
         do
         {
-            if (file.cFileName[0] != 0 && strcmp(file.cFileName, "..") && strcmp(file.cFileName, "."))
+            char cFileNameA[MAX_PATH];
+            WideCharToMultiByte(CP_ACP, 0, file.cFileName, -1, cFileNameA, MAX_PATH, NULL, NULL);
+            if (cFileNameA[0] != 0 && strcmp(cFileNameA, "..") && strcmp(cFileNameA, "."))
             {
                 if ((file.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY) &&
-                    (end - (char*)path) + strlen(file.cFileName) < path.Size() - 2)
+                    (end - (char*)path) + strlen(cFileNameA) < path.Size() - 2)
                 {
-                    strcpy(end, file.cFileName);
-                    ClearReadOnlyAttr(path, file.dwFileAttributes);
+                    strcpy(end, cFileNameA);
+                    ClearReadOnlyAttrW(AnsiToWide(path).c_str(), file.dwFileAttributes);
                     _RemoveEmptyDirs(path);
                 }
             }
-        } while (FindNextFile(find, &file));
+        } while (FindNextFileW(find, &file));
         HANDLES(FindClose(find));
     }
     *(end - 1) = 0;
@@ -1479,7 +1483,7 @@ void RemoveEmptyDirs(const char* dir)
         _RemoveEmptyDirs(dir);
     SetCurrentDirectoryToSystem(); // must leave it, otherwise it won't be deletable
 
-    ClearReadOnlyAttr(dir);
+    ClearReadOnlyAttrW(AnsiToWide(dir).c_str());
     SalLPRemoveDirectory(dir);
 }
 
@@ -1504,7 +1508,7 @@ AGAIN:
             gPrompter->ShowError(LoadStrW(IDS_ERRORTITLE), LoadStrW(IDS_TOOLONGNAME));
         return FALSE;
     }
-    DWORD attrs = SalGetFileAttributes(dir);
+    DWORD attrs = GetFileAttributesW(AnsiToWide(dir).c_str());
     CPathBuffer buf; // for error messages (truncation OK)
     CPathBuffer name;
     if (attrs == 0xFFFFFFFF) // probably doesn't exist, allow creating it
@@ -1559,7 +1563,7 @@ AGAIN:
                     strcpy(name, root);
                     break; // we're already at root directory
                 }
-                attrs = SalGetFileAttributes(name);
+                attrs = GetFileAttributesW(AnsiToWide(name).c_str());
                 if (attrs != 0xFFFFFFFF) // name exists
                 {
                     if (attrs & FILE_ATTRIBUTE_DIRECTORY)
@@ -2672,7 +2676,7 @@ unsigned BkgndReadingIconsThreadBody(void* param)
         CUserMenuIconData* item = bkgndReaderData->At(i);
         HICON umIcon;
         if (item->FileName[0] != 0 &&
-            SalGetFileAttributes(item->FileName) != INVALID_FILE_ATTRIBUTES && // accessibility test (instead of CheckPath)
+            GetFileAttributesW(AnsiToWide(item->FileName).c_str()) != INVALID_FILE_ATTRIBUTES && // accessibility test (instead of CheckPath)
             ExtractIconEx(item->FileName, item->IconIndex, NULL, &umIcon, 1) == 1)
         {
             HANDLES_ADD(__htIcon, __hoLoadImage, umIcon); // pridame handle na 'umIcon' do HANDLES
@@ -2682,7 +2686,7 @@ unsigned BkgndReadingIconsThreadBody(void* param)
             umIcon = NULL;
             if (item->UMCommand[0] != 0)
             { // in case previous method failed - try to get icon from system
-                DWORD attrs = SalGetFileAttributes(item->UMCommand);
+                DWORD attrs = GetFileAttributesW(AnsiToWide(item->UMCommand).c_str());
                 if (attrs != INVALID_FILE_ATTRIBUTES) // accessibility test (instead of CheckPath)
                 {
                     umIcon = GetFileOrPathIconAux(item->UMCommand, FALSE,
@@ -3037,7 +3041,7 @@ BOOL CUserMenuItem::GetIconHandle(CUserMenuIconDataArr* bkgndReaderData, BOOL ge
         MainWindow->GetActivePanel() != NULL &&
         MainWindow->GetActivePanel()->CheckPath(FALSE, umCommand) == ERROR_SUCCESS)
     {
-        DWORD attrs = SalGetFileAttributes(umCommand);
+        DWORD attrs = GetFileAttributesW(AnsiToWide(umCommand).c_str());
         UMIcon = GetFileOrPathIconAux(umCommand, FALSE,
                                       (attrs != INVALID_FILE_ATTRIBUTES && (attrs & FILE_ATTRIBUTE_DIRECTORY)));
         if (UMIcon != NULL)
@@ -3585,14 +3589,14 @@ void CFileTimeStamps::CheckAndPackAndClear(HWND parent, BOOL* someFilesChanged, 
     if (archMaybeUpdated != NULL)
         *archMaybeUpdated = FALSE;
     CPathBuffer buf;
-    WIN32_FIND_DATA data;
+    WIN32_FIND_DATAW data;
     int i;
     for (i = List.Count - 1; i >= 0; i--)
     {
         CFileTimeStampsItem* item = List[i];
         sprintf(buf, "%s\\%s", item->SourcePath, item->FileName);
         BOOL kill = TRUE;
-        HANDLE find = SalFindFirstFileH(buf, &data);
+        HANDLE find = HANDLES_Q(FindFirstFileW(AnsiToWide(buf).c_str(), &data));
         if (find != INVALID_HANDLE_VALUE)
         {
             HANDLES(FindClose(find));

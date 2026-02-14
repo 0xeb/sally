@@ -98,7 +98,8 @@ BOOL CCacheData::CleanFromDisk()
     {
         if (!OwnDelete)
         {
-            DWORD attrs = SalGetFileAttributes(TmpName.c_str());
+            std::wstring tmpNameW = AnsiToWide(TmpName.c_str());
+            DWORD attrs = GetFileAttributesW(tmpNameW.c_str());
             if (attrs == 0xFFFFFFFF)
             {
                 return GetLastError() == ERROR_FILE_NOT_FOUND || GetLastError() == ERROR_PATH_NOT_FOUND;
@@ -111,11 +112,11 @@ BOOL CCacheData::CleanFromDisk()
             {
                 if (attrs & FILE_ATTRIBUTE_READONLY)
                 {
-                    SetFileAttributes(TmpName.c_str(), FILE_ATTRIBUTE_ARCHIVE);
+                    SetFileAttributesW(tmpNameW.c_str(), FILE_ATTRIBUTE_ARCHIVE);
                 }
-                gFileSystem->DeleteFile(AnsiToWide(TmpName.c_str()).c_str());
+                gFileSystem->DeleteFile(tmpNameW.c_str());
             }
-            attrs = SalGetFileAttributes(TmpName.c_str()); // check if the deletion was successful
+            attrs = GetFileAttributesW(tmpNameW.c_str()); // check if the deletion was successful
             if (attrs == 0xFFFFFFFF)
             {
                 return GetLastError() == ERROR_FILE_NOT_FOUND || GetLastError() == ERROR_PATH_NOT_FOUND;
@@ -167,7 +168,7 @@ CCacheData::GetName(CDiskCache* monitor, BOOL* exists, BOOL canBlock, BOOL onlyA
     {
         if (Prepared) // tmp-file is ready
         {
-            DWORD attrs = SalGetFileAttributes(TmpName.c_str());
+            DWORD attrs = GetFileAttributesW(AnsiToWide(TmpName.c_str()).c_str());
             if (attrs == 0xFFFFFFFF || OutOfDate)
             {
                 if (OutOfDate && attrs != 0xFFFFFFFF)
@@ -377,19 +378,23 @@ BOOL CCacheDirData::ContainTmpName(const char* tmpName, const char* rootTmpPath,
                         return TRUE;
                 }
 
-                WIN32_FIND_DATA data;
-                HANDLE find = SalFindFirstFileH(tmpFullName, &data);
+                WIN32_FIND_DATAW data;
+                HANDLE find = HANDLES_Q(FindFirstFileW(AnsiToWide(tmpFullName).c_str(), &data));
                 if (find != INVALID_HANDLE_VALUE)
                 {
                     HANDLES(FindClose(find));
-                    if (StrICmp(tmpName, data.cFileName) == 0)
+                    char cFileNameA[MAX_PATH];
+                    WideCharToMultiByte(CP_ACP, 0, data.cFileName, -1, cFileNameA, MAX_PATH, NULL, NULL);
+                    if (StrICmp(tmpName, cFileNameA) == 0)
                     {
                         TRACE_E("CCacheDirData::ContainTmpName(): unexpected situation: tmp-directory contains unknown file!");
                         *canContainThisName = FALSE; // the file can't be placed here, a foreign file would be opened
                     }
                     else
                     {
-                        if (data.cAlternateFileName[0] != 0 && StrICmp(tmpName, data.cAlternateFileName) == 0)
+                        char cAltNameA[14];
+                        WideCharToMultiByte(CP_ACP, 0, data.cAlternateFileName, -1, cAltNameA, 14, NULL, NULL);
+                        if (cAltNameA[0] != 0 && StrICmp(tmpName, cAltNameA) == 0)
                         {
                             TRACE_I("CCacheDirData::ContainTmpName(): tmp-directory contains file whose dos-name conflicts with new tmp-file - different tmp-directory has to be choosen!");
                             *canContainThisName = FALSE; // the file can't be placed here, an existing file with the same dos-name would be opened
@@ -1463,21 +1468,23 @@ void CDiskCache::ClearTEMPIfNeeded(HWND parent, HWND hActivePanel)
         {
             TIndirectArray<char> tmpDirs(10, 50);
 
-            WIN32_FIND_DATA data;
-            HANDLE find = SalFindFirstFileH(tmpDir, &data);
+            WIN32_FIND_DATAW data;
+            HANDLE find = HANDLES_Q(FindFirstFileW(AnsiToWide(tmpDir).c_str(), &data));
             if (find != INVALID_HANDLE_VALUE)
             {
                 do
                 { // we will process all found directories (search errors are ignored)
                     if (data.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY)
                     {
-                        char* s = data.cFileName + 3;
+                        char cFileNameA[MAX_PATH];
+                        WideCharToMultiByte(CP_ACP, 0, data.cFileName, -1, cFileNameA, MAX_PATH, NULL, NULL);
+                        char* s = cFileNameA + 3;
                         while (*s != 0 && *s != '.' &&
                                (*s >= '0' && *s <= '9' || *s >= 'a' && *s <= 'f' || *s >= 'A' && *s <= 'F'))
                             s++;
                         if (StrICmp(s, ".tmp") == 0) // matches "SAL" + hex-number + ".tmp" = it's almost certainly our directory
                         {
-                            char* tmp = DupStr(data.cFileName);
+                            char* tmp = DupStr(cFileNameA);
                             if (tmp != NULL)
                             {
                                 tmpDirs.Add(tmp);
@@ -1489,7 +1496,7 @@ void CDiskCache::ClearTEMPIfNeeded(HWND parent, HWND hActivePanel)
                             }
                         }
                     }
-                } while (FindNextFile(find, &data));
+                } while (FindNextFileW(find, &data));
                 HANDLES(FindClose(find));
             }
 
