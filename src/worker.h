@@ -332,6 +332,8 @@ struct COperation
     BOOL ClearSourceReadOnly(DWORD attr = (DWORD)-1) const;
     BOOL IsSourceNameInvalid(BOOL ignInvalidName = FALSE) const;
     BOOL IsTargetNameInvalid(BOOL ignInvalidName = FALSE) const;
+    HANDLE FindFirstSource(WIN32_FIND_DATA* findData) const;
+    HANDLE FindFirstTarget(WIN32_FIND_DATA* findData) const;
 
     // Platform-abstracted helpers for compression and file time preservation.
     // Static because they operate on arbitrary paths, not on SourceName/TargetName.
