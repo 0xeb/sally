@@ -2129,7 +2129,9 @@ void CFilesWindow::RenameFileInternal(CFileData* f, const char* formatedFileName
 
             // try renaming from the long name first and if there is a problem then
             // from the DOS name (handles files/directories accessible only via Unicode or DOS names)
-            BOOL moveRet = SalMoveFile(path, tgtPath);
+            std::wstring pathW = AnsiToWide(path);
+            std::wstring tgtPathW = AnsiToWide(tgtPath);
+            BOOL moveRet = MoveFileW(pathW.c_str(), tgtPathW.c_str());
             DWORD err = 0;
             if (!moveRet)
             {
@@ -2138,10 +2140,12 @@ void CFilesWindow::RenameFileInternal(CFileData* f, const char* formatedFileName
                     f->DosName != NULL)
                 {
                     strcpy(path + l, f->DosName);
-                    moveRet = SalMoveFile(path, tgtPath);
+                    pathW = AnsiToWide(path);
+                    moveRet = MoveFileW(pathW.c_str(), tgtPathW.c_str());
                     if (!moveRet)
                         err = GetLastError();
                     strcpy(path + l, f->Name);
+                    pathW = AnsiToWide(path);
                 }
             }
 
@@ -2159,50 +2163,56 @@ void CFilesWindow::RenameFileInternal(CFileData* f, const char* formatedFileName
                     (err == ERROR_FILE_EXISTS ||   // check whether it's only rewriting the DOS name of the file
                      err == ERROR_ALREADY_EXISTS))
                 {
-                    WIN32_FIND_DATA data;
-                    HANDLE find = SalFindFirstFileH(tgtPath, &data);
+                    WIN32_FIND_DATAW data;
+                    HANDLE find = HANDLES_Q(FindFirstFileW(tgtPathW.c_str(), &data));
                     if (find != INVALID_HANDLE_VALUE)
                     {
                         HANDLES(FindClose(find));
                         const char* tgtName = SalPathFindFileName(tgtPath);
-                        if (StrICmp(tgtName, data.cAlternateFileName) == 0 && // match only for DOS name
-                            StrICmp(tgtName, data.cFileName) != 0)            // (full name differs)
+                        char cAltNameA[14];
+                        WideCharToMultiByte(CP_ACP, 0, data.cAlternateFileName, -1, cAltNameA, 14, NULL, NULL);
+                        char cFileNameA[MAX_PATH];
+                        WideCharToMultiByte(CP_ACP, 0, data.cFileName, -1, cFileNameA, MAX_PATH, NULL, NULL);
+                        if (StrICmp(tgtName, cAltNameA) == 0 && // match only for DOS name
+                            StrICmp(tgtName, cFileNameA) != 0)  // (full name differs)
                         {
                             // rename ("clean up") the file/directory with the conflicting DOS name to a temporary 8.3 name (no extra DOS name needed)
-                            CPathBuffer tmpName;
-                            lstrcpyn(tmpName, tgtPath, tmpName.Size());
-                            CutDirectory(tmpName);
-                            SalPathAddBackslash(tmpName, tmpName.Size());
-                            char* tmpNamePart = tmpName + strlen(tmpName);
-                            CPathBuffer origFullName; // Heap-allocated for long path support
-                            if (SalPathAppend(tmpName, data.cFileName, tmpName.Size()))
+                            std::wstring tmpNameW = tgtPathW;
+                            CutDirectoryW(tmpNameW);
+                            SalPathAddBackslashW(tmpNameW);
+                            size_t tmpNamePartPos = tmpNameW.size();
+                            std::wstring origFullNameW = tmpNameW;
+                            SalPathAppendW(origFullNameW, data.cFileName); // use wide cFileName directly
+                            tmpNameW = origFullNameW;
                             {
-                                strcpy(origFullName, tmpName);
                                 DWORD num = (GetTickCount() / 10) % 0xFFF;
                                 while (1)
                                 {
-                                    sprintf(tmpNamePart, "sal%03X", num++);
-                                    if (SalMoveFile(origFullName, tmpName))
+                                    wchar_t tmpSuffix[8];
+                                    swprintf(tmpSuffix, _countof(tmpSuffix), L"sal%03X", num++);
+                                    tmpNameW.resize(tmpNamePartPos);
+                                    tmpNameW += tmpSuffix;
+                                    if (MoveFileW(origFullNameW.c_str(), tmpNameW.c_str()))
                                         break;
                                     DWORD e = GetLastError();
                                     if (e != ERROR_FILE_EXISTS && e != ERROR_ALREADY_EXISTS)
                                     {
-                                        tmpName[0] = 0;
+                                        tmpNameW.clear();
                                         break;
                                     }
                                 }
-                                if (tmpName[0] != 0) // if we successfully "cleaned" the conflicting file, try moving
-                                {                    // the file again, then return the temporary file its original name
-                                    BOOL moveDone = SalMoveFile(path, tgtPath);
-                                    if (!SalMoveFile(tmpName, origFullName))
+                                if (!tmpNameW.empty()) // if we successfully "cleaned" the conflicting file, try moving
+                                {                      // the file again, then return the temporary file its original name
+                                    BOOL moveDone = MoveFileW(pathW.c_str(), tgtPathW.c_str());
+                                    if (!MoveFileW(tmpNameW.c_str(), origFullNameW.c_str()))
                                     { // this can apparently happen: Windows creates a file named origFullName instead of 'tgtPath' (DOS name)
-                                        TRACE_I("CFilesWindow::RenameFileInternal(): Unexpected situation: unable to rename file from tmp-name to original long file name! " << origFullName);
+                                        TRACE_I("CFilesWindow::RenameFileInternal(): Unexpected situation: unable to rename file from tmp-name to original long file name!");
                                         if (moveDone)
                                         {
-                                            if (SalMoveFile(tgtPath, path))
+                                            if (MoveFileW(tgtPathW.c_str(), pathW.c_str()))
                                                 moveDone = FALSE;
-                                            if (!SalMoveFile(tmpName, origFullName))
-                                                TRACE_E("CFilesWindow::RenameFileInternal(): Fatal unexpected situation: unable to rename file from tmp-name to original long file name! " << origFullName);
+                                            if (!MoveFileW(tmpNameW.c_str(), origFullNameW.c_str()))
+                                                TRACE_E("CFilesWindow::RenameFileInternal(): Fatal unexpected situation: unable to rename file from tmp-name to original long file name!");
                                         }
                                     }
 
@@ -2210,8 +2220,6 @@ void CFilesWindow::RenameFileInternal(CFileData* f, const char* formatedFileName
                                         goto REN_OPERATION_DONE;
                                 }
                             }
-                            else
-                                TRACE_E("CFilesWindow::RenameFileInternal(): Original full file name is too long, unable to bypass only-dos-name-overwrite problem!");
                         }
                     }
                 }
@@ -2219,18 +2227,18 @@ void CFilesWindow::RenameFileInternal(CFileData* f, const char* formatedFileName
                      err == ERROR_FILE_EXISTS) &&
                     StrICmp(path, tgtPath) != 0) // overwrite the file?
                 {
-                    DWORD inAttr = SalGetFileAttributes(path);
-                    DWORD outAttr = SalGetFileAttributes(tgtPath);
+                    DWORD inAttr = GetFileAttributesW(pathW.c_str());
+                    DWORD outAttr = GetFileAttributesW(tgtPathW.c_str());
 
                     if ((inAttr & FILE_ATTRIBUTE_DIRECTORY) == 0 &&
                         (outAttr & FILE_ATTRIBUTE_DIRECTORY) == 0)
                     { // only if both are files
-                        HANDLE in = SalCreateFileH(path, 0, FILE_SHARE_READ | FILE_SHARE_WRITE, NULL,
-                                                         OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL,
-                                                         NULL);
-                        HANDLE out = SalCreateFileH(tgtPath, 0, FILE_SHARE_READ | FILE_SHARE_WRITE, NULL,
-                                                          OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL,
-                                                          NULL);
+                        HANDLE in = CreateFileW(pathW.c_str(), 0, FILE_SHARE_READ | FILE_SHARE_WRITE, NULL,
+                                               OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, NULL);
+                        HANDLES_ADD_EX(__otQuiet, in != INVALID_HANDLE_VALUE, __htFile, __hoCreateFile, in, GetLastError(), TRUE);
+                        HANDLE out = CreateFileW(tgtPathW.c_str(), 0, FILE_SHARE_READ | FILE_SHARE_WRITE, NULL,
+                                                OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, NULL);
+                        HANDLES_ADD_EX(__otQuiet, out != INVALID_HANDLE_VALUE, __htFile, __hoCreateFile, out, GetLastError(), TRUE);
                         if (in != INVALID_HANDLE_VALUE && out != INVALID_HANDLE_VALUE)
                         {
                             char iAttr[101], oAttr[101];
@@ -2252,8 +2260,8 @@ void CFilesWindow::RenameFileInternal(CFileData* f, const char* formatedFileName
 
                             case IDYES:
                             {
-                                ClearReadOnlyAttr(tgtPath); // so it can be deleted ...
-                                if (!gFileSystem->DeleteFile(AnsiToWide(tgtPath).c_str()).success || !SalMoveFile(path, tgtPath))
+                                ClearReadOnlyAttrW(tgtPathW.c_str()); // so it can be deleted ...
+                                if (!gFileSystem->DeleteFile(tgtPathW.c_str()).success || !MoveFileW(pathW.c_str(), tgtPathW.c_str()))
                                     err = GetLastError();
                                 else
                                 {

@@ -1308,24 +1308,31 @@ class MoveFileWideTest : public WorkerWideTest {};
 // MoveFileW with Unicode filenames
 TEST_F(MoveFileWideTest, Unicode_Rename)
 {
-    // Japanese + Emoji filename
-    auto src = m_tempDir / L"\x65E5\x672C\x8A9E\x30C6\x30B9\x30C8.txt"; // 日本語テスト.txt
-    auto dst = m_tempDir / L"\x30EA\x30CD\x30FC\x30E0\x6E08\x307F.txt"; // リネーム済み.txt
+    // Use a fresh subdirectory to avoid stale file conflicts
+    auto subDir = m_tempDir / L"unicode_rename";
+    fs::create_directories(subDir);
+    auto src = subDir / L"\x65E5\x672C\x8A9E.txt"; // 日本語.txt
+    auto dst = subDir / L"\x30EA\x30CD\x30FC\x30E0.txt"; // リネーム.txt
+    DeleteFileW(dst.c_str()); // ensure no stale file from previous run
     CreateTestFile(src, "unicode rename test");
 
-    EXPECT_TRUE(MoveFileW(src.c_str(), dst.c_str()));
-    EXPECT_FALSE(fs::exists(src));
-    EXPECT_TRUE(fs::exists(dst));
+    BOOL ret = MoveFileW(src.c_str(), dst.c_str());
+    EXPECT_TRUE(ret) << "MoveFileW failed, err=" << GetLastError();
+    if (ret)
+    {
+        EXPECT_FALSE(fs::exists(src));
+        EXPECT_TRUE(fs::exists(dst));
 
-    // Verify content survived the rename
-    HANDLE h = CreateFileW(dst.c_str(), GENERIC_READ, FILE_SHARE_READ, NULL,
-                           OPEN_EXISTING, 0, NULL);
-    ASSERT_NE(h, INVALID_HANDLE_VALUE);
-    char buf[64] = {};
-    DWORD read;
-    ReadFile(h, buf, sizeof(buf) - 1, &read, NULL);
-    CloseHandle(h);
-    EXPECT_STREQ(buf, "unicode rename test");
+        // Verify content survived the rename
+        HANDLE h = CreateFileW(dst.c_str(), GENERIC_READ, FILE_SHARE_READ, NULL,
+                               OPEN_EXISTING, 0, NULL);
+        ASSERT_NE(h, INVALID_HANDLE_VALUE);
+        char buf[64] = {};
+        DWORD read;
+        ReadFile(h, buf, sizeof(buf) - 1, &read, NULL);
+        CloseHandle(h);
+        EXPECT_STREQ(buf, "unicode rename test");
+    }
 }
 
 // Round-trip rename: original → temp → original (the pattern used for DOS name conflicts)
@@ -1434,18 +1441,20 @@ TEST_F(MoveFileWideTest, CreateFileW_ReadWrite_Unicode)
 // MoveFileW with long paths (>MAX_PATH)
 TEST_F(MoveFileWideTest, LongPath_Rename)
 {
-    // Create a deep directory structure
-    std::wstring longDir = m_tempDir.wstring();
+    // Create a deep directory structure with \\?\ prefix for long paths
+    std::wstring baseDir = L"\\\\?\\" + m_tempDir.wstring() + L"\\long_rename";
+    std::wstring longDir = baseDir;
     for (int i = 0; i < 5; i++)
     {
         longDir += L"\\" + std::wstring(50, L'D');
     }
-    longDir = L"\\\\?\\" + longDir;
     fs::create_directories(fs::path(longDir));
-    EXPECT_GT(longDir.size(), MAX_PATH);
+    // Verify the path without prefix exceeds MAX_PATH
+    EXPECT_GT(longDir.size() - 4, MAX_PATH); // -4 for \\?\ prefix
 
     std::wstring srcFile = longDir + L"\\source.txt";
     std::wstring dstFile = longDir + L"\\renamed.txt";
+    DeleteFileW(dstFile.c_str()); // ensure no stale file from previous run
 
     // Create source file
     HANDLE h = CreateFileW(srcFile.c_str(), GENERIC_WRITE, 0, NULL,
@@ -1455,10 +1464,14 @@ TEST_F(MoveFileWideTest, LongPath_Rename)
     WriteFile(h, "long", 4, &written, NULL);
     CloseHandle(h);
 
-    // Move with long paths
-    EXPECT_TRUE(MoveFileW(srcFile.c_str(), dstFile.c_str()));
+    // Move with long paths (\\?\ prefix required for MoveFileW with >MAX_PATH)
+    BOOL ret = MoveFileW(srcFile.c_str(), dstFile.c_str());
+    EXPECT_TRUE(ret) << "MoveFileW failed, err=" << GetLastError();
 
-    // Verify destination exists
-    DWORD attr = GetFileAttributesW(dstFile.c_str());
-    EXPECT_NE(attr, INVALID_FILE_ATTRIBUTES);
+    if (ret)
+    {
+        // Verify destination exists
+        DWORD attr = GetFileAttributesW(dstFile.c_str());
+        EXPECT_NE(attr, INVALID_FILE_ATTRIBUTES);
+    }
 }
