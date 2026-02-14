@@ -796,3 +796,208 @@ TEST_F(WorkerWideTest, Junction_ReadOnlyDir)
 
     EXPECT_EQ(GetFileAttributesW(link.c_str()), INVALID_FILE_ATTRIBUTES);
 }
+
+// ---- ADS (Alternate Data Streams) tests ----
+// These test the same Win32 API patterns used by CheckFileOrDirADS and DoCopyADS
+
+class AdsTest : public ::testing::Test
+{
+protected:
+    fs::path tempDir;
+
+    void SetUp() override
+    {
+        tempDir = fs::temp_directory_path() / L"sal_ads_test";
+        fs::create_directories(tempDir);
+    }
+
+    void TearDown() override
+    {
+        std::error_code ec;
+        fs::remove_all(tempDir, ec);
+    }
+
+    // Write data to a named ADS on a file
+    static bool WriteADS(const std::wstring& filePath, const wchar_t* streamName, const void* data, DWORD size)
+    {
+        std::wstring adsPath = filePath + L":" + streamName;
+        HANDLE h = CreateFileW(adsPath.c_str(), GENERIC_WRITE, 0, NULL,
+                               CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL, NULL);
+        if (h == INVALID_HANDLE_VALUE)
+            return false;
+        DWORD written;
+        BOOL ok = WriteFile(h, data, size, &written, NULL);
+        CloseHandle(h);
+        return ok && written == size;
+    }
+
+    // Read data from a named ADS on a file
+    static std::string ReadADS(const std::wstring& filePath, const wchar_t* streamName)
+    {
+        std::wstring adsPath = filePath + L":" + streamName;
+        HANDLE h = CreateFileW(adsPath.c_str(), GENERIC_READ, FILE_SHARE_READ, NULL,
+                               OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, NULL);
+        if (h == INVALID_HANDLE_VALUE)
+            return {};
+        char buf[4096];
+        DWORD bytesRead;
+        std::string result;
+        while (ReadFile(h, buf, sizeof(buf), &bytesRead, NULL) && bytesRead > 0)
+            result.append(buf, bytesRead);
+        CloseHandle(h);
+        return result;
+    }
+
+    // Enumerate ADS streams using FindFirstStreamW/FindNextStreamW
+    static std::vector<std::wstring> EnumerateStreams(const std::wstring& filePath)
+    {
+        std::vector<std::wstring> streams;
+        WIN32_FIND_STREAM_DATA streamData;
+        HANDLE h = FindFirstStreamW(filePath.c_str(), FindStreamInfoStandard, &streamData, 0);
+        if (h == INVALID_HANDLE_VALUE)
+            return streams;
+        do
+        {
+            // Stream names look like ":streamname:$DATA"
+            streams.push_back(streamData.cStreamName);
+        } while (FindNextStreamW(h, &streamData));
+        FindClose(h);
+        return streams;
+    }
+};
+
+TEST_F(AdsTest, WriteAndRead_BasicStream)
+{
+    fs::path file = tempDir / "test.txt";
+    // Create the main file
+    HANDLE h = CreateFileW(file.c_str(), GENERIC_WRITE, 0, NULL,
+                           CREATE_NEW, FILE_ATTRIBUTE_NORMAL, NULL);
+    ASSERT_NE(h, INVALID_HANDLE_VALUE);
+    const char mainData[] = "main content";
+    DWORD written;
+    WriteFile(h, mainData, sizeof(mainData) - 1, &written, NULL);
+    CloseHandle(h);
+
+    // Write an ADS
+    const char adsData[] = "alternate stream data";
+    ASSERT_TRUE(WriteADS(file.wstring(), L"mystream", adsData, sizeof(adsData) - 1));
+
+    // Read it back
+    std::string readBack = ReadADS(file.wstring(), L"mystream");
+    EXPECT_EQ(readBack, "alternate stream data");
+
+    // Main stream unaffected
+    h = CreateFileW(file.c_str(), GENERIC_READ, FILE_SHARE_READ, NULL,
+                    OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, NULL);
+    ASSERT_NE(h, INVALID_HANDLE_VALUE);
+    char buf[64];
+    DWORD bytesRead;
+    ReadFile(h, buf, sizeof(buf), &bytesRead, NULL);
+    CloseHandle(h);
+    EXPECT_EQ(std::string(buf, bytesRead), "main content");
+}
+
+TEST_F(AdsTest, EnumerateStreams_MultipleADS)
+{
+    fs::path file = tempDir / "multi.txt";
+    HANDLE h = CreateFileW(file.c_str(), GENERIC_WRITE, 0, NULL,
+                           CREATE_NEW, FILE_ATTRIBUTE_NORMAL, NULL);
+    ASSERT_NE(h, INVALID_HANDLE_VALUE);
+    CloseHandle(h);
+
+    const char data1[] = "stream1";
+    const char data2[] = "stream2";
+    ASSERT_TRUE(WriteADS(file.wstring(), L"alpha", data1, sizeof(data1) - 1));
+    ASSERT_TRUE(WriteADS(file.wstring(), L"beta", data2, sizeof(data2) - 1));
+
+    auto streams = EnumerateStreams(file.wstring());
+    // Should have at least ::$DATA (main), :alpha:$DATA, :beta:$DATA
+    ASSERT_GE(streams.size(), 3u);
+
+    // Check for our named streams
+    bool foundAlpha = false, foundBeta = false;
+    for (auto& s : streams)
+    {
+        if (s == L":alpha:$DATA")
+            foundAlpha = true;
+        if (s == L":beta:$DATA")
+            foundBeta = true;
+    }
+    EXPECT_TRUE(foundAlpha) << "Expected :alpha:$DATA stream";
+    EXPECT_TRUE(foundBeta) << "Expected :beta:$DATA stream";
+}
+
+TEST_F(AdsTest, UnicodeStreamName)
+{
+    fs::path file = tempDir / L"\x30C6\x30B9\x30C8.txt"; // テスト.txt
+    HANDLE h = CreateFileW(file.c_str(), GENERIC_WRITE, 0, NULL,
+                           CREATE_NEW, FILE_ATTRIBUTE_NORMAL, NULL);
+    ASSERT_NE(h, INVALID_HANDLE_VALUE);
+    CloseHandle(h);
+
+    const char data[] = "unicode stream";
+    ASSERT_TRUE(WriteADS(file.wstring(), L"\x30B9\x30C8\x30EA\x30FC\x30E0", data, sizeof(data) - 1)); // ストリーム
+
+    std::string readBack = ReadADS(file.wstring(), L"\x30B9\x30C8\x30EA\x30FC\x30E0");
+    EXPECT_EQ(readBack, "unicode stream");
+}
+
+TEST_F(AdsTest, LongPath_ADS)
+{
+    // Build path exceeding MAX_PATH by creating directories one at a time
+    std::wstring longDir = L"\\\\?\\" + tempDir.wstring();
+    for (int i = 0; i < 15; i++)
+    {
+        longDir += L"\\subdir_pad_" + std::to_wstring(i);
+        CreateDirectoryW(longDir.c_str(), NULL);
+    }
+
+    std::wstring longFile = longDir + L"\\file.txt";
+    HANDLE h = CreateFileW(longFile.c_str(), GENERIC_WRITE, 0, NULL,
+                           CREATE_NEW, FILE_ATTRIBUTE_NORMAL, NULL);
+    if (h == INVALID_HANDLE_VALUE)
+        GTEST_SKIP() << "Cannot create long-path file";
+    CloseHandle(h);
+
+    const char data[] = "long path ADS data";
+    std::wstring adsPath = longFile + L":longstream";
+    h = CreateFileW(adsPath.c_str(), GENERIC_WRITE, 0, NULL,
+                    CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL, NULL);
+    if (h == INVALID_HANDLE_VALUE)
+        GTEST_SKIP() << "Cannot create ADS on long path";
+    DWORD written;
+    WriteFile(h, data, sizeof(data) - 1, &written, NULL);
+    CloseHandle(h);
+
+    // Read back
+    h = CreateFileW(adsPath.c_str(), GENERIC_READ, FILE_SHARE_READ, NULL,
+                    OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, NULL);
+    ASSERT_NE(h, INVALID_HANDLE_VALUE);
+    char buf[64];
+    DWORD bytesRead;
+    ReadFile(h, buf, sizeof(buf), &bytesRead, NULL);
+    CloseHandle(h);
+    EXPECT_EQ(std::string(buf, bytesRead), "long path ADS data");
+}
+
+TEST_F(AdsTest, DirectoryADS)
+{
+    // Directories can also have ADS
+    fs::path dir = tempDir / "dirwithads";
+    fs::create_directory(dir);
+
+    const char data[] = "dir ADS data";
+    ASSERT_TRUE(WriteADS(dir.wstring(), L"dirstream", data, sizeof(data) - 1));
+
+    std::string readBack = ReadADS(dir.wstring(), L"dirstream");
+    EXPECT_EQ(readBack, "dir ADS data");
+
+    auto streams = EnumerateStreams(dir.wstring());
+    bool foundDirStream = false;
+    for (auto& s : streams)
+    {
+        if (s == L":dirstream:$DATA")
+            foundDirStream = true;
+    }
+    EXPECT_TRUE(foundDirStream) << "Expected :dirstream:$DATA on directory";
+}

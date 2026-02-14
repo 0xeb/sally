@@ -810,32 +810,6 @@ BOOL COperation::IsTargetNameInvalid(BOOL ignInvalidName) const
     }
 }
 
-// Finds source file - uses SourceNameW if available
-HANDLE COperation::FindFirstSource(WIN32_FIND_DATA* findData) const
-{
-    if (HasWideSource())
-    {
-        return SalFindFirstFileHW(SourceNameW.c_str(), findData);
-    }
-    else
-    {
-        return SalFindFirstFileH(SourceName, findData);
-    }
-}
-
-// Finds target file - uses TargetNameW if available
-HANDLE COperation::FindFirstTarget(WIN32_FIND_DATA* findData) const
-{
-    if (HasWideTarget())
-    {
-        return SalFindFirstFileHW(TargetNameW.c_str(), findData);
-    }
-    else
-    {
-        return SalFindFirstFileH(TargetName, findData);
-    }
-}
-
 // Checks if source and target are on the same root path - uses wide paths if both available
 BOOL COperation::HasSameRootPath() const
 {
@@ -4909,7 +4883,7 @@ BOOL DoCopyFile(COperation* op, IWorkerObserver& observer, void* buffer,
         !invalidSrcName && !invalidTgtName && script->OverwriteOlder)
     {
         HANDLE find;
-        find = op->FindFirstTarget(&dataOut);
+        find = SalFindFirstFileH(op->TargetName, &dataOut);
         if (find != INVALID_HANDLE_VALUE)
         {
             HANDLES(FindClose(find));
@@ -4921,7 +4895,7 @@ BOOL DoCopyFile(COperation* op, IWorkerObserver& observer, void* buffer,
             if (StrICmp(tgtName, dataOut.cFileName) == 0 &&                 // ensure it is not just a DOS-name match (that would change the DOS-name instead of overwriting)
                 (dataOut.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY) == 0) // ensure it is not a directory (overwrite-older cannot help there)
             {
-                find = op->FindFirstSource(&dataIn);
+                find = SalFindFirstFileH(op->SourceName, &dataIn);
                 if (find != INVALID_HANDLE_VALUE)
                 {
                     HANDLES(FindClose(find));
@@ -6163,7 +6137,7 @@ BOOL DoMoveFile(COperation* op, IWorkerObserver& observer, void* buffer,
                     targetNameMvDir == op->TargetName) // no invalid names are allowed here
                 {
                     WIN32_FIND_DATA findData;
-                    HANDLE find = op->FindFirstTarget(&findData);
+                    HANDLE find = SalFindFirstFileH(op->TargetName, &findData);
                     if (find != INVALID_HANDLE_VALUE)
                     {
                         HANDLES(FindClose(find));
