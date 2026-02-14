@@ -2455,7 +2455,8 @@ BOOL CheckFileOrDirADS(const char* fileName, BOOL isDir, CQuadWord* adsSize, wch
     return FALSE;
 }
 
-BOOL DeleteAllADS(HANDLE file, const char* fileName)
+BOOL DeleteAllADS(HANDLE file, const char* fileName,
+                  const std::wstring& fileNameW = std::wstring())
 {
     if (DynNtQueryInformationFile != NULL) // "always true"
     {
@@ -2489,7 +2490,9 @@ BOOL DeleteAllADS(HANDLE file, const char* fileName)
                 {
                     if (adsFullName[0] == 0) // convert the file name only when needed for the first time to save CPU time
                     {
-                        if (ConvertA2U(fileName, -1, adsFullName, adsFullName.Size()) == 0)
+                        if (!fileNameW.empty())
+                            lstrcpynW(adsFullName, fileNameW.c_str(), adsFullName.Size());
+                        else if (ConvertA2U(fileName, -1, adsFullName, adsFullName.Size()) == 0)
                             return FALSE; // "always false"
                         adsPart = adsFullName + wcslen(adsFullName);
                         adsPartSize = (int)((adsFullName + adsFullName.Size()) - adsPart);
@@ -5745,7 +5748,7 @@ COPY_AGAIN:
                                     }
 
                                     // on target paths that support ADS also delete ADS on the target file (CREATE_ALWAYS should remove them, but on home W2K and XP they simply stay; no idea why, W2K and XP in VMWare delete ADS normally)
-                                    if (script->TargetPathSupADS && !DeleteAllADS(out, op->TargetName))
+                                    if (script->TargetPathSupADS && !DeleteAllADS(out, op->TargetName, op->TargetNameW))
                                     {
                                         HANDLES(CloseHandle(out));
                                         out = INVALID_HANDLE_VALUE;
