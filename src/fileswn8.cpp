@@ -1185,7 +1185,7 @@ void CFilesWindow::FilesAction(CActionType type, CFilesWindow* target, int count
 // returns TRUE, if everything succeeded; otherwise returns FALSE
 BOOL EmailFilesAddDirectory(CSimpleMAPI* mapi, const char* path, BOOL* errGetFileSizeOfLnkTgtIgnAll)
 {
-    WIN32_FIND_DATA file;
+    WIN32_FIND_DATAW file;
     CPathBuffer myPath;
     int l = (int)strlen(path);
     memmove(myPath, path, l);
@@ -1193,7 +1193,7 @@ BOOL EmailFilesAddDirectory(CSimpleMAPI* mapi, const char* path, BOOL* errGetFil
         myPath[l++] = '\\';
     char* name = myPath + l;
     strcpy(name, "*");
-    HANDLE find = SalFindFirstFileH(myPath, &file);
+    HANDLE find = HANDLES_Q(FindFirstFileW(AnsiToWide(myPath).c_str(), &file));
     if (find == INVALID_HANDLE_VALUE)
     {
         DWORD err = GetLastError();
@@ -1213,11 +1213,13 @@ BOOL EmailFilesAddDirectory(CSimpleMAPI* mapi, const char* path, BOOL* errGetFil
     BOOL ok = TRUE;
     do
     {
-        if (file.cFileName[0] != 0 &&
-            (file.cFileName[0] != '.' ||
-             (file.cFileName[1] != 0 && (file.cFileName[1] != '.' || file.cFileName[2] != 0))))
+        char cFileNameA[MAX_PATH];
+        WideCharToMultiByte(CP_ACP, 0, file.cFileName, -1, cFileNameA, MAX_PATH, NULL, NULL);
+        if (cFileNameA[0] != 0 &&
+            (cFileNameA[0] != '.' ||
+             (cFileNameA[1] != 0 && (cFileNameA[1] != '.' || cFileNameA[2] != 0))))
         {
-            strcpy(name, file.cFileName);
+            strcpy(name, cFileNameA);
             if (file.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY)
             {
                 if (!EmailFilesAddDirectory(mapi, myPath, errGetFileSizeOfLnkTgtIgnAll))
@@ -1243,7 +1245,7 @@ BOOL EmailFilesAddDirectory(CSimpleMAPI* mapi, const char* path, BOOL* errGetFil
                 }
             }
         }
-    } while (FindNextFile(find, &file));
+    } while (FindNextFileW(find, &file));
     HANDLES(FindClose(find));
     return ok;
 }

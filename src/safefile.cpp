@@ -720,7 +720,7 @@ CREATE_FILE:
                 SetEndOfFile(hFile);
 
                 CloseHandle(hFile);
-                ClearReadOnlyAttr(fileName); // in case it ended up read-only so we can handle it
+                ClearReadOnlyAttrW(AnsiToWide(fileName).c_str()); // in case it ended up read-only so we can handle it
                 gFileSystem->DeleteFile(AnsiToWide(fileName).c_str());
 
                 allocateWholeFile = NULL; // next time we will no longer try to preallocate

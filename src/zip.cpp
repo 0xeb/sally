@@ -2497,8 +2497,8 @@ BOOL ViewFileInPluginViewer(const char* pluginSPL,
         else // successfully obtained a temp file; we must call NamePrepared()
         {
             CQuadWord size(0, 0);
-            HANDLE file = SalCreateFileH(fileName, GENERIC_READ, FILE_SHARE_READ | FILE_SHARE_WRITE,
-                                               NULL, OPEN_EXISTING, 0, NULL);
+            HANDLE file = HANDLES_Q(CreateFileW(AnsiToWide(fileName).c_str(), GENERIC_READ, FILE_SHARE_READ | FILE_SHARE_WRITE,
+                                               NULL, OPEN_EXISTING, 0, NULL));
             if (file != INVALID_HANDLE_VALUE)
             { // ignore the error; the file size is not that important
                 DWORD err;

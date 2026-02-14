@@ -1864,19 +1864,27 @@ BOOL AddWin64RedirectedDirAux(const char* path, const char* subDir, const char* 
             SalPathAppend(findPath, "*", findPath.Size()))
         {
             HANDLE h;
-            h = SalFindFirstFileH(findPath, fileData); // find-data for redirected-dir can be obtained from the "." directory in the listing of redirected-dir
+            WIN32_FIND_DATAW fileDataW;
+            h = HANDLES_Q(FindFirstFileW(AnsiToWide(findPath).c_str(), &fileDataW)); // find-data for redirected-dir can be obtained from the "." directory in the listing of redirected-dir
             if (h != INVALID_HANDLE_VALUE)
             {
                 BOOL found = FALSE;
                 do
                 {
-                    if (strcmp(fileData->cFileName, "..") == 0 &&
-                        (fileData->dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY) != 0) // "." directory
+                    if (wcscmp(fileDataW.cFileName, L"..") == 0 &&
+                        (fileDataW.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY) != 0) // "." directory
                     {
+                        // Copy non-name fields to caller's ANSI struct (name fields are overwritten below)
+                        fileData->dwFileAttributes = fileDataW.dwFileAttributes;
+                        fileData->ftCreationTime = fileDataW.ftCreationTime;
+                        fileData->ftLastAccessTime = fileDataW.ftLastAccessTime;
+                        fileData->ftLastWriteTime = fileDataW.ftLastWriteTime;
+                        fileData->nFileSizeHigh = fileDataW.nFileSizeHigh;
+                        fileData->nFileSizeLow = fileDataW.nFileSizeLow;
                         found = TRUE;
                         break;
                     }
-                } while (SalLPFindNextFileA(h, fileData));
+                } while (FindNextFileW(h, &fileDataW));
                 HANDLES(FindClose(h));
                 if (found)
                 {
@@ -1887,13 +1895,15 @@ BOOL AddWin64RedirectedDirAux(const char* path, const char* subDir, const char* 
 
                     if (CutDirectory(findPath)) // find out if there's a directory with the same name as redirected-dir on the disk (it does not need to be in the 'dirs' array, e.g. because of the command "Hide Selected Names")
                     {
-                        WIN32_FIND_DATA fd;
-                        h = SalFindFirstFileH(findPath, &fd);
+                        WIN32_FIND_DATAW fd;
+                        h = HANDLES_Q(FindFirstFileW(AnsiToWide(findPath).c_str(), &fd));
                         if (h != INVALID_HANDLE_VALUE)
                         {
                             HANDLES(FindClose(h));
+                            char cFileNameA[MAX_PATH];
+                            WideCharToMultiByte(CP_ACP, 0, fd.cFileName, -1, cFileNameA, MAX_PATH, NULL, NULL);
                             if ((fd.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY) != 0 &&
-                                StrICmp(fd.cFileName, redirectedDirLastComp) == 0)
+                                StrICmp(cFileNameA, redirectedDirLastComp) == 0)
                             {
                                 *dirWithSameNameExists = TRUE;
                             }
