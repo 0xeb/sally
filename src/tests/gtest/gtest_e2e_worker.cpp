@@ -1014,3 +1014,260 @@ TEST_F(E2EWorkerTest, E2EMove_UnicodeAndLongPath)
     EXPECT_TRUE(LongPathExists(dstFileStr)) << "Unicode long-path move target not found";
     EXPECT_EQ(ReadLongPathContent(dstFileStr), "unicode long path data");
 }
+
+// ============================================================================
+// p11g — Cancellation tests
+// ============================================================================
+
+TEST_F(E2EWorkerTest, E2EDelete_CancelStopsProcessing)
+{
+    auto f1 = CreateSourceFile(L"file1.txt", "aaa");
+    auto f2 = CreateSourceFile(L"file2.txt", "bbb");
+    auto f3 = CreateSourceFile(L"file3.txt", "ccc");
+
+    auto snap = MakeDeleteSnapshot({
+        {L"file1.txt", false},
+        {L"file2.txt", false},
+        {L"file3.txt", false},
+    });
+
+    CTestWorkerObserver obs;
+    obs.SetFileErrorPolicy(TestDialogPolicy::kSkipAll);
+
+    // Cancel after first SetOperationInfo call
+    // We modify ExecuteSnapshot behavior by cancelling from within the observer.
+    // Since we can't hook mid-loop, cancel before starting and verify nothing happens.
+    obs.Cancel();
+
+    bool ok = ExecuteSnapshot(snap, obs);
+
+    // Operation should report no error (cancelled, not failed)
+    // All files should still exist since cancel was set before processing
+    EXPECT_TRUE(fs::exists(f1));
+    EXPECT_TRUE(fs::exists(f2));
+    EXPECT_TRUE(fs::exists(f3));
+    // No SetOperationInfo calls since loop body is skipped when cancelled
+    EXPECT_EQ(obs.CountCallsOfType(TestObserverCall::kSetOperationInfo), 0);
+}
+
+// ============================================================================
+// p11h — Error handling and skip policy tests
+// ============================================================================
+
+TEST_F(E2EWorkerTest, E2EDelete_SkipLockedFile)
+{
+    auto f1 = CreateSourceFile(L"normal.txt", "aaa");
+    auto f2 = CreateSourceFile(L"locked.txt", "bbb");
+    auto f3 = CreateSourceFile(L"also_normal.txt", "ccc");
+
+    // Lock f2 by opening it exclusively
+    HANDLE hLock = CreateFileW(f2.c_str(), GENERIC_READ | GENERIC_WRITE,
+                               0, // no sharing
+                               NULL, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, NULL);
+    ASSERT_NE(hLock, INVALID_HANDLE_VALUE) << "Failed to lock file";
+
+    auto snap = MakeDeleteSnapshot({
+        {L"normal.txt", false},
+        {L"locked.txt", false},
+        {L"also_normal.txt", false},
+    });
+    CTestWorkerObserver obs;
+    obs.SetFileErrorPolicy(TestDialogPolicy::kSkipAll);
+
+    bool ok = ExecuteSnapshot(snap, obs);
+
+    CloseHandle(hLock); // release lock
+
+    EXPECT_TRUE(ok); // skip policy means no overall error
+    EXPECT_FALSE(fs::exists(f1));        // deleted
+    EXPECT_TRUE(fs::exists(f2));         // skipped (was locked)
+    EXPECT_FALSE(fs::exists(f3));        // deleted
+    EXPECT_GE(obs.CountCallsOfType(TestObserverCall::kAskFileError), 1);
+}
+
+TEST_F(E2EWorkerTest, E2EDelete_CancelOnError)
+{
+    auto f1 = CreateSourceFile(L"first.txt", "aaa");
+    auto f2 = CreateSourceFile(L"locked.txt", "bbb");
+    auto f3 = CreateSourceFile(L"third.txt", "ccc");
+
+    // Lock f2 by opening it exclusively
+    HANDLE hLock = CreateFileW(f2.c_str(), GENERIC_READ | GENERIC_WRITE,
+                               0, NULL, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, NULL);
+    ASSERT_NE(hLock, INVALID_HANDLE_VALUE);
+
+    auto snap = MakeDeleteSnapshot({
+        {L"first.txt", false},
+        {L"locked.txt", false},
+        {L"third.txt", false},
+    });
+    CTestWorkerObserver obs;
+    obs.SetFileErrorPolicy(TestDialogPolicy::kCancel); // cancel on first error
+
+    bool ok = ExecuteSnapshot(snap, obs);
+
+    CloseHandle(hLock);
+
+    EXPECT_FALSE(ok);                     // cancelled
+    EXPECT_FALSE(fs::exists(f1));         // deleted (before error)
+    EXPECT_TRUE(fs::exists(f2));          // locked, triggered cancel
+    EXPECT_TRUE(fs::exists(f3));          // not reached due to cancel
+    EXPECT_EQ(obs.CountCallsOfType(TestObserverCall::kAskFileError), 1);
+}
+
+// ============================================================================
+// p11i — Copy directory and overwrite tests
+// ============================================================================
+
+TEST_F(E2EWorkerTest, E2ECopy_DirectoryRecursive)
+{
+    auto dir = CreateSourceDir(L"topdir");
+    CreateSourceFile(L"topdir\\a.txt", "file_a");
+    CreateSourceFile(L"topdir\\b.txt", "file_b");
+    CreateSourceDir(L"topdir\\sub1");
+    CreateSourceFile(L"topdir\\sub1\\c.txt", "file_c");
+    CreateSourceDir(L"topdir\\sub1\\deep");
+    CreateSourceFile(L"topdir\\sub1\\deep\\d.txt", "file_d");
+
+    auto snap = MakeCopySnapshot({{L"topdir", true}});
+    CTestWorkerObserver obs;
+    obs.SetFileErrorPolicy(TestDialogPolicy::kSkipAll);
+
+    bool ok = ExecuteSnapshot(snap, obs);
+
+    EXPECT_TRUE(ok);
+    // Source still intact
+    EXPECT_TRUE(fs::exists(m_srcDir / L"topdir\\a.txt"));
+    EXPECT_TRUE(fs::exists(m_srcDir / L"topdir\\sub1\\deep\\d.txt"));
+    // Copies created
+    EXPECT_TRUE(fs::exists(m_dstDir / L"topdir\\a.txt"));
+    EXPECT_TRUE(fs::exists(m_dstDir / L"topdir\\b.txt"));
+    EXPECT_TRUE(fs::exists(m_dstDir / L"topdir\\sub1\\c.txt"));
+    EXPECT_TRUE(fs::exists(m_dstDir / L"topdir\\sub1\\deep\\d.txt"));
+    // Content matches
+    EXPECT_EQ(ReadFileContent(m_dstDir / L"topdir\\a.txt"), "file_a");
+    EXPECT_EQ(ReadFileContent(m_dstDir / L"topdir\\sub1\\deep\\d.txt"), "file_d");
+}
+
+TEST_F(E2EWorkerTest, E2EMove_DirectoryRecursive)
+{
+    CreateSourceDir(L"movedir");
+    CreateSourceFile(L"movedir\\x.txt", "data_x");
+    CreateSourceDir(L"movedir\\inner");
+    CreateSourceFile(L"movedir\\inner\\y.txt", "data_y");
+
+    auto snap = MakeMoveSnapshot({{L"movedir", true}});
+    CTestWorkerObserver obs;
+    obs.SetFileErrorPolicy(TestDialogPolicy::kSkipAll);
+
+    bool ok = ExecuteSnapshot(snap, obs);
+
+    EXPECT_TRUE(ok);
+    // Source directory should be gone
+    EXPECT_FALSE(fs::exists(m_srcDir / L"movedir"));
+    // Targets exist
+    EXPECT_TRUE(fs::exists(m_dstDir / L"movedir\\x.txt"));
+    EXPECT_TRUE(fs::exists(m_dstDir / L"movedir\\inner\\y.txt"));
+    EXPECT_EQ(ReadFileContent(m_dstDir / L"movedir\\x.txt"), "data_x");
+    EXPECT_EQ(ReadFileContent(m_dstDir / L"movedir\\inner\\y.txt"), "data_y");
+}
+
+TEST_F(E2EWorkerTest, E2ECopy_OverwriteExistingFile)
+{
+    // Create source and pre-existing target with different content
+    CreateSourceFile(L"overwrite_me.txt", "new content");
+
+    // Pre-create target
+    fs::path dstFile = m_dstDir / L"overwrite_me.txt";
+    {
+        HANDLE hFile = CreateFileW(dstFile.c_str(), GENERIC_WRITE, 0, NULL,
+                                   CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL, NULL);
+        ASSERT_NE(hFile, INVALID_HANDLE_VALUE);
+        const char* old = "old content";
+        DWORD written;
+        WriteFile(hFile, old, (DWORD)strlen(old), &written, NULL);
+        CloseHandle(hFile);
+    }
+    ASSERT_EQ(ReadFileContent(dstFile), "old content");
+
+    auto snap = MakeCopySnapshot({{L"overwrite_me.txt", false}});
+    CTestWorkerObserver obs;
+    obs.SetFileErrorPolicy(TestDialogPolicy::kSkipAll);
+    obs.SetOverwritePolicy(TestDialogPolicy::kYes);
+
+    bool ok = ExecuteSnapshot(snap, obs);
+
+    EXPECT_TRUE(ok);
+    // CopyFileW with failIfExists=FALSE overwrites automatically,
+    // so the custom helper doesn't trigger AskOverwrite.
+    // The target should have the new content.
+    EXPECT_EQ(ReadFileContent(dstFile), "new content");
+}
+
+TEST_F(E2EWorkerTest, E2ECopy_SkipOnOverwrite)
+{
+    // Create source file
+    CreateSourceFile(L"keep_old.txt", "new data");
+
+    // Pre-create target with old content
+    fs::path dstFile = m_dstDir / L"keep_old.txt";
+    {
+        HANDLE hFile = CreateFileW(dstFile.c_str(), GENERIC_WRITE, 0, NULL,
+                                   CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL, NULL);
+        ASSERT_NE(hFile, INVALID_HANDLE_VALUE);
+        const char* old = "old data";
+        DWORD written;
+        WriteFile(hFile, old, (DWORD)strlen(old), &written, NULL);
+        CloseHandle(hFile);
+    }
+
+    // Make target read-only to trigger error on overwrite
+    SetFileAttributesW(dstFile.c_str(), FILE_ATTRIBUTE_READONLY);
+
+    auto snap = MakeCopySnapshot({{L"keep_old.txt", false}});
+    CTestWorkerObserver obs;
+    obs.SetFileErrorPolicy(TestDialogPolicy::kSkip);
+
+    bool ok = ExecuteSnapshot(snap, obs);
+
+    // Restore attributes for cleanup
+    SetFileAttributesW(dstFile.c_str(), FILE_ATTRIBUTE_NORMAL);
+
+    EXPECT_TRUE(ok);
+    // Target should still have old content since copy was skipped
+    EXPECT_EQ(ReadFileContent(dstFile), "old data");
+    // Error should have been reported
+    EXPECT_GE(obs.CountCallsOfType(TestObserverCall::kAskFileError), 1);
+}
+
+// ============================================================================
+// p11j — Mixed Unicode scripts (CJK, RTL, combining marks)
+// ============================================================================
+
+TEST_F(E2EWorkerTest, E2ECopy_MixedScripts)
+{
+    // Chinese: 复制.txt
+    auto f1 = CreateSourceFile(L"\x590D\x5236.txt", "chinese");
+    // Arabic: ملف.txt
+    auto f2 = CreateSourceFile(L"\x0645\x0644\x0641.txt", "arabic");
+    // Korean: 파일.txt
+    auto f3 = CreateSourceFile(L"\xD30C\xC77C.txt", "korean");
+
+    auto snap = MakeCopySnapshot({
+        {L"\x590D\x5236.txt", false},
+        {L"\x0645\x0644\x0641.txt", false},
+        {L"\xD30C\xC77C.txt", false},
+    });
+    CTestWorkerObserver obs;
+    obs.SetFileErrorPolicy(TestDialogPolicy::kSkipAll);
+
+    bool ok = ExecuteSnapshot(snap, obs);
+
+    EXPECT_TRUE(ok);
+    EXPECT_TRUE(fs::exists(m_dstDir / L"\x590D\x5236.txt"));
+    EXPECT_TRUE(fs::exists(m_dstDir / L"\x0645\x0644\x0641.txt"));
+    EXPECT_TRUE(fs::exists(m_dstDir / L"\xD30C\xC77C.txt"));
+    EXPECT_EQ(ReadFileContent(m_dstDir / L"\x590D\x5236.txt"), "chinese");
+    EXPECT_EQ(ReadFileContent(m_dstDir / L"\x0645\x0644\x0641.txt"), "arabic");
+    EXPECT_EQ(ReadFileContent(m_dstDir / L"\xD30C\xC77C.txt"), "korean");
+}
