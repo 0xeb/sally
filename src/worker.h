@@ -682,4 +682,5 @@ typedef struct
 BOOL CheckFileOrDirADS(const char* fileName, BOOL isDir, CQuadWord* adsSize, wchar_t*** streamNames,
                        int* streamNamesCount, BOOL* lowMemory, DWORD* winError,
                        DWORD bytesPerCluster, CQuadWord* adsOccupiedSpace,
-                       BOOL* onlyDiscardableStreams);
+                       BOOL* onlyDiscardableStreams,
+                       const std::wstring& fileNameW = std::wstring());

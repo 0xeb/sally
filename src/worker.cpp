@@ -2187,7 +2187,8 @@ DWORD MyEncryptFileW(IWorkerObserver& observer, const wchar_t* fileName, const c
 BOOL CheckFileOrDirADS(const char* fileName, BOOL isDir, CQuadWord* adsSize, wchar_t*** streamNames,
                        int* streamNamesCount, BOOL* lowMemory, DWORD* winError,
                        DWORD bytesPerCluster, CQuadWord* adsOccupiedSpace,
-                       BOOL* onlyDiscardableStreams)
+                       BOOL* onlyDiscardableStreams,
+                       const std::wstring& fileNameW)
 {
     if (adsSize != NULL)
         adsSize->SetUI64(0);
@@ -2208,13 +2209,25 @@ BOOL CheckFileOrDirADS(const char* fileName, BOOL isDir, CQuadWord* adsSize, wch
     {
         // if the path ends with a space or dot, we must append '\\', otherwise CreateFile
         // trims the spaces/dots and works with a different path
-        const char* fileNameCrFile = fileName;
-        CPathBuffer fileNameCrFileCopy; // Heap-allocated for long path support
-        MakeCopyWithBackslashIfNeeded(fileNameCrFile, fileNameCrFileCopy);
-
-        HANDLE file = SalCreateFileH(fileNameCrFile, 0, FILE_SHARE_READ | FILE_SHARE_WRITE,
-                                     NULL, OPEN_EXISTING,
-                                     isDir ? FILE_FLAG_BACKUP_SEMANTICS : 0, NULL);
+        HANDLE file;
+        if (!fileNameW.empty())
+        {
+            std::wstring fileNameCrFileW = MakeCopyWithBackslashIfNeededW(fileNameW.c_str());
+            file = CreateFileW(fileNameCrFileW.c_str(), 0, FILE_SHARE_READ | FILE_SHARE_WRITE,
+                               NULL, OPEN_EXISTING,
+                               isDir ? FILE_FLAG_BACKUP_SEMANTICS : 0, NULL);
+            DWORD openErr = GetLastError();
+            HANDLES_ADD_EX(__otQuiet, file != INVALID_HANDLE_VALUE, __htFile, __hoCreateFile, file, openErr, TRUE);
+        }
+        else
+        {
+            const char* fileNameCrFile = fileName;
+            CPathBuffer fileNameCrFileCopy; // Heap-allocated for long path support
+            MakeCopyWithBackslashIfNeeded(fileNameCrFile, fileNameCrFileCopy);
+            file = SalCreateFileH(fileNameCrFile, 0, FILE_SHARE_READ | FILE_SHARE_WRITE,
+                                  NULL, OPEN_EXISTING,
+                                  isDir ? FILE_FLAG_BACKUP_SEMANTICS : 0, NULL);
+        }
         if (file == INVALID_HANDLE_VALUE)
         {
             if (winError != NULL)
@@ -2651,7 +2664,8 @@ BOOL CheckTailOfOutFile(CAsyncCopyParams* asyncPar, HANDLE in, HANDLE out, const
 // open HANDLEs — COperation wrapping not applicable here
 BOOL DoCopyADS(IWorkerObserver& observer, const char* sourceName, BOOL isDir, const char* targetName,
                CQuadWord const& totalDone, CQuadWord& operDone, CQuadWord const& operTotal,
-               CWorkerState& workerState, COperations* script, BOOL* skip, void* buffer)
+               CWorkerState& workerState, COperations* script, BOOL* skip, void* buffer,
+               const std::wstring& sourceNameW = std::wstring())
 {
     BOOL doCopyADSRet = TRUE;
     BOOL lowMemory;
@@ -2668,7 +2682,7 @@ BOOL DoCopyADS(IWorkerObserver& observer, const char* sourceName, BOOL isDir, co
 COPY_ADS_AGAIN:
 
     if (CheckFileOrDirADS(sourceName, isDir, NULL, &streamNames, &streamNamesCount,
-                          &lowMemory, &adsWinError, 0, NULL, NULL) &&
+                          &lowMemory, &adsWinError, 0, NULL, NULL, sourceNameW) &&
         !lowMemory && streamNames != NULL)
     {                                  // we have the list of ADS, let's try to copy them to the target file/directory
         CWidePathBuffer srcName;       // Heap-allocated for long path + ADS name support
@@ -5175,7 +5189,8 @@ COPY_AGAIN:
                             operDone = COPY_MIN_FILE_SIZE; // zero/small files take at least as long as files of size COPY_MIN_FILE_SIZE
                         BOOL adsSkip = FALSE;
                         if (!DoCopyADS(observer, op->SourceName, FALSE, op->TargetName, totalDone,
-                                       operDone, op->Size, workerState, script, &adsSkip, buffer) ||
+                                       operDone, op->Size, workerState, script, &adsSkip, buffer,
+                                       op->SourceNameW) ||
                             adsSkip) // user hit cancel or skipped at least one ADS
                         {
                             if (out != NULL)
