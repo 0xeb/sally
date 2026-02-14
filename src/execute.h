@@ -217,6 +217,10 @@ BOOL ExpandInitDir(HWND msgParent, const char* name, const char* dosName, const 
 BOOL ExpandCommand(HWND msgParent, const char* varText, char* buffer, int bufferLen,
                    BOOL ignoreEnvVarNotFoundOrTooLong);
 
+// Wide version of ExpandCommand — returns expanded string or empty on failure
+std::wstring ExpandCommandW(HWND msgParent, const char* varText,
+                            BOOL ignoreEnvVarNotFoundOrTooLong = FALSE);
+
 // Expands varText containing environment variables and stores the result in buffer
 // msgParent - parent of the message box for errors; if NULL, errors are not shown
 BOOL ExpandHotPath(HWND msgParent, const char* varText, char* buffer, int bufferLen,

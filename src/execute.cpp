@@ -1941,6 +1941,15 @@ BOOL ExpandCommand(HWND msgParent, const char* varText, char* buffer, int buffer
         return FALSE;
 }
 
+std::wstring ExpandCommandW(HWND msgParent, const char* varText,
+                            BOOL ignoreEnvVarNotFoundOrTooLong)
+{
+    CPathBuffer buffer;
+    if (ExpandCommand(msgParent, varText, buffer, buffer.Size(), ignoreEnvVarNotFoundOrTooLong))
+        return AnsiToWide(buffer);
+    return L"";
+}
+
 BOOL ExpandHotPath(HWND msgParent, const char* varText, char* buffer, int bufferLen,
                    BOOL ignoreEnvVarNotFoundOrTooLong)
 {
