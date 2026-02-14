@@ -836,6 +836,24 @@ BOOL COperation::AreSourceAndTargetSamePath() const
     }
 }
 
+// FindFirstFile for target path - always returns wide find data
+HANDLE COperation::FindFirstTarget(WIN32_FIND_DATAW* findData) const
+{
+    if (HasWideTarget())
+        return FindFirstFileW(TargetNameW.c_str(), findData);
+    else
+        return SalFindFirstFileHW(TargetName, findData);
+}
+
+// FindFirstFile for source path - always returns wide find data
+HANDLE COperation::FindFirstSource(WIN32_FIND_DATAW* findData) const
+{
+    if (HasWideSource())
+        return FindFirstFileW(SourceNameW.c_str(), findData);
+    else
+        return SalFindFirstFileHW(SourceName, findData);
+}
+
 // Wraps CreateFileW + DeviceIoControl(FSCTL_SET_COMPRESSION) for platform abstraction.
 DWORD COperation::SetCompressionW(const wchar_t* path, USHORT compressionFormat)
 {
@@ -1617,32 +1635,28 @@ void GetDirInfo(char* buffer, const char* dir)
     GetDirInfoW(buffer, AnsiToWide(dir).c_str());
 }
 
-BOOL IsDirectoryEmpty(const char* name) // directories/subdirectories contain no files
+BOOL IsDirectoryEmptyW(const wchar_t* name) // directories/subdirectories contain no files
 {
-    CPathBuffer dir;
-    int len = (int)strlen(name);
-    memcpy(dir, name, len);
-    if (dir[len - 1] != '\\')
-        dir[len++] = '\\';
-    char* end = dir + len;
-    strcpy(end, "*");
+    std::wstring dir(name);
+    if (!dir.empty() && dir.back() != L'\\')
+        dir += L'\\';
+    std::wstring pattern = dir + L"*";
 
-    WIN32_FIND_DATA fileData;
-    HANDLE search;
-    search = SalFindFirstFileH(dir, &fileData);
+    WIN32_FIND_DATAW fileData;
+    HANDLE search = FindFirstFileW(pattern.c_str(), &fileData);
     if (search != INVALID_HANDLE_VALUE)
     {
         do
         {
             if (fileData.cFileName[0] == 0 ||
-                fileData.cFileName[0] == '.' && (fileData.cFileName[1] == 0 ||
-                                                 fileData.cFileName[1] == '.' && fileData.cFileName[2] == 0))
+                fileData.cFileName[0] == L'.' && (fileData.cFileName[1] == 0 ||
+                                                   fileData.cFileName[1] == L'.' && fileData.cFileName[2] == 0))
                 continue;
 
             if (fileData.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY)
             {
-                strcpy(end, fileData.cFileName);
-                if (!IsDirectoryEmpty(dir)) // the subdirectory is not empty
+                std::wstring subDir = dir + fileData.cFileName;
+                if (!IsDirectoryEmptyW(subDir.c_str())) // the subdirectory is not empty
                 {
                     HANDLES(FindClose(search));
                     return FALSE;
@@ -1653,10 +1667,16 @@ BOOL IsDirectoryEmpty(const char* name) // directories/subdirectories contain no
                 HANDLES(FindClose(search)); // a file exists here
                 return FALSE;
             }
-        } while (FindNextFile(search, &fileData));
+        } while (FindNextFileW(search, &fileData));
         HANDLES(FindClose(search));
     }
     return TRUE;
+}
+
+// ANSI wrapper — delegates to wide version
+BOOL IsDirectoryEmpty(const char* name)
+{
+    return IsDirectoryEmptyW(AnsiToWide(name).c_str());
 }
 
 BOOL CurrentProcessTokenUserValid = FALSE;
@@ -3376,16 +3396,20 @@ HANDLE SalCreateFileEx(const char* fileName, DWORD desiredAccess,
             err == ERROR_ALREADY_EXISTS ||
             err == ERROR_ACCESS_DENIED)
         {
-            WIN32_FIND_DATA data;
-            HANDLE find = SalFindFirstFileH(fileName, &data);
+            WIN32_FIND_DATAW data;
+            HANDLE find = SalFindFirstFileHW(fileName, &data);
             if (find != INVALID_HANDLE_VALUE)
             {
                 HANDLES(FindClose(find));
                 if (err != ERROR_ACCESS_DENIED || (data.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY))
                 {
                     const char* tgtName = SalPathFindFileName(fileName);
-                    if (StrICmp(tgtName, data.cAlternateFileName) == 0 && // match only for DOS name
-                        StrICmp(tgtName, data.cFileName) != 0)            // (full name differs)
+                    char cFileNameA[MAX_PATH];
+                    char cAltNameA[14];
+                    WideCharToMultiByte(CP_ACP, 0, data.cFileName, -1, cFileNameA, MAX_PATH, NULL, NULL);
+                    WideCharToMultiByte(CP_ACP, 0, data.cAlternateFileName, -1, cAltNameA, 14, NULL, NULL);
+                    if (StrICmp(tgtName, cAltNameA) == 0 &&    // match only for DOS name
+                        StrICmp(tgtName, cFileNameA) != 0)     // (full name differs)
                     {
                         // rename ("tidy up") the file/directory with the conflicting DOS name to a temporary 8.3 name (no extra DOS name needed)
                         CPathBuffer tmpName;
@@ -3394,7 +3418,7 @@ HANDLE SalCreateFileEx(const char* fileName, DWORD desiredAccess,
                         SalPathAddBackslash(tmpName, tmpName.Size());
                         char* tmpNamePart = tmpName + strlen(tmpName);
                         CPathBuffer origFullName; // Heap-allocated for long path support
-                        if (SalPathAppend(tmpName, data.cFileName, tmpName.Size()))
+                        if (SalPathAppend(tmpName, cFileNameA, tmpName.Size()))
                         {
                             strcpy(origFullName, tmpName);
                             DWORD num = (GetTickCount() / 10) % 0xFFF;
@@ -3579,20 +3603,23 @@ void SetCompressAndEncryptedAttrs(const char* name, DWORD attr, HANDLE* out, BOO
     }
 }
 
-void CorrectCaseOfTgtName(char* tgtName, BOOL dataRead, WIN32_FIND_DATA* data)
+void CorrectCaseOfTgtName(char* tgtName, BOOL dataRead, WIN32_FIND_DATAW* data)
 {
     if (!dataRead)
     {
-        HANDLE find = SalFindFirstFileH(tgtName, data);
+        HANDLE find = SalFindFirstFileHW(tgtName, data);
         if (find != INVALID_HANDLE_VALUE)
             HANDLES(FindClose(find));
         else
             return; // failed to read data for the target file; abort
     }
-    int len = (int)strlen(data->cFileName);
+    // data->cFileName is wchar_t[] — convert to ANSI for the tgtName buffer
+    char ansiFileName[MAX_PATH];
+    WideCharToMultiByte(CP_ACP, 0, data->cFileName, -1, ansiFileName, MAX_PATH, NULL, NULL);
+    int len = (int)strlen(ansiFileName);
     int tgtNameLen = (int)strlen(tgtName);
-    if (tgtNameLen >= len && StrICmp(tgtName + tgtNameLen - len, data->cFileName) == 0)
-        memcpy(tgtName + tgtNameLen - len, data->cFileName, len);
+    if (tgtNameLen >= len && StrICmp(tgtName + tgtNameLen - len, ansiFileName) == 0)
+        memcpy(tgtName + tgtNameLen - len, ansiFileName, len);
 }
 
 void SetTFSandPSforSkippedFile(COperation* op, CQuadWord& lastTransferredFileSize,
@@ -4881,12 +4908,12 @@ BOOL DoCopyFile(COperation* op, IWorkerObserver& observer, void* buffer,
     // slowing down when the file is newer is 5%, so it should be well worth it
     // (it is safe to assume the user enables "Overwrite Older" when the skips occur)
     BOOL tgtNameCaseCorrected = FALSE; // TRUE = the letter case in the target name was already adjusted to match the existing target file (so overwriting does not change it)
-    WIN32_FIND_DATA dataIn, dataOut;
+    WIN32_FIND_DATAW dataIn, dataOut;
     if ((op->OpFlags & OPFL_OVERWROLDERALRTESTED) == 0 &&
         !invalidSrcName && !invalidTgtName && script->OverwriteOlder)
     {
         HANDLE find;
-        find = SalFindFirstFileH(op->TargetName, &dataOut);
+        find = op->FindFirstTarget(&dataOut);
         if (find != INVALID_HANDLE_VALUE)
         {
             HANDLES(FindClose(find));
@@ -4895,10 +4922,12 @@ BOOL DoCopyFile(COperation* op, IWorkerObserver& observer, void* buffer,
             tgtNameCaseCorrected = TRUE;
 
             const char* tgtName = SalPathFindFileName(op->TargetName);
-            if (StrICmp(tgtName, dataOut.cFileName) == 0 &&                 // ensure it is not just a DOS-name match (that would change the DOS-name instead of overwriting)
+            char cFileNameA[MAX_PATH];
+            WideCharToMultiByte(CP_ACP, 0, dataOut.cFileName, -1, cFileNameA, MAX_PATH, NULL, NULL);
+            if (StrICmp(tgtName, cFileNameA) == 0 &&                        // ensure it is not just a DOS-name match (that would change the DOS-name instead of overwriting)
                 (dataOut.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY) == 0) // ensure it is not a directory (overwrite-older cannot help there)
             {
-                find = SalFindFirstFileH(op->SourceName, &dataIn);
+                find = op->FindFirstSource(&dataIn);
                 if (find != INVALID_HANDLE_VALUE)
                 {
                     HANDLES(FindClose(find));
@@ -6139,14 +6168,18 @@ BOOL DoMoveFile(COperation* op, IWorkerObserver& observer, void* buffer,
                      err == ERROR_ALREADY_EXISTS) &&
                     targetNameMvDir == op->TargetName) // no invalid names are allowed here
                 {
-                    WIN32_FIND_DATA findData;
-                    HANDLE find = SalFindFirstFileH(op->TargetName, &findData);
+                    WIN32_FIND_DATAW findData;
+                    HANDLE find = op->FindFirstTarget(&findData);
                     if (find != INVALID_HANDLE_VALUE)
                     {
                         HANDLES(FindClose(find));
                         const char* tgtName = SalPathFindFileName(op->TargetName);
-                        if (StrICmp(tgtName, findData.cAlternateFileName) == 0 && // match only on the DOS name
-                            StrICmp(tgtName, findData.cFileName) != 0)            // (the full name is different)
+                        char cFileNameA[MAX_PATH];
+                        char cAltNameA[14];
+                        WideCharToMultiByte(CP_ACP, 0, findData.cFileName, -1, cFileNameA, MAX_PATH, NULL, NULL);
+                        WideCharToMultiByte(CP_ACP, 0, findData.cAlternateFileName, -1, cAltNameA, 14, NULL, NULL);
+                        if (StrICmp(tgtName, cAltNameA) == 0 &&    // match only on the DOS name
+                            StrICmp(tgtName, cFileNameA) != 0)     // (the full name is different)
                         {
                             // rename ("tidy up") the file/directory with the conflicting DOS name to a temporary 8.3 name (does not need an extra DOS name)
                             CPathBuffer tmpName;
@@ -6155,7 +6188,7 @@ BOOL DoMoveFile(COperation* op, IWorkerObserver& observer, void* buffer,
                             SalPathAddBackslash(tmpName, tmpName.Size());
                             char* tmpNamePart = tmpName + strlen(tmpName);
                             CPathBuffer origFullName; // Heap-allocated for long path support
-                            if (SalPathAppend(tmpName, findData.cFileName, tmpName.Size()))
+                            if (SalPathAppend(tmpName, cFileNameA, tmpName.Size()))
                             {
                                 strcpy(origFullName, tmpName);
                                 DWORD num = (GetTickCount() / 10) % 0xFFF;
@@ -6666,14 +6699,18 @@ BOOL SalCreateDirectoryEx(const char* name, DWORD* err)
             (errLoc == ERROR_FILE_EXISTS || // check whether this is only overwriting the file's DOS name
              errLoc == ERROR_ALREADY_EXISTS))
         {
-            WIN32_FIND_DATA data;
-            HANDLE find = SalFindFirstFileH(name, &data);
+            WIN32_FIND_DATAW data;
+            HANDLE find = SalFindFirstFileHW(name, &data);
             if (find != INVALID_HANDLE_VALUE)
             {
                 HANDLES(FindClose(find));
                 const char* tgtName = SalPathFindFileName(name);
-                if (StrICmp(tgtName, data.cAlternateFileName) == 0 && // match only for the DOS name
-                    StrICmp(tgtName, data.cFileName) != 0)            // (the full name differs)
+                char cFileNameA[MAX_PATH];
+                char cAltNameA[14];
+                WideCharToMultiByte(CP_ACP, 0, data.cFileName, -1, cFileNameA, MAX_PATH, NULL, NULL);
+                WideCharToMultiByte(CP_ACP, 0, data.cAlternateFileName, -1, cAltNameA, 14, NULL, NULL);
+                if (StrICmp(tgtName, cAltNameA) == 0 &&    // match only for the DOS name
+                    StrICmp(tgtName, cFileNameA) != 0)     // (the full name differs)
                 {
                     // rename ("tidy up") the file/directory whose DOS name conflicts to a temporary 8.3 name (no extra DOS name needed)
                     CPathBuffer tmpName;
@@ -6682,7 +6719,7 @@ BOOL SalCreateDirectoryEx(const char* name, DWORD* err)
                     SalPathAddBackslash(tmpName, tmpName.Size());
                     char* tmpNamePart = tmpName + strlen(tmpName);
                     CPathBuffer origFullName; // Heap-allocated for long path support
-                    if (SalPathAppend(tmpName, data.cFileName, tmpName.Size()))
+                    if (SalPathAppend(tmpName, cFileNameA, tmpName.Size()))
                     {
                         strcpy(origFullName, tmpName);
                         DWORD num = (GetTickCount() / 10) % 0xFFF;

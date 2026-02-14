@@ -334,6 +334,8 @@ struct COperation
     BOOL IsTargetNameInvalid(BOOL ignInvalidName = FALSE) const;
     BOOL HasSameRootPath() const;
     BOOL AreSourceAndTargetSamePath() const;
+    HANDLE FindFirstTarget(WIN32_FIND_DATAW* findData) const;
+    HANDLE FindFirstSource(WIN32_FIND_DATAW* findData) const;
 
     // Platform-abstracted helpers for compression and file time preservation.
     // Static because they operate on arbitrary paths, not on SourceName/TargetName.

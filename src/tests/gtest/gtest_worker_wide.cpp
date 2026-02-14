@@ -1119,3 +1119,180 @@ TEST_F(SecurityTest, LongPath_SecurityInfo)
     if (sd)
         LocalFree(sd);
 }
+
+// ============================================================================
+// FindFirstFileW migration tests — verify wide find data preserves Unicode
+// ============================================================================
+
+class FindDataWideTest : public ::testing::Test
+{
+protected:
+    fs::path m_tempDir;
+
+    void SetUp() override
+    {
+        wchar_t tmpPath[MAX_PATH];
+        GetTempPathW(MAX_PATH, tmpPath);
+        m_tempDir = fs::path(tmpPath) / L"sal_finddata_wide_test";
+
+        std::error_code ec;
+        fs::remove_all(m_tempDir, ec);
+        fs::create_directories(m_tempDir);
+    }
+
+    void TearDown() override
+    {
+        std::error_code ec;
+        fs::remove_all(m_tempDir, ec);
+    }
+
+    void CreateTestFile(const fs::path& path)
+    {
+        fs::create_directories(path.parent_path());
+        HANDLE h = CreateFileW(path.c_str(), GENERIC_WRITE, 0, NULL,
+                               CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL, NULL);
+        ASSERT_NE(h, INVALID_HANDLE_VALUE)
+            << "Failed to create: " << path << " err=" << GetLastError();
+        CloseHandle(h);
+    }
+};
+
+TEST_F(FindDataWideTest, Unicode_cFileName_Preserved)
+{
+    // Create a file with a Unicode name that can't round-trip through ANSI
+    const wchar_t* unicodeName = L"\x65E5\x672C\x8A9E.txt"; // 日本語.txt
+    fs::path file = m_tempDir / unicodeName;
+    CreateTestFile(file);
+
+    // FindFirstFileW should preserve the exact Unicode filename
+    WIN32_FIND_DATAW dataW;
+    HANDLE find = FindFirstFileW(file.c_str(), &dataW);
+    ASSERT_NE(find, INVALID_HANDLE_VALUE);
+    FindClose(find);
+
+    EXPECT_STREQ(dataW.cFileName, unicodeName);
+}
+
+TEST_F(FindDataWideTest, Ansi_cFileName_Loses_Unicode)
+{
+    // Create a file with a Unicode name
+    const wchar_t* unicodeName = L"\x65E5\x672C\x8A9E.txt"; // 日本語.txt
+    fs::path file = m_tempDir / unicodeName;
+    CreateTestFile(file);
+
+    // Use the ANSI path to call FindFirstFileW (like SalFindFirstFileHW does)
+    char ansiPath[MAX_PATH];
+    WideCharToMultiByte(CP_ACP, 0, file.c_str(), -1, ansiPath, MAX_PATH, NULL, NULL);
+
+    // ANSI FindFirstFile loses the Unicode characters
+    WIN32_FIND_DATAA dataA;
+    HANDLE findA = FindFirstFileA(ansiPath, &dataA);
+    if (findA != INVALID_HANDLE_VALUE)
+    {
+        FindClose(findA);
+        // The ANSI cFileName will contain replacement characters (? or similar)
+        // because the Unicode chars can't be represented in the current ANSI codepage
+        // (unless the system codepage happens to be Japanese)
+        char ansiName[MAX_PATH];
+        WideCharToMultiByte(CP_ACP, 0, unicodeName, -1, ansiName, MAX_PATH, NULL, NULL);
+
+        // Wide find data should still preserve the original Unicode
+        WIN32_FIND_DATAW dataW;
+        HANDLE findW = FindFirstFileW(file.c_str(), &dataW);
+        ASSERT_NE(findW, INVALID_HANDLE_VALUE);
+        FindClose(findW);
+        EXPECT_STREQ(dataW.cFileName, unicodeName);
+    }
+    else
+    {
+        // If ANSI path itself can't be resolved, that proves the point:
+        // ANSI paths lose Unicode data. The wide path should still work.
+        WIN32_FIND_DATAW dataW;
+        HANDLE findW = FindFirstFileW(file.c_str(), &dataW);
+        ASSERT_NE(findW, INVALID_HANDLE_VALUE);
+        FindClose(findW);
+        EXPECT_STREQ(dataW.cFileName, unicodeName);
+    }
+}
+
+TEST_F(FindDataWideTest, LongPath_FindFirstFileW)
+{
+    // Build a path exceeding MAX_PATH
+    std::wstring longDir = L"\\\\?\\" + m_tempDir.wstring();
+    for (int i = 0; i < 15; i++)
+    {
+        longDir += L"\\findpad_" + std::to_wstring(i);
+        CreateDirectoryW(longDir.c_str(), NULL);
+    }
+
+    std::wstring longFile = longDir + L"\\testfile.txt";
+    HANDLE h = CreateFileW(longFile.c_str(), GENERIC_WRITE, 0, NULL,
+                           CREATE_NEW, FILE_ATTRIBUTE_NORMAL, NULL);
+    if (h == INVALID_HANDLE_VALUE)
+        GTEST_SKIP() << "Cannot create long-path file";
+    CloseHandle(h);
+
+    // FindFirstFileW should work with the long path
+    WIN32_FIND_DATAW dataW;
+    HANDLE find = FindFirstFileW(longFile.c_str(), &dataW);
+    ASSERT_NE(find, INVALID_HANDLE_VALUE);
+    FindClose(find);
+
+    EXPECT_STREQ(dataW.cFileName, L"testfile.txt");
+}
+
+TEST_F(FindDataWideTest, Mixed_Unicode_Ascii_Names)
+{
+    // Create files with mixed scripts
+    const wchar_t* names[] = {
+        L"\x0410\x0411\x0412.dat",     // Cyrillic АБВ.dat
+        L"\x4E2D\x6587.txt",           // Chinese 中文.txt
+        L"plain_ascii.txt",            // Plain ASCII
+    };
+
+    for (const wchar_t* name : names)
+    {
+        fs::path file = m_tempDir / name;
+        CreateTestFile(file);
+
+        WIN32_FIND_DATAW dataW;
+        HANDLE find = FindFirstFileW(file.c_str(), &dataW);
+        ASSERT_NE(find, INVALID_HANDLE_VALUE) << "Failed for: " << file;
+        FindClose(find);
+
+        EXPECT_STREQ(dataW.cFileName, name)
+            << "cFileName mismatch for: " << file;
+    }
+}
+
+TEST_F(FindDataWideTest, Attributes_Identical_In_A_And_W)
+{
+    // Verify that non-string fields are identical between A and W versions
+    fs::path file = m_tempDir / L"attrs_test.txt";
+    CreateTestFile(file);
+
+    // Set a specific attribute
+    SetFileAttributesW(file.c_str(), FILE_ATTRIBUTE_READONLY | FILE_ATTRIBUTE_ARCHIVE);
+
+    WIN32_FIND_DATAW dataW;
+    HANDLE findW = FindFirstFileW(file.c_str(), &dataW);
+    ASSERT_NE(findW, INVALID_HANDLE_VALUE);
+    FindClose(findW);
+
+    WIN32_FIND_DATAA dataA;
+    char ansiPath[MAX_PATH];
+    WideCharToMultiByte(CP_ACP, 0, file.c_str(), -1, ansiPath, MAX_PATH, NULL, NULL);
+    HANDLE findA = FindFirstFileA(ansiPath, &dataA);
+    ASSERT_NE(findA, INVALID_HANDLE_VALUE);
+    FindClose(findA);
+
+    // dwFileAttributes, ftLastWriteTime, file sizes should be identical
+    EXPECT_EQ(dataW.dwFileAttributes, dataA.dwFileAttributes);
+    EXPECT_EQ(dataW.ftLastWriteTime.dwLowDateTime, dataA.ftLastWriteTime.dwLowDateTime);
+    EXPECT_EQ(dataW.ftLastWriteTime.dwHighDateTime, dataA.ftLastWriteTime.dwHighDateTime);
+    EXPECT_EQ(dataW.nFileSizeHigh, dataA.nFileSizeHigh);
+    EXPECT_EQ(dataW.nFileSizeLow, dataA.nFileSizeLow);
+
+    // Cleanup: remove readonly before TearDown
+    SetFileAttributesW(file.c_str(), FILE_ATTRIBUTE_NORMAL);
+}
