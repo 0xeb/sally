@@ -1296,3 +1296,169 @@ TEST_F(FindDataWideTest, Attributes_Identical_In_A_And_W)
     // Cleanup: remove readonly before TearDown
     SetFileAttributesW(file.c_str(), FILE_ATTRIBUTE_NORMAL);
 }
+
+// ============================================================================
+// MoveFileW / rename pattern tests
+// (validates the DOS name conflict rename pattern used in DoMoveFile,
+//  SalCreateDirectoryEx, and SalCreateFileEx)
+// ============================================================================
+
+class MoveFileWideTest : public WorkerWideTest {};
+
+// MoveFileW with Unicode filenames
+TEST_F(MoveFileWideTest, Unicode_Rename)
+{
+    // Japanese + Emoji filename
+    auto src = m_tempDir / L"\x65E5\x672C\x8A9E\x30C6\x30B9\x30C8.txt"; // 日本語テスト.txt
+    auto dst = m_tempDir / L"\x30EA\x30CD\x30FC\x30E0\x6E08\x307F.txt"; // リネーム済み.txt
+    CreateTestFile(src, "unicode rename test");
+
+    EXPECT_TRUE(MoveFileW(src.c_str(), dst.c_str()));
+    EXPECT_FALSE(fs::exists(src));
+    EXPECT_TRUE(fs::exists(dst));
+
+    // Verify content survived the rename
+    HANDLE h = CreateFileW(dst.c_str(), GENERIC_READ, FILE_SHARE_READ, NULL,
+                           OPEN_EXISTING, 0, NULL);
+    ASSERT_NE(h, INVALID_HANDLE_VALUE);
+    char buf[64] = {};
+    DWORD read;
+    ReadFile(h, buf, sizeof(buf) - 1, &read, NULL);
+    CloseHandle(h);
+    EXPECT_STREQ(buf, "unicode rename test");
+}
+
+// Round-trip rename: original → temp → original (the pattern used for DOS name conflicts)
+TEST_F(MoveFileWideTest, RoundTrip_RenameToTempAndBack)
+{
+    auto original = m_tempDir / L"\x4E2D\x6587\x6587\x4EF6.dat"; // 中文文件.dat
+    CreateTestFile(original, "roundtrip data");
+    DWORD origAttr = GetFileAttributesW(original.c_str());
+    ASSERT_NE(origAttr, INVALID_FILE_ATTRIBUTES);
+
+    // Rename to temp name (simulates the "tidy up" step)
+    auto tmpName = m_tempDir / L"sal001";
+    ASSERT_TRUE(MoveFileW(original.c_str(), tmpName.c_str()));
+    EXPECT_FALSE(fs::exists(original));
+    EXPECT_TRUE(fs::exists(tmpName));
+
+    // Rename back to original (simulates the "restore" step)
+    ASSERT_TRUE(MoveFileW(tmpName.c_str(), original.c_str()));
+    EXPECT_TRUE(fs::exists(original));
+    EXPECT_FALSE(fs::exists(tmpName));
+
+    // Verify attributes survived the round-trip
+    DWORD finalAttr = GetFileAttributesW(original.c_str());
+    // Archive bit may change due to MoveFile, but other bits should match
+    EXPECT_EQ(origAttr & ~FILE_ATTRIBUTE_ARCHIVE, finalAttr & ~FILE_ATTRIBUTE_ARCHIVE);
+}
+
+// Attribute preservation after MoveFileW (archive bit fixup pattern)
+TEST_F(MoveFileWideTest, Attributes_Preserved_After_Rename)
+{
+    auto file = m_tempDir / L"attrs.txt";
+    CreateTestFile(file);
+
+    // Clear the archive bit (as the worker code checks)
+    DWORD attr = GetFileAttributesW(file.c_str());
+    ASSERT_NE(attr, INVALID_FILE_ATTRIBUTES);
+    SetFileAttributesW(file.c_str(), attr & ~FILE_ATTRIBUTE_ARCHIVE);
+    attr = GetFileAttributesW(file.c_str());
+    EXPECT_FALSE(attr & FILE_ATTRIBUTE_ARCHIVE);
+
+    // MoveFile typically sets the archive bit
+    auto renamed = m_tempDir / L"attrs_renamed.txt";
+    ASSERT_TRUE(MoveFileW(file.c_str(), renamed.c_str()));
+    DWORD renamedAttr = GetFileAttributesW(renamed.c_str());
+
+    // Restore the original attributes (the pattern used in worker.cpp)
+    if ((attr & FILE_ATTRIBUTE_ARCHIVE) == 0)
+        SetFileAttributesW(renamed.c_str(), attr);
+
+    DWORD restoredAttr = GetFileAttributesW(renamed.c_str());
+    EXPECT_FALSE(restoredAttr & FILE_ATTRIBUTE_ARCHIVE);
+}
+
+// MoveFileW fails when destination already exists (validates the retry loop logic)
+TEST_F(MoveFileWideTest, FailsWhenDestExists)
+{
+    auto src = m_tempDir / L"source.txt";
+    auto dst = m_tempDir / L"dest.txt";
+    CreateTestFile(src, "source");
+    CreateTestFile(dst, "dest");
+
+    EXPECT_FALSE(MoveFileW(src.c_str(), dst.c_str()));
+    DWORD err = GetLastError();
+    EXPECT_TRUE(err == ERROR_FILE_EXISTS || err == ERROR_ALREADY_EXISTS);
+}
+
+// CreateDirectoryW + RemoveDirectoryW with Unicode names
+TEST_F(MoveFileWideTest, CreateAndRemoveDir_Unicode)
+{
+    auto dir = m_tempDir / L"\xD55C\xAD6D\xC5B4\xD3F4\xB354"; // 한국어폴더 (Korean folder)
+    ASSERT_TRUE(CreateDirectoryW(dir.c_str(), NULL));
+    EXPECT_TRUE(fs::is_directory(dir));
+
+    ASSERT_TRUE(RemoveDirectoryW(dir.c_str()));
+    EXPECT_FALSE(fs::exists(dir));
+}
+
+// Wide CreateFileW for read/write (validates RetryCopyReadErr/WriteErr conversion)
+TEST_F(MoveFileWideTest, CreateFileW_ReadWrite_Unicode)
+{
+    auto file = m_tempDir / L"\x0410\x0411\x0412.bin"; // АБВ.bin (Cyrillic)
+    const char* data = "test binary data 12345";
+
+    // Write via CreateFileW (simulates what OpenTargetFile does)
+    HANDLE out = CreateFileW(file.c_str(), GENERIC_WRITE, 0, NULL,
+                             CREATE_ALWAYS, FILE_FLAG_SEQUENTIAL_SCAN, NULL);
+    ASSERT_NE(out, INVALID_HANDLE_VALUE);
+    DWORD written;
+    WriteFile(out, data, (DWORD)strlen(data), &written, NULL);
+    CloseHandle(out);
+
+    // Read via CreateFileW (simulates what OpenSourceFile does)
+    HANDLE in = CreateFileW(file.c_str(), GENERIC_READ,
+                            FILE_SHARE_READ | FILE_SHARE_WRITE, NULL,
+                            OPEN_EXISTING, FILE_FLAG_SEQUENTIAL_SCAN, NULL);
+    ASSERT_NE(in, INVALID_HANDLE_VALUE);
+    char buf[64] = {};
+    DWORD read;
+    ReadFile(in, buf, sizeof(buf) - 1, &read, NULL);
+    CloseHandle(in);
+
+    EXPECT_STREQ(buf, data);
+    EXPECT_EQ(read, written);
+}
+
+// MoveFileW with long paths (>MAX_PATH)
+TEST_F(MoveFileWideTest, LongPath_Rename)
+{
+    // Create a deep directory structure
+    std::wstring longDir = m_tempDir.wstring();
+    for (int i = 0; i < 5; i++)
+    {
+        longDir += L"\\" + std::wstring(50, L'D');
+    }
+    longDir = L"\\\\?\\" + longDir;
+    fs::create_directories(fs::path(longDir));
+    EXPECT_GT(longDir.size(), MAX_PATH);
+
+    std::wstring srcFile = longDir + L"\\source.txt";
+    std::wstring dstFile = longDir + L"\\renamed.txt";
+
+    // Create source file
+    HANDLE h = CreateFileW(srcFile.c_str(), GENERIC_WRITE, 0, NULL,
+                           CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL, NULL);
+    ASSERT_NE(h, INVALID_HANDLE_VALUE) << "err=" << GetLastError();
+    DWORD written;
+    WriteFile(h, "long", 4, &written, NULL);
+    CloseHandle(h);
+
+    // Move with long paths
+    EXPECT_TRUE(MoveFileW(srcFile.c_str(), dstFile.c_str()));
+
+    // Verify destination exists
+    DWORD attr = GetFileAttributesW(dstFile.c_str());
+    EXPECT_NE(attr, INVALID_FILE_ATTRIBUTES);
+}
