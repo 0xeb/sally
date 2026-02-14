@@ -1773,52 +1773,34 @@ DWORD SalGetFileAttributes(const char* fileName)
     return SalLPGetFileAttributes(fileName);
 }
 
-BOOL ClearReadOnlyAttr(const char* name, DWORD attr)
+BOOL ClearReadOnlyAttrW(const wchar_t* name, DWORD attr)
 {
-    if (attr == -1)
-        attr = SalGetFileAttributes(name);
+    if (attr == (DWORD)-1)
+        attr = GetFileAttributesW(name);
     if (attr != INVALID_FILE_ATTRIBUTES)
     {
         // only drop RO (for hardlinks it also changes attributes of other hardlinks to the same file, so keep it minimal)
         if ((attr & FILE_ATTRIBUTE_READONLY) != 0)
         {
-            // Use SalLPSetFileAttributes for long path support
-            if (!SalLPSetFileAttributes(name, attr & ~FILE_ATTRIBUTE_READONLY))
-                TRACE_E("ClearReadOnlyAttr(): error setting attrs (0x" << std::hex << (attr & ~FILE_ATTRIBUTE_READONLY) << std::dec << "): " << name);
+            if (!SetFileAttributesW(name, attr & ~FILE_ATTRIBUTE_READONLY))
+                TRACE_EW(L"ClearReadOnlyAttrW(): error setting attrs (0x" << std::hex << (attr & ~FILE_ATTRIBUTE_READONLY) << std::dec << L"): " << name);
             return TRUE;
         }
     }
     else
     {
-        TRACE_E("ClearReadOnlyAttr(): error getting attrs: " << name);
-        if (!SalLPSetFileAttributes(name, FILE_ATTRIBUTE_ARCHIVE)) // cannot read attributes, try at least writing (don't care if it's needed)
-            TRACE_E("ClearReadOnlyAttr(): error setting attrs (FILE_ATTRIBUTE_ARCHIVE): " << name);
+        TRACE_EW(L"ClearReadOnlyAttrW(): error getting attrs: " << name);
+        if (!SetFileAttributesW(name, FILE_ATTRIBUTE_ARCHIVE)) // cannot read attributes, try at least writing (don't care if it's needed)
+            TRACE_EW(L"ClearReadOnlyAttrW(): error setting attrs (FILE_ATTRIBUTE_ARCHIVE): " << name);
         return TRUE;
     }
     return FALSE;
 }
 
-BOOL ClearReadOnlyAttrW(const wchar_t* name, DWORD attr)
+// ANSI wrapper — delegates to wide version
+BOOL ClearReadOnlyAttr(const char* name, DWORD attr)
 {
-    if (attr == -1)
-        attr = GetFileAttributesW(name);
-    if (attr != INVALID_FILE_ATTRIBUTES)
-    {
-        if ((attr & FILE_ATTRIBUTE_READONLY) != 0)
-        {
-            if (!SetFileAttributesW(name, attr & ~FILE_ATTRIBUTE_READONLY))
-                TRACE_E("ClearReadOnlyAttrW(): error setting attrs");
-            return TRUE;
-        }
-    }
-    else
-    {
-        TRACE_E("ClearReadOnlyAttrW(): error getting attrs");
-        if (!SetFileAttributesW(name, FILE_ATTRIBUTE_ARCHIVE))
-            TRACE_E("ClearReadOnlyAttrW(): error setting attrs (FILE_ATTRIBUTE_ARCHIVE)");
-        return TRUE;
-    }
-    return FALSE;
+    return ClearReadOnlyAttrW(AnsiToWide(name).c_str(), attr);
 }
 
 BOOL IsNetworkProviderDrive(const char* path, DWORD providerType)

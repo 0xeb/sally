@@ -2008,6 +2008,7 @@ DWORD UncompressFileW(const wchar_t* fileName, DWORD attrs);
 DWORD MyEncryptFileW(IWorkerObserver& observer, const wchar_t* fileName, const char* fileNameA,
                      DWORD attrs, DWORD finalAttrs, CWorkerState& workerState, BOOL& cancelOper, BOOL preserveDate);
 DWORD MyDecryptFileW(const wchar_t* fileName, DWORD attrs, BOOL preserveDate);
+BOOL DoDeleteDirLinkAuxW(const wchar_t* nameDelLink, DWORD* err);
 
 // ANSI wrapper — delegates to wide version
 DWORD CompressFile(char* fileName, DWORD attrs)
@@ -6589,20 +6590,10 @@ BOOL SalCreateDirectoryEx(const char* name, DWORD* err)
     return FALSE;
 }
 
+// ANSI wrapper — delegates to wide version
 BOOL GetDirTime(const char* dirName, FILETIME* ftModified)
 {
-    HANDLE dir;
-    dir = SalCreateFileH(dirName, GENERIC_READ,
-                         FILE_SHARE_READ | FILE_SHARE_WRITE,
-                         NULL, OPEN_EXISTING,
-                         FILE_FLAG_BACKUP_SEMANTICS, NULL);
-    if (dir != INVALID_HANDLE_VALUE)
-    {
-        BOOL ret = GetFileTime(dir, NULL /*ftCreated*/, NULL /*ftAccessed*/, ftModified);
-        HANDLES(CloseHandle(dir));
-        return ret;
-    }
-    return FALSE;
+    return GetDirTimeW(AnsiToWide(dirName).c_str(), ftModified);
 }
 
 BOOL GetDirTimeW(const wchar_t* dirName, FILETIME* ftModified)
@@ -7235,75 +7226,10 @@ struct TMN_REPARSE_DATA_BUFFER
   return FALSE;
 */
 
+// ANSI wrapper — delegates to wide version
 BOOL DoDeleteDirLinkAux(const char* nameDelLink, DWORD* err)
 {
-    // remove the reparse point from directory 'nameDelLink'
-    if (err != NULL)
-        *err = ERROR_SUCCESS;
-    BOOL ok = FALSE;
-    DWORD attr = SalLPGetFileAttributes(nameDelLink);
-    if (attr != INVALID_FILE_ATTRIBUTES && (attr & FILE_ATTRIBUTE_REPARSE_POINT))
-    {
-        HANDLE dir = SalCreateFileH(nameDelLink, GENERIC_WRITE /* | GENERIC_READ */, 0, 0, OPEN_EXISTING,
-                                    FILE_FLAG_BACKUP_SEMANTICS | FILE_FLAG_OPEN_REPARSE_POINT, NULL);
-        if (dir != INVALID_HANDLE_VALUE)
-        {
-            DWORD dummy;
-            char buf[MAXIMUM_REPARSE_DATA_BUFFER_SIZE];
-            REPARSE_GUID_DATA_BUFFER* juncData = (REPARSE_GUID_DATA_BUFFER*)buf;
-            if (DeviceIoControl(dir, FSCTL_GET_REPARSE_POINT, NULL, 0, juncData,
-                                MAXIMUM_REPARSE_DATA_BUFFER_SIZE, &dummy, NULL) == 0)
-            {
-                if (err != NULL)
-                    *err = GetLastError();
-            }
-            else
-            {
-                if (juncData->ReparseTag != IO_REPARSE_TAG_MOUNT_POINT &&
-                    juncData->ReparseTag != IO_REPARSE_TAG_SYMLINK)
-                { // if this is not a volume mount point, junction, or symlink, report an error (we could probably delete it, but better refuse than break something...)
-                    TRACE_E("DoDeleteDirLinkAux(): Unknown type of reparse point (tag is 0x" << std::hex << juncData->ReparseTag << std::dec << "): " << nameDelLink);
-                    if (err != NULL)
-                        *err = 4394 /* ERROR_REPARSE_TAG_MISMATCH */;
-                }
-                else
-                {
-                    REPARSE_GUID_DATA_BUFFER rgdb = {0};
-                    rgdb.ReparseTag = juncData->ReparseTag;
-
-                    DWORD dwBytes;
-                    if (DeviceIoControl(dir, FSCTL_DELETE_REPARSE_POINT, &rgdb, REPARSE_GUID_DATA_BUFFER_HEADER_SIZE,
-                                        NULL, 0, &dwBytes, 0) != 0)
-                    {
-                        ok = TRUE;
-                    }
-                    else
-                    {
-                        if (err != NULL)
-                            *err = GetLastError();
-                    }
-                }
-            }
-            HANDLES(CloseHandle(dir));
-        }
-        else
-        {
-            if (err != NULL)
-                *err = GetLastError();
-        }
-    }
-    else
-        ok = TRUE; // the reparse point is apparently gone; all that remains is to delete the empty directory...
-    // remove the empty directory (that remained after deleting the reparse point)
-    if (ok)
-        ClearReadOnlyAttr(nameDelLink, attr); // ensure it can be deleted even with the read-only attribute
-    if (ok && !SalLPRemoveDirectory(nameDelLink))
-    {
-        ok = FALSE;
-        if (err != NULL)
-            *err = GetLastError();
-    }
-    return ok;
+    return DoDeleteDirLinkAuxW(AnsiToWide(nameDelLink).c_str(), err);
 }
 
 BOOL DoDeleteDirLinkAuxW(const wchar_t* nameDelLink, DWORD* err)
@@ -7379,13 +7305,9 @@ BOOL DoDeleteDirLinkAuxW(const wchar_t* nameDelLink, DWORD* err)
 
 BOOL DeleteDirLink(const char* name, DWORD* err)
 {
-    // if the path ends with a space/dot, we must append '\\'; otherwise CreateFile
-    // and RemoveDirectory trim the spaces/dots and operate on a different path
-    const char* nameDelLink = name;
-    CPathBuffer nameDelLinkCopy; // Heap-allocated for long path support
-    MakeCopyWithBackslashIfNeeded(nameDelLink, nameDelLinkCopy);
-
-    return DoDeleteDirLinkAux(nameDelLink, err);
+    // Go through wide path — handles trailing space/dot fixup natively
+    std::wstring nameW = MakeCopyWithBackslashIfNeededW(AnsiToWide(name).c_str());
+    return DoDeleteDirLinkAuxW(nameW.c_str(), err);
 }
 
 BOOL DoDeleteDirLink(IWorkerObserver& observer, char* name, const CQuadWord& size, COperations* script,
