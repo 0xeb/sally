@@ -1838,7 +1838,9 @@ struct CSrcSecurity // helper structure for keeping security info for MoveFile (
     }
 };
 
-BOOL DoCopySecurity(const char* sourceName, const char* targetName, DWORD* err, CSrcSecurity* srcSecurity)
+BOOL DoCopySecurity(const char* sourceName, const char* targetName, DWORD* err, CSrcSecurity* srcSecurity,
+                    const std::wstring& sourceNameW = std::wstring(),
+                    const std::wstring& targetNameW = std::wstring())
 {
     // if the path ends with a space or dot, we must append '\\', otherwise
     // GetNamedSecurityInfo (and others) trim the spaces/dots and then work
@@ -1849,6 +1851,27 @@ BOOL DoCopySecurity(const char* sourceName, const char* targetName, DWORD* err, 
     const char* targetNameSec = targetName;
     CPathBuffer targetNameSecCopy; // Heap-allocated for long path support
     MakeCopyWithBackslashIfNeeded(targetNameSec, targetNameSecCopy);
+
+    // Wide paths for security APIs (when available)
+    std::wstring sourceNameSecW = !sourceNameW.empty() ? MakeCopyWithBackslashIfNeededW(sourceNameW.c_str()) : std::wstring();
+    std::wstring targetNameSecW = !targetNameW.empty() ? MakeCopyWithBackslashIfNeededW(targetNameW.c_str()) : std::wstring();
+
+    // Helpers to call Get/SetNamedSecurityInfo with wide or ANSI paths
+    auto GetSecSource = [&](SECURITY_INFORMATION si, PSID* owner, PSID* group, PACL* dacl, PACL* sacl, PSECURITY_DESCRIPTOR* sd) -> DWORD {
+        if (!sourceNameSecW.empty())
+            return GetNamedSecurityInfoW((LPWSTR)sourceNameSecW.c_str(), SE_FILE_OBJECT, si, owner, group, dacl, sacl, sd);
+        return GetNamedSecurityInfo((LPSTR)sourceNameSec, SE_FILE_OBJECT, si, owner, group, dacl, sacl, sd);
+    };
+    auto GetSecTarget = [&](SECURITY_INFORMATION si, PSID* owner, PSID* group, PACL* dacl, PACL* sacl, PSECURITY_DESCRIPTOR* sd) -> DWORD {
+        if (!targetNameSecW.empty())
+            return GetNamedSecurityInfoW((LPWSTR)targetNameSecW.c_str(), SE_FILE_OBJECT, si, owner, group, dacl, sacl, sd);
+        return GetNamedSecurityInfo((LPSTR)targetNameSec, SE_FILE_OBJECT, si, owner, group, dacl, sacl, sd);
+    };
+    auto SetSecTarget = [&](SECURITY_INFORMATION si, PSID owner, PSID group, PACL dacl, PACL sacl) -> DWORD {
+        if (!targetNameSecW.empty())
+            return SetNamedSecurityInfoW((LPWSTR)targetNameSecW.c_str(), SE_FILE_OBJECT, si, owner, group, dacl, sacl);
+        return SetNamedSecurityInfo((LPSTR)targetNameSec, SE_FILE_OBJECT, si, owner, group, dacl, sacl);
+    };
 
     PSID srcOwner = NULL;
     PSID srcGroup = NULL;
@@ -1865,9 +1888,8 @@ BOOL DoCopySecurity(const char* sourceName, const char* targetName, DWORD* err, 
     }
     else // obtain the security info from the source
     {
-        *err = GetNamedSecurityInfo((char*)sourceNameSec, SE_FILE_OBJECT,
-                                    DACL_SECURITY_INFORMATION | GROUP_SECURITY_INFORMATION | OWNER_SECURITY_INFORMATION,
-                                    &srcOwner, &srcGroup, &srcDACL, NULL, &srcSD);
+        *err = GetSecSource(DACL_SECURITY_INFORMATION | GROUP_SECURITY_INFORMATION | OWNER_SECURITY_INFORMATION,
+                            &srcOwner, &srcGroup, &srcDACL, NULL, &srcSD);
     }
     BOOL ret = *err == ERROR_SUCCESS;
 
@@ -1883,11 +1905,10 @@ BOOL DoCopySecurity(const char* sourceName, const char* targetName, DWORD* err, 
         else
         {
             BOOL inheritedDACL = /*(srcSDControl & SE_DACL_AUTO_INHERITED) != 0 &&*/ (srcSDControl & SE_DACL_PROTECTED) == 0; // SE_DACL_AUTO_INHERITED unfortunately is not always set (for example Total Commander clears it after moving a file, so we ignore it)
-            DWORD attr = SalLPGetFileAttributes(targetNameSec);
-            *err = SetNamedSecurityInfo((char*)targetNameSec, SE_FILE_OBJECT,
-                                        DACL_SECURITY_INFORMATION | GROUP_SECURITY_INFORMATION | OWNER_SECURITY_INFORMATION |
-                                            (inheritedDACL ? UNPROTECTED_DACL_SECURITY_INFORMATION : PROTECTED_DACL_SECURITY_INFORMATION),
-                                        srcOwner, srcGroup, srcDACL, NULL);
+            DWORD attr = !targetNameSecW.empty() ? GetFileAttributesW(targetNameSecW.c_str()) : SalLPGetFileAttributes(targetNameSec);
+            *err = SetSecTarget(DACL_SECURITY_INFORMATION | GROUP_SECURITY_INFORMATION | OWNER_SECURITY_INFORMATION |
+                                    (inheritedDACL ? UNPROTECTED_DACL_SECURITY_INFORMATION : PROTECTED_DACL_SECURITY_INFORMATION),
+                                srcOwner, srcGroup, srcDACL, NULL);
             ret = *err == ERROR_SUCCESS;
 
             if (!ret)
@@ -1898,9 +1919,8 @@ BOOL DoCopySecurity(const char* sourceName, const char* targetName, DWORD* err, 
                 PSID tgtGroup = NULL;
                 PACL tgtDACL = NULL;
                 PSECURITY_DESCRIPTOR tgtSD = NULL;
-                BOOL tgtRead = GetNamedSecurityInfo((char*)targetNameSec, SE_FILE_OBJECT,
-                                                    DACL_SECURITY_INFORMATION | GROUP_SECURITY_INFORMATION | OWNER_SECURITY_INFORMATION,
-                                                    &tgtOwner, &tgtGroup, &tgtDACL, NULL, &tgtSD) == ERROR_SUCCESS;
+                BOOL tgtRead = GetSecTarget(DACL_SECURITY_INFORMATION | GROUP_SECURITY_INFORMATION | OWNER_SECURITY_INFORMATION,
+                                            &tgtOwner, &tgtGroup, &tgtDACL, NULL, &tgtSD) == ERROR_SUCCESS;
                 // if the owner of the target file is not the current user, try to set it ("take ownership") - only
                 // provided we have the right to write the owner so that we can write back the original owner afterwards
                 BOOL ownerOfFile = FALSE;
@@ -1911,8 +1931,8 @@ BOOL DoCopySecurity(const char* sourceName, const char* targetName, DWORD* err, 
                 {
                     if (HaveWriteOwnerRight &&
                         CurrentProcessTokenUserValid && CurrentProcessTokenUser->User.Sid != NULL &&
-                        SetNamedSecurityInfo((char*)targetNameSec, SE_FILE_OBJECT, OWNER_SECURITY_INFORMATION,
-                                             CurrentProcessTokenUser->User.Sid, NULL, NULL, NULL) == ERROR_SUCCESS)
+                        SetSecTarget(OWNER_SECURITY_INFORMATION,
+                                     CurrentProcessTokenUser->User.Sid, NULL, NULL, NULL) == ERROR_SUCCESS)
                     { // setting succeeded; we must retrieve 'tgtSD' again
                         ownerOfFile = TRUE;
                         if (tgtSD != NULL)
@@ -1921,9 +1941,8 @@ BOOL DoCopySecurity(const char* sourceName, const char* targetName, DWORD* err, 
                         tgtGroup = NULL;
                         tgtDACL = NULL;
                         tgtSD = NULL;
-                        tgtRead = GetNamedSecurityInfo((char*)targetNameSec, SE_FILE_OBJECT,
-                                                       DACL_SECURITY_INFORMATION | GROUP_SECURITY_INFORMATION | OWNER_SECURITY_INFORMATION,
-                                                       &tgtOwner, &tgtGroup, &tgtDACL, NULL, &tgtSD) == ERROR_SUCCESS;
+                        tgtRead = GetSecTarget(DACL_SECURITY_INFORMATION | GROUP_SECURITY_INFORMATION | OWNER_SECURITY_INFORMATION,
+                                               &tgtOwner, &tgtGroup, &tgtDACL, NULL, &tgtSD) == ERROR_SUCCESS;
                     }
                 }
                 else
@@ -1947,41 +1966,38 @@ BOOL DoCopySecurity(const char* sourceName, const char* targetName, DWORD* err, 
                     if (allowChPermDACL != NULL && InitializeAcl(allowChPermDACL, allowChPermDACLSize, ACL_REVISION) &&
                         AddAccessAllowedAce(allowChPermDACL, ACL_REVISION, READ_CONTROL | WRITE_DAC | WRITE_OWNER,
                                             CurrentProcessTokenUser->User.Sid) &&
-                        SetNamedSecurityInfo((char*)targetNameSec, SE_FILE_OBJECT,
-                                             DACL_SECURITY_INFORMATION | PROTECTED_DACL_SECURITY_INFORMATION,
-                                             NULL, NULL, allowChPermDACL, NULL) == ERROR_SUCCESS)
+                        SetSecTarget(DACL_SECURITY_INFORMATION | PROTECTED_DACL_SECURITY_INFORMATION,
+                                     NULL, NULL, allowChPermDACL, NULL) == ERROR_SUCCESS)
                     {
-                        ownerOK = SetNamedSecurityInfo((char*)targetNameSec, SE_FILE_OBJECT,
-                                                       OWNER_SECURITY_INFORMATION,
-                                                       srcOwner, NULL, NULL, NULL) == ERROR_SUCCESS;
-                        groupOK = SetNamedSecurityInfo((char*)targetNameSec, SE_FILE_OBJECT,
-                                                       GROUP_SECURITY_INFORMATION,
-                                                       NULL, srcGroup, NULL, NULL) == ERROR_SUCCESS;
-                        daclOK = SetNamedSecurityInfo((char*)targetNameSec, SE_FILE_OBJECT, DACL_SECURITY_INFORMATION | (inheritedDACL ? UNPROTECTED_DACL_SECURITY_INFORMATION : PROTECTED_DACL_SECURITY_INFORMATION),
-                                                      NULL, NULL, srcDACL, NULL) == ERROR_SUCCESS;
+                        ownerOK = SetSecTarget(OWNER_SECURITY_INFORMATION,
+                                               srcOwner, NULL, NULL, NULL) == ERROR_SUCCESS;
+                        groupOK = SetSecTarget(GROUP_SECURITY_INFORMATION,
+                                               NULL, srcGroup, NULL, NULL) == ERROR_SUCCESS;
+                        daclOK = SetSecTarget(DACL_SECURITY_INFORMATION | (inheritedDACL ? UNPROTECTED_DACL_SECURITY_INFORMATION : PROTECTED_DACL_SECURITY_INFORMATION),
+                                              NULL, NULL, srcDACL, NULL) == ERROR_SUCCESS;
                     }
                     if (allowChPermDACL != (PACL)buff3 && allowChPermDACL != NULL)
                         free(allowChPermDACL);
                 }
                 if (!ownerOK &&
-                    (SetNamedSecurityInfo((char*)targetNameSec, SE_FILE_OBJECT, OWNER_SECURITY_INFORMATION,
-                                          srcOwner, NULL, NULL, NULL) == ERROR_SUCCESS ||
+                    (SetSecTarget(OWNER_SECURITY_INFORMATION,
+                                  srcOwner, NULL, NULL, NULL) == ERROR_SUCCESS ||
                      tgtRead && (srcOwner == NULL && tgtOwner == NULL || // if the owner is already set, ignore a potential error while setting
                                  srcOwner != NULL && tgtOwner != NULL && EqualSid(srcOwner, tgtOwner))))
                 {
                     ownerOK = TRUE;
                 }
                 if (!groupOK &&
-                    (SetNamedSecurityInfo((char*)targetNameSec, SE_FILE_OBJECT, GROUP_SECURITY_INFORMATION,
-                                          NULL, srcGroup, NULL, NULL) == ERROR_SUCCESS ||
+                    (SetSecTarget(GROUP_SECURITY_INFORMATION,
+                                  NULL, srcGroup, NULL, NULL) == ERROR_SUCCESS ||
                      tgtRead && (srcGroup == NULL && tgtGroup == NULL || // if the group is already set, ignore a potential error while setting
                                  srcGroup != NULL && tgtGroup != NULL && EqualSid(srcGroup, tgtGroup))))
                 {
                     groupOK = TRUE;
                 }
                 if (!daclOK && // the DACL must be set last because it depends on the owner (CREATOR OWNER is replaced with the real owner, etc.)
-                    SetNamedSecurityInfo((char*)targetNameSec, SE_FILE_OBJECT, DACL_SECURITY_INFORMATION | (inheritedDACL ? UNPROTECTED_DACL_SECURITY_INFORMATION : PROTECTED_DACL_SECURITY_INFORMATION),
-                                         NULL, NULL, srcDACL, NULL) == ERROR_SUCCESS)
+                    SetSecTarget(DACL_SECURITY_INFORMATION | (inheritedDACL ? UNPROTECTED_DACL_SECURITY_INFORMATION : PROTECTED_DACL_SECURITY_INFORMATION),
+                                 NULL, NULL, srcDACL, NULL) == ERROR_SUCCESS)
                 {
                     daclOK = TRUE;
                 }
@@ -1994,7 +2010,12 @@ BOOL DoCopySecurity(const char* sourceName, const char* targetName, DWORD* err, 
                     LocalFree(tgtSD);
             }
             if (attr != INVALID_FILE_ATTRIBUTES)
-                SalLPSetFileAttributes(targetNameSec, attr);
+            {
+                if (!targetNameSecW.empty())
+                    SetFileAttributesW(targetNameSecW.c_str(), attr);
+                else
+                    SalLPSetFileAttributes(targetNameSec, attr);
+            }
         }
     }
     if (srcSD != NULL)
@@ -5335,7 +5356,8 @@ COPY_AGAIN:
                     if (script->CopySecurity) // should we copy NTFS security permissions?
                     {
                         DWORD err;
-                        if (!DoCopySecurity(op->SourceName, op->TargetName, &err, NULL))
+                        if (!DoCopySecurity(op->SourceName, op->TargetName, &err, NULL,
+                                           op->SourceNameW, op->TargetNameW))
                         {
                             observer.WaitIfSuspended(); // if we should be in suspend mode, wait ...
                             if (observer.IsCancelled())
@@ -5927,7 +5949,8 @@ BOOL DoMoveFile(COperation* op, IWorkerObserver& observer, void* buffer,
                 if (script->CopySecurity && !srcSecurityErr) // should we copy NTFS security permissions?
                 {
                     DWORD err;
-                    if (!DoCopySecurity(sourceNameMvDir, targetNameMvDir, &err, &srcSecurity))
+                    if (!DoCopySecurity(sourceNameMvDir, targetNameMvDir, &err, &srcSecurity,
+                                       sourceNameMvDirW, targetNameMvDirW))
                     {
                         observer.WaitIfSuspended(); // if we should be in suspend mode, wait ...
                         if (observer.IsCancelled())
