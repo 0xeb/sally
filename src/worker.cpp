@@ -836,6 +836,32 @@ HANDLE COperation::FindFirstTarget(WIN32_FIND_DATA* findData) const
     }
 }
 
+// Checks if source and target are on the same root path - uses wide paths if both available
+BOOL COperation::HasSameRootPath() const
+{
+    if (HasWideSource() && HasWideTarget())
+    {
+        return HasTheSameRootPathW(SourceNameW.c_str(), TargetNameW.c_str());
+    }
+    else
+    {
+        return HasTheSameRootPath(SourceName, TargetName);
+    }
+}
+
+// Case-insensitive comparison of source and target paths - uses wide paths if both available
+BOOL COperation::AreSourceAndTargetSamePath() const
+{
+    if (HasWideSource() && HasWideTarget())
+    {
+        return _wcsicmp(SourceNameW.c_str(), TargetNameW.c_str()) == 0;
+    }
+    else
+    {
+        return StrICmp(SourceName, TargetName) == 0;
+    }
+}
+
 // Wraps CreateFileW + DeviceIoControl(FSCTL_SET_COMPRESSION) for platform abstraction.
 DWORD COperation::SetCompressionW(const wchar_t* path, USHORT compressionFormat)
 {
@@ -5910,7 +5936,7 @@ BOOL DoMoveFile(COperation* op, IWorkerObserver& observer, void* buffer,
     BOOL invalidName = op->IsSourceNameInvalid(dir) ||
                        op->IsTargetNameInvalid(dir && ignInvalidName);
 
-    if (!copyAsEncrypted && !script->SameRootButDiffVolume && HasTheSameRootPath(op->SourceName, op->TargetName))
+    if (!copyAsEncrypted && !script->SameRootButDiffVolume && op->HasSameRootPath())
     {
         // if the path ends with a space or dot, we must append '\\', otherwise GetNamedSecurityInfo,
         // GetDirTime, SetFileAttributes, and MoveFile trim the spaces/dots and operate on a different path
@@ -6116,7 +6142,7 @@ BOOL DoMoveFile(COperation* op, IWorkerObserver& observer, void* buffer,
                     }
                 }
 
-                if (StrICmp(op->SourceName, op->TargetName) != 0 && // provided this is not just a change of case
+                if (!op->AreSourceAndTargetSamePath() &&            // provided this is not just a change of case
                     (err == ERROR_FILE_EXISTS ||                    // verify whether this is only overwriting the DOS name of the file/directory
                      err == ERROR_ALREADY_EXISTS) &&
                     targetNameMvDir == op->TargetName) // no invalid names are allowed here
@@ -6188,7 +6214,7 @@ BOOL DoMoveFile(COperation* op, IWorkerObserver& observer, void* buffer,
 
                 if ((err == ERROR_ALREADY_EXISTS || // theoretically can happen for directories; prevent that (overwrite prompt is only for files)
                      err == ERROR_FILE_EXISTS) &&
-                    !dir && StrICmp(op->SourceName, op->TargetName) != 0 &&
+                    !dir && !op->AreSourceAndTargetSamePath() &&
                     sourceNameMvDir == op->SourceName && targetNameMvDir == op->TargetName) // no invalid names allowed here (files only, and their names are validated)
                 {
                     HANDLE in, out;
