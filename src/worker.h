@@ -330,6 +330,8 @@ struct COperation
     DWORD GetSourceAttributes() const;
     BOOL ClearTargetReadOnly(DWORD attr = (DWORD)-1) const;
     BOOL ClearSourceReadOnly(DWORD attr = (DWORD)-1) const;
+    BOOL IsSourceNameInvalid(BOOL ignInvalidName = FALSE) const;
+    BOOL IsTargetNameInvalid(BOOL ignInvalidName = FALSE) const;
 
     // Platform-abstracted helpers for compression and file time preservation.
     // Static because they operate on arbitrary paths, not on SourceName/TargetName.

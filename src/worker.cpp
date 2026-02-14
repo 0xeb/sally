@@ -784,6 +784,32 @@ BOOL COperation::ClearSourceReadOnly(DWORD attr) const
     }
 }
 
+// Checks if source file name is invalid (ends with space/dot) - uses SourceNameW if available
+BOOL COperation::IsSourceNameInvalid(BOOL ignInvalidName) const
+{
+    if (HasWideSource())
+    {
+        return FileNameIsInvalidW(SourceNameW.c_str(), TRUE, ignInvalidName);
+    }
+    else
+    {
+        return FileNameIsInvalid(SourceName, TRUE, ignInvalidName);
+    }
+}
+
+// Checks if target file name is invalid (ends with space/dot) - uses TargetNameW if available
+BOOL COperation::IsTargetNameInvalid(BOOL ignInvalidName) const
+{
+    if (HasWideTarget())
+    {
+        return FileNameIsInvalidW(TargetNameW.c_str(), TRUE, ignInvalidName);
+    }
+    else
+    {
+        return FileNameIsInvalid(TargetName, TRUE, ignInvalidName);
+    }
+}
+
 // Wraps CreateFileW + DeviceIoControl(FSCTL_SET_COMPRESSION) for platform abstraction.
 DWORD COperation::SetCompressionW(const wchar_t* path, USHORT compressionFormat)
 {
@@ -4804,8 +4830,8 @@ BOOL DoCopyFile(COperation* op, IWorkerObserver& observer, void* buffer,
 
     // if the path ends with a space/dot, it is invalid and we must not copy it,
     // CreateFile would trim the spaces/dots and copy a different file or under a different name
-    BOOL invalidSrcName = FileNameIsInvalid(op->SourceName, TRUE);
-    BOOL invalidTgtName = FileNameIsInvalid(op->TargetName, TRUE);
+    BOOL invalidSrcName = op->IsSourceNameInvalid();
+    BOOL invalidTgtName = op->IsTargetNameInvalid();
 
     // optimization: skipping all "older and identical" files is about 4x faster,
     // slowing down when the file is newer is 5%, so it should be well worth it
@@ -5855,10 +5881,8 @@ BOOL DoMoveFile(COperation* op, IWorkerObserver& observer, void* buffer,
     // directories fare better: appending a backslash helps there, we block the move
     // only when a new directory name would be invalid (when moving under the old
     // name, 'ignInvalidName' is TRUE)
-    BOOL invalidName = (op->HasWideSource() ? FileNameIsInvalidW(op->SourceNameW.c_str(), TRUE, dir)
-                                             : FileNameIsInvalid(op->SourceName, TRUE, dir)) ||
-                       (op->HasWideTarget() ? FileNameIsInvalidW(op->TargetNameW.c_str(), TRUE, dir && ignInvalidName)
-                                            : FileNameIsInvalid(op->TargetName, TRUE, dir && ignInvalidName));
+    BOOL invalidName = op->IsSourceNameInvalid(dir) ||
+                       op->IsTargetNameInvalid(dir && ignInvalidName);
 
     if (!copyAsEncrypted && !script->SameRootButDiffVolume && HasTheSameRootPath(op->SourceName, op->TargetName))
     {
