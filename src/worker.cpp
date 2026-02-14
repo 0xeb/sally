@@ -2790,7 +2790,8 @@ BOOL CheckTailOfOutFile(CAsyncCopyParams* asyncPar, HANDLE in, HANDLE out, const
 BOOL DoCopyADS(IWorkerObserver& observer, const char* sourceName, BOOL isDir, const char* targetName,
                CQuadWord const& totalDone, CQuadWord& operDone, CQuadWord const& operTotal,
                CWorkerState& workerState, COperations* script, BOOL* skip, void* buffer,
-               const std::wstring& sourceNameW = std::wstring())
+               const std::wstring& sourceNameW = std::wstring(),
+               const std::wstring& targetNameW = std::wstring())
 {
     BOOL doCopyADSRet = TRUE;
     BOOL lowMemory;
@@ -2812,14 +2813,28 @@ COPY_ADS_AGAIN:
     {                                  // we have the list of ADS, let's try to copy them to the target file/directory
         CWidePathBuffer srcName;       // Heap-allocated for long path + ADS name support
         CWidePathBuffer tgtName;
-        CPathBuffer longSourceName;
-        CPathBuffer longTargetName;
-        DoLongName(longSourceName, sourceName, longSourceName.Size());
-        DoLongName(longTargetName, targetName, longTargetName.Size());
-        if (!MultiByteToWideChar(CP_ACP, MB_PRECOMPOSED, longSourceName, -1, srcName, srcName.Size()))
-            srcName[0] = 0;
-        if (!MultiByteToWideChar(CP_ACP, MB_PRECOMPOSED, longTargetName, -1, tgtName, tgtName.Size()))
-            tgtName[0] = 0;
+        if (!sourceNameW.empty())
+        {
+            lstrcpynW(srcName, sourceNameW.c_str(), srcName.Size());
+        }
+        else
+        {
+            CPathBuffer longSourceName;
+            DoLongName(longSourceName, sourceName, longSourceName.Size());
+            if (!MultiByteToWideChar(CP_ACP, MB_PRECOMPOSED, longSourceName, -1, srcName, srcName.Size()))
+                srcName[0] = 0;
+        }
+        if (!targetNameW.empty())
+        {
+            lstrcpynW(tgtName, targetNameW.c_str(), tgtName.Size());
+        }
+        else
+        {
+            CPathBuffer longTargetName;
+            DoLongName(longTargetName, targetName, longTargetName.Size());
+            if (!MultiByteToWideChar(CP_ACP, MB_PRECOMPOSED, longTargetName, -1, tgtName, tgtName.Size()))
+                tgtName[0] = 0;
+        }
         wchar_t* srcEnd = (wchar_t*)srcName + lstrlenW(srcName);
         if (srcEnd > (wchar_t*)srcName && *(srcEnd - 1) == L'\\')
             *--srcEnd = 0;
@@ -5315,7 +5330,7 @@ COPY_AGAIN:
                         BOOL adsSkip = FALSE;
                         if (!DoCopyADS(observer, op->SourceName, FALSE, op->TargetName, totalDone,
                                        operDone, op->Size, workerState, script, &adsSkip, buffer,
-                                       op->SourceNameW) ||
+                                       op->SourceNameW, op->TargetNameW) ||
                             adsSkip) // user hit cancel or skipped at least one ADS
                         {
                             if (out != NULL)
