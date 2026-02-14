@@ -13,6 +13,7 @@
 #include "usermenu.h"
 #include "execute.h"
 #include "pack.h"
+#include "common/unicode/helpers.h"
 #include "fileswnd.h"
 #include "edtlbwnd.h"
 
@@ -409,7 +410,7 @@ BOOL CPackACDialog::MyGetBinaryType(LPCSTR filename, LPDWORD lpBinaryType)
 
     BOOL ret = FALSE;
     // open the file for reading
-    HANDLE hfile = SalCreateFileH(filename, GENERIC_READ, FILE_SHARE_READ, NULL, OPEN_EXISTING, 0, NULL);
+    HANDLE hfile = HANDLES_Q(CreateFileW(AnsiToWide(filename).c_str(), GENERIC_READ, FILE_SHARE_READ, NULL, OPEN_EXISTING, 0, NULL));
     if (hfile != INVALID_HANDLE_VALUE)
     {
         IMAGE_DOS_HEADER mz_header;
@@ -596,28 +597,30 @@ BOOL CPackACDialog::DirectorySearch(char* path)
 
     // set up some variables
     BOOL mustStop = FALSE;
-    WIN32_FIND_DATA findData;
+    WIN32_FIND_DATAW findData;
     // try to find the first file
-    HANDLE fileFind = SalFindFirstFileH(fileName, &findData);
+    HANDLE fileFind = HANDLES_Q(FindFirstFileW(AnsiToWide(fileName).c_str(), &findData));
     if (fileFind != INVALID_HANDLE_VALUE)
     {
         do
         {
-            unsigned int nameLen = (unsigned int)strlen(findData.cFileName);
+            char cFileNameA[MAX_PATH];
+            WideCharToMultiByte(CP_ACP, 0, findData.cFileName, -1, cFileNameA, MAX_PATH, NULL, NULL);
+            unsigned int nameLen = (unsigned int)strlen(cFileNameA);
             if ((findData.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY) == 0)
             {
                 // it is a file; now check if it is an exe
                 if (nameLen > 4 && pathLen + nameLen < SAL_MAX_LONG_PATH &&
-                    (findData.cFileName[nameLen - 1] == 'e' || findData.cFileName[nameLen - 1] == 'E') &&
-                    (findData.cFileName[nameLen - 2] == 'x' || findData.cFileName[nameLen - 2] == 'X') &&
-                    (findData.cFileName[nameLen - 3] == 'e' || findData.cFileName[nameLen - 3] == 'E') &&
-                    findData.cFileName[nameLen - 4] == '.')
+                    (cFileNameA[nameLen - 1] == 'e' || cFileNameA[nameLen - 1] == 'E') &&
+                    (cFileNameA[nameLen - 2] == 'x' || cFileNameA[nameLen - 2] == 'X') &&
+                    (cFileNameA[nameLen - 3] == 'e' || cFileNameA[nameLen - 3] == 'E') &&
+                    cFileNameA[nameLen - 4] == '.')
                 {
                     // determine the program type
                     CPathBuffer fullName; // Heap-allocated for long path support
                     DWORD type;
                     strcpy(fullName, path);
-                    strcat(fullName, findData.cFileName);
+                    strcat(fullName, cFileNameA);
 
                     if (!MyGetBinaryType(fullName, &type))
                     {
@@ -625,7 +628,7 @@ BOOL CPackACDialog::DirectorySearch(char* path)
                         continue;
                     }
                     // and see whether we are interested in it
-                    mustStop |= ListView->ConsiderItem(path, findData.cFileName,
+                    mustStop |= ListView->ConsiderItem(path, cFileNameA,
                                                        findData.ftLastWriteTime,
                                                        CQuadWord(findData.nFileSizeLow,
                                                                  findData.nFileSizeHigh),
@@ -635,10 +638,10 @@ BOOL CPackACDialog::DirectorySearch(char* path)
             else
             {
                 // we have a directory - exclude '.' and '..'
-                if (findData.cFileName[0] != 0 &&
-                    (findData.cFileName[0] != '.' ||
-                     (findData.cFileName[1] != '\0' &&
-                      (findData.cFileName[1] != '.' || findData.cFileName[2] != '\0'))) &&
+                if (cFileNameA[0] != 0 &&
+                    (cFileNameA[0] != '.' ||
+                     (cFileNameA[1] != '\0' &&
+                      (cFileNameA[1] != '.' || cFileNameA[2] != '\0'))) &&
                     pathLen + 1 + nameLen < SAL_MAX_LONG_PATH)
                 {
                     // create the directory name to search
@@ -652,7 +655,7 @@ BOOL CPackACDialog::DirectorySearch(char* path)
                     else
                     {
                         strcpy(newPath, path);
-                        strcat(newPath, findData.cFileName);
+                        strcat(newPath, cFileNameA);
                         strcat(newPath, "\\");
                         // and search it recursively
                         DirectorySearch(newPath);
@@ -664,7 +667,7 @@ BOOL CPackACDialog::DirectorySearch(char* path)
             DWORD ret = WaitForSingleObject(StopSearch, 0);
             if (ret != WAIT_TIMEOUT)
                 mustStop = TRUE;
-        } while (FindNextFile(fileFind, &findData) && !mustStop);
+        } while (FindNextFileW(fileFind, &findData) && !mustStop);
         HANDLES(FindClose(fileFind));
     }
     HANDLES(GlobalFree((HGLOBAL)fileName));
@@ -1833,7 +1836,7 @@ void CPackACDrives::Validate(CTransferInfo& ti)
         {
             INT_PTR itemID;
             EditLB->GetItemID(i, itemID);
-            DWORD attr = SalGetFileAttributes((char*)itemID);
+            DWORD attr = GetFileAttributesW(AnsiToWide((char*)itemID).c_str());
             if (attr == -1 || (attr & FILE_ATTRIBUTE_DIRECTORY) == 0)
             {
                 EditLB->SetCurSel(i);

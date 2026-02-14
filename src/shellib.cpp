@@ -13,6 +13,7 @@ extern "C"
 }
 #include "salshlib.h"
 #include "common/widepath.h"
+#include "common/unicode/helpers.h"
 
 // original location in fileswnd.h (here only because of MakeCopyOfName in CImpDropTarget::ProcessClipboardData)
 extern BOOL OurClipDataObject; // TRUE during "paste" of our IDataObject
@@ -2407,11 +2408,11 @@ void ResolveNetHoodPath(char* path)
     lstrcpyn(name, path, name.Size());
     if (SalPathAppend(name, "desktop.ini", name.Size()))
     {
-        HANDLE hFile = SalCreateFileH(name, GENERIC_READ,
+        HANDLE hFile = HANDLES_Q(CreateFileW(AnsiToWide(name).c_str(), GENERIC_READ,
                                             FILE_SHARE_WRITE | FILE_SHARE_READ, NULL,
                                             OPEN_EXISTING,
                                             FILE_FLAG_SEQUENTIAL_SCAN,
-                                            NULL);
+                                            NULL));
         if (hFile != INVALID_HANDLE_VALUE)
         {
             if (GetFileSize(hFile, NULL) <= 1000) // so far all had 92 bytes, so 1000 bytes should be more than enough
@@ -2454,8 +2455,8 @@ void ResolveNetHoodPath(char* path)
         lstrcpyn(name, path, name.Size());
         if (SalPathAppend(name, "target.lnk", name.Size()))
         {
-            WIN32_FIND_DATA data;
-            HANDLE find = SalFindFirstFileH(name, &data);
+            WIN32_FIND_DATAW data;
+            HANDLE find = HANDLES_Q(FindFirstFileW(AnsiToWide(name).c_str(), &data));
             if (find != INVALID_HANDLE_VALUE) // file exists and we have its 'data'
             {
                 HANDLES(FindClose(find));
@@ -2474,7 +2475,8 @@ void ResolveNetHoodPath(char* path)
                         oleName[oleName.Size() - 1] = 0;
                         if (fileInt->Load(oleName, STGM_READ) == S_OK)
                         {
-                            if (link->GetPath(name, name.Size(), &data, SLGP_UNCPRIORITY) == NOERROR)
+                            WIN32_FIND_DATAA dataA;
+                            if (link->GetPath(name, name.Size(), &dataA, SLGP_UNCPRIORITY) == NOERROR)
                             {                       // we don't use Resolve because it's not that critical here and would slow things down considerably
                                 strcpy(path, name); // eureka, finally we know where that link leads
                             }

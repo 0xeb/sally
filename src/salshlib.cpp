@@ -651,8 +651,8 @@ void CSalShExtPastedData::DoPasteOperation(BOOL copy, const char* tgtPath)
             BOOL canUseData = FALSE;
             FILETIME archiveDate;  // archive file date&time
             CQuadWord archiveSize; // archive file size
-            HANDLE file = SalCreateFileH(ArchiveFileName, GENERIC_READ, FILE_SHARE_READ | FILE_SHARE_WRITE,
-                                               NULL, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, NULL);
+            HANDLE file = HANDLES_Q(CreateFileW(AnsiToWide(ArchiveFileName).c_str(), GENERIC_READ, FILE_SHARE_READ | FILE_SHARE_WRITE,
+                                               NULL, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, NULL));
             if (file != INVALID_HANDLE_VALUE)
             {
                 GetFileTime(file, NULL, NULL, &archiveDate);
@@ -688,8 +688,8 @@ void CSalShExtPastedData::DoPasteOperation(BOOL copy, const char* tgtPath)
             DWORD err = NO_ERROR;
             FILETIME archiveDate;  // archive file date&time
             CQuadWord archiveSize; // archive file size
-            HANDLE file = SalCreateFileH(ArchiveFileName, GENERIC_READ, FILE_SHARE_READ | FILE_SHARE_WRITE,
-                                               NULL, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, NULL);
+            HANDLE file = HANDLES_Q(CreateFileW(AnsiToWide(ArchiveFileName).c_str(), GENERIC_READ, FILE_SHARE_READ | FILE_SHARE_WRITE,
+                                               NULL, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, NULL));
             if (file != INVALID_HANDLE_VALUE)
             {
                 GetFileTime(file, NULL, NULL, &archiveDate);

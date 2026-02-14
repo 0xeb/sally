@@ -7,6 +7,7 @@
 #include "cfgdlg.h"
 #include "find.h"
 #include "md5.h"
+#include "common/unicode/helpers.h"
 
 char* FindNamedHistory[FIND_NAMED_HISTORY_SIZE];
 char* FindLookInHistory[FIND_LOOKIN_HISTORY_SIZE];
@@ -814,8 +815,8 @@ BOOL CDuplicateCandidates::GetMD5Digest(CGrepData* data, CFoundFilesData* file,
     data->SearchingText->Set(fullPath); // set the current file
 
     // open the file for reading with sequential access
-    HANDLE hFile = SalCreateFileH(fullPath, GENERIC_READ, FILE_SHARE_READ | FILE_SHARE_WRITE,
-                                        NULL, OPEN_EXISTING, FILE_FLAG_SEQUENTIAL_SCAN, NULL);
+    HANDLE hFile = HANDLES_Q(CreateFileW(AnsiToWide(fullPath).c_str(), GENERIC_READ, FILE_SHARE_READ | FILE_SHARE_WRITE,
+                                        NULL, OPEN_EXISTING, FILE_FLAG_SEQUENTIAL_SCAN, NULL));
     if (hFile != INVALID_HANDLE_VALUE)
     {
         BYTE buffer[DUPLICATES_BUFFER_SIZE];
@@ -1351,11 +1352,11 @@ BOOL TestFileContent(DWORD sizeLow, DWORD sizeHigh, const char* path, CGrepData*
     {
         DWORD err = ERROR_SUCCESS;
         data->SearchingText->Set(path); // set the current file
-        HANDLE hFile = SalCreateFileH(path, GENERIC_READ,
+        HANDLE hFile = HANDLES_Q(CreateFileW(AnsiToWide(path).c_str(), GENERIC_READ,
                                             FILE_SHARE_READ | FILE_SHARE_WRITE, NULL,
                                             OPEN_EXISTING,
                                             FILE_FLAG_SEQUENTIAL_SCAN,
-                                            NULL);
+                                            NULL));
         BOOL getLinkFileSizeErr = FALSE;
         if (hFile != INVALID_HANDLE_VALUE)
         {
@@ -1539,8 +1540,8 @@ void SearchDirectory(CPathBuffer& path, char* end, int startPathLen,
         return;
     }
 
-    WIN32_FIND_DATA file;
-    HANDLE find = SalFindFirstFileH(path, &file);
+    WIN32_FIND_DATAW file;
+    HANDLE find = HANDLES_Q(FindFirstFileW(AnsiToWide(path).c_str(), &file));
     if (find != INVALID_HANDLE_VALUE)
     {
         if (end - path > 3)
@@ -1560,9 +1561,11 @@ void SearchDirectory(CPathBuffer& path, char* end, int startPathLen,
 
         do
         {
+            char cFileNameA[MAX_PATH];
+            WideCharToMultiByte(CP_ACP, 0, file.cFileName, -1, cFileNameA, MAX_PATH, NULL, NULL);
             BOOL isDir = (file.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY) != 0;
-            BOOL ignoreDir = isDir && (lstrcmp(file.cFileName, ".") == 0 || lstrcmp(file.cFileName, "..") == 0);
-            if (ignoreDir || (end - path) + lstrlen(file.cFileName) < path.Size())
+            BOOL ignoreDir = isDir && (lstrcmp(cFileNameA, ".") == 0 || lstrcmp(cFileNameA, "..") == 0);
+            if (ignoreDir || (end - path) + lstrlen(cFileNameA) < path.Size())
             {
                 // after finding an item without displaying it and once 0.5 s have passed since the last redraw,
                 // we request the listview to redraw
@@ -1572,7 +1575,7 @@ void SearchDirectory(CPathBuffer& path, char* end, int startPathLen,
                     data->NeedRefresh = FALSE;
                 }
 
-                if (file.cFileName[0] != 0 && !ignoreDir)
+                if (cFileNameA[0] != 0 && !ignoreDir)
                 {
                     // add all files and directories except "." and ".."
 
@@ -1582,7 +1585,7 @@ void SearchDirectory(CPathBuffer& path, char* end, int startPathLen,
                     {
                         // file name
                         // let the extension be resolved if ext==NULL
-                        if (masksGroup->AgreeMasks(file.cFileName, NULL)) // mask is OK
+                        if (masksGroup->AgreeMasks(cFileNameA, NULL)) // mask is OK
                         {
                             BOOL ok;
                             if (data->Grep)
@@ -1592,7 +1595,7 @@ void SearchDirectory(CPathBuffer& path, char* end, int startPathLen,
                                     ok = FALSE; // a directory cannot be grepped
                                 else
                                 {
-                                    strcpy_s(end, path.Size() - (end - path), file.cFileName);
+                                    strcpy_s(end, path.Size() - (end - path), cFileNameA);
                                     // links: file.nFileSizeLow == 0 && file.nFileSizeHigh == 0, the file size
                                     // must be additionally obtained via SalGetFileSize()
                                     BOOL isLink = (file.dwFileAttributes & FILE_ATTRIBUTE_REPARSE_POINT) != 0;
@@ -1611,7 +1614,7 @@ void SearchDirectory(CPathBuffer& path, char* end, int startPathLen,
                                 else
                                     *end = 0;
 
-                                AddFoundItem(path, file.cFileName, file.nFileSizeLow, file.nFileSizeHigh,
+                                AddFoundItem(path, cFileNameA, file.nFileSizeLow, file.nFileSizeHigh,
                                              file.dwFileAttributes, &file.ftLastWriteTime, isDir, data,
                                              duplicateCandidates);
 
@@ -1625,7 +1628,7 @@ void SearchDirectory(CPathBuffer& path, char* end, int startPathLen,
                 }
                 if (isDir && includeSubDirs && !ignoreDir) // directory + not "." or ".."
                 {
-                    int l = (int)strlen(file.cFileName);
+                    int l = (int)strlen(cFileNameA);
 
                     if ((end - path) + l + 1 /* 1 za backslash */ < path.Size())
                     {
@@ -1637,7 +1640,7 @@ void SearchDirectory(CPathBuffer& path, char* end, int startPathLen,
                             char* newFileName = new char[l + 1];
                             if (newFileName != NULL)
                             {
-                                memmove(newFileName, file.cFileName, l + 1);
+                                memmove(newFileName, cFileNameA, l + 1);
                                 if (dirStackCount < dirStack->Count)
                                 {
                                     // no need to assign an item - we have space
@@ -1666,7 +1669,7 @@ void SearchDirectory(CPathBuffer& path, char* end, int startPathLen,
                         if (searchNow)
                         {
                             // out of memory - we will not use dirStack
-                            strcpy_s(end, path.Size() - (end - path), file.cFileName);
+                            strcpy_s(end, path.Size() - (end - path), cFileNameA);
                             strcat_s(end, path.Size() - (end - path), "\\");
                             l++;
                             SearchDirectory(path, end + l, startPathLen, masksGroup, includeSubDirs, data, NULL,
@@ -1678,7 +1681,7 @@ void SearchDirectory(CPathBuffer& path, char* end, int startPathLen,
                         FIND_LOG_ITEM log;
                         log.Flags = FLI_ERROR;
                         log.Text = LoadStr(IDS_TOOLONGNAME);
-                        strcpy_s(end, path.Size() - (end - path), file.cFileName);
+                        strcpy_s(end, path.Size() - (end - path), cFileNameA);
                         log.Path = path;
                         SendMessage(data->HWindow, WM_USER_ADDLOG, (WPARAM)&log, 0);
                     }
@@ -1691,7 +1694,7 @@ void SearchDirectory(CPathBuffer& path, char* end, int startPathLen,
                 log.Text = LoadStr(IDS_TOOLONGNAME);
                 *end = 0;
                 lstrcpyn(message, path, message.Size());
-                lstrcpyn(message + strlen(message), file.cFileName, message.Size() - (int)strlen(message));
+                lstrcpyn(message + strlen(message), cFileNameA, message.Size() - (int)strlen(message));
                 log.Path = message;
                 SendMessage(data->HWindow, WM_USER_ADDLOG, (WPARAM)&log, 0);
             }
@@ -1700,7 +1703,7 @@ void SearchDirectory(CPathBuffer& path, char* end, int startPathLen,
                 testFindNextErr = FALSE;
                 break;
             }
-        } while (FindNextFile(find, &file));
+        } while (FindNextFileW(find, &file));
         DWORD err = GetLastError();
         HANDLES(FindClose(find));
 

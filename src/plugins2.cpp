@@ -13,6 +13,7 @@
 #include "mainwnd.h"
 #include "toolbar.h"
 #include "zip.h"
+#include "common/unicode/helpers.h"
 #include "pack.h"
 #include "dialogs.h"
 
@@ -2719,21 +2720,23 @@ int CPlugins::GetViewerCount(int index)
 }
 
 // helper function for CPlugins::AutoInstallStdPluginsDir
-void SearchForSPLs(char* buf, char* s, TIndirectArray<char>& foundFiles, WIN32_FIND_DATA& data)
+void SearchForSPLs(char* buf, char* s, TIndirectArray<char>& foundFiles, WIN32_FIND_DATAW& data)
 {
     strcpy(s++, "\\*");
-    HANDLE find = SalFindFirstFileH(buf, &data);
+    HANDLE find = HANDLES_Q(FindFirstFileW(AnsiToWide(buf).c_str(), &data));
     if (find != INVALID_HANDLE_VALUE)
     {
         do
         {
+            char cFileNameA[MAX_PATH];
+            WideCharToMultiByte(CP_ACP, 0, data.cFileName, -1, cFileNameA, MAX_PATH, NULL, NULL);
             if ((data.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY) == 0) // it's a file
             {
-                char* str = strrchr(data.cFileName, '.');
-                //        if (str != NULL && str > data.cFileName && StrICmp(str, ".spl") == 0) // ".cvspass" in Windows is treated as an extension ...
+                char* str = strrchr(cFileNameA, '.');
+                //        if (str != NULL && str > cFileNameA && StrICmp(str, ".spl") == 0) // ".cvspass" in Windows is treated as an extension ...
                 if (str != NULL && StrICmp(str, ".spl") == 0)
                 { // SPL extension, add to the list of found files
-                    strcpy(s, data.cFileName);
+                    strcpy(s, cFileNameA);
                     str = DupStr(buf);
                     if (str != NULL)
                     {
@@ -2750,13 +2753,13 @@ void SearchForSPLs(char* buf, char* s, TIndirectArray<char>& foundFiles, WIN32_F
             }
             else // it's a directory
             {
-                if (data.cFileName[0] != 0 && strcmp(data.cFileName, ".") != 0 && strcmp(data.cFileName, "..") != 0)
+                if (cFileNameA[0] != 0 && strcmp(cFileNameA, ".") != 0 && strcmp(cFileNameA, "..") != 0)
                 { // not "." or "..", search the subdirectory...
-                    strcpy(s, data.cFileName);
+                    strcpy(s, cFileNameA);
                     SearchForSPLs(buf, s + strlen(s), foundFiles, data);
                 }
             }
-        } while (FindNextFile(find, &data));
+        } while (FindNextFileW(find, &data));
         HANDLES(FindClose(find));
     }
 }
@@ -2764,8 +2767,8 @@ void SearchForSPLs(char* buf, char* s, TIndirectArray<char>& foundFiles, WIN32_F
 BOOL SearchForAddedSPLs(char* buf, char* s, TIndirectArray<char>& foundFiles)
 { // returns TRUE if plugins from 'foundFiles' should be installed and all plugins loaded
     strcpy(s, "\\plugins.ver");
-    HANDLE file = SalCreateFileH(buf, GENERIC_READ, FILE_SHARE_READ, NULL, OPEN_EXISTING,
-                                       FILE_FLAG_SEQUENTIAL_SCAN, NULL);
+    HANDLE file = HANDLES_Q(CreateFileW(AnsiToWide(buf).c_str(), GENERIC_READ, FILE_SHARE_READ, NULL, OPEN_EXISTING,
+                                       FILE_FLAG_SEQUENTIAL_SCAN, NULL));
     if (file != INVALID_HANDLE_VALUE)
     {
         BOOL isPluginVerNew = FALSE;
@@ -2829,7 +2832,7 @@ BOOL SearchForAddedSPLs(char* buf, char* s, TIndirectArray<char>& foundFiles)
                             memmove(name + l, name, min((int)strlen(name) + 1, name.Size() - l));
                             memcpy(name, buf, l); // assumes buf contains the path including backslash
                         }
-                        DWORD attrs = SalGetFileAttributes(name);
+                        DWORD attrs = GetFileAttributesW(AnsiToWide(name).c_str());
                         if (attrs != 0xFFFFFFFF && (attrs & FILE_ATTRIBUTE_DIRECTORY) == 0)
                         { // the name exists and it's a file
                             char* str = DupStr(name);
@@ -3227,7 +3230,7 @@ void CPlugins::RemoveNoLongerExistingPlugins(BOOL canDelPluginRegKey, BOOL loadA
                 fullName = buf;
             }
 
-            DWORD attr = SalGetFileAttributes(fullName);
+            DWORD attr = GetFileAttributesW(AnsiToWide(fullName).c_str());
             DWORD err = GetLastError();
             if (attr == INVALID_FILE_ATTRIBUTES &&
                 (err == ERROR_FILE_NOT_FOUND || err == ERROR_PATH_NOT_FOUND || err == ERROR_BAD_PATHNAME))
@@ -3349,7 +3352,7 @@ void CPlugins::AutoInstallStdPluginsDir(HWND parent)
 
     // search for *.spl in the "plugins" directory and its subdirectories
     TIndirectArray<char> foundFiles(10, 10);
-    WIN32_FIND_DATA data;
+    WIN32_FIND_DATAW data;
     SearchForSPLs(buf, s, foundFiles, data);
 
     // for progress compute the number of existing plugins that will be loaded later

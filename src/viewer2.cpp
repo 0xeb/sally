@@ -358,8 +358,8 @@ BOOL CViewerWindow::LoadBefore(HANDLE* hFile)
     HANDLE file;
     if (hFile == NULL || *hFile == NULL)
     {
-        file = SalCreateFileH(FileName.c_str(), GENERIC_READ, FILE_SHARE_READ | FILE_SHARE_WRITE, NULL,
-                              OPEN_EXISTING, FILE_FLAG_SEQUENTIAL_SCAN, NULL);
+        file = HANDLES_Q(CreateFileW(AnsiToWide(FileName.c_str()).c_str(), GENERIC_READ, FILE_SHARE_READ | FILE_SHARE_WRITE, NULL,
+                              OPEN_EXISTING, FILE_FLAG_SEQUENTIAL_SCAN, NULL));
         if (hFile != NULL && file != INVALID_HANDLE_VALUE)
             *hFile = file;
     }
@@ -503,8 +503,8 @@ BOOL CViewerWindow::LoadBehind(HANDLE* hFile)
     HANDLE file;
     if (hFile == NULL || *hFile == NULL)
     {
-        file = SalCreateFileH(FileName.c_str(), GENERIC_READ, FILE_SHARE_READ | FILE_SHARE_WRITE, NULL, OPEN_EXISTING,
-                              FILE_FLAG_SEQUENTIAL_SCAN, NULL);
+        file = HANDLES_Q(CreateFileW(AnsiToWide(FileName.c_str()).c_str(), GENERIC_READ, FILE_SHARE_READ | FILE_SHARE_WRITE, NULL, OPEN_EXISTING,
+                              FILE_FLAG_SEQUENTIAL_SCAN, NULL));
         if (hFile != NULL && file != INVALID_HANDLE_VALUE)
             *hFile = file;
     }
@@ -789,8 +789,8 @@ void CViewerWindow::FileChanged(HANDLE file, BOOL testOnlyFileSize, BOOL& fatalE
     BOOL close;
     if (file == NULL)
     {
-        file = SalCreateFileH(FileName.c_str(), GENERIC_READ, FILE_SHARE_READ | FILE_SHARE_WRITE, NULL, OPEN_EXISTING,
-                              FILE_FLAG_SEQUENTIAL_SCAN, NULL);
+        file = HANDLES_Q(CreateFileW(AnsiToWide(FileName.c_str()).c_str(), GENERIC_READ, FILE_SHARE_READ | FILE_SHARE_WRITE, NULL, OPEN_EXISTING,
+                              FILE_FLAG_SEQUENTIAL_SCAN, NULL));
         close = TRUE;
     }
     else

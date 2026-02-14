@@ -13,6 +13,7 @@
 #include "pack.h"
 #include "common/IFileSystem.h"
 #include "common/widepath.h"
+#include "common/unicode/helpers.h"
 
 //
 // ****************************************************************************
@@ -1590,7 +1591,7 @@ BOOL PackUniversalUncompress(HWND parent, const char* command, TPackErrorTable* 
         // locate the extracted subdirectory path - names of subdirectories may not match
         // because of the Czech characters and long names :-(
         char* r = rootPath;
-        WIN32_FIND_DATA foundFile;
+        WIN32_FIND_DATAW foundFile;
         char buffer[1000];
         while (1)
         {
@@ -1602,7 +1603,7 @@ BOOL PackUniversalUncompress(HWND parent, const char* command, TPackErrorTable* 
                 r++; // skip the backslash in the original rootPath
             strcat(srcDir, "\\*");
 
-            HANDLE found = SalFindFirstFileH(srcDir, &foundFile);
+            HANDLE found = HANDLES_Q(FindFirstFileW(AnsiToWide(srcDir).c_str(), &foundFile));
             if (found == INVALID_HANDLE_VALUE)
             {
                 strcpy(buffer, "FindFirstFile: ");
@@ -1614,10 +1615,10 @@ BOOL PackUniversalUncompress(HWND parent, const char* command, TPackErrorTable* 
                 return (*PackErrorHandlerPtr)(parent, IDS_PACKERR_GENERAL, buffer);
             }
             while (foundFile.cFileName[0] == 0 ||
-                   strcmp(foundFile.cFileName, ".") == 0 || // we ignore "." and ".."
-                   strcmp(foundFile.cFileName, "..") == 0)
+                   wcscmp(foundFile.cFileName, L".") == 0 || // we ignore "." and ".."
+                   wcscmp(foundFile.cFileName, L"..") == 0)
             {
-                if (!FindNextFile(found, &foundFile))
+                if (!FindNextFileW(found, &foundFile))
                 {
                     HANDLES(FindClose(found));
                     strcpy(buffer, "FindNextFile: ");
@@ -1628,8 +1629,10 @@ BOOL PackUniversalUncompress(HWND parent, const char* command, TPackErrorTable* 
 
             if (foundFile.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY)
             { // attach another subdirectory on the path
+                char cFileNameA[MAX_PATH];
+                WideCharToMultiByte(CP_ACP, 0, foundFile.cFileName, -1, cFileNameA, MAX_PATH, NULL, NULL);
                 srcDir[strlen(srcDir) - 1] = 0;
-                strcat(srcDir, foundFile.cFileName);
+                strcat(srcDir, cFileNameA);
             }
             else
             {
@@ -1858,8 +1861,8 @@ BOOL PackUnpackOneFile(CFilesWindow* panel, const char* archiveFileName,
 
     // find the extracted file - the name may not match due to the Czech characters and long names :-(
     std::string extractedFile = std::string(tmpDirNameBuf) + "\\*";
-    WIN32_FIND_DATA foundFile;
-    HANDLE found = SalFindFirstFileH(extractedFile.c_str(), &foundFile);
+    WIN32_FIND_DATAW foundFile;
+    HANDLE found = HANDLES_Q(FindFirstFileW(AnsiToWide(extractedFile.c_str()).c_str(), &foundFile));
     if (found == INVALID_HANDLE_VALUE)
     {
         char buffer[1000];
@@ -1869,9 +1872,9 @@ BOOL PackUnpackOneFile(CFilesWindow* panel, const char* archiveFileName,
         return (*PackErrorHandlerPtr)(NULL, IDS_PACKERR_GENERAL, buffer);
     }
     while (foundFile.cFileName[0] == 0 ||
-           strcmp(foundFile.cFileName, ".") == 0 || strcmp(foundFile.cFileName, "..") == 0)
+           wcscmp(foundFile.cFileName, L".") == 0 || wcscmp(foundFile.cFileName, L"..") == 0)
     {
-        if (!FindNextFile(found, &foundFile))
+        if (!FindNextFileW(found, &foundFile))
         {
             char buffer[1000];
             strcpy(buffer, "FindNextFile: ");
@@ -1884,7 +1887,9 @@ BOOL PackUnpackOneFile(CFilesWindow* panel, const char* archiveFileName,
     HANDLES(FindClose(found));
 
     // and finally move it where it belongs
-    std::string srcName = std::string(tmpDirNameBuf) + "\\" + foundFile.cFileName;
+    char cFileNameA[MAX_PATH];
+    WideCharToMultiByte(CP_ACP, 0, foundFile.cFileName, -1, cFileNameA, MAX_PATH, NULL, NULL);
+    std::string srcName = std::string(tmpDirNameBuf) + "\\" + cFileNameA;
     const char* onlyName = strrchr(nameInArchive, '\\');
     if (onlyName == NULL)
         onlyName = nameInArchive;

@@ -1557,7 +1557,7 @@ CViewerWindow::WindowProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
                     }
 
                     DWORD attr;
-                    attr = SalGetFileAttributes(fileName);
+                    attr = GetFileAttributesW(AnsiToWide(fileName).c_str());
 
                     if (attr != 0xFFFFFFFF && (attr & FILE_ATTRIBUTE_DIRECTORY))
                     {
@@ -1590,11 +1590,11 @@ CViewerWindow::WindowProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
                             strcpy(tmpFile, fileName);
                         if (attr == 0xFFFFFFFF || SalGetTempFileName(path, "sal", tmpFile, TRUE))
                         {
-                            HANDLE file = SalCreateFileH(tmpFile, GENERIC_WRITE,
+                            HANDLE file = HANDLES_Q(CreateFileW(AnsiToWide(tmpFile).c_str(), GENERIC_WRITE,
                                                          FILE_SHARE_READ, NULL,
                                                          CREATE_ALWAYS,
                                                          FILE_FLAG_SEQUENTIAL_SCAN,
-                                                         NULL);
+                                                         NULL));
                             if (file != INVALID_HANDLE_VALUE)
                             {
                                 __int64 off = start, len;
@@ -1624,7 +1624,7 @@ CViewerWindow::WindowProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
                                 {
                                     if (attr != 0xFFFFFFFF) // overwrite: tmp -> fileName
                                     {
-                                        BOOL setAttr = ClearReadOnlyAttr(fileName, attr); // for the case of a read-only file
+                                        BOOL setAttr = ClearReadOnlyAttrW(AnsiToWide(fileName).c_str(), attr); // for the case of a read-only file
                                         if (gFileSystem->DeleteFile(AnsiToWide(fileName).c_str()).success)
                                         {
                                             if (!SalMoveFile(tmpFile, fileName))
