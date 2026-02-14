@@ -1045,6 +1045,26 @@ BOOL CCriteriaData::AgreeMasksAndAdvanced(const WIN32_FIND_DATA* file)
     return TRUE;
 }
 
+BOOL CCriteriaData::AgreeMasksAndAdvanced(const WIN32_FIND_DATAW* file)
+{
+    if (UseMasks)
+    {
+        char fileNameA[MAX_PATH];
+        WideCharToMultiByte(CP_ACP, 0, file->cFileName, -1, fileNameA, MAX_PATH, NULL, NULL);
+        if (!Masks.AgreeMasks(fileNameA, NULL))
+            return FALSE;
+    }
+
+    if (UseAdvanced)
+    {
+        CQuadWord size(file->nFileSizeLow, file->nFileSizeHigh);
+        if (!Advanced.Test(file->dwFileAttributes, &size, &file->ftLastWriteTime))
+            return FALSE;
+    }
+
+    return TRUE;
+}
+
 const char* CRITERIADATA_OVERWRITEOLDER_REG = "Overwrite Older";
 const char* CRITERIADATA_STARTONIDLE_REG = "Start On Idle";
 const char* CRITERIADATA_COPYSECURITY_REG = "Copy Security";

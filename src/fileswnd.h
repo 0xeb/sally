@@ -106,6 +106,7 @@ public:
     // NOTE: advanced criteria must also be prepared
     BOOL AgreeMasksAndAdvanced(const CFileData* file);
     BOOL AgreeMasksAndAdvanced(const WIN32_FIND_DATA* file);
+    BOOL AgreeMasksAndAdvanced(const WIN32_FIND_DATAW* file);
 
     // save/load to/from the Windows Registry
     // NOTE: saving is optimized, only changed values are stored; the key must be cleared before saving

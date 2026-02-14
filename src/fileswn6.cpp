@@ -361,8 +361,8 @@ BOOL CFilesWindow::MoveFiles(const char* source, const char* target, const char*
         sourceDir[len++] = '\\';
         strcpy(sourceDir + len, "*");
 
-        WIN32_FIND_DATA file;
-        HANDLE find = SalFindFirstFileH(sourceDir, &file);
+        WIN32_FIND_DATAW file;
+        HANDLE find = HANDLES_Q(FindFirstFileW(AnsiToWide(sourceDir).c_str(), &file));
         if (find == INVALID_HANDLE_VALUE)
         {
             FreeScript(script);
@@ -404,16 +404,18 @@ BOOL CFilesWindow::MoveFiles(const char* source, const char* target, const char*
             do
             {
                 if (file.cFileName[0] != 0 &&
-                    (file.cFileName[0] != '.' ||
-                     (file.cFileName[1] != 0 && (file.cFileName[1] != '.' || file.cFileName[2] != 0))))
+                    (file.cFileName[0] != L'.' ||
+                     (file.cFileName[1] != 0 && (file.cFileName[1] != L'.' || file.cFileName[2] != 0))))
                 {
+                    char fileNameA[MAX_PATH];
+                    WideCharToMultiByte(CP_ACP, 0, file.cFileName, -1, fileNameA, MAX_PATH, NULL, NULL);
                     if (file.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY)
                     {
                         if (!BuildScriptDir(script, atMove, sourceDir, sourceSupADS, targetDir,
                                             targetPathState, targetSupADS, targetIsFAT32, NULL,
-                                            file.cFileName, NULL, NULL, NULL, file.dwFileAttributes, NULL,
+                                            fileNameA, NULL, NULL, NULL, file.dwFileAttributes, NULL,
                                             TRUE, FALSE, fastDirectoryMove, NULL, NULL, &file.ftLastWriteTime,
-                                            srcAndTgtPathsFlags))
+                                            srcAndTgtPathsFlags, file.cFileName))
                         {
                             scriptOK = FALSE;
                             break;
@@ -423,17 +425,17 @@ BOOL CFilesWindow::MoveFiles(const char* source, const char* target, const char*
                     {
                         if (!BuildScriptFile(script, atMove, sourceDir, sourceSupADS, targetDir,
                                              targetPathState, targetSupADS, targetIsFAT32, NULL,
-                                             file.cFileName, NULL,
+                                             fileNameA, NULL,
                                              CQuadWord(file.nFileSizeLow, file.nFileSizeHigh),
                                              NULL, NULL, file.dwFileAttributes, NULL, FALSE, NULL,
-                                             srcAndTgtPathsFlags))
+                                             srcAndTgtPathsFlags, file.cFileName))
                         {
                             scriptOK = FALSE;
                             break;
                         }
                     }
                 }
-            } while (FindNextFile(find, &file));
+            } while (FindNextFileW(find, &file));
             HANDLES(FindClose(find));
             int i;
             for (i = 0; i < script->Count; i++)
@@ -676,7 +678,7 @@ BOOL CFilesWindow::BuildScriptMain2(COperations* script, BOOL copy, char* target
         }
 
         // For Unicode files, use wide path to get attributes (ANSI path has ?? for non-convertible chars)
-        DWORD attrs = (fileNameW != NULL) ? GetFileAttributesW(fileNameW) : SalGetFileAttributes(fileName);
+        DWORD attrs = (fileNameW != NULL) ? GetFileAttributesW(fileNameW) : GetFileAttributesW(AnsiToWide(fileName).c_str());
         if (attrs != 0xFFFFFFFF)
         {
             char* s = fileName + strlen(fileName);
@@ -702,7 +704,7 @@ BOOL CFilesWindow::BuildScriptMain2(COperations* script, BOOL copy, char* target
                     BOOL isKnown;
                     // mapName must be NULL here, otherwise data->MakeCopyOfName could not be TRUE
                     if ((isKnown = ContainsString(usedNames.get(), targetName)) != 0 ||
-                        SalGetFileAttributes(targetPath) != 0xFFFFFFFF)
+                        GetFileAttributesW(AnsiToWide(targetPath).c_str()) != INVALID_FILE_ATTRIBUTES)
                     { // name already exists, we must generate a new one
                         if (!isKnown)
                             AddStringToNames(usedNames.get(), targetName);
@@ -797,7 +799,7 @@ BOOL CFilesWindow::BuildScriptMain2(COperations* script, BOOL copy, char* target
                             if (strlen(targetName) < MAX_PATH) // name assembly succeeded, otherwise we ignore the result
                             {
                                 if ((isKnown = ContainsString(usedNames.get(), targetName)) != 0 ||
-                                    SalGetFileAttributes(targetPath) != 0xFFFFFFFF)
+                                    GetFileAttributesW(AnsiToWide(targetPath).c_str()) != INVALID_FILE_ATTRIBUTES)
                                 {
                                     if (!isKnown)
                                         AddStringToNames(usedNames.get(), targetName);
@@ -830,7 +832,7 @@ BOOL CFilesWindow::BuildScriptMain2(COperations* script, BOOL copy, char* target
                                     if (strlen(targetName) < MAX_PATH)                                                            // name assembly succeeded, otherwise we ignore the result
                                     {
                                         if ((isKnown = ContainsString(usedNames.get(), targetName)) != 0 ||
-                                            SalGetFileAttributes(targetPath) != 0xFFFFFFFF)
+                                            GetFileAttributesW(AnsiToWide(targetPath).c_str()) != INVALID_FILE_ATTRIBUTES)
                                         {
                                             if (!isKnown)
                                                 AddStringToNames(usedNames.get(), targetName);
@@ -885,7 +887,7 @@ BOOL CFilesWindow::BuildScriptMain2(COperations* script, BOOL copy, char* target
                                     if (strlen(targetName) < MAX_PATH) // name assembly succeeded, otherwise we ignore the result
                                     {
                                         if ((isKnown = ContainsString(usedNames.get(), targetName)) != 0 ||
-                                            SalGetFileAttributes(targetPath) != 0xFFFFFFFF)
+                                            GetFileAttributesW(AnsiToWide(targetPath).c_str()) != INVALID_FILE_ATTRIBUTES)
                                         {
                                             if (!isKnown)
                                                 AddStringToNames(usedNames.get(), targetName);
@@ -919,7 +921,7 @@ BOOL CFilesWindow::BuildScriptMain2(COperations* script, BOOL copy, char* target
                                 if (strlen(targetName) < MAX_PATH)                                                        // name assembly succeeded, otherwise we ignore the result
                                 {
                                     if ((isKnown = ContainsString(usedNames.get(), targetName)) != 0 ||
-                                        SalGetFileAttributes(targetPath) != 0xFFFFFFFF)
+                                        GetFileAttributesW(AnsiToWide(targetPath).c_str()) != INVALID_FILE_ATTRIBUTES)
                                     {
                                         if (!isKnown)
                                             AddStringToNames(usedNames.get(), targetName);
@@ -958,18 +960,17 @@ BOOL CFilesWindow::BuildScriptMain2(COperations* script, BOOL copy, char* target
                 else
                 {
                     HANDLE h;
-                    if (fileNameW != NULL)
                     {
-                        // Use wide path for Unicode filenames (ANSI path has ?? for non-convertible chars)
-                        h = CreateFileW(fileNameW, GENERIC_READ, FILE_SHARE_READ | FILE_SHARE_WRITE,
-                                        NULL, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, NULL);
-                        DWORD err2 = GetLastError();
-                        HANDLES_ADD_EX(__otQuiet, h != INVALID_HANDLE_VALUE, __htFile, __hoCreateFile, h, err2, TRUE);
-                    }
-                    else
-                    {
-                        h = SalCreateFileH(fileName, GENERIC_READ, FILE_SHARE_READ | FILE_SHARE_WRITE,
-                                                 NULL, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, NULL);
+                        // Use wide path — either from fileNameW or convert ANSI fileName
+                        const wchar_t* fileW = fileNameW;
+                        std::wstring fileWBuf;
+                        if (fileW == NULL)
+                        {
+                            fileWBuf = AnsiToWide(fileName);
+                            fileW = fileWBuf.c_str();
+                        }
+                        h = HANDLES_Q(CreateFileW(fileW, GENERIC_READ, FILE_SHARE_READ | FILE_SHARE_WRITE,
+                                                  NULL, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, NULL));
                     }
                     DWORD err = NO_ERROR;
                     if (h != INVALID_HANDLE_VALUE)
@@ -1309,13 +1310,13 @@ BOOL CFilesWindow::BuildScriptMain(COperations* script, CActionType type,
         strcpy(s, oneFile->Name);
         // try whether the file name is valid; if not, try its DOS name
         // (handles files accessible only via Unicode or DOS names)
-        if (SalGetFileAttributes(sourcePath) == 0xffffffff)
+        if (GetFileAttributesW(AnsiToWide(sourcePath).c_str()) == INVALID_FILE_ATTRIBUTES)
         {
             DWORD err = GetLastError();
             if (err == ERROR_FILE_NOT_FOUND || err == ERROR_INVALID_NAME)
             {
                 strcpy(s, oneFile->DosName);
-                if (SalGetFileAttributes(sourcePath) != 0xffffffff)
+                if (GetFileAttributesW(AnsiToWide(sourcePath).c_str()) != INVALID_FILE_ATTRIBUTES)
                 {
                     useName = oneFile->DosName;
                     useDOSName = NULL;
@@ -1859,8 +1860,8 @@ BOOL CFilesWindow::BuildScriptDir(COperations* script, CActionType type, char* s
                             lstrcpyn(finalName, sourcePath, 2 * MAX_PATH + 200);
                             if (SalPathAppend(finalName, "*", 2 * MAX_PATH + 200))
                             {
-                                WIN32_FIND_DATA f;
-                                HANDLE search = SalFindFirstFileH(finalName, &f);
+                                WIN32_FIND_DATAW f;
+                                HANDLE search = HANDLES_Q(FindFirstFileW(AnsiToWide(finalName).c_str(), &f));
                                 if (search == INVALID_HANDLE_VALUE)
                                 {
                                     DWORD err = GetLastError();
@@ -2044,9 +2045,9 @@ BOOL CFilesWindow::BuildScriptDir(COperations* script, CActionType type, char* s
     BOOL canDelDirAfterMove = TRUE; // Move only: FALSE if not everything is moved (filter skipped something), source directory can't be removed (won't be empty)
     if (!copyMoveDirIsLink || !copyMoveSkipLinkContent)
     {
-        WIN32_FIND_DATA f;
+        WIN32_FIND_DATAW f;
         strcpy(st, "\\*");
-        HANDLE search = SalFindFirstFileH(sourcePath, &f);
+        HANDLE search = HANDLES_Q(FindFirstFileW(AnsiToWide(sourcePath).c_str(), &f));
         *st = 0; // remove "\\*"
         if (search == INVALID_HANDLE_VALUE)
         {
@@ -2058,7 +2059,7 @@ BOOL CFilesWindow::BuildScriptDir(COperations* script, CActionType type, char* s
                     SalPathAppend(finalName, dirDOSName, 2 * MAX_PATH + 200) &&
                     SalPathAppend(finalName, "*", 2 * MAX_PATH + 200))
                 {
-                    search = SalFindFirstFileH(finalName, &f);
+                    search = HANDLES_Q(FindFirstFileW(AnsiToWide(finalName).c_str(), &f));
                     if (search != INVALID_HANDLE_VALUE)
                     {
                         strcpy(*sourceEnd == '\\' ? sourceEnd + 1 : sourceEnd, dirDOSName); // modify sourcePath (it's used further for handling found files and directories)
@@ -2102,8 +2103,8 @@ BOOL CFilesWindow::BuildScriptDir(COperations* script, CActionType type, char* s
             BOOL testFindNextErr = TRUE;
             do
             {
-                if (f.cFileName[0] == '.' &&
-                        (f.cFileName[1] == 0 || (f.cFileName[1] == '.' && f.cFileName[2] == 0)) ||
+                if (f.cFileName[0] == L'.' &&
+                        (f.cFileName[1] == 0 || (f.cFileName[1] == L'.' && f.cFileName[2] == 0)) ||
                     f.cFileName[0] == 0)
                     continue; // "." and ".." plus empty names (would lead to infinite recursion)
 
@@ -2142,15 +2143,19 @@ BOOL CFilesWindow::BuildScriptDir(COperations* script, CActionType type, char* s
                 }
 
                 //---  build a directory or file
+                char cFileNameA[MAX_PATH];
+                WideCharToMultiByte(CP_ACP, 0, f.cFileName, -1, cFileNameA, MAX_PATH, NULL, NULL);
+                char cAltNameA[14];
+                WideCharToMultiByte(CP_ACP, 0, f.cAlternateFileName, -1, cAltNameA, 14, NULL, NULL);
                 if (f.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY)
                 {
                     if (!BuildScriptDir(script, copyMoveDirIsLink ? atCopy : type, sourcePath, sourcePathSupADS, targetPath,
                                         targetPathState, targetPathSupADS, targetPathIsFAT32,
-                                        NULL, f.cFileName,
-                                        f.cAlternateFileName[0] != 0 ? f.cAlternateFileName : NULL,
+                                        NULL, cFileNameA,
+                                        cAltNameA[0] != 0 ? cAltNameA : NULL,
                                         attrsData, NULL, f.dwFileAttributes, chCaseData, FALSE,
                                         onlySize, fastDirectoryMove, filterCriteria, &canDelDirAfterMove,
-                                        &f.ftLastWriteTime, srcAndTgtPathsFlags))
+                                        &f.ftLastWriteTime, srcAndTgtPathsFlags, f.cFileName))
                     {
                     BUILD_ERROR:
                         HANDLES(FindClose(search));
@@ -2166,17 +2171,17 @@ BOOL CFilesWindow::BuildScriptDir(COperations* script, CActionType type, char* s
                     {
                         if (!BuildScriptFile(script, copyMoveDirIsLink ? atCopy : type, sourcePath, sourcePathSupADS, targetPath,
                                              targetPathState, targetPathSupADS, targetPathIsFAT32,
-                                             NULL, f.cFileName,
-                                             f.cAlternateFileName[0] != 0 ? f.cAlternateFileName : NULL,
+                                             NULL, cFileNameA,
+                                             cAltNameA[0] != 0 ? cAltNameA : NULL,
                                              CQuadWord(f.nFileSizeLow, f.nFileSizeHigh), attrsData, NULL,
                                              f.dwFileAttributes, chCaseData, onlySize, &f.ftLastWriteTime,
-                                             srcAndTgtPathsFlags))
+                                             srcAndTgtPathsFlags, f.cFileName))
                             goto BUILD_ERROR;
                     }
                     else
                         canDelDirAfterMove = FALSE; // not everything is being moved (filter skipped something); the source directory cannot be deleted (it would not be empty)
                 }
-            } while (FindNextFile(search, &f));
+            } while (FindNextFileW(search, &f));
             DWORD err = GetLastError();
             HANDLES(FindClose(search));
 
@@ -2541,14 +2546,16 @@ BOOL CFilesWindow::BuildScriptFile(COperations* script, CActionType type, char* 
                 if (!invalidTgtName)
                 {
                     HANDLE find;
-                    WIN32_FIND_DATA dataOut;
-                    find = SalFindFirstFileH(op.TargetName, &dataOut);
+                    WIN32_FIND_DATAW dataOut;
+                    find = HANDLES_Q(FindFirstFileW(AnsiToWide(op.TargetName).c_str(), &dataOut));
                     if (find != INVALID_HANDLE_VALUE)
                     {
                         HANDLES(FindClose(find));
 
                         const char* tgtName = SalPathFindFileName(op.TargetName);
-                        if (StrICmp(tgtName, dataOut.cFileName) == 0 &&                 // if it's not just a DOS-name match (that would change the DOS-name instead of overwriting)
+                        char cFileNameA[MAX_PATH];
+                        WideCharToMultiByte(CP_ACP, 0, dataOut.cFileName, -1, cFileNameA, MAX_PATH, NULL, NULL);
+                        if (StrICmp(tgtName, cFileNameA) == 0 &&                        // if it's not just a DOS-name match (that would change the DOS-name instead of overwriting)
                             (dataOut.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY) == 0) // if it's not a directory (overwrite older cannot handle directories)
                         {
                             // truncate timestamps to seconds (different FSs store timestamps with different precision, so there were "differences" even between "identical" times)
@@ -2948,7 +2955,7 @@ BOOL CFilesWindow::BuildScriptFile(COperations* script, CActionType type, char* 
         {
             return skip;
         }
-        op.TargetName = (char*)(DWORD_PTR)((SalGetFileAttributes(op.SourceName) & attrsData->AttrAnd) | attrsData->AttrOr);
+        op.TargetName = (char*)(DWORD_PTR)((GetFileAttributesW(AnsiToWide(op.SourceName).c_str()) & attrsData->AttrAnd) | attrsData->AttrOr);
         op.OwnsTargetName = false;  // TargetName stores attributes, not a pointer
         if (fileNameW != NULL)
             op.SetSourceNameW(sourcePath, fileNameW);
@@ -3125,7 +3132,7 @@ void CFilesWindow::ExecuteFromArchive(int index, BOOL edit, HWND editWithMenuPar
     }
     char dosName[14];
     dosName[0] = 0;
-    WIN32_FIND_DATA data;
+    WIN32_FIND_DATAW data;
     if (!exists) // we must unpack it
     {
         char* backSlash = strrchr(name, '\\');
@@ -3142,7 +3149,7 @@ void CFilesWindow::ExecuteFromArchive(int index, BOOL edit, HWND editWithMenuPar
             SetCursor(oldCur);
             SetThreadPriority(GetCurrentThread(), THREAD_PRIORITY_ABOVE_NORMAL);
 
-            HANDLE find = SalFindFirstFileH(name, &data);
+            HANDLE find = HANDLES_Q(FindFirstFileW(AnsiToWide(name).c_str(), &data));
             if (find != INVALID_HANDLE_VALUE)
             {
                 HANDLES(FindClose(find));
@@ -3150,7 +3157,7 @@ void CFilesWindow::ExecuteFromArchive(int index, BOOL edit, HWND editWithMenuPar
                 lastWrite = data.ftLastWriteTime;
                 attr = data.dwFileAttributes;
                 if (data.cAlternateFileName[0] != 0)
-                    strcpy(dosName, data.cAlternateFileName);
+                    WideCharToMultiByte(CP_ACP, 0, data.cAlternateFileName, -1, dosName, 14, NULL, NULL);
             }
 
             DiskCache.NamePrepared(dcFileName, fileSize);
@@ -3199,7 +3206,7 @@ void CFilesWindow::ExecuteFromArchive(int index, BOOL edit, HWND editWithMenuPar
 
     if (fileSize == CQuadWord(-1, -1))
     {
-        HANDLE find = SalFindFirstFileH(name, &data);
+        HANDLE find = HANDLES_Q(FindFirstFileW(AnsiToWide(name).c_str(), &data));
         if (find != INVALID_HANDLE_VALUE)
         {
             HANDLES(FindClose(find));
@@ -3207,7 +3214,7 @@ void CFilesWindow::ExecuteFromArchive(int index, BOOL edit, HWND editWithMenuPar
             lastWrite = data.ftLastWriteTime;
             attr = data.dwFileAttributes;
             if (data.cAlternateFileName[0] != 0)
-                strcpy(dosName, data.cAlternateFileName);
+                WideCharToMultiByte(CP_ACP, 0, data.cAlternateFileName, -1, dosName, 14, NULL, NULL);
         }
     }
 

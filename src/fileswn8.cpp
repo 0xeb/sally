@@ -590,10 +590,11 @@ void CFilesWindow::FilesAction(CActionType type, CFilesWindow* target, int count
                             }
 
                             *secondPart = 0; // 'path' holds the archive file name
+                            std::wstring pathW = AnsiToWide(path);
                             BOOL haveSize = FALSE;
                             CQuadWord size;
                             DWORD err;
-                            HANDLE hFile = SalCreateFileH(path, GENERIC_READ, 0, NULL, OPEN_EXISTING, 0, NULL);
+                            HANDLE hFile = HANDLES_Q(CreateFileW(pathW.c_str(), GENERIC_READ, 0, NULL, OPEN_EXISTING, 0, NULL));
                             if (hFile != INVALID_HANDLE_VALUE)
                             {
                                 haveSize = SalGetFileSize(hFile, size, err);
@@ -609,9 +610,9 @@ void CFilesWindow::FilesAction(CActionType type, CFilesWindow* target, int count
                                 DWORD nullFileAttrs;
                                 if (nullFile)
                                 {
-                                    nullFileAttrs = SalGetFileAttributes(path);
-                                    ClearReadOnlyAttr(path, nullFileAttrs); // so it's possible to delete even read-only files
-                                    gFileSystem->DeleteFile(AnsiToWide(path).c_str());
+                                    nullFileAttrs = GetFileAttributesW(pathW.c_str());
+                                    ClearReadOnlyAttrW(pathW.c_str(), nullFileAttrs); // so it's possible to delete even read-only files
+                                    gFileSystem->DeleteFile(pathW.c_str());
                                 }
                                 //---  custom packing
                                 EnvSetCurrentDirectoryA(gEnvironment, GetPath());
@@ -622,9 +623,9 @@ void CFilesWindow::FilesAction(CActionType type, CFilesWindow* target, int count
                                     if (nullFile && // a zero-size file might have a different compressed attribute; set the archive to the same
                                         nullFileAttrs != INVALID_FILE_ATTRIBUTES)
                                     {
-                                        HANDLE hFile2 = SalCreateFileH(path, GENERIC_READ | GENERIC_WRITE,
+                                        HANDLE hFile2 = HANDLES_Q(CreateFileW(pathW.c_str(), GENERIC_READ | GENERIC_WRITE,
                                                                              0, NULL, OPEN_EXISTING,
-                                                                             0, NULL);
+                                                                             0, NULL));
                                         if (hFile2 != INVALID_HANDLE_VALUE)
                                         {
                                             // restore the 'compressed' flag; it simply doesn't work on FAT or FAT32
@@ -633,7 +634,7 @@ void CFilesWindow::FilesAction(CActionType type, CFilesWindow* target, int count
                                             DeviceIoControl(hFile2, FSCTL_SET_COMPRESSION, &state,
                                                             sizeof(USHORT), NULL, 0, &length, FALSE);
                                             HANDLES(CloseHandle(hFile2));
-                                            SalLPSetFileAttributes(path, nullFileAttrs);
+                                            SetFileAttributesW(pathW.c_str(), nullFileAttrs);
                                         }
                                     }
                                     SetSel(FALSE, -1, TRUE);                        // explicit redraw
@@ -643,9 +644,9 @@ void CFilesWindow::FilesAction(CActionType type, CFilesWindow* target, int count
                                 {
                                     if (nullFile) // it failed, we have to create it again
                                     {
-                                        HANDLE hFile2 = SalCreateFileH(path, GENERIC_READ | GENERIC_WRITE,
+                                        HANDLE hFile2 = HANDLES_Q(CreateFileW(pathW.c_str(), GENERIC_READ | GENERIC_WRITE,
                                                                              0, NULL, OPEN_ALWAYS,
-                                                                             0, NULL);
+                                                                             0, NULL));
                                         if (hFile2 != INVALID_HANDLE_VALUE)
                                         {
                                             if (nullFileAttrs != INVALID_FILE_ATTRIBUTES)
@@ -658,7 +659,7 @@ void CFilesWindow::FilesAction(CActionType type, CFilesWindow* target, int count
                                             }
                                             HANDLES(CloseHandle(hFile2));
                                             if (nullFileAttrs != INVALID_FILE_ATTRIBUTES)
-                                                SalLPSetFileAttributes(path, nullFileAttrs);
+                                                SetFileAttributesW(pathW.c_str(), nullFileAttrs);
                                         }
                                     }
                                 }
