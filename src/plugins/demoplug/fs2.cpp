@@ -1351,7 +1351,7 @@ CPluginFSInterface::Delete(const char* fsName, int mode, HWND parent, int panel,
   SalamanderGeneral->GetConfigParameter(SALCFG_CNFRMSHFILEDEL, &ConfirmOnSystemHiddenFileDelete, 4, NULL);
   SalamanderGeneral->GetConfigParameter(SALCFG_CNFRMSHDIRDEL, &ConfirmOnSystemHiddenDirDelete, 4, NULL);
 
-  char buf[2 * MAX_PATH];  // buffer for error texts
+  CPathBuffer buf;  // buffer for error texts
 
   CPathBuffer fileName;   // buffer for the full name
   strcpy(fileName, Path);
@@ -1363,10 +1363,10 @@ CPluginFSInterface::Delete(const char* fsName, int mode, HWND parent, int panel,
   }
   int endSize = fileName.Size() - (int)(end - fileName);  // maximum number of characters available for a panel name
 
-  char dfsFileName[2 * MAX_PATH];   // buffer for the full DFS name
+  CPathBuffer dfsFileName;   // buffer for the full DFS name
   sprintf(dfsFileName, "%s:%s", fsName, (const char*)fileName);
   char *endDFSName = dfsFileName + strlen(dfsFileName);  // space reserved for names from the panel
-  int endDFSNameSize = 2 * MAX_PATH - (endDFSName - dfsFileName); // maximum number of characters available for a panel name
+  int endDFSNameSize = dfsFileName.Size() - (int)(endDFSName - (char*)dfsFileName); // maximum number of characters available for a panel name
 
   const CFileData *f = NULL;  // pointer to the file/directory in the panel to process
   BOOL isDir = FALSE;         // TRUE if 'f' is a directory

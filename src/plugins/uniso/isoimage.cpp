@@ -1358,8 +1358,8 @@ BOOL CISOImage::ListImage(CSalamanderDirectoryAbstract* dir, CPluginDataInterfac
 {
     CALL_STACK_MESSAGE1("CISOImage::ListImage(, )");
 
-    char path[2 * MAX_PATH + 1];
-    ZeroMemory(&path, sizeof(path));
+    CPathBuffer path;
+    ZeroMemory(path.Get(), path.Size());
 
     if (Options.SessionAsDirectory && Session.Count > 1)
     {
@@ -1455,10 +1455,10 @@ int CISOImage::UnpackFile(CSalamanderForOperationsAbstract* salamander, const ch
         return UNPACK_ERROR;
     }
 
-    char nameInArc[MAX_PATH + MAX_PATH];
+    CPathBuffer nameInArc;
     strcpy(nameInArc, FileName);
-    SalamanderGeneral->SalPathAppend(nameInArc, srcPath, MAX_PATH + MAX_PATH);
-    SalamanderGeneral->SalPathAppend(nameInArc, fileData->Name, MAX_PATH + MAX_PATH);
+    SalamanderGeneral->SalPathAppend(nameInArc, srcPath, nameInArc.Size());
+    SalamanderGeneral->SalPathAppend(nameInArc, fileData->Name, nameInArc.Size());
 
     CUnISOFSAbstract* fileSystem = Tracks[track]->FileSystem;
     if (fileSystem != NULL)

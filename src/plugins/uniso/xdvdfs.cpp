@@ -224,8 +224,8 @@ int CXDVDFS::ScanDir(DWORD sector, DWORD size, char* path, CSalamanderDirectoryA
 
         // get filename
         BYTE len = GET_BYTE(data, offset + 0x000D);
-        char fileName[2 * MAX_PATH + 1];
-        strncpy_s(fileName, (char*)data + offset + 0x000E, len);
+        CPathBuffer fileName;
+        strncpy_s(fileName.Get(), fileName.Size(), (char*)data + offset + 0x000E, len);
 
         if (!AddFileDir(path, fileName, &de, dir, pluginData))
         {

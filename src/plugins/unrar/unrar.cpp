@@ -910,14 +910,14 @@ BOOL CPluginInterfaceForArchiver::Init()
 {
     CALL_STACK_MESSAGE1("CPluginInterfaceForArchiver::Init()");
     ArchiveVolumes = NULL;
-    char buf[MAX_PATH + 12];
-    if (!GetModuleFileName(DLLInstance, buf, 1024))
+    CPathBuffer buf;
+    if (!GetModuleFileName(DLLInstance, buf, buf.Size()))
         return Error(IDS_ERRMODULEFN);
     SalamanderGeneral->CutDirectory(buf);
-    SalamanderGeneral->SalPathAppend(buf, "unrar.dll", MAX_PATH + 12);
+    SalamanderGeneral->SalPathAppend(buf, "unrar.dll", buf.Size());
     UnRarDll = LoadLibrary(buf);
     if (!UnRarDll)
-        return Error(IDS_ERRLOADLIB, buf);
+        return Error(IDS_ERRLOADLIB, buf.Get());
 
     FRARGetDllVersion RARGetDllVersion = (FRARGetDllVersion)GetProcAddress(UnRarDll, "RARGetDllVersion");
     if (RARGetDllVersion == NULL || RARGetDllVersion() < RAR_DLL_VERSION)
@@ -1525,7 +1525,7 @@ BOOL CPluginInterfaceForArchiver::DoThisFile(CFileHeader* header, const char* ar
 {
     CALL_STACK_MESSAGE3("CPluginInterfaceForArchiver::DoThisFile(, %s, %s)", arcName,
                         targetDir);
-    char message[MAX_PATH + 32];
+    CPathBuffer message;
 
     lstrcpy(message, LoadStr(IDS_EXTRACTING));
     lstrcat(message, header->FileName);
@@ -1578,9 +1578,9 @@ BOOL CPluginInterfaceForArchiver::DoThisFile(CFileHeader* header, const char* ar
             return FALSE;
         }
     }
-    char nameInArc[MAX_PATH + MAX_PATH];
+    CPathBuffer nameInArc;
     lstrcpy(nameInArc, arcName);
-    SalamanderGeneral->SalPathAppend(nameInArc, header->FileName, MAX_PATH + MAX_PATH);
+    SalamanderGeneral->SalPathAppend(nameInArc, header->FileName, nameInArc.Size());
     char buf[100];
     GetInfo(buf, &header->Time, header->Size);
     DestroyIllegalChars(TargetName + 2);

@@ -266,7 +266,7 @@ BOOL CPluginInterfaceForArchiver::ListArchive(CSalamanderForOperationsAbstract* 
     FirstCAB = TRUE;
     HFDI hfdi;
     ERF err;
-    char arcPath[MAX_PATH + 2];
+    CPathBuffer arcPath;
     char* arcName;
     Dir = dir;
     Count = 0;
@@ -275,7 +275,7 @@ BOOL CPluginInterfaceForArchiver::ListArchive(CSalamanderForOperationsAbstract* 
     if (!SalamanderGeneral->CutDirectory(arcPath, &arcName))
         return FALSE;
     strcpy(NextCAB, arcName);
-    SalamanderGeneral->SalPathAddBackslash(arcPath, MAX_PATH + 2);
+    SalamanderGeneral->SalPathAddBackslash(arcPath, arcPath.Size());
 
     memset(&err, 0, sizeof(ERF));
     hfdi = FDICreate(Malloc, Free, ::Open, ::Read, ::Write, ::Close, ::Seek, cpuUNKNOWN, &err);
@@ -294,9 +294,9 @@ BOOL CPluginInterfaceForArchiver::ListArchive(CSalamanderForOperationsAbstract* 
         if (!*NextCAB)
             break;
         FirstCAB = FALSE;
-        char buffer[MAX_PATH + CB_MAX_CABINET_NAME + 1];
+        CPathBuffer buffer;
         strcpy(buffer, arcPath);
-        SalamanderGeneral->SalPathAppend(buffer, NextCAB, MAX_PATH + CB_MAX_CABINET_NAME + 1);
+        SalamanderGeneral->SalPathAppend(buffer, NextCAB, buffer.Size());
         DWORD attr = SalamanderGeneral->SalGetFileAttributes(buffer);
         if (attr == -1 || attr & FILE_ATTRIBUTE_DIRECTORY)
         {
@@ -456,7 +456,7 @@ BOOL CPluginInterfaceForArchiver::UnpackOneFile(CSalamanderForOperationsAbstract
     HFDI hfdi;
     ERF err;
     Count = 0;
-    char rootDir[MAX_PATH + 2];
+    CPathBuffer rootDir;
     strcpy(rootDir, nameInArchive);
     char* c = strrchr(rootDir, '\\');
     if (!c)
@@ -1007,7 +1007,7 @@ CPluginInterfaceForArchiver::UnpackFile(char* fileName, DWORD size, WORD date, W
     if (!DoThisFile(fileName))
         return 0;
 
-    char message[MAX_PATH + 32];
+    CPathBuffer message;
     lstrcpy(message, LoadStr(IDS_EXTRACTING));
     lstrcat(message, fileName);
     if (Action != CA_UNPACK_ONE_FILE)
@@ -1054,10 +1054,10 @@ CPluginInterfaceForArchiver::UnpackFile(char* fileName, DWORD size, WORD date, W
             return -1;
         }
     }
-    char nameInArc[MAX_PATH + MAX_PATH];
+    CPathBuffer nameInArc;
     strcpy(nameInArc, CurrentCABPath);
-    SalamanderGeneral->SalPathAppend(nameInArc, CurrentCAB, MAX_PATH + MAX_PATH);
-    SalamanderGeneral->SalPathAppend(nameInArc, fileName, MAX_PATH + MAX_PATH);
+    SalamanderGeneral->SalPathAppend(nameInArc, CurrentCAB, nameInArc.Size());
+    SalamanderGeneral->SalPathAppend(nameInArc, fileName, nameInArc.Size());
     char buf[100];
     FILETIME ft, lft;
     if (!DosDateTimeToFileTime(date, time, &lft))

@@ -269,7 +269,7 @@ void CRendererWindow::OnGoto()
 
 void CRendererWindow::SetViewerTitle()
 {
-    char title[MAX_PATH + 300];
+    CPathBuffer title;
     if (Database.IsOpened())
     {
         sprintf(title, "%s - %s", Database.GetFileName(), LoadStr(IDS_PLUGINNAME));

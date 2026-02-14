@@ -524,7 +524,7 @@ void CPluginInterfaceForArchiver::UnpackInnerBody(FILE* f, const char* targetDir
 {
     CALL_STACK_MESSAGE4("CPluginInterfaceForArchiver::UnpackInnerBody( , %s, %s, , %ld)", targetDir, fileName, bDir);
 
-    char message[MAX_PATH + 32];
+    CPathBuffer message;
     lstrcpy(message, LoadStr(IDS_UNPACKING));
     lstrcat(message, hdr.name);
     Salamander->ProgressDialogAddText(message, TRUE);
@@ -557,9 +557,9 @@ void CPluginInterfaceForArchiver::UnpackInnerBody(FILE* f, const char* targetDir
         return;
     }
 
-    char nameInArc[MAX_PATH + MAX_PATH];
+    CPathBuffer nameInArc;
     lstrcpy(nameInArc, fileName);
-    SalamanderGeneral->SalPathAppend(nameInArc, hdr.name, MAX_PATH + MAX_PATH);
+    SalamanderGeneral->SalPathAppend(nameInArc, hdr.name, nameInArc.Size());
     char buf[100];
     GetInfo(buf, &hdr.last_modified_filetime, hdr.original_size);
     BOOL skip;

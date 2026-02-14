@@ -114,7 +114,7 @@ CPluginFSInterface::ChangePath(int currentFSNameIndex, char* fsName, int fsNameI
     if (forceRefresh)
         EmptyCache();
 
-    char buf[2 * MAX_PATH + 100];
+    CPathBuffer buf; // Heap-allocated for long path support
     CPathBuffer errBuf; // Heap-allocated for long path support
     errBuf[0] = 0;
     CPathBuffer path;
@@ -210,10 +210,10 @@ CPluginFSInterface::ListCurrentPath(CSalamanderDirectoryAbstract* dir,
 
     iconsType = pitFromRegistry;
 
-    char buf[2 * MAX_PATH + 100];
-    char curPath[MAX_PATH + 4];
+    CPathBuffer buf; // Heap-allocated for long path support
+    CPathBuffer curPath; // Heap-allocated for long path support
     strcpy(curPath, Path);
-    CRAPI::PathAppend(curPath, "*", MAX_PATH + 4);
+    CRAPI::PathAppend(curPath, "*", curPath.Size());
     char* name = curPath + strlen(curPath) - 3;
 
     DWORD count;
@@ -519,7 +519,7 @@ CPluginFSInterface::QuickRename(const char* fsName, int mode, HWND parent, CFile
 
     // Verify the provided name syntactically
     char* s = newName;
-    char buf[2 * MAX_PATH];
+    CPathBuffer buf; // Heap-allocated for long path support
     while (*s != 0 && *s != '\\' && *s != '/' && *s != ':' &&
            *s >= 32 && *s != '<' && *s != '>' && *s != '|' && *s != '"')
         s++;
@@ -531,7 +531,7 @@ CPluginFSInterface::QuickRename(const char* fsName, int mode, HWND parent, CFile
     }
 
     // process the mask in newName
-    SalamanderGeneral->MaskName(buf, 2 * MAX_PATH, file.Name, newName);
+    SalamanderGeneral->MaskName(buf, buf.Size(), file.Name, newName);
     lstrcpyn(newName, buf, MAX_PATH);
 
     // perform the rename operation
@@ -561,7 +561,7 @@ CPluginFSInterface::QuickRename(const char* fsName, int mode, HWND parent, CFile
     }
     else // operation succeeded - report the change on the path (triggers refresh) and return success
     {
-        char cefsFileName[2 * MAX_PATH];
+        CPathBuffer cefsFileName; // Heap-allocated for long path support
         if (SalamanderGeneral->StrICmp(nameFrom, nameTo) != 0)
         { // if it is more than just a case change (CEFS is case-insensitive)
             // remove the source file from the disk cache (the original name is no longer valid)
@@ -588,9 +588,9 @@ CPluginFSInterface::AcceptChangeOnPathNotification(const char* fsName, const cha
     // test whether the paths or at least their prefixes match (only paths on our FS have a chance;
     // disk paths and other FS paths in 'path' are excluded automatically because they can never
     // match 'fsName'+':' at the start of 'path2' below)
-    char path1[2 * MAX_PATH];
-    char path2[2 * MAX_PATH];
-    lstrcpyn(path1, path, 2 * MAX_PATH);
+    CPathBuffer path1; // Heap-allocated for long path support
+    CPathBuffer path2; // Heap-allocated for long path support
+    lstrcpyn(path1, path, path1.Size());
     sprintf(path2, "%s:%s", fsName, Path);
     SalamanderGeneral->SalPathRemoveBackslash(path1);
     SalamanderGeneral->SalPathRemoveBackslash(path2);
@@ -612,12 +612,12 @@ CPluginFSInterface::CreateDir(const char* fsName, int mode, HWND parent, char* n
     BOOL isDir;
     char* secondPart;
     CPathBuffer nextFocus;
-    char path[2 * MAX_PATH];
+    CPathBuffer path; // Heap-allocated for long path support
     int error;
     nextFocus[0] = 0;
     if (!SalamanderGeneral->SalParsePath(parent, newName, type, isDir, secondPart,
                                          TitleWMobileError, nextFocus,
-                                         FALSE, NULL, NULL, &error, 2 * MAX_PATH))
+                                         FALSE, NULL, NULL, &error, path.Size()))
     {
         if (error == SPP_EMPTYPATHNOTALLOWED) // empty string -> stop without performing the operation
         {
@@ -640,7 +640,7 @@ CPluginFSInterface::CreateDir(const char* fsName, int mode, HWND parent, char* n
             strcpy(path, fsName);
             strcat(path, ":");
 
-            if (strlen(fsName) + strlen(newName) + 1 >= 2 * MAX_PATH)
+            if (strlen(fsName) + strlen(newName) + 1 >= (size_t)path.Size())
             {
                 SalamanderGeneral->SalMessageBox(parent, LoadStr(IDS_ERR_NAMETOOLONG),
                                                  TitleWMobile, MB_OK | MB_ICONEXCLAMATION);
@@ -725,11 +725,11 @@ CPluginFSInterface::ViewFile(const char* fsName, HWND parent,
         CRAPI::ReInit();
 
     // build a unique file name for the disk cache (standard Salamander path format)
-    char uniqueFileName[2 * MAX_PATH];
+    CPathBuffer uniqueFileName; // Heap-allocated for long path support
     strcpy(uniqueFileName, AssignedFSName);
     strcat(uniqueFileName, ":");
     strcat(uniqueFileName, Path);
-    CRAPI::PathAppend(uniqueFileName + strlen(AssignedFSName) + 1, file.Name, MAX_PATH);
+    CRAPI::PathAppend(uniqueFileName + strlen(AssignedFSName) + 1, file.Name, uniqueFileName.Size() - (int)strlen(AssignedFSName) - 1);
     // disk names are case-insensitive while the disk cache is case-sensitive; converting
     // to lowercase makes the disk cache behave case-insensitively as well
     SalamanderGeneral->ToLowerCase(uniqueFileName);
@@ -781,7 +781,7 @@ CPluginFSInterface::ViewFile(const char* fsName, HWND parent,
         }
         else if (err != -1)
         {
-            char buf[2 * MAX_PATH + 100];
+            CPathBuffer buf; // Heap-allocated for long path support
             sprintf(buf, LoadStr(IDS_PATH_ERROR), errFileName, SalamanderGeneral->GetErrorText(err));
             SalamanderGeneral->ShowMessageBox(buf, TitleWMobileError, MSGBOX_ERROR);
             return;
@@ -811,7 +811,7 @@ CPluginFSInterface::Delete(const char* fsName, int mode, HWND parent, int panel,
     if (mode == 1)
         return FALSE; // request for the standard prompt
 
-    char buf[2 * MAX_PATH]; // buffer for error messages
+    CPathBuffer buf; // Heap-allocated for long path support — buffer for error messages
 
     CPathBuffer rootPath, fileName, dfsFileName;
 
@@ -1192,7 +1192,7 @@ CPluginFSInterface::CopyOrMoveFromFS(BOOL copy, int mode, const char* fsName, HW
                                      char* targetPath, BOOL& operationMask,
                                      BOOL& cancelOrHandlePath, HWND dropTarget)
 {
-    char path[2 * MAX_PATH];
+    CPathBuffer path; // Heap-allocated for long path support
     operationMask = FALSE;
     cancelOrHandlePath = FALSE;
     if (mode == 1) // first call to CopyOrMoveFromFS
@@ -1202,7 +1202,7 @@ CPluginFSInterface::CopyOrMoveFromFS(BOOL copy, int mode, const char* fsName, HW
             int targetPanel = (panel == PANEL_LEFT ? PANEL_RIGHT : PANEL_LEFT);
             int type;
             char* fs;
-            if (SalamanderGeneral->GetPanelPath(targetPanel, path, 2 * MAX_PATH, &type, &fs))
+            if (SalamanderGeneral->GetPanelPath(targetPanel, path, path.Size(), &type, &fs))
             {
                 if (type == PATH_TYPE_FS && fs - path == (int)strlen(fsName) &&
                     SalamanderGeneral->StrNICmp(path, fsName, (int)(fs - path)) == 0)
@@ -1227,7 +1227,7 @@ CPluginFSInterface::CopyOrMoveFromFS(BOOL copy, int mode, const char* fsName, HW
         return FALSE; // request for the standard dialog
     }
 
-    char buf[3 * MAX_PATH + 100];
+    CPathBuffer buf; // Heap-allocated for long path support
     CPathBuffer nextFocus;
     nextFocus[0] = 0;
 
@@ -1588,13 +1588,13 @@ CPluginFSInterface::CopyOrMoveFromFS(BOOL copy, int mode, const char* fsName, HW
     }
     int endSourceSize = sourceName.Size() - (int)(endSource - sourceName); // maximum number of characters for a panel name
 
-    char cefsSourceName[2 * MAX_PATH]; // buffer for the full CEFS name (for locating the operation source in the disk cache)
+    CPathBuffer cefsSourceName; // Heap-allocated for long path support — buffer for the full CEFS name (for locating the operation source in the disk cache)
     sprintf(cefsSourceName, "%s:%s", fsName, sourceName.Get());
     // Disk names are case-insensitive, the disk cache is case-sensitive; converting
     // to lowercase makes the disk cache behave case-insensitively as well
     SalamanderGeneral->ToLowerCase(cefsSourceName);
-    char* endCEFSSource = cefsSourceName + strlen(cefsSourceName);                // space for names from the panel
-    int endCEFSSourceSize = 2 * MAX_PATH - (int)(endCEFSSource - cefsSourceName); // maximum number of characters for a panel name
+    char* endCEFSSource = cefsSourceName + strlen(cefsSourceName);                       // space for names from the panel
+    int endCEFSSourceSize = cefsSourceName.Size() - (int)(endCEFSSource - cefsSourceName.Get()); // maximum number of characters for a panel name
 
     CPathBuffer targetName; // buffer for the full disk name (if the target resides on disk)
     targetName[0] = 0;
@@ -1697,7 +1697,7 @@ CPluginFSInterface::CopyOrMoveFromFS(BOOL copy, int mode, const char* fsName, HW
     {
         CFileInfo& fi = array[i];
 
-        char* targetFile = SalamanderGeneral->MaskName(buf, 3 * MAX_PATH + 100, fi.cFileName, opMask);
+        char* targetFile = SalamanderGeneral->MaskName(buf, buf.Size(), fi.cFileName, opMask);
 
         if ((int)strlen(fi.cFileName) >= endSourceSize || (int)strlen(targetFile) >= endTargetSize)
         {
@@ -2076,7 +2076,7 @@ static BOOL FindAllFilesInTree(LPCTSTR rootPath, char (&path)[MAX_PATH], LPCTSTR
         if (err == ERROR_NO_MORE_FILES || err == ERROR_FILE_NOT_FOUND)
             return TRUE; // JR empty directory, stop
 
-        char buf[2 * MAX_PATH + 100];
+        CPathBuffer buf; // Heap-allocated for long path support
         sprintf(buf, LoadStr(IDS_PATH_ERROR), fullPath.Get(), SalamanderGeneral->GetErrorText(err));
         SalamanderGeneral->ShowMessageBox(buf, TitleWMobileError, MSGBOX_ERROR);
         return FALSE;
@@ -2189,8 +2189,8 @@ CPluginFSInterface::CopyOrMoveFromDiskToFS(BOOL copy, int mode, const char* fsNa
         return TRUE;
     }
 
-    char cefsFileName[2 * MAX_PATH];
-    char buf[3 * MAX_PATH + 100];
+    CPathBuffer cefsFileName; // Heap-allocated for long path support
+    CPathBuffer buf; // Heap-allocated for long path support
 
     if (mode != 2 && mode != 3)
         return FALSE; // unknown 'mode'
@@ -2427,7 +2427,7 @@ CPluginFSInterface::CopyOrMoveFromDiskToFS(BOOL copy, int mode, const char* fsNa
     {
         CFileInfo& fi = array[i];
 
-        char* targetFile = SalamanderGeneral->MaskName(buf, 3 * MAX_PATH + 100, fi.cFileName, opMask);
+        char* targetFile = SalamanderGeneral->MaskName(buf, buf.Size(), fi.cFileName, opMask);
 
         if ((int)strlen(fi.cFileName) >= endSourceSize || (int)strlen(targetFile) >= endTargetSize)
         {
@@ -2904,7 +2904,7 @@ CPluginFSInterface::ChangeAttributes(const char* fsName, HWND parent, int panel,
             break;
     }
 
-    char path[2 * MAX_PATH];
+    CPathBuffer path; // Heap-allocated for long path support
     if (!success || count == 0)
     {
         // JR The file/directory was probably deleted already
@@ -3217,7 +3217,7 @@ CPluginFSInterface::ContextMenu(const char* fsName, HWND parent, int menuX, int 
 void CPluginFSInterface::EmptyCache()
 {
     // Build a unique name for this FS root in the disk cache (touch all cached copies of files from this FS)
-    char uniqueFileName[2 * MAX_PATH];
+    CPathBuffer uniqueFileName; // Heap-allocated for long path support
     strcpy(uniqueFileName, AssignedFSName);
     strcat(uniqueFileName, ":\\");
     // Disk names are case-insensitive, the disk cache is case-sensitive; converting

@@ -85,8 +85,8 @@ BOOL CUDFISO::ListDirectory(char* path, int session, CSalamanderDirectoryAbstrac
 {
     CALL_STACK_MESSAGE3("CUDFISO::ListDirectory(%s, %d, , )", path, session);
 
-    char partPath[2 * MAX_PATH + 1];
-    ZeroMemory(&partPath, sizeof(partPath));
+    CPathBuffer partPath;
+    ZeroMemory(partPath.Get(), partPath.Size());
     int pathLen = (int)strlen(path);
 
     if (ISO != NULL)

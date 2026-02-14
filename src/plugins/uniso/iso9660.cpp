@@ -181,8 +181,8 @@ void CISO9660::ExtractExtFileName(char* fileName, const char* src, CDirectoryRec
         if (strncmp((char*)rrHeader.Signature, "RR", 2) == 0)
             ext = extRockRidge; // this is a RockRidge entry
 
-        char extFileName[2 * MAX_PATH + 1];
-        ZeroMemory(extFileName, sizeof(extFileName));
+        CPathBuffer extFileName;
+        ZeroMemory(extFileName.Get(), extFileName.Size());
 
         switch (ext)
         {
@@ -225,8 +225,8 @@ void CISO9660::ExtractExtFileName(char* fileName, const char* src, CDirectoryRec
 //
 void CISO9660::ExtractFileName(char* fileName, const char* src, CISO9660::CDirectoryRecord& dr)
 {
-    char tmpFileName[2 * MAX_PATH + 1];
-    ZeroMemory(tmpFileName, sizeof(tmpFileName));
+    CPathBuffer tmpFileName;
+    ZeroMemory(tmpFileName.Get(), tmpFileName.Size());
 
     ExtractExtFileName(tmpFileName, src, dr);
 
@@ -249,22 +249,22 @@ void CISO9660::ExtractFileName(char* fileName, const char* src, CISO9660::CDirec
 
 void CISO9660::ConvJolietName(char* dest, const char* src, int nLen)
 {
-    char tmp[2 * MAX_PATH];
-    ZeroMemory(&tmp, sizeof(tmp));
+    CPathBuffer tmp;
+    ZeroMemory(tmp.Get(), tmp.Size());
 
-    memcpy(tmp, src, nLen);
+    memcpy(tmp.Get(), src, nLen);
 
-    WCHAR* uname = (WCHAR*)tmp;
+    WCHAR* uname = (WCHAR*)tmp.Get();
     int i;
     for (i = 0; i < (nLen / 2); i++)
         uname[i] = (WORD)ROTATE(uname[i]);
 
-    char final[2 * MAX_PATH];
-    ZeroMemory(&final, sizeof(final));
-    WideCharToMultiByte(CP_ACP, 0, uname, nLen / 2, final, sizeof(final) - 1, 0, 0);
-    final[sizeof(final) - 1] = 0;
+    CPathBuffer final_buf;
+    ZeroMemory(final_buf.Get(), final_buf.Size());
+    WideCharToMultiByte(CP_ACP, 0, uname, nLen / 2, final_buf, final_buf.Size() - 1, 0, 0);
+    final_buf.Get()[final_buf.Size() - 1] = 0;
 
-    strcpy(dest, final);
+    strcpy(dest, final_buf);
 }
 
 BOOL CISO9660::AddFileDir(const char* path, char* fileName, CDirectoryRecord& dr,
@@ -490,8 +490,8 @@ int CISO9660::ListDirectoryRe(char* path, CDirectoryRecord* root,
             {
                 if (dirRecord.LengthOfFileIdentifier > 1)
                 {
-                    char dirName[2 * MAX_PATH];
-                    ZeroMemory(&dirName, sizeof(dirName));
+                    CPathBuffer dirName;
+                    ZeroMemory(dirName.Get(), dirName.Size());
                     ConvJolietName(dirName, (data + offset + 33), dirRecord.LengthOfFileIdentifier);
                     if (AddFileDir(path, dirName, dirRecord, dir, pluginData))
                     {
@@ -517,8 +517,8 @@ int CISO9660::ListDirectoryRe(char* path, CDirectoryRecord* root,
                 char firstChar = data[offset + 33];
                 if (firstChar != 0x00 && firstChar != 0x01)
                 {
-                    char extFileName[2 * MAX_PATH + 1];
-                    ZeroMemory(extFileName, sizeof(extFileName));
+                    CPathBuffer extFileName;
+                    ZeroMemory(extFileName.Get(), extFileName.Size());
                     ExtractExtFileName(extFileName, (data + offset + 33), dirRecord);
 
                     if (AddFileDir(path, extFileName, dirRecord, dir, pluginData))
@@ -544,14 +544,14 @@ int CISO9660::ListDirectoryRe(char* path, CDirectoryRecord* root,
         }
         else
         {
-            char fileName[2 * MAX_PATH + 1];
-            ZeroMemory(&fileName, sizeof(fileName));
+            CPathBuffer fileName;
+            ZeroMemory(fileName.Get(), fileName.Size());
 
             char* src = (data + offset + 33);
             if (Ext == extJoliet)
             {
                 ConvJolietName(fileName, src, dirRecord.LengthOfFileIdentifier);
-                src = fileName;
+                src = fileName.Get();
             }
 
             ExtractFileName(fileName, src, dirRecord);

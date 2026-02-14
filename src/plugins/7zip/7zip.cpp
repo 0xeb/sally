@@ -914,7 +914,7 @@ BOOL CPluginInterfaceForArchiver::UnpackWholeArchive(CSalamanderForOperationsAbs
                     char modmask[256];
                     SalamanderGeneral->PrepareMask(modmask, mask);
 
-                    char archivePath[MAX_PATH_LEN];
+                    CPathBuffer archivePath;
                     archivePath[0] = '\0';
 
                     TIndirectArray<CArchiveItemInfo> archiveItems(itemCount, 10, dtDelete);
@@ -1382,7 +1382,7 @@ static BOOL TestArchive(CSalamanderForOperationsAbstract* salamander, HWND hPare
     const CFileData* cfd = SalamanderGeneral->GetPanelFocusedItem(PANEL_SOURCE, NULL);
     if (cfd == NULL)
         return FALSE;
-    char fileName[2 * MAX_PATH];
+    CPathBuffer fileName;
 
     C7zClient client;
 
@@ -1390,8 +1390,8 @@ static BOOL TestArchive(CSalamanderForOperationsAbstract* salamander, HWND hPare
     sprintf(fileName, LoadStr(IDS_TESTING_ARCHIVE_NAME), cfd->Name);
     salamander->ProgressDialogAddText(fileName, FALSE);
 
-    SalamanderGeneral->GetPanelPath(PANEL_SOURCE, fileName, 2 * MAX_PATH, NULL, NULL);
-    SalamanderGeneral->SalPathAppend(fileName, cfd->Name, 2 * MAX_PATH);
+    SalamanderGeneral->GetPanelPath(PANEL_SOURCE, fileName, fileName.Size(), NULL, NULL);
+    SalamanderGeneral->SalPathAppend(fileName, cfd->Name, fileName.Size());
     int ret = client.TestArchive(salamander, fileName);
     salamander->CloseProgressDialog();
 

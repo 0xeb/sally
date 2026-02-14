@@ -192,7 +192,7 @@ BOOL CFATImage::ListImage(CSalamanderDirectoryAbstract* dir, HWND hParent)
     }
 
     // the recursive AddDirectory function loads a directory and all of its subdirectories
-    char root[2 * MAX_PATH];
+    CPathBuffer root;
     root[0] = 0;
     return AddDirectory(root, &rootDirFAT, dir, FirstRootDirSecNum, hParent);
 }
@@ -551,10 +551,10 @@ BOOL CFATImage::AddDirectory(char* root, TDirectArray<DWORD>* fat,
         {
             CDirStore* ds = &dirStore[i];
 
-            if (rootEnd - root + strlen(ds->Name) + 2 >= MAX_PATH)
+            if (rootEnd - root + strlen(ds->Name) + 2 >= SAL_MAX_LONG_PATH)
             {
-                // we must not allow exceeding MAX_PATH
-                TRACE_E("The path len exceeds MAX_PATH. Skipping directory: " << ds->Name);
+                // we must not allow exceeding the buffer size
+                TRACE_E("The path len exceeds SAL_MAX_LONG_PATH. Skipping directory: " << ds->Name);
                 continue;
             }
 
@@ -733,9 +733,9 @@ BOOL CFATImage::UnpackFile(CSalamanderForOperationsAbstract* salamander, const c
         return FALSE;
     }
 
-    char targetName[2 * MAX_PATH];
+    CPathBuffer targetName;
     strcpy(targetName, targetDir);
-    if (!SalamanderGeneral->SalPathAppend(targetName, fileData->Name, 2 * MAX_PATH))
+    if (!SalamanderGeneral->SalPathAppend(targetName, fileData->Name, targetName.Size()))
     {
         TRACE_E("Name is too long, skipping");
         if (allowSkip)
@@ -753,16 +753,16 @@ BOOL CFATImage::UnpackFile(CSalamanderForOperationsAbstract* salamander, const c
     }
 
     // "extracting: %s..."
-    char progressText[2 * MAX_PATH + 100];
+    CPathBuffer progressText;
     sprintf(progressText, LoadStr(IDS_EXTRACTING), nameInArchive);
     salamander->ProgressDialogAddText(progressText, TRUE);
 
     char fileInfo[200];
     GetFileInfo(fileInfo, 200, fileData);
 
-    char currentImgPath[2 * MAX_PATH];
+    CPathBuffer currentImgPath;
     strcpy(currentImgPath, archiveName);
-    if (!SalamanderGeneral->SalPathAppend(currentImgPath, nameInArchive, 2 * MAX_PATH))
+    if (!SalamanderGeneral->SalPathAppend(currentImgPath, nameInArchive, currentImgPath.Size()))
     {
         TRACE_E("Name is too long, skipping");
         if (allowSkip)

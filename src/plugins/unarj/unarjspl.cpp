@@ -960,7 +960,7 @@ BOOL CPluginInterfaceForArchiver::DoThisFile(CARJHeaderData* hdr, const char* ar
 {
     CALL_STACK_MESSAGE3("CPluginInterfaceForArchiver::DoThisFile(, %s, %s)", arcName,
                         targetDir);
-    char message[MAX_PATH + 32];
+    CPathBuffer message;
 
     lstrcpy(message, LoadStr(IDS_EXTRACTING));
     lstrcat(message, hdr->FileName);
@@ -993,9 +993,9 @@ BOOL CPluginInterfaceForArchiver::DoThisFile(CARJHeaderData* hdr, const char* ar
     }
     lstrcpyn(TargetName, targetDir, TargetName.Size());
     SalamanderGeneral->SalPathAppend(TargetName, hdr->FileName + RootLen, TargetName.Size());
-    char nameInArc[MAX_PATH + ARJ_MAX_PATH];
+    CPathBuffer nameInArc;
     lstrcpy(nameInArc, arcName);
-    SalamanderGeneral->SalPathAppend(nameInArc, hdr->FileName, MAX_PATH + ARJ_MAX_PATH);
+    SalamanderGeneral->SalPathAppend(nameInArc, hdr->FileName, nameInArc.Size());
     char buf[100];
     GetInfo(buf, &hdr->Time, hdr->Size);
     BOOL skip;

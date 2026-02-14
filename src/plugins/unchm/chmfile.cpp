@@ -253,10 +253,10 @@ int CCHMFile::ExtractObject(CSalamanderForOperationsAbstract* salamander, const 
 {
     CALL_STACK_MESSAGE5("CCHMFile::ExtractObject( , %s, %s, , %u, %d)", srcPath, path, silent, toSkip);
 
-    char nameInArc[MAX_PATH + MAX_PATH];
+    CPathBuffer nameInArc;
     strcpy(nameInArc, FileName);
-    SalamanderGeneral->SalPathAppend(nameInArc, srcPath, MAX_PATH + MAX_PATH);
-    SalamanderGeneral->SalPathAppend(nameInArc, fileData->Name, MAX_PATH + MAX_PATH);
+    SalamanderGeneral->SalPathAppend(nameInArc, srcPath, nameInArc.Size());
+    SalamanderGeneral->SalPathAppend(nameInArc, fileData->Name, nameInArc.Size());
 
     ///
     CPathBuffer name; // Heap-allocated for long path support

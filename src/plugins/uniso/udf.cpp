@@ -952,8 +952,8 @@ int CUDF::ScanDir(CUDF::CAD dirICB, char* path,
 
                 if (fileChar & UDF_DIRECTORY)
                 {
-                    char newPath[2 * MAX_PATH];
-                    ZeroMemory(newPath, 2 * MAX_PATH);
+                    CPathBuffer newPath;
+                    ZeroMemory(newPath.Get(), newPath.Size());
                     strcpy(newPath, path);
                     strcat(newPath, "\\");
                     strcat(newPath, fileName);

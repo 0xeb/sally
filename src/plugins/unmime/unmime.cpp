@@ -400,7 +400,7 @@ BOOL CPluginInterfaceForArchiver::UnpackArchive(CSalamanderForOperationsAbstract
     if (!SalamanderGeneral->TestFreeSpace(SalamanderGeneral->GetMsgBoxParent(), targetDir, totalSize, LoadStr(IDS_PLUGINNAME)))
         return FALSE;
     // openprogressdialog
-    char title[MAX_PATH + 32];
+    CPathBuffer title;
     sprintf(title, LoadStr(IDS_EXTRTITLE), SalamanderGeneral->SalPathFindFileName(fileName));
     Salamander->OpenProgressDialog(title, TRUE, NULL, FALSE);
     // extraction
@@ -436,7 +436,7 @@ BOOL CPluginInterfaceForArchiver::UnpackWholeArchive(CSalamanderForOperationsAbs
         CloseHandle(hFile);
     }
     // openprogressdialog
-    char title[MAX_PATH + 32];
+    CPathBuffer title;
     sprintf(title, LoadStr(IDS_EXTRTITLE), SalamanderGeneral->SalPathFindFileName(fileName));
     Salamander->OpenProgressDialog(title, TRUE, NULL, FALSE);
     Salamander->ProgressDialogAddText(LoadStr(IDS_PARSE), FALSE);

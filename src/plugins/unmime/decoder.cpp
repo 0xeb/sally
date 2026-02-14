@@ -667,7 +667,7 @@ static BOOL Decode(CDecoder* pDec, BOOL bOnlyOneFile)
         if (InputFile.iCurrentLine >= pNextMarker->iLine)
         {
             iNextMarker++;
-            char text[MAX_PATH + 32]; // must be longer than MAX_PATH due to "too long name" (see below)
+            CPathBuffer text;
             if (pNextMarker->iMarkerType == MARKER_START)
             {
                 CStartMarker* pStartMarker = (CStartMarker*)pNextMarker;
@@ -682,13 +682,13 @@ static BOOL Decode(CDecoder* pDec, BOOL bOnlyOneFile)
                 }
                 else
                 {
-                    strncpy_s(text, MAX_PATH, pszDir, _TRUNCATE);
-                    if (!SalamanderGeneral->SalPathAppend(text, pStartMarker->cFileName, MAX_PATH))
+                    strncpy_s((char*)text, text.Size(), pszDir, _TRUNCATE);
+                    if (!SalamanderGeneral->SalPathAppend(text, pStartMarker->cFileName, text.Size()))
                     { // too long name - reported in SalamanderSafeFile->SafeFileCreate
                         char* end = text + strlen(text);
                         if (end > text && *(end - 1) != '\\')
                             *end++ = '\\';
-                        strncpy_s(end, _countof(text) - (end - text), pStartMarker->cFileName, _TRUNCATE);
+                        strncpy_s(end, text.Size() - (end - (char*)text), pStartMarker->cFileName, _TRUNCATE);
                     }
                     strcpy_s(pszText2, MAX_PATH, pszArcName);
                     SalamanderGeneral->SalPathAppend(pszText2, pStartMarker->cFileName, MAX_PATH);

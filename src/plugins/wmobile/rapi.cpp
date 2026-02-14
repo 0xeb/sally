@@ -592,7 +592,7 @@ BOOL CRAPI::FindAllFilesInTree(LPCTSTR rootPath, char (&path)[MAX_PATH], LPCTSTR
         if (nError == ERROR_NO_MORE_FILES || nError == ERROR_FILE_NOT_FOUND)
             return TRUE; // JR empty directory, stop
 
-        char buf[2 * MAX_PATH + 100];
+        CPathBuffer buf; // Heap-allocated for long path support
         DWORD err = GetLastError();
         sprintf(buf, LoadStr(IDS_PATH_ERROR), fullPath.Get(), SalamanderGeneral->GetErrorText(err));
         SalamanderGeneral->ShowMessageBox(buf, TitleWMobileError, MSGBOX_ERROR);
@@ -1033,7 +1033,7 @@ BOOL CRAPI::CheckAndCreateDirectory(const char* dir, HWND parent, BOOL quiet, ch
     CALL_STACK_MESSAGE2("CheckAndCreateDirectory(%s)", dir);
 
     DWORD attrs = GetFileAttributes(dir);
-    char buf[MAX_PATH + 100];
+    CPathBuffer buf; // Heap-allocated for long path support
     CPathBuffer name;
     if (newDir != NULL)
         newDir[0] = 0;
