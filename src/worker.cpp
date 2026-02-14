@@ -1561,7 +1561,7 @@ void GetFileOverwriteInfo(char* buff, int buffLen, HANDLE file, const char* file
 
     char attr[30];
     lstrcpy(attr, ", ");
-    DWORD attrs = SalGetFileAttributes(fileName);
+    DWORD attrs = GetFileAttributesW(AnsiToWide(fileName).c_str());
     if (attrs != 0xFFFFFFFF)
         GetAttrsString(attr + 2, attrs);
     if (strlen(attr) == 2)
@@ -3377,7 +3377,7 @@ HANDLE SalCreateFileEx(const char* fileName, DWORD desiredAccess,
                         {
                             strcpy(origFullName, tmpName);
                             DWORD num = (GetTickCount() / 10) % 0xFFF;
-                            DWORD origFullNameAttr = SalGetFileAttributes(origFullName);
+                            DWORD origFullNameAttr = GetFileAttributesW(AnsiToWide(origFullName).c_str());
                             while (1)
                             {
                                 sprintf(tmpNamePart, "sal%03X", num++);
@@ -3424,7 +3424,7 @@ HANDLE SalCreateFileEx(const char* fileName, DWORD desiredAccess,
                                 else
                                 {
                                     if ((origFullNameAttr & FILE_ATTRIBUTE_ARCHIVE) == 0)
-                                        SalLPSetFileAttributes(origFullName, origFullNameAttr); // leave without extra handling or retry; not critical (normally toggles unpredictably)
+                                        SetFileAttributesW(AnsiToWide(origFullName).c_str(), origFullNameAttr); // leave without extra handling or retry; not critical (normally toggles unpredictably)
                                 }
                             }
                         }
