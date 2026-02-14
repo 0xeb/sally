@@ -741,7 +741,7 @@ int CLanguageSelectorDialog::Execute()
         int index = GetPreferredLanguageIndex(SLGName);
         CPathBuffer path; // Heap-allocated for long path support
         GetModuleFileName(HInstance, path, path.Size());
-        sprintf(strrchr(path, '\\') + 1, "lang\\%s", Items[index].FileName.c_str());
+        sprintf(strrchr(path, '\\') + 1, "lang\\%s", Items[index].FileName);
         hTmpLanguage = HANDLES(LoadLibrary(path));
         if (hTmpLanguage != NULL)
             Modul = hTmpLanguage;
@@ -762,7 +762,7 @@ BOOL CLanguageSelectorDialog::GetSLGName(char* path, int index)
 {
     if (index >= Items.Count)
         return FALSE;
-    lstrcpy(path, Items[index].FileName.c_str());
+    lstrcpy(path, Items[index].FileName);
     return TRUE;
 }
 
@@ -771,7 +771,7 @@ BOOL CLanguageSelectorDialog::SLGNameExists(const char* slgName)
     int i;
     for (i = 0; i < Items.Count; i++)
     {
-        if (StrICmp(Items[i].FileName.c_str(), slgName) == 0)
+        if (StrICmp(Items[i].FileName, slgName) == 0)
             return TRUE;
     }
     return FALSE;
@@ -782,15 +782,15 @@ void CLanguageSelectorDialog::FillControls()
     int index = ListView_GetNextItem(HListView, -1, LVIS_FOCUSED);
     if (index != -1)
     {
-        SetDlgItemTextW(HWindow, IDC_SLG_AUTHOR, Items[index].AuthorW.c_str());
-        SetDlgItemText(HWindow, IDC_SLG_WEB, Items[index].Web.c_str());
-        SetDlgItemTextW(HWindow, IDC_SLG_COMMENT, Items[index].CommentW.c_str());
+        SetDlgItemTextW(HWindow, IDC_SLG_AUTHOR, Items[index].AuthorW);
+        SetDlgItemText(HWindow, IDC_SLG_WEB, Items[index].Web);
+        SetDlgItemTextW(HWindow, IDC_SLG_COMMENT, Items[index].CommentW);
         if (PluginName == NULL)
-            SetDlgItemText(HWindow, IDC_SLG_HELPDIR, Items[index].HelpDir.c_str());
+            SetDlgItemText(HWindow, IDC_SLG_HELPDIR, Items[index].HelpDir);
         if (Web != NULL)
         {
             char buff[300];
-            sprintf(buff, "http://%s", Items[index].Web.c_str());
+            sprintf(buff, "http://%s", Items[index].Web);
             Web->SetActionOpen(buff);
         }
     }
@@ -810,7 +810,7 @@ void CLanguageSelectorDialog::LoadListView()
 
         Items[i].GetLanguageName(buff, 200);
         ListView_SetItemText(HListView, i, 0, buff);
-        sprintf(buff, "lang\\%s", Items[i].FileName.c_str());
+        sprintf(buff, "lang\\%s", Items[i].FileName);
         ListView_SetItemText(HListView, i, 1, buff);
     }
 
@@ -842,7 +842,7 @@ void CLanguageSelectorDialog::Transfer(CTransferInfo& ti)
         int index = ListView_GetNextItem(HListView, -1, LVIS_FOCUSED);
         if (index != -1)
         {
-            lstrcpy(SLGName, Items[index].FileName.c_str());
+            lstrcpy(SLGName, Items[index].FileName);
             if (PluginName != NULL) // store the alternative language name only when selecting an alternative language for a plug-in
             {
                 if (Configuration.UseAsAltSLGInOtherPlugins)
@@ -905,13 +905,13 @@ int CLanguageSelectorDialog::GetPreferredLanguageIndex(const char* selectSLGName
     int i;
     for (i = 0; i < Items.Count; i++)
     {
-        if (selectSLGName != NULL && stricmp(Items[i].FileName.c_str(), selectSLGName) == 0)
+        if (selectSLGName != NULL && stricmp(Items[i].FileName, selectSLGName) == 0)
             return i;
         if (localeIndex == -1 && Items[i].LanguageID == langID)
             localeIndex = i;
         if (primarylocaleIndex == -1 && PRIMARYLANGID(Items[i].LanguageID) == primaryID)
             primarylocaleIndex = i;
-        if (stricmp(Items[i].FileName.c_str(), "english.slg") == 0)
+        if (stricmp(Items[i].FileName, "english.slg") == 0)
             englishIndex = i;
     }
     if (localeIndex == -1)

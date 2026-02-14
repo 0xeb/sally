@@ -74,7 +74,7 @@ enum CDriveTypeEnum
 struct CDriveData
 {
     CDriveTypeEnum DriveType; // if it's drvtSeparator, other items are not valid
-    std::string DriveText;
+    char* DriveText; // NOTE: stored in TDirectArray (memmove) — must NOT be std::string
     DWORD Param;      // at the moment for Hot Paths - its index
     BOOL Accessible;  // for drvtRemote: FALSE - gray symbol
     BOOL Shared;      // is the drive shared?

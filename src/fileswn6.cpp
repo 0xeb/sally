@@ -81,7 +81,7 @@ CSelectionSnapshot CFilesWindow::TakeSnapshot(CActionType type, int selCount,
 
             CSnapshotItem item;
             item.Name = file->Name;
-            if (!file->NameW.empty())
+            if (file->NameW != NULL)
                 item.NameW = file->NameW;
             if (file->DosName != NULL)
                 item.DosName = file->DosName;
@@ -1359,7 +1359,7 @@ BOOL CFilesWindow::BuildScriptMain(COperations* script, CActionType type,
                         oldTotalSize = script->TotalSize;
                     }
                     // Pass wide name if available for Unicode filename support
-                    wchar_t* useNameW = oneFile->NameW.empty() ? NULL : const_cast<wchar_t*>(oneFile->NameW.c_str());
+                    wchar_t* useNameW = oneFile->NameW;
                     if (!BuildScriptDir(script, type, sourcePath, sourceSupADS, targetPath,
                                         targetPathState, targetSupADS, targetIsFAT32, mask,
                                         useName, useDOSName, attrsData, NULL, oneFile->Attr,
@@ -1432,7 +1432,7 @@ BOOL CFilesWindow::BuildScriptMain(COperations* script, CActionType type,
                 if (filterCriteria == NULL || filterCriteria->AgreeMasksAndAdvanced(oneFile))
                 {
                     // Pass wide name if available for Unicode filename support
-                    wchar_t* useNameW = oneFile->NameW.empty() ? NULL : const_cast<wchar_t*>(oneFile->NameW.c_str());
+                    wchar_t* useNameW = oneFile->NameW;
                     if (!BuildScriptFile(script, type, sourcePath, sourceSupADS, targetPath,
                                          targetPathState, targetSupADS, targetIsFAT32, mask,
                                          useName, useDOSName, oneFile->Size, attrsData, NULL,

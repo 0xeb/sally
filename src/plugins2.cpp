@@ -1139,8 +1139,8 @@ BOOL CPlugins::AddItemsToChangeDrvMenu(CDrivesList* drvList, int& currentFSIndex
         CPluginData* p = Data[orderIndex];
         if (p->SupportFS && !p->ChDrvMenuFSItemName.empty() && p->ChDrvMenuFSItemVisible)
         {
-            drv.DriveText = p->ChDrvMenuFSItemName.c_str();
-            if (drv.DriveText.empty())
+            drv.DriveText = DupStr(p->ChDrvMenuFSItemName.c_str());
+            if (drv.DriveText == NULL)
                 return FALSE;
             if (p->PluginIcons != NULL && p->ChDrvMenuFSItemIconIndex != -1)
             {

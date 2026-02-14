@@ -1865,7 +1865,7 @@ BOOL CFilesWindow::CopyFocusedNameToClipboard(CCopyFocusedNameModeEnum mode)
             MultiByteToWideChar(CP_ACP, 0, buff, -1, buffW, buffW.Size());
             int l = (int)wcslen(buffW);
             // Append wide filename (no AlterFileName for wide yet - TODO)
-            lstrcpynW(buffW + l, file->NameW.c_str(), 2 * MAX_PATH - l);
+            lstrcpynW(buffW + l, file->NameW, 2 * MAX_PATH - l);
             return CopyTextToClipboardW(buffW, -1, FALSE, NULL);
         }
 

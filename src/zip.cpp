@@ -5846,6 +5846,7 @@ BOOL CSalamanderDirectory::AddFile(const char* path, CFileData& file, CPluginDat
     if ((ValidData & VALID_DATA_ICONOVERLAY) == 0)
         file.IconOverlayIndex = ICONOVERLAYINDEX_NOTUSED;
 
+    file.NameW = NULL; // plugins don't set this; ensure it's initialized for UseWideName()
     file.Association = 0;
     file.Selected = 0;
     file.Shared = 0;
@@ -5944,6 +5945,7 @@ BOOL CSalamanderDirectory::AddDir(const char* path, CFileData& dir, CPluginDataI
     if ((ValidData & VALID_DATA_ICONOVERLAY) == 0)
         dir.IconOverlayIndex = ICONOVERLAYINDEX_NOTUSED;
 
+    dir.NameW = NULL; // plugins don't set this; ensure it's initialized for UseWideName()
     dir.Association = 0;
     dir.Selected = 0;
     dir.Shared = 0;

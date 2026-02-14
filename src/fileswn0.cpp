@@ -2285,7 +2285,10 @@ void CFilesWindow::RefreshDirectory(BOOL probablyUselessRefresh, BOOL forceReloa
         ensureFocusIndexVisible = ListBox->IsItemVisible(focusIndex, &wholeItemVisible);
     }
     else
+    {
         focusData.Name = NULL; // there won't be a focus ...
+        focusData.NameW = NULL;
+    }
 
     // if it's an FS, we need to prepare objects for the new listing separately (they'll be attached later)
     OnlyDetachFSListing = Is(ptPluginFS);

@@ -129,7 +129,7 @@ ENUM_NEXT:
                     if (errorOccured != NULL)
                         *errorOccured = SALENUM_ERROR;
                     // TODO: Use wide format string when IDS_NAMEISTOOLONG supports %ls
-                    std::wstring nameW = f->NameW.empty() ? AnsiToWide(f->Name) : f->NameW;
+                    std::wstring nameW = f->NameW == NULL ? AnsiToWide(f->Name) : f->NameW;
                     std::wstring zipPathW = AnsiToWide(curZIPPath);
                     if (parent != NULL &&
                         gPrompter->ConfirmError(LoadStrW(IDS_ERRORTITLE),
@@ -212,7 +212,7 @@ ENUM_NEXT:
                             *errorOccured = SALENUM_ERROR;
                         const char* nameA = (tooLong1 || f->DosName == NULL ? f->Name : f->DosName);
                         const char* pathA = (tooLong1 ? data->EnumLastPath : data->EnumLastDosPath);
-                        std::wstring nameW = f->NameW.empty() ? AnsiToWide(nameA) : f->NameW;
+                        std::wstring nameW = f->NameW == NULL ? AnsiToWide(nameA) : f->NameW;
                         std::wstring pathW = AnsiToWide(pathA);
                         if (parent != NULL &&
                             gPrompter->ConfirmError(LoadStrW(IDS_ERRORTITLE),
@@ -258,7 +258,7 @@ ENUM_NEXT:
                                 *errorOccured = SALENUM_ERROR;
                             const char* nameA = (tooLong1 || f->DosName == NULL ? f->Name : f->DosName);
                             const char* pathA = (tooLong1 ? data->EnumLastPath + zipPathLen + (zipPathLen > 0 ? 1 : 0) : data->EnumLastDosPath);
-                            std::wstring nameW = f->NameW.empty() ? AnsiToWide(nameA) : f->NameW;
+                            std::wstring nameW = f->NameW == NULL ? AnsiToWide(nameA) : f->NameW;
                             std::wstring pathW = AnsiToWide(pathA);
                             if (parent != NULL &&
                                 gPrompter->ConfirmError(LoadStrW(IDS_ERRORTITLE),
@@ -862,6 +862,7 @@ BOOL _ReadDirectoryTree(HWND parent, CPathBuffer& path, char* name, CSalamanderD
         CFileData newF; // we no longer work with these items
         if (dir != NULL)
         {
+            newF.NameW = NULL;
             newF.PluginData = -1; // -1 is arbitrary, ignored
             newF.Association = 0;
             newF.Selected = 0;
@@ -1091,6 +1092,7 @@ CSalamanderDirectory* ReadDirectoryTree(HWND parent, CPanelTmpEnumData* data, in
     CFileData newF;
     if (dir != NULL)
     {
+        newF.NameW = NULL;
         newF.PluginData = -1; // -1 is arbitrary, ignored
         newF.Association = 0;
         newF.Selected = 0;

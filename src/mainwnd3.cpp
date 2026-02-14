@@ -164,7 +164,7 @@ BOOL OpenHtmlHelp(char* helpFileName, HWND parent, CHtmlHelpCommand command, DWO
         CLanguage language;
         if (language.Init(Configuration.LoadedSLGName, NULL))
         {
-            lstrcpyn(helpSubdir, language.HelpDir.c_str(), helpSubdir.Size());
+            lstrcpyn(helpSubdir, language.HelpDir, helpSubdir.Size());
             language.Free();
         }
         if (helpSubdir[0] == 0)

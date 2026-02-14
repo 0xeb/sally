@@ -3267,27 +3267,43 @@ typedef DWORD(WINAPI* FSalamanderLanguageEntry)();
 
 CLanguage::CLanguage()
 {
+    FileName = NULL;
     LanguageID = 0;
+    AuthorW = NULL;
+    Web = NULL;
+    CommentW = NULL;
+    HelpDir = NULL;
 }
 
 void CLanguage::Free()
 {
-    FileName.clear();
-    AuthorW.clear();
-    Web.clear();
-    CommentW.clear();
-    HelpDir.clear();
+    free(FileName);
+    FileName = NULL;
+    free(AuthorW);
+    AuthorW = NULL;
+    free(Web);
+    Web = NULL;
+    free(CommentW);
+    CommentW = NULL;
+    free(HelpDir);
+    HelpDir = NULL;
 }
 
 BOOL CLanguage::Init(const char* fileName, WORD languageID, const WCHAR* authorW,
                      const char* web, const WCHAR* commentW, const char* helpdir)
 {
+    Free();
     LanguageID = languageID;
-    FileName = fileName;
-    AuthorW = authorW;
-    Web = web;
-    CommentW = commentW;
-    HelpDir = helpdir;
+    FileName = DupStr(fileName);
+    AuthorW = DupStr(authorW);
+    Web = DupStr(web);
+    CommentW = DupStr(commentW);
+    HelpDir = DupStr(helpdir);
+    if (FileName == NULL || AuthorW == NULL || Web == NULL || CommentW == NULL || HelpDir == NULL)
+    {
+        Free();
+        return FALSE;
+    }
     return TRUE;
 }
 

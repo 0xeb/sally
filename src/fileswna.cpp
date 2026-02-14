@@ -392,6 +392,7 @@ void CFilesWindow::DragDropToArcOrFS(CTmpDragDropOperData* data)
     {
         BOOL ok = TRUE;
         CFileData newF;       // we no longer work with these items
+        newF.NameW = NULL;
         newF.PluginData = -1; // -1 is arbitrary, thevalue will be ignored
         newF.Association = 0;
         newF.Selected = 0;

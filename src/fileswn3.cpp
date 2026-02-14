@@ -271,6 +271,7 @@ BOOL CFilesWindow::ReadDirectory(HWND parent, BOOL isRefresh)
         BOOL addtoIconCache;
         CFileData file;
         // inicialization of structure members which will not be changed later
+        file.NameW = NULL;
         file.PluginData = -1; // -1 just like that, ignored
         file.Selected = 0;
         file.SizeValid = 0;
@@ -530,9 +531,9 @@ BOOL CFilesWindow::ReadDirectory(HWND parent, BOOL isRefresh)
 
                 //--- wide name (for Unicode filenames not representable in ANSI)
                 if (nameConversionLossy)
-                    file.NameW = fileDataW.cFileName;
+                    file.NameW = DupStr(fileDataW.cFileName);
                 else
-                    file.NameW.clear();  // Reset from previous iteration
+                    file.NameW = NULL;  // Reset from previous iteration
 
                 //--- extension
                 if (!Configuration.SortDirsByExt && (fileDataW.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY)) // this is ptDisk
@@ -1080,6 +1081,7 @@ BOOL CFilesWindow::ReadDirectory(HWND parent, BOOL isRefresh)
                 upDir.Attr = 0;
                 upDir.LastWrite = GetZIPArchiveDate();
                 upDir.DosName = NULL;
+                upDir.NameW = NULL;
                 upDir.PluginData = 0; // 0 just like that, plug-in will overwrite it with its value
                 upDir.NameLen = 2;
                 upDir.Hidden = 0;

@@ -570,7 +570,7 @@ BOOL CPluginInterfaceForMenu::ExecuteMenuItem(CSalamanderForOperationsAbstract* 
         {
             size_t lastSlash = file1W.rfind(L'\\');
             if (lastSlash != std::wstring::npos)
-                file1W = file1W.substr(0, lastSlash + 1) + fd1->NameW.c_str();
+                file1W = file1W.substr(0, lastSlash + 1) + fd1->NameW;
         }
 
         if (fd2 &&
@@ -587,7 +587,7 @@ BOOL CPluginInterfaceForMenu::ExecuteMenuItem(CSalamanderForOperationsAbstract* 
             {
                 size_t lastSlash = file2W.rfind(L'\\');
                 if (lastSlash != std::wstring::npos)
-                    file2W = file2W.substr(0, lastSlash + 1) + fd2->NameW.c_str();
+                    file2W = file2W.substr(0, lastSlash + 1) + fd2->NameW;
             }
             secondFromSource = TRUE;
         }
@@ -610,7 +610,7 @@ BOOL CPluginInterfaceForMenu::ExecuteMenuItem(CSalamanderForOperationsAbstract* 
                         {
                             if (fd1->UseWideName() && fd2->UseWideName())
                             {
-                                if (_wcsicmp(fd1->NameW.c_str(), fd2->NameW.c_str()) == 0)
+                                if (_wcsicmp(fd1->NameW, fd2->NameW) == 0)
                                     break;
                             }
                             else if (SG->StrICmp(fd1->Name, fd2->Name) == 0)
@@ -633,7 +633,7 @@ BOOL CPluginInterfaceForMenu::ExecuteMenuItem(CSalamanderForOperationsAbstract* 
                     {
                         size_t lastSlash = file2W.rfind(L'\\');
                         if (lastSlash != std::wstring::npos)
-                            file2W = file2W.substr(0, lastSlash + 1) + fd2->NameW.c_str();
+                            file2W = file2W.substr(0, lastSlash + 1) + fd2->NameW;
                     }
                 }
             }

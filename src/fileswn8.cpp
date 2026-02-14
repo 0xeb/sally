@@ -112,14 +112,14 @@ BOOL CFilesWindow::DeleteThroughRecycleBin(int* selection, int selCount, CFileDa
         if (oneFile->Name[oneFile->NameLen - 1] <= ' ' || oneFile->Name[oneFile->NameLen - 1] == '.')
         {
             // Use wide name if available, otherwise convert from ANSI
-            std::wstring nameW = oneFile->NameW.empty() ? AnsiToWide(oneFile->Name) : oneFile->NameW;
+            std::wstring nameW = (oneFile->NameW == NULL) ? AnsiToWide(oneFile->Name) : oneFile->NameW;
             gPrompter->ShowError(LoadStrW(IDS_ERRORTITLE), (nameW + L" - invalid filename (ends with space or dot)").c_str());
             return FALSE; // quick dirty bloody hack - Recycle Bin simply cannot handle names ending with a space or dot (it deletes a different name created by trimming those characters, which we definitely do not want)
         }
         // oneFile points to the selected item or the caret item in the filebox
         // Use NameW if available (Unicode filename), otherwise convert from ANSI
         namesW += pathW;
-        if (!oneFile->NameW.empty())
+        if (oneFile->NameW != NULL)
             namesW += oneFile->NameW;
         else
             namesW += AnsiToWide(oneFile->Name);

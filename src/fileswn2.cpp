@@ -268,7 +268,7 @@ void CFilesWindow::Execute(int index)
             MainWindow->SetDefaultDirectories(); // to ensure the launching process inherits the correct current directories
             // Use wide version for Unicode filenames that can't be represented in ANSI
             if (file->UseWideName())
-                ExecuteAssociationW(GetListBoxHWND(), GetPath(), file->NameW.c_str());
+                ExecuteAssociationW(GetListBoxHWND(), GetPath(), file->NameW);
             else
                 ExecuteAssociation(GetListBoxHWND(), GetPath(), fileName);
 
@@ -547,7 +547,10 @@ void CFilesWindow::ChangeSortType(CSortType newType, BOOL reverse, BOOL force)
     if (focusIndex >= 0 && focusIndex < Dirs->Count + Files->Count)
         d1 = (focusIndex < Dirs->Count) ? Dirs->At(focusIndex) : Files->At(focusIndex - Dirs->Count);
     else
+    {
         d1.Name = NULL;
+        d1.NameW = NULL;
+    }
     //---  sorting
     if (UseSystemIcons || UseThumbnails)
         SleepIconCacheThread();

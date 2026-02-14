@@ -2340,7 +2340,7 @@ void CFilesWindow::RenameFileInternalW(CFileData* f, const std::wstring& newName
     std::wstring srcPath = pathW;
     if (!srcPath.empty() && srcPath.back() != L'\\')
         srcPath += L'\\';
-    if (!f->NameW.empty())
+    if (f->NameW != NULL)
     {
         srcPath += f->NameW;
     }
@@ -2484,9 +2484,9 @@ void CFilesWindow::RenameFile(int specialIndex)
                 {
                     if (useUnicode)
                     {
-                        const wchar_t* dotW = wcsrchr(f->NameW.c_str(), L'.');
-                        if (dotW != NULL && dotW > f->NameW.c_str())
-                            selectionEnd = (int)(dotW - f->NameW.c_str());
+                        const wchar_t* dotW = wcsrchr(f->NameW, L'.');
+                        if (dotW != NULL && dotW > f->NameW)
+                            selectionEnd = (int)(dotW - f->NameW);
                     }
                     else
                     {

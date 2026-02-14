@@ -73,9 +73,8 @@ public:
         free(member.Name);
         if (member.DosName != NULL)
             free(member.DosName);
-        // Explicitly destroy the wide name string (can't use swap - it allocates a new proxy block
-        // that would leak because TDirectArray doesn't call C++ destructors on removal)
-        member.NameW.~basic_string();
+        if (member.NameW != NULL)
+            free(member.NameW);
     }
 };
 
@@ -581,14 +580,14 @@ class CLanguage
 {
 public:
     // SLG file name (only name.spl)
-    std::string FileName;
+    char* FileName; // NOTE: stored in TDirectArray (memmove) — must NOT be std::string
 
     // data retrieved from the SLG file
     WORD LanguageID;
-    std::wstring AuthorW;
-    std::string Web;
-    std::wstring CommentW;
-    std::string HelpDir;
+    WCHAR* AuthorW;
+    char* Web;
+    WCHAR* CommentW;
+    char* HelpDir;
 
 public:
     CLanguage();
