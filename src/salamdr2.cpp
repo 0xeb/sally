@@ -1019,6 +1019,193 @@ BOOL ExpandVarString(HWND msgParent, const char* varText, char* buffer, int buff
                              ignoreEnvVarNotFoundOrTooLong);
 }
 
+std::wstring ExpandVarStringW(HWND msgParent, const char* varText,
+                               const CSalamanderVarStrEntry* variables, void* param,
+                               BOOL ignoreEnvVarNotFoundOrTooLong)
+{
+    const char* s = varText;
+    std::wstring result;
+
+    while (*s != 0)
+    {
+        if (*s == '$')
+        {
+            if (*++s != 0)
+            {
+                switch (*s)
+                {
+                case '$':
+                {
+                    result += L'$';
+                    s++;
+                    break;
+                }
+
+                case '(':
+                {
+                    const char* var = s + 1;
+                    while (*s != ')' && *s != 0)
+                        s++;
+                    if (*s == 0)
+                    {
+                        if (msgParent == NULL)
+                            TRACE_I(LoadStr(IDS_EXP_UNMATCHEDPAR));
+                        else
+                            gPrompter->ShowError(LoadStrW(IDS_ERRORTITLE),
+                                                 AnsiToWide(LoadStr(IDS_EXP_UNMATCHEDPAR)).c_str());
+                        return L"";
+                    }
+                    else
+                    {
+                        int varLen = (int)(s - var);
+                        // Strip width suffix (":num" or ":max") for name lookup
+                        int nameLen = varLen;
+                        const char* s2 = var;
+                        while (s2 < s)
+                        {
+                            if (*s2 == ':')
+                            {
+                                if (s2 + 1 < s && *(s2 + 1) != ':') // not escaped "::"
+                                {
+                                    nameLen = (int)(s2 - var);
+                                    break;
+                                }
+                            }
+                            s2++;
+                        }
+
+                        const CSalamanderVarStrEntry* entry = variables;
+                        while (entry->Name != NULL)
+                        {
+                            if (StrICmpEx(var, nameLen, entry->Name, (int)strlen(entry->Name)) == 0)
+                            {
+                                const char* value = entry->Execute(msgParent, param);
+                                if (value == NULL)
+                                {
+                                    if (msgParent == NULL)
+                                        TRACE_I(LoadStr(IDS_EXP_INTERNALERR));
+                                    else
+                                        gPrompter->ShowError(LoadStrW(IDS_ERRORTITLE),
+                                                             AnsiToWide(LoadStr(IDS_EXP_INTERNALERR)).c_str());
+                                    return L"";
+                                }
+                                result += AnsiToWide(value);
+                                break;
+                            }
+                            entry++;
+                        }
+                        if (entry->Name == NULL)
+                        {
+                            char nameBuf[200];
+                            int copyLen = min(nameLen, 199);
+                            memcpy(nameBuf, var, copyLen);
+                            nameBuf[copyLen] = 0;
+                            char text[400];
+                            sprintf(text, LoadStr(IDS_EXP_VARNOTFOUND), nameBuf);
+                            if (msgParent == NULL)
+                                TRACE_I(text);
+                            else
+                                gPrompter->ShowError(LoadStrW(IDS_ERRORTITLE), AnsiToWide(text).c_str());
+                            return L"";
+                        }
+                        s++;
+                        break;
+                    }
+                }
+
+                case '[':
+                {
+                    const char* var = s + 1;
+                    while (*s != ']' && *s != 0)
+                        s++;
+                    if (*s == 0)
+                    {
+                        if (msgParent == NULL)
+                            TRACE_I(LoadStr(IDS_EXP_UNMATCHEDBRACKET));
+                        else
+                            gPrompter->ShowError(LoadStrW(IDS_ERRORTITLE),
+                                                 AnsiToWide(LoadStr(IDS_EXP_UNMATCHEDBRACKET)).c_str());
+                        return L"";
+                    }
+                    else
+                    {
+                        int varLen = (int)(s - var);
+                        // Convert env var name to wide (variable names are ASCII)
+                        std::wstring envName(varLen, L'\0');
+                        for (int i = 0; i < varLen; i++)
+                            envName[i] = (wchar_t)(unsigned char)var[i];
+
+                        // Use GetEnvironmentVariableW for correct Unicode support
+                        DWORD needed = GetEnvironmentVariableW(envName.c_str(), NULL, 0);
+                        if (needed > 0)
+                        {
+                            std::wstring envValue(needed - 1, L'\0');
+                            DWORD res = GetEnvironmentVariableW(envName.c_str(), envValue.data(), needed);
+                            if (res > 0 && res < needed)
+                            {
+                                result += envValue;
+                                s++;
+                                break;
+                            }
+                        }
+                        // Not found or error
+                        char envNameA[200];
+                        int copyLen = min(varLen, 199);
+                        memcpy(envNameA, var, copyLen);
+                        envNameA[copyLen] = 0;
+                        char text[400];
+                        if (needed == 0)
+                            sprintf(text, LoadStr(IDS_EXP_ENVVARNOTFOUND), envNameA);
+                        else
+                            sprintf(text, LoadStr(IDS_EXP_ENVVARTOOLARGE), envNameA);
+                        if (msgParent == NULL)
+                            TRACE_I(text);
+                        else
+                        {
+                            if (!ignoreEnvVarNotFoundOrTooLong)
+                            {
+                                if (gPrompter->ConfirmError(LoadStrW(IDS_ERRORTITLE),
+                                                            AnsiToWide(text).c_str())
+                                        .type == PromptResult::kCancel)
+                                    return L"";
+                            }
+                        }
+                        // Continue with empty expansion for this variable
+                        s++;
+                        break;
+                    }
+                }
+
+                default:
+                {
+                    if (msgParent == NULL)
+                        TRACE_I(LoadStr(IDS_EXP_UNEXPECTEDCHAR));
+                    else
+                        gPrompter->ShowError(LoadStrW(IDS_ERRORTITLE),
+                                             AnsiToWide(LoadStr(IDS_EXP_UNEXPECTEDCHAR)).c_str());
+                    return L"";
+                }
+                }
+            }
+            else
+            {
+                if (msgParent == NULL)
+                    TRACE_I(LoadStr(IDS_EXP_TRAILINGDOLLAR));
+                else
+                    gPrompter->ShowError(LoadStrW(IDS_ERRORTITLE),
+                                         AnsiToWide(LoadStr(IDS_EXP_TRAILINGDOLLAR)).c_str());
+                return L"";
+            }
+        }
+        else
+        {
+            result += (wchar_t)(unsigned char)*s;
+            s++;
+        }
+    }
+    return result;
+}
+
 // ****************************************************************************
 
 CQuadWord MyGetDiskFreeSpace(const char* path, CQuadWord* total)

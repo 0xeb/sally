@@ -744,6 +744,15 @@ BOOL ExpandVarString(HWND msgParent, const char* varText, char* buffer, int buff
                      BOOL detectMaxVarWidths = FALSE, int* maxVarWidths = NULL,
                      int maxVarWidthsCount = 0);
 
+// Wide version of ExpandVarString — returns expanded string or empty on failure.
+// Uses GetEnvironmentVariableW directly for correct Unicode environment variable support.
+// Variable callbacks (CSalamanderVarStrEntry::Execute) still return ANSI and are
+// converted via AnsiToWide; this will improve when the plugin API is widened.
+// Does not support varPlacements/maxVarWidths (use ANSI version for InfoLine/MakeFileList).
+std::wstring ExpandVarStringW(HWND msgParent, const char* varText,
+                               const CSalamanderVarStrEntry* variables, void* param,
+                               BOOL ignoreEnvVarNotFoundOrTooLong = FALSE);
+
 // Saves Unicode version of text str with length len chars to clipboard
 // returns ERROR_SUCCESS or GetLastError
 DWORD AddUnicodeToClipboard(const char* str, int len);

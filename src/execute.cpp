@@ -12,6 +12,7 @@
 #include "ui/IPrompter.h"
 #include "common/unicode/helpers.h"
 #include "common/IEnvironment.h"
+#include "common/fsutil.h"
 
 //******************************************************************************
 //
@@ -1821,10 +1822,12 @@ BOOL ExpandArguments(HWND msgParent, const char* name, const char* dosName, cons
 std::wstring ExpandArgumentsW(HWND msgParent, const char* name, const char* dosName, const char* varText,
                               BOOL* fileNameUsed)
 {
-    CPathBuffer buffer;
-    if (ExpandArguments(msgParent, name, dosName, varText, buffer, buffer.Size(), fileNameUsed))
-        return AnsiToWide(buffer);
-    return L"";
+    CExecuteExpData data;
+    data.Name = name;
+    data.DosName = dosName;
+    data.FileNameUsed = fileNameUsed;
+    data.UserMenuAdvancedData = NULL;
+    return ExpandVarStringW(msgParent, varText, ArgumentsExpArray, &data);
 }
 
 BOOL ValidateInitDir(HWND msgParent, const char* varText, int& errorPos1, int& errorPos2)
@@ -1932,10 +1935,16 @@ BOOL ExpandInitDir(HWND msgParent, const char* name, const char* dosName, const 
 std::wstring ExpandInitDirW(HWND msgParent, const char* name, const char* dosName, const char* varText,
                             BOOL ignoreEnvVarNotFoundOrTooLong)
 {
-    CPathBuffer buffer;
-    if (ExpandInitDir(msgParent, name, dosName, varText, buffer, buffer.Size(), ignoreEnvVarNotFoundOrTooLong))
-        return AnsiToWide(buffer);
-    return L"";
+    CExecuteExpData data;
+    data.Name = name;
+    data.DosName = dosName;
+    data.FileNameUsed = NULL;
+    data.UserMenuAdvancedData = NULL;
+    std::wstring result = ExpandVarStringW(msgParent, varText, InitDirExpArray, &data,
+                                           ignoreEnvVarNotFoundOrTooLong);
+    if (!result.empty())
+        RemoveDoubleBackslashesW(result);
+    return result;
 }
 
 BOOL ExpandCommand(HWND msgParent, const char* varText, char* buffer, int bufferLen,
@@ -1962,10 +1971,16 @@ BOOL ExpandCommand(HWND msgParent, const char* varText, char* buffer, int buffer
 std::wstring ExpandCommandW(HWND msgParent, const char* varText,
                             BOOL ignoreEnvVarNotFoundOrTooLong)
 {
-    CPathBuffer buffer;
-    if (ExpandCommand(msgParent, varText, buffer, buffer.Size(), ignoreEnvVarNotFoundOrTooLong))
-        return AnsiToWide(buffer);
-    return L"";
+    CExecuteExpData data;
+    data.Name = NULL;
+    data.DosName = NULL;
+    data.FileNameUsed = NULL;
+    data.UserMenuAdvancedData = NULL;
+    std::wstring result = ExpandVarStringW(msgParent, varText, CommandExpArray, &data,
+                                           ignoreEnvVarNotFoundOrTooLong);
+    if (!result.empty())
+        RemoveDoubleBackslashesW(result);
+    return result;
 }
 
 BOOL ExpandHotPath(HWND msgParent, const char* varText, char* buffer, int bufferLen,
@@ -1992,10 +2007,16 @@ BOOL ExpandHotPath(HWND msgParent, const char* varText, char* buffer, int buffer
 std::wstring ExpandHotPathW(HWND msgParent, const char* varText,
                             BOOL ignoreEnvVarNotFoundOrTooLong)
 {
-    CPathBuffer buffer;
-    if (ExpandHotPath(msgParent, varText, buffer, buffer.Size(), ignoreEnvVarNotFoundOrTooLong))
-        return AnsiToWide(buffer);
-    return L"";
+    CExecuteExpData data;
+    data.Name = NULL;
+    data.DosName = NULL;
+    data.FileNameUsed = NULL;
+    data.UserMenuAdvancedData = NULL;
+    std::wstring result = ExpandVarStringW(msgParent, varText, HotPathExpArray, &data,
+                                           ignoreEnvVarNotFoundOrTooLong);
+    if (!result.empty())
+        RemoveDoubleBackslashesW(result);
+    return result;
 }
 
 const CExecuteItem*
