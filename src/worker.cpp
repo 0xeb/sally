@@ -1943,32 +1943,20 @@ BOOL DoCopySecurity(const char* sourceName, const char* targetName, DWORD* err, 
     // if the path ends with a space or dot, we must append '\\', otherwise
     // GetNamedSecurityInfo (and others) trim the spaces/dots and then work
     // with a different path
-    const char* sourceNameSec = sourceName;
-    CPathBuffer sourceNameSecCopy; // Heap-allocated for long path support
-    MakeCopyWithBackslashIfNeeded(sourceNameSec, sourceNameSecCopy);
-    const char* targetNameSec = targetName;
-    CPathBuffer targetNameSecCopy; // Heap-allocated for long path support
-    MakeCopyWithBackslashIfNeeded(targetNameSec, targetNameSecCopy);
+    std::wstring sourceNameSecW = MakeCopyWithBackslashIfNeededW(
+        (!sourceNameW.empty() ? sourceNameW : AnsiToWide(sourceName)).c_str());
+    std::wstring targetNameSecW = MakeCopyWithBackslashIfNeededW(
+        (!targetNameW.empty() ? targetNameW : AnsiToWide(targetName)).c_str());
 
-    // Wide paths for security APIs (when available)
-    std::wstring sourceNameSecW = !sourceNameW.empty() ? MakeCopyWithBackslashIfNeededW(sourceNameW.c_str()) : std::wstring();
-    std::wstring targetNameSecW = !targetNameW.empty() ? MakeCopyWithBackslashIfNeededW(targetNameW.c_str()) : std::wstring();
-
-    // Helpers to call Get/SetNamedSecurityInfo with wide or ANSI paths
+    // Helpers to call Get/SetNamedSecurityInfo with wide paths
     auto GetSecSource = [&](SECURITY_INFORMATION si, PSID* owner, PSID* group, PACL* dacl, PACL* sacl, PSECURITY_DESCRIPTOR* sd) -> DWORD {
-        if (!sourceNameSecW.empty())
-            return GetNamedSecurityInfoW((LPWSTR)sourceNameSecW.c_str(), SE_FILE_OBJECT, si, owner, group, dacl, sacl, sd);
-        return GetNamedSecurityInfo((LPSTR)sourceNameSec, SE_FILE_OBJECT, si, owner, group, dacl, sacl, sd);
+        return GetNamedSecurityInfoW((LPWSTR)sourceNameSecW.c_str(), SE_FILE_OBJECT, si, owner, group, dacl, sacl, sd);
     };
     auto GetSecTarget = [&](SECURITY_INFORMATION si, PSID* owner, PSID* group, PACL* dacl, PACL* sacl, PSECURITY_DESCRIPTOR* sd) -> DWORD {
-        if (!targetNameSecW.empty())
-            return GetNamedSecurityInfoW((LPWSTR)targetNameSecW.c_str(), SE_FILE_OBJECT, si, owner, group, dacl, sacl, sd);
-        return GetNamedSecurityInfo((LPSTR)targetNameSec, SE_FILE_OBJECT, si, owner, group, dacl, sacl, sd);
+        return GetNamedSecurityInfoW((LPWSTR)targetNameSecW.c_str(), SE_FILE_OBJECT, si, owner, group, dacl, sacl, sd);
     };
     auto SetSecTarget = [&](SECURITY_INFORMATION si, PSID owner, PSID group, PACL dacl, PACL sacl) -> DWORD {
-        if (!targetNameSecW.empty())
-            return SetNamedSecurityInfoW((LPWSTR)targetNameSecW.c_str(), SE_FILE_OBJECT, si, owner, group, dacl, sacl);
-        return SetNamedSecurityInfo((LPSTR)targetNameSec, SE_FILE_OBJECT, si, owner, group, dacl, sacl);
+        return SetNamedSecurityInfoW((LPWSTR)targetNameSecW.c_str(), SE_FILE_OBJECT, si, owner, group, dacl, sacl);
     };
 
     PSID srcOwner = NULL;
@@ -2003,7 +1991,7 @@ BOOL DoCopySecurity(const char* sourceName, const char* targetName, DWORD* err, 
         else
         {
             BOOL inheritedDACL = /*(srcSDControl & SE_DACL_AUTO_INHERITED) != 0 &&*/ (srcSDControl & SE_DACL_PROTECTED) == 0; // SE_DACL_AUTO_INHERITED unfortunately is not always set (for example Total Commander clears it after moving a file, so we ignore it)
-            DWORD attr = !targetNameSecW.empty() ? GetFileAttributesW(targetNameSecW.c_str()) : SalLPGetFileAttributes(targetNameSec);
+            DWORD attr = GetFileAttributesW(targetNameSecW.c_str());
             *err = SetSecTarget(DACL_SECURITY_INFORMATION | GROUP_SECURITY_INFORMATION | OWNER_SECURITY_INFORMATION |
                                     (inheritedDACL ? UNPROTECTED_DACL_SECURITY_INFORMATION : PROTECTED_DACL_SECURITY_INFORMATION),
                                 srcOwner, srcGroup, srcDACL, NULL);
@@ -2108,12 +2096,7 @@ BOOL DoCopySecurity(const char* sourceName, const char* targetName, DWORD* err, 
                     LocalFree(tgtSD);
             }
             if (attr != INVALID_FILE_ATTRIBUTES)
-            {
-                if (!targetNameSecW.empty())
-                    SetFileAttributesW(targetNameSecW.c_str(), attr);
-                else
-                    SalLPSetFileAttributes(targetNameSec, attr);
-            }
+                SetFileAttributesW(targetNameSecW.c_str(), attr);
         }
     }
     if (srcSD != NULL)
@@ -2328,25 +2311,13 @@ BOOL CheckFileOrDirADS(const char* fileName, BOOL isDir, CQuadWord* adsSize, wch
     {
         // if the path ends with a space or dot, we must append '\\', otherwise CreateFile
         // trims the spaces/dots and works with a different path
-        HANDLE file;
-        if (!fileNameW.empty())
-        {
-            std::wstring fileNameCrFileW = MakeCopyWithBackslashIfNeededW(fileNameW.c_str());
-            file = CreateFileW(fileNameCrFileW.c_str(), 0, FILE_SHARE_READ | FILE_SHARE_WRITE,
-                               NULL, OPEN_EXISTING,
-                               isDir ? FILE_FLAG_BACKUP_SEMANTICS : 0, NULL);
-            DWORD openErr = GetLastError();
-            HANDLES_ADD_EX(__otQuiet, file != INVALID_HANDLE_VALUE, __htFile, __hoCreateFile, file, openErr, TRUE);
-        }
-        else
-        {
-            const char* fileNameCrFile = fileName;
-            CPathBuffer fileNameCrFileCopy; // Heap-allocated for long path support
-            MakeCopyWithBackslashIfNeeded(fileNameCrFile, fileNameCrFileCopy);
-            file = SalCreateFileH(fileNameCrFile, 0, FILE_SHARE_READ | FILE_SHARE_WRITE,
+        std::wstring fileNameCrFileW = MakeCopyWithBackslashIfNeededW(
+            (!fileNameW.empty() ? fileNameW : AnsiToWide(fileName)).c_str());
+        HANDLE file = CreateFileW(fileNameCrFileW.c_str(), 0, FILE_SHARE_READ | FILE_SHARE_WRITE,
                                   NULL, OPEN_EXISTING,
                                   isDir ? FILE_FLAG_BACKUP_SEMANTICS : 0, NULL);
-        }
+        DWORD openErr = GetLastError();
+        HANDLES_ADD_EX(__otQuiet, file != INVALID_HANDLE_VALUE, __htFile, __hoCreateFile, file, openErr, TRUE);
         if (file == INVALID_HANDLE_VALUE)
         {
             if (winError != NULL)
@@ -3523,8 +3494,11 @@ void SetCompressAndEncryptedAttrs(const char* name, DWORD attr, HANDLE* out, BOO
 {
     if (*out != INVALID_HANDLE_VALUE)
     {
+        // Always have a wide path available
+        const std::wstring& effectiveNameW = !nameW.empty() ? nameW : (const std::wstring&)AnsiToWide(name);
+
         DWORD err = NO_ERROR;
-        DWORD curAttr = !nameW.empty() ? GetFileAttributesW(nameW.c_str()) : SalGetFileAttributes(name);
+        DWORD curAttr = GetFileAttributesW(effectiveNameW.c_str());
         if ((curAttr == INVALID_FILE_ATTRIBUTES ||
              (attr & FILE_ATTRIBUTE_COMPRESSED) != (curAttr & FILE_ATTRIBUTE_COMPRESSED)) &&
             (attr & FILE_ATTRIBUTE_COMPRESSED) == 0)
@@ -3544,8 +3518,7 @@ void SetCompressAndEncryptedAttrs(const char* name, DWORD attr, HANDLE* out, BOO
             HANDLES(CloseHandle(*out)); // close the file; otherwise we cannot change its encrypted attribute
             if (attr & FILE_ATTRIBUTE_ENCRYPTED)
             {
-                BOOL ok = !nameW.empty() ? EncryptFileW(nameW.c_str()) : EncryptFile(name);
-                if (!ok)
+                if (!EncryptFileW(effectiveNameW.c_str()))
                 {
                     err = GetLastError();
                     if (encryptionNotSupported != NULL)
@@ -3554,36 +3527,21 @@ void SetCompressAndEncryptedAttrs(const char* name, DWORD attr, HANDLE* out, BOO
             }
             else
             {
-                BOOL ok = !nameW.empty() ? DecryptFileW(nameW.c_str(), 0) : DecryptFile(name, 0);
-                if (!ok)
+                if (!DecryptFileW(effectiveNameW.c_str(), 0))
                     err = GetLastError();
             }
             if (err != NO_ERROR)
                 TRACE_I("SetCompressAndEncryptedAttrs(): Unable to set Encrypted attribute for " << name << "! error=" << GetErrorText(err));
             // reopen the existing file to continue writing
-            if (!nameW.empty())
-            {
-                *out = CreateFileW(nameW.c_str(), GENERIC_WRITE | (openAlsoForRead ? GENERIC_READ : 0), 0, NULL, OPEN_ALWAYS,
+            *out = CreateFileW(effectiveNameW.c_str(), GENERIC_WRITE | (openAlsoForRead ? GENERIC_READ : 0), 0, NULL, OPEN_ALWAYS,
+                               asyncPar->GetOverlappedFlag() | FILE_FLAG_SEQUENTIAL_SCAN, NULL);
+            if (openAlsoForRead && *out == INVALID_HANDLE_VALUE)
+                *out = CreateFileW(effectiveNameW.c_str(), GENERIC_WRITE, 0, NULL, OPEN_ALWAYS,
                                    asyncPar->GetOverlappedFlag() | FILE_FLAG_SEQUENTIAL_SCAN, NULL);
-                if (openAlsoForRead && *out == INVALID_HANDLE_VALUE)
-                    *out = CreateFileW(nameW.c_str(), GENERIC_WRITE, 0, NULL, OPEN_ALWAYS,
-                                       asyncPar->GetOverlappedFlag() | FILE_FLAG_SEQUENTIAL_SCAN, NULL);
-            }
-            else
-            {
-                *out = SalCreateFileH(name, GENERIC_WRITE | (openAlsoForRead ? GENERIC_READ : 0), 0, NULL, OPEN_ALWAYS,
-                                      asyncPar->GetOverlappedFlag() | FILE_FLAG_SEQUENTIAL_SCAN, NULL);
-                if (openAlsoForRead && *out == INVALID_HANDLE_VALUE)
-                    *out = SalCreateFileH(name, GENERIC_WRITE, 0, NULL, OPEN_ALWAYS,
-                                          asyncPar->GetOverlappedFlag() | FILE_FLAG_SEQUENTIAL_SCAN, NULL);
-            }
             if (*out == INVALID_HANDLE_VALUE) // still a problem: cannot reopen; delete it + report an error
             {
                 err = GetLastError();
-                if (!nameW.empty())
-                    DeleteFileW(nameW.c_str());
-                else
-                    DeleteFileA(gFileSystem, name);
+                DeleteFileW(effectiveNameW.c_str());
                 SetLastError(err);
             }
         }
@@ -5961,32 +5919,23 @@ BOOL DoMoveFile(COperation* op, IWorkerObserver& observer, void* buffer,
     {
         // if the path ends with a space or dot, we must append '\\', otherwise GetNamedSecurityInfo,
         // GetDirTime, SetFileAttributes, and MoveFile trim the spaces/dots and operate on a different path
-        const char* sourceNameMvDir = op->SourceName;
-        CPathBuffer sourceNameMvDirCopy; // Heap-allocated for long path support
-        MakeCopyWithBackslashIfNeeded(sourceNameMvDir, sourceNameMvDirCopy);
-        const char* targetNameMvDir = op->TargetName;
-        CPathBuffer targetNameMvDirCopy; // Heap-allocated for long path support
-        MakeCopyWithBackslashIfNeeded(targetNameMvDir, targetNameMvDirCopy);
-
-        // Compute wide versions for Unicode-correct file operations
-        std::wstring sourceNameMvDirW = op->HasWideSource() ? MakeCopyWithBackslashIfNeededW(op->SourceNameW.c_str()) : std::wstring();
-        std::wstring targetNameMvDirW = op->HasWideTarget() ? MakeCopyWithBackslashIfNeededW(op->TargetNameW.c_str()) : std::wstring();
+        std::wstring effectiveSourceW = op->HasWideSource() ? op->SourceNameW : AnsiToWide(op->SourceName);
+        std::wstring effectiveTargetW = op->HasWideTarget() ? op->TargetNameW : AnsiToWide(op->TargetName);
+        std::wstring sourceNameMvDirW = MakeCopyWithBackslashIfNeededW(effectiveSourceW.c_str());
+        std::wstring targetNameMvDirW = MakeCopyWithBackslashIfNeededW(effectiveTargetW.c_str());
+        // true when path was NOT modified (no trailing space/dot) — replaces old pointer-equality check
+        bool sourceNameUnmodified = (sourceNameMvDirW == effectiveSourceW);
+        bool targetNameUnmodified = (targetNameMvDirW == effectiveTargetW);
 
         int autoRetryAttempts = 0;
         CSrcSecurity srcSecurity;
         BOOL srcSecurityErr = FALSE;
         if (!invalidName && script->CopySecurity) // should we copy NTFS security permissions?
         {
-            if (!sourceNameMvDirW.empty())
-                srcSecurity.SrcError = GetNamedSecurityInfoW((LPWSTR)sourceNameMvDirW.c_str(), SE_FILE_OBJECT,
-                                                              DACL_SECURITY_INFORMATION | GROUP_SECURITY_INFORMATION | OWNER_SECURITY_INFORMATION,
-                                                              &srcSecurity.SrcOwner, &srcSecurity.SrcGroup, &srcSecurity.SrcDACL,
-                                                              NULL, &srcSecurity.SrcSD);
-            else
-                srcSecurity.SrcError = GetNamedSecurityInfo(sourceNameMvDir, SE_FILE_OBJECT,
-                                                             DACL_SECURITY_INFORMATION | GROUP_SECURITY_INFORMATION | OWNER_SECURITY_INFORMATION,
-                                                             &srcSecurity.SrcOwner, &srcSecurity.SrcGroup, &srcSecurity.SrcDACL,
-                                                             NULL, &srcSecurity.SrcSD);
+            srcSecurity.SrcError = GetNamedSecurityInfoW((LPWSTR)sourceNameMvDirW.c_str(), SE_FILE_OBJECT,
+                                                          DACL_SECURITY_INFORMATION | GROUP_SECURITY_INFORMATION | OWNER_SECURITY_INFORMATION,
+                                                          &srcSecurity.SrcOwner, &srcSecurity.SrcGroup, &srcSecurity.SrcDACL,
+                                                          NULL, &srcSecurity.SrcSD);
             if (srcSecurity.SrcError != ERROR_SUCCESS) // failed to read security info from the source file -> nothing to apply on the target
             {
                 srcSecurityErr = TRUE;
@@ -6017,27 +5966,19 @@ BOOL DoMoveFile(COperation* op, IWorkerObserver& observer, void* buffer,
         FILETIME dirTimeModified;
         BOOL dirTimeModifiedIsValid = FALSE;
         if (!invalidName && dir && !*novellRenamePatch && *setDirTimeAfterMove != 2 /* no */) // the issue apparently does not apply to Novell Netware, so ignore it there (affects e.g. Samba)
-            dirTimeModifiedIsValid = !sourceNameMvDirW.empty() ? GetDirTimeW(sourceNameMvDirW.c_str(), &dirTimeModified)
-                                                               : GetDirTime(sourceNameMvDir, &dirTimeModified);
+            dirTimeModifiedIsValid = GetDirTimeW(sourceNameMvDirW.c_str(), &dirTimeModified);
         while (1)
         {
-            if (!invalidName && !*novellRenamePatch && MoveFileAW(gFileSystem, sourceNameMvDir, targetNameMvDir, sourceNameMvDirW, targetNameMvDirW).success)
+            if (!invalidName && !*novellRenamePatch && gFileSystem->MoveFile(sourceNameMvDirW.c_str(), targetNameMvDirW.c_str()).success)
             {
                 if (script->CopyAttrs && (op->Attr & FILE_ATTRIBUTE_ARCHIVE) == 0) // Archive attribute was not set, MoveFile turned it on, clear it again
-                {
-                    if (!targetNameMvDirW.empty())
-                        SetFileAttributesW(targetNameMvDirW.c_str(), op->Attr);
-                    else
-                        SalLPSetFileAttributes(targetNameMvDir, op->Attr); // leave without handling or retry, not important (it normally toggles chaotically)
-                }
+                    SetFileAttributesW(targetNameMvDirW.c_str(), op->Attr); // leave without handling or retry, not important (it normally toggles chaotically)
 
             OPERATION_DONE:
 
                 if (script->CopyAttrs) // check whether the source file attributes were preserved
                 {
-                    DWORD curAttrs;
-                    curAttrs = !targetNameMvDirW.empty() ? GetFileAttributesW(targetNameMvDirW.c_str())
-                                                         : SalGetFileAttributes(targetNameMvDir);
+                    DWORD curAttrs = GetFileAttributesW(targetNameMvDirW.c_str());
                     if (curAttrs == INVALID_FILE_ATTRIBUTES || (curAttrs & DISPLAYED_ATTRIBUTES) != (op->Attr & DISPLAYED_ATTRIBUTES))
                     {                                                              // attributes probably were not preserved, warn the user
                         observer.WaitIfSuspended(); // if we should be in suspend mode, wait ...
@@ -6072,7 +6013,7 @@ BOOL DoMoveFile(COperation* op, IWorkerObserver& observer, void* buffer,
                 if (script->CopySecurity && !srcSecurityErr) // should we copy NTFS security permissions?
                 {
                     DWORD err;
-                    if (!DoCopySecurity(sourceNameMvDir, targetNameMvDir, &err, &srcSecurity,
+                    if (!DoCopySecurity(op->SourceName, op->TargetName, &err, &srcSecurity,
                                        sourceNameMvDirW, targetNameMvDirW))
                     {
                         observer.WaitIfSuspended(); // if we should be in suspend mode, wait ...
@@ -6103,8 +6044,7 @@ BOOL DoMoveFile(COperation* op, IWorkerObserver& observer, void* buffer,
                 if (dir && dirTimeModifiedIsValid && *setDirTimeAfterMove != 2 /* no */)
                 {
                     FILETIME movedDirTimeModified;
-                    BOOL gotTime = !targetNameMvDirW.empty() ? GetDirTimeW(targetNameMvDirW.c_str(), &movedDirTimeModified)
-                                                                : GetDirTime(targetNameMvDir, &movedDirTimeModified);
+                    BOOL gotTime = GetDirTimeW(targetNameMvDirW.c_str(), &movedDirTimeModified);
                     if (gotTime)
                     {
                         if (CompareFileTime(&dirTimeModified, &movedDirTimeModified) == 0)
@@ -6116,7 +6056,7 @@ BOOL DoMoveFile(COperation* op, IWorkerObserver& observer, void* buffer,
                         {
                             if (*setDirTimeAfterMove == 0 /* need test */)
                                 *setDirTimeAfterMove = 1 /* yes */;
-                            DoCopyDirTime(observer, targetNameMvDir, &dirTimeModified, workerState, TRUE, targetNameMvDirW); // ignore any failure, this is just a hack (we already ignore time read errors from the directory); MoveFile should not change times
+                            DoCopyDirTime(observer, op->TargetName, &dirTimeModified, workerState, TRUE, targetNameMvDirW); // ignore any failure, this is just a hack (we already ignore time read errors from the directory); MoveFile should not change times
                         }
                     }
                 }
@@ -6135,38 +6075,26 @@ BOOL DoMoveFile(COperation* op, IWorkerObserver& observer, void* buffer,
                 // Novell patch - before calling MoveFile we need to drop the read-only attribute
                 if (!invalidName && *novellRenamePatch || err == ERROR_ACCESS_DENIED)
                 {
-                    DWORD attr = !sourceNameMvDirW.empty() ? GetFileAttributesW(sourceNameMvDirW.c_str())
-                                                              : SalGetFileAttributes(sourceNameMvDir);
-                    BOOL setAttr = !sourceNameMvDirW.empty() ? ClearReadOnlyAttrW(sourceNameMvDirW.c_str(), attr)
-                                                             : ClearReadOnlyAttr(sourceNameMvDir, attr);
-                    if (MoveFileAW(gFileSystem, sourceNameMvDir, targetNameMvDir, sourceNameMvDirW, targetNameMvDirW).success)
+                    DWORD attr = GetFileAttributesW(sourceNameMvDirW.c_str());
+                    BOOL setAttr = ClearReadOnlyAttrW(sourceNameMvDirW.c_str(), attr);
+                    if (gFileSystem->MoveFile(sourceNameMvDirW.c_str(), targetNameMvDirW.c_str()).success)
                     {
                         if (!*novellRenamePatch)
                             *novellRenamePatch = TRUE; // the next operations will go straight through here
                         if (setAttr || script->CopyAttrs && (attr & FILE_ATTRIBUTE_ARCHIVE) == 0)
-                        {
-                            if (!targetNameMvDirW.empty())
-                                SetFileAttributesW(targetNameMvDirW.c_str(), attr);
-                            else
-                                SalLPSetFileAttributes(targetNameMvDir, attr);
-                        }
+                            SetFileAttributesW(targetNameMvDirW.c_str(), attr);
 
                         goto OPERATION_DONE;
                     }
                     err = GetLastError();
                     if (setAttr)
-                    {
-                        if (!sourceNameMvDirW.empty())
-                            SetFileAttributesW(sourceNameMvDirW.c_str(), attr);
-                        else
-                            SalLPSetFileAttributes(sourceNameMvDir, attr);
-                    }
+                        SetFileAttributesW(sourceNameMvDirW.c_str(), attr);
                 }
 
                 if (!op->AreSourceAndTargetSamePath() &&            // provided this is not just a change of case
                     (err == ERROR_FILE_EXISTS ||                    // verify whether this is only overwriting the DOS name of the file/directory
                      err == ERROR_ALREADY_EXISTS) &&
-                    targetNameMvDir == op->TargetName) // no invalid names are allowed here
+                    targetNameUnmodified) // no invalid names are allowed here (path was not modified by MakeCopy)
                 {
                     WIN32_FIND_DATAW findData;
                     HANDLE find = op->FindFirstTarget(&findData);
@@ -6207,7 +6135,7 @@ BOOL DoMoveFile(COperation* op, IWorkerObserver& observer, void* buffer,
                                 }
                                 if (tmpName[0] != 0) // if we managed to "tidy up" the conflicting file/directory, try moving it again
                                 {                    // then restore the original name of the "tidied" file/directory
-                                    BOOL moveDone = SalMoveFile(sourceNameMvDir, op->TargetName);
+                                    BOOL moveDone = gFileSystem->MoveFile(sourceNameMvDirW.c_str(), targetNameMvDirW.c_str()).success;
                                     if (script->CopyAttrs && (op->Attr & FILE_ATTRIBUTE_ARCHIVE) == 0) // the Archive attribute was not set; MoveFile turned it on, clear it again
                                         op->SetTargetAttributes(op->Attr);                   // leave without handling or retry, not important (it normally toggles chaotically)
                                     if (!SalMoveFile(tmpName, origFullName))
@@ -6215,7 +6143,7 @@ BOOL DoMoveFile(COperation* op, IWorkerObserver& observer, void* buffer,
                                         TRACE_I("DoMoveFile(): Unexpected situation: unable to rename file/dir from tmp-name to original long file name! " << origFullName);
                                         if (moveDone)
                                         {
-                                            if (SalMoveFile(op->TargetName, sourceNameMvDir))
+                                            if (gFileSystem->MoveFile(targetNameMvDirW.c_str(), sourceNameMvDirW.c_str()).success)
                                                 moveDone = FALSE;
                                             if (!SalMoveFile(tmpName, origFullName))
                                                 TRACE_E("DoMoveFile(): Fatal unexpected situation: unable to rename file/dir from tmp-name to original long file name! " << origFullName);
@@ -6240,7 +6168,7 @@ BOOL DoMoveFile(COperation* op, IWorkerObserver& observer, void* buffer,
                 if ((err == ERROR_ALREADY_EXISTS || // theoretically can happen for directories; prevent that (overwrite prompt is only for files)
                      err == ERROR_FILE_EXISTS) &&
                     !dir && !op->AreSourceAndTargetSamePath() &&
-                    sourceNameMvDir == op->SourceName && targetNameMvDir == op->TargetName) // no invalid names allowed here (files only, and their names are validated)
+                    sourceNameUnmodified && targetNameUnmodified) // no invalid names allowed here (paths were not modified by MakeCopy)
                 {
                     HANDLE in, out;
                     in = op->OpenSourceFile(FILE_ATTRIBUTE_NORMAL);
@@ -6514,8 +6442,8 @@ BOOL DoDeleteFile(IWorkerObserver& observer, char* name, const CQuadWord& size, 
 {
     // if the path ends with a space/dot it is invalid and we must not delete it,
     // DeleteFile would trim the spaces/dots and remove a different file
-    BOOL invalidName = !nameW.empty() ? FileNameIsInvalidW(nameW.c_str(), TRUE)
-                                      : FileNameIsInvalid(name, TRUE);
+    std::wstring effectiveDeleteNameW = !nameW.empty() ? nameW : AnsiToWide(name);
+    BOOL invalidName = FileNameIsInvalidW(effectiveDeleteNameW.c_str(), TRUE);
 
     DWORD err;
     while (1)
@@ -6552,10 +6480,10 @@ BOOL DoDeleteFile(IWorkerObserver& observer, char* name, const CQuadWord& size, 
                     }
                 }
             }
-            if (!nameW.empty())
-                ClearReadOnlyAttrW(nameW.c_str(), attr);
-            else
-                ClearReadOnlyAttr(name, attr); // ensure it can be deleted
+            {
+                std::wstring effectiveNameW = !nameW.empty() ? nameW : AnsiToWide(name);
+                ClearReadOnlyAttrW(effectiveNameW.c_str(), attr); // ensure it can be deleted
+            }
 
             err = ERROR_SUCCESS;
             BOOL useRecycleBin;
@@ -6600,32 +6528,33 @@ BOOL DoDeleteFile(IWorkerObserver& observer, char* name, const CQuadWord& size, 
             }
             if (useRecycleBin)
             {
-                CPathBuffer nameList;
-                int l = (int)strlen(name) + 1;
-                memmove(nameList, name, l);
-                nameList[l] = 0; // double-null termination for SHFileOperation
-                if (!PathContainsValidComponents(nameList, FALSE))
+                std::wstring effectiveNameW = !nameW.empty() ? nameW : AnsiToWide(name);
+                // SHFileOperationW needs double-null terminated wide path
+                std::wstring nameList = effectiveNameW;
+                nameList.push_back(L'\0'); // double-null termination
+                if (!PathContainsValidComponentsW(nameList.c_str()))
                 {
                     err = ERROR_INVALID_NAME;
                 }
                 else
                 {
                     CShellExecuteWnd shellExecuteWnd;
-                    SHFILEOPSTRUCT opCode;
+                    SHFILEOPSTRUCTW opCode;
                     memset(&opCode, 0, sizeof(opCode));
 
                     opCode.hwnd = shellExecuteWnd.Create(observer.GetParentWindow(), "SEW: DoDeleteFile");
 
                     opCode.wFunc = FO_DELETE;
-                    opCode.pFrom = nameList;
+                    opCode.pFrom = nameList.c_str();
                     opCode.fFlags = FOF_ALLOWUNDO | FOF_SILENT | FOF_NOCONFIRMATION;
-                    opCode.lpszProgressTitle = "";
-                    err = SHFileOperation(&opCode);
+                    opCode.lpszProgressTitle = L"";
+                    err = SHFileOperationW(&opCode);
                 }
             }
             else
             {
-                if (!nameW.empty() ? !DeleteFileW(nameW.c_str()) : !SalLPDeleteFile(name))
+                std::wstring effectiveNameW = !nameW.empty() ? nameW : AnsiToWide(name);
+                if (!DeleteFileW(effectiveNameW.c_str()))
                     err = GetLastError();
             }
         }
@@ -6673,7 +6602,8 @@ BOOL DoDeleteFile(IWorkerObserver& observer, char* name, const CQuadWord& size, 
         }
         if (!invalidName)
         {
-            DWORD attr2 = SalGetFileAttributes(name); // get the current attribute state
+            std::wstring effectiveNameW = !nameW.empty() ? nameW : AnsiToWide(name);
+            DWORD attr2 = GetFileAttributesW(effectiveNameW.c_str()); // get the current attribute state
             if (attr2 != INVALID_FILE_ATTRIBUTES)
                 attr = attr2;
         }
@@ -6686,16 +6616,15 @@ BOOL SalCreateDirectoryEx(const char* name, DWORD* err)
         *err = 0;
     // if the name ends with a space/dot we must append '\\', otherwise CreateDirectory
     // quietly trims the trailing spaces/dots and creates a different directory
-    const char* nameCrDir = name;
-    CPathBuffer nameCrDirBuf; // Heap-allocated for long path support
-    MakeCopyWithBackslashIfNeeded(nameCrDir, nameCrDirBuf);
-    // Use SalLPCreateDirectory for long path support
-    if (SalLPCreateDirectory(nameCrDir, NULL))
+    std::wstring nameW = AnsiToWide(name);
+    std::wstring nameCrDirW = MakeCopyWithBackslashIfNeededW(nameW.c_str());
+    bool nameUnmodified = (nameCrDirW == nameW); // true when no trailing space/dot fixup was needed
+    if (CreateDirectoryW(nameCrDirW.c_str(), NULL))
         return TRUE;
     else
     {
         DWORD errLoc = GetLastError();
-        if (name == nameCrDir &&            // a name ending with a space/dot cannot collide with a DOS name
+        if (nameUnmodified &&               // a name ending with a space/dot cannot collide with a DOS name
             (errLoc == ERROR_FILE_EXISTS || // check whether this is only overwriting the file's DOS name
              errLoc == ERROR_ALREADY_EXISTS))
         {
@@ -6798,31 +6727,19 @@ BOOL DoCopyDirTime(IWorkerObserver& observer, const char* targetName, FILETIME* 
 {
     // if the path ends with a space/dot, we must append '\\', otherwise CreateFile
     // trims the spaces/dots and works with a different path
-    const char* targetNameCrFile = targetName;
-    CPathBuffer targetNameCrFileCopy; // Heap-allocated for long path support
-    MakeCopyWithBackslashIfNeeded(targetNameCrFile, targetNameCrFileCopy);
-    std::wstring targetNameCrFileW = !targetNameW.empty() ? MakeCopyWithBackslashIfNeededW(targetNameW.c_str()) : std::wstring();
+    std::wstring targetNameCrFileW = MakeCopyWithBackslashIfNeededW(
+        !targetNameW.empty() ? targetNameW.c_str() : AnsiToWide(targetName).c_str());
 
     BOOL showError = !quiet;
     DWORD error = NO_ERROR;
-    DWORD attr = !targetNameCrFileW.empty() ? GetFileAttributesW(targetNameCrFileW.c_str()) : SalLPGetFileAttributes(targetNameCrFile);
+    DWORD attr = GetFileAttributesW(targetNameCrFileW.c_str());
     BOOL setAttr = FALSE;
     if (attr != INVALID_FILE_ATTRIBUTES && (attr & FILE_ATTRIBUTE_READONLY))
     {
-        if (!targetNameCrFileW.empty())
-            SetFileAttributesW(targetNameCrFileW.c_str(), attr & ~FILE_ATTRIBUTE_READONLY);
-        else
-            SalLPSetFileAttributes(targetNameCrFile, attr & ~FILE_ATTRIBUTE_READONLY);
+        SetFileAttributesW(targetNameCrFileW.c_str(), attr & ~FILE_ATTRIBUTE_READONLY);
         setAttr = TRUE;
     }
-    HANDLE file;
-    if (!targetNameCrFileW.empty())
-        file = CreateFileW(targetNameCrFileW.c_str(), GENERIC_WRITE,
-                           FILE_SHARE_READ | FILE_SHARE_WRITE,
-                           NULL, OPEN_EXISTING,
-                           FILE_FLAG_BACKUP_SEMANTICS, NULL);
-    else
-        file = SalCreateFileH(targetNameCrFile, GENERIC_WRITE,
+    HANDLE file = CreateFileW(targetNameCrFileW.c_str(), GENERIC_WRITE,
                               FILE_SHARE_READ | FILE_SHARE_WRITE,
                               NULL, OPEN_EXISTING,
                               FILE_FLAG_BACKUP_SEMANTICS, NULL);
@@ -6837,12 +6754,7 @@ BOOL DoCopyDirTime(IWorkerObserver& observer, const char* targetName, FILETIME* 
     else
         error = GetLastError();
     if (setAttr)
-    {
-        if (!targetNameCrFileW.empty())
-            SetFileAttributesW(targetNameCrFileW.c_str(), attr);
-        else
-            SalLPSetFileAttributes(targetNameCrFile, attr);
-    }
+        SetFileAttributesW(targetNameCrFileW.c_str(), attr);
 
     if (showError)
     {
@@ -6856,7 +6768,7 @@ BOOL DoCopyDirTime(IWorkerObserver& observer, const char* targetName, FILETIME* 
             ret = IDB_IGNORE;
         else
         {
-            ret = observer.AskCopyDirTimeError(targetNameCrFile, error);
+            ret = observer.AskCopyDirTimeError(targetName, error);
         }
         switch (ret)
         {
@@ -6888,19 +6800,15 @@ BOOL DoCreateDir(IWorkerObserver& observer, char* name, DWORD attr,
     CQuadWord lastTransferredFileSize;
     script->GetTFS(&lastTransferredFileSize);
 
-    BOOL invalidName = !nameW.empty() ? FileNameIsInvalidW(nameW.c_str(), TRUE, ignInvalidName)
-                                      : FileNameIsInvalid(name, TRUE, ignInvalidName);
+    std::wstring effectiveNameW = !nameW.empty() ? nameW : AnsiToWide(name);
+    BOOL invalidName = FileNameIsInvalidW(effectiveNameW.c_str(), TRUE, ignInvalidName);
 
     // if the path ends with a space/dot, we must append '\\'; otherwise SetFileAttributes
     // and RemoveDirectory trim the spaces/dots and operate on a different path
-    const char* nameCrDir = name;
-    CPathBuffer nameCrDirCopy; // Heap-allocated for long path support
-    MakeCopyWithBackslashIfNeeded(nameCrDir, nameCrDirCopy);
-    std::wstring nameCrDirW = !nameW.empty() ? MakeCopyWithBackslashIfNeededW(nameW.c_str()) : std::wstring();
-    const char* sourceDirCrDir = sourceDir;
-    CPathBuffer sourceDirCrDirCopy; // Heap-allocated for long path support
-    if (sourceDirCrDir != NULL)
-        MakeCopyWithBackslashIfNeeded(sourceDirCrDir, sourceDirCrDirCopy);
+    std::wstring nameCrDirW = MakeCopyWithBackslashIfNeededW(effectiveNameW.c_str());
+    std::wstring sourceDirCrDirW;
+    if (sourceDir != NULL)
+        sourceDirCrDirW = MakeCopyWithBackslashIfNeededW(AnsiToWide(sourceDir).c_str());
 
     while (1)
     {
@@ -6908,14 +6816,9 @@ BOOL DoCreateDir(IWorkerObserver& observer, char* name, DWORD attr,
         BOOL createOk;
         if (!invalidName)
         {
-            if (!nameCrDirW.empty())
-            {
-                createOk = CreateDirectoryW(nameCrDirW.c_str(), NULL);
-                if (!createOk)
-                    err = GetLastError();
-            }
-            else
-                createOk = SalCreateDirectoryEx(name, &err);
+            createOk = CreateDirectoryW(nameCrDirW.c_str(), NULL);
+            if (!createOk)
+                err = GetLastError();
         }
         else
             createOk = FALSE;
@@ -6933,7 +6836,7 @@ BOOL DoCreateDir(IWorkerObserver& observer, char* name, DWORD attr,
                                std::wstring(), nameW) ||
                     adsSkip) // user cancelled or skipped at least one ADS
                 {
-                    if ((!nameCrDirW.empty() ? !RemoveDirectoryW(nameCrDirW.c_str()) : SalLPRemoveDirectory(nameCrDir) == 0))
+                    if (!RemoveDirectoryW(nameCrDirW.c_str()))
                     {
                         DWORD err2 = GetLastError();
                         TRACE_E("Unable to remove newly created directory: " << name << ", error: " << GetErrorText(err2));
@@ -6954,15 +6857,13 @@ BOOL DoCreateDir(IWorkerObserver& observer, char* name, DWORD attr,
                         newAttr |= FILE_ATTRIBUTE_ENCRYPTED;
                     }
                     DWORD changeAttrErr = NO_ERROR;
-                    DWORD currentAttrs = !nameCrDirW.empty() ? GetFileAttributesW(nameCrDirW.c_str())
-                                                             : SalGetFileAttributes(name);
+                    DWORD currentAttrs = GetFileAttributesW(nameCrDirW.c_str());
                     if (currentAttrs != INVALID_FILE_ATTRIBUTES)
                     {
                         if ((newAttr & FILE_ATTRIBUTE_COMPRESSED) != (currentAttrs & FILE_ATTRIBUTE_COMPRESSED) &&
                             (newAttr & FILE_ATTRIBUTE_COMPRESSED) == 0)
                         {
-                            changeAttrErr = !nameCrDirW.empty() ? UncompressFileW(nameCrDirW.c_str(), currentAttrs)
-                                                                : UncompressFile(name, currentAttrs);
+                            changeAttrErr = UncompressFileW(nameCrDirW.c_str(), currentAttrs);
                         }
                         if (changeAttrErr == NO_ERROR &&
                             (newAttr & FILE_ATTRIBUTE_ENCRYPTED) != (currentAttrs & FILE_ATTRIBUTE_ENCRYPTED))
@@ -6970,10 +6871,8 @@ BOOL DoCreateDir(IWorkerObserver& observer, char* name, DWORD attr,
                             BOOL dummyCancelOper = FALSE;
                             if (newAttr & FILE_ATTRIBUTE_ENCRYPTED)
                             {
-                                changeAttrErr = !nameCrDirW.empty() ? MyEncryptFileW(observer, nameCrDirW.c_str(), name, currentAttrs, 0 /* allow encrypting directories with the SYSTEM attribute */,
-                                                                                     workerState, dummyCancelOper, FALSE)
-                                                                    : MyEncryptFile(observer, name, currentAttrs, 0 /* allow encrypting directories with the SYSTEM attribute */,
-                                                                                    workerState, dummyCancelOper, FALSE);
+                                changeAttrErr = MyEncryptFileW(observer, nameCrDirW.c_str(), name, currentAttrs, 0 /* allow encrypting directories with the SYSTEM attribute */,
+                                                                                     workerState, dummyCancelOper, FALSE);
 
                                 if ( //(WindowsVistaAndLater || script->TargetPathSupEFS) &&  // complain regardless of OS version and EFS support; originally directories on FAT could not be encrypted before Vista, we behave the same (to match Explorer, the Encrypted attribute is not that important)
                                     !workerState.DirCrLossEncrAll && changeAttrErr != ERROR_SUCCESS)
@@ -7001,14 +6900,8 @@ BOOL DoCreateDir(IWorkerObserver& observer, char* name, DWORD attr,
                                         workerState.SkipAllDirCrLossEncr = TRUE;
                                     case IDB_SKIP:
                                     {
-                                        if (!nameCrDirW.empty())
-                                            ClearReadOnlyAttrW(nameCrDirW.c_str());
-                                        else
-                                            ClearReadOnlyAttr(nameCrDir); // remove read-only attribute so the file can be deleted
-                                        if (!nameCrDirW.empty())
-                                            RemoveDirectoryW(nameCrDirW.c_str());
-                                        else
-                                            SalLPRemoveDirectory(nameCrDir);
+                                        ClearReadOnlyAttrW(nameCrDirW.c_str());
+                                        RemoveDirectoryW(nameCrDirW.c_str());
                                         script->SetTFS(lastTransferredFileSize); // add TFS only after the directory is fully outside; ProgressSize will be synced outside (no point in adjusting it here)
                                         skip = TRUE;
                                         return TRUE;
@@ -7020,15 +6913,13 @@ BOOL DoCreateDir(IWorkerObserver& observer, char* name, DWORD attr,
                                 }
                             }
                             else
-                                changeAttrErr = !nameCrDirW.empty() ? MyDecryptFileW(nameCrDirW.c_str(), currentAttrs, FALSE)
-                                                                    : MyDecryptFile(name, currentAttrs, FALSE);
+                                changeAttrErr = MyDecryptFileW(nameCrDirW.c_str(), currentAttrs, FALSE);
                         }
                         if (changeAttrErr == NO_ERROR &&
                             (newAttr & FILE_ATTRIBUTE_COMPRESSED) != (currentAttrs & FILE_ATTRIBUTE_COMPRESSED) &&
                             (newAttr & FILE_ATTRIBUTE_COMPRESSED) != 0)
                         {
-                            changeAttrErr = !nameCrDirW.empty() ? CompressFileW(nameCrDirW.c_str(), currentAttrs)
-                                                                : CompressFile(name, currentAttrs);
+                            changeAttrErr = CompressFileW(nameCrDirW.c_str(), currentAttrs);
                         }
                     }
                     else
@@ -7038,16 +6929,11 @@ BOOL DoCreateDir(IWorkerObserver& observer, char* name, DWORD attr,
                         TRACE_I("DoCreateDir(): Unable to set Encrypted or Compressed attributes for " << name << "! error=" << GetErrorText(changeAttrErr));
                     }
                 }
-                if (!nameCrDirW.empty())
-                    SetFileAttributesW(nameCrDirW.c_str(), newAttr);
-                else
-                    SalLPSetFileAttributes(nameCrDir, newAttr);
+                SetFileAttributesW(nameCrDirW.c_str(), newAttr);
 
                 if (script->CopyAttrs) // verify whether the source file attributes were preserved
                 {
-                    DWORD curAttrs;
-                    curAttrs = !nameCrDirW.empty() ? GetFileAttributesW(nameCrDirW.c_str())
-                                                   : SalGetFileAttributes(name);
+                    DWORD curAttrs = GetFileAttributesW(nameCrDirW.c_str());
                     if (curAttrs == INVALID_FILE_ATTRIBUTES || (curAttrs & DISPLAYED_ATTRIBUTES) != (newAttr & DISPLAYED_ATTRIBUTES))
                     {                                                              // attributes probably did not transfer; warn the user
                         observer.WaitIfSuspended(); // if we should be in suspend mode, wait ...
@@ -7073,16 +6959,8 @@ BOOL DoCreateDir(IWorkerObserver& observer, char* name, DWORD attr,
                         {
                         CANCEL_CRDIR:
 
-                            if (!nameCrDirW.empty())
-                            {
-                                ClearReadOnlyAttrW(nameCrDirW.c_str());
-                                RemoveDirectoryW(nameCrDirW.c_str());
-                            }
-                            else
-                            {
-                                ClearReadOnlyAttr(nameCrDir); // remove read-only so the file can be deleted
-                                SalLPRemoveDirectory(nameCrDir);
-                            }
+                            ClearReadOnlyAttrW(nameCrDirW.c_str());
+                            RemoveDirectoryW(nameCrDirW.c_str());
                             return FALSE;
                         }
                         }
@@ -7128,18 +7006,14 @@ BOOL DoCreateDir(IWorkerObserver& observer, char* name, DWORD attr,
             if (err == ERROR_ALREADY_EXISTS ||
                 err == ERROR_FILE_EXISTS)
             {
-                DWORD attr2 = !nameCrDirW.empty() ? GetFileAttributesW(nameCrDirW.c_str())
-                                                  : SalGetFileAttributes(name);
+                DWORD attr2 = GetFileAttributesW(nameCrDirW.c_str());
                 if (attr2 & FILE_ATTRIBUTE_DIRECTORY) // "directory overwrite"
                 {
                     if (workerState.CnfrmDirOver && !workerState.DirOverwriteAll) // should we ask the user about overwriting the directory?
                     {
                         char sAttr[101], tAttr[101];
                         GetDirInfo(sAttr, sourceDir);
-                        if (!nameW.empty())
-                            GetDirInfoW(tAttr, nameW.c_str());
-                        else
-                            GetDirInfo(tAttr, name);
+                        GetDirInfoW(tAttr, effectiveNameW.c_str());
 
                         observer.WaitIfSuspended(); // if we should be in suspend mode, wait ...
                         if (observer.IsCancelled())
@@ -7236,50 +7110,44 @@ BOOL DoDeleteDir(IWorkerObserver& observer, char* name, const CQuadWord& size, C
 
     // if the path ends with a space/dot, we must append '\\'; otherwise SetFileAttributes
     // and RemoveDirectory trim the spaces/dots and operate on a different path
-    const char* nameRmDir = name;
-    CPathBuffer nameRmDirCopy; // Heap-allocated for long path support
-    MakeCopyWithBackslashIfNeeded(nameRmDir, nameRmDirCopy);
-    std::wstring nameRmDirW = !nameW.empty() ? MakeCopyWithBackslashIfNeededW(nameW.c_str()) : std::wstring();
+    std::wstring nameRmDirW = MakeCopyWithBackslashIfNeededW(
+        !nameW.empty() ? nameW.c_str() : AnsiToWide(name).c_str());
 
     while (1)
     {
-        if (!nameRmDirW.empty())
-            ClearReadOnlyAttrW(nameRmDirW.c_str(), attr);
-        else
-            ClearReadOnlyAttr(nameRmDir, attr); // ensure it can be deleted
+        ClearReadOnlyAttrW(nameRmDirW.c_str(), attr); // ensure it can be deleted
 
         err = ERROR_SUCCESS;
         if (script->CanUseRecycleBin && !dontUseRecycleBin &&
             (script->InvertRecycleBin && workerState.UseRecycleBin == 0 ||
              !script->InvertRecycleBin && workerState.UseRecycleBin == 1) &&
-            IsDirectoryEmpty(name)) // subdirectory must not contain any files!!!
+            IsDirectoryEmptyW(nameRmDirW.c_str())) // subdirectory must not contain any files!!!
         {
-            CPathBuffer nameList;
-            int l = (int)strlen(name) + 1;
-            memmove(nameList, name, l);
-            nameList[l] = 0; // double-null termination for SHFileOperation
-            if (!PathContainsValidComponents(nameList, FALSE))
+            // SHFileOperation needs double-null terminated wide path
+            std::wstring nameList = nameRmDirW;
+            nameList.push_back(L'\0'); // double-null termination
+            if (!PathContainsValidComponentsW(nameList.c_str()))
             {
                 err = ERROR_INVALID_NAME;
             }
             else
             {
                 CShellExecuteWnd shellExecuteWnd;
-                SHFILEOPSTRUCT opCode;
+                SHFILEOPSTRUCTW opCode;
                 memset(&opCode, 0, sizeof(opCode));
 
                 opCode.hwnd = shellExecuteWnd.Create(observer.GetParentWindow(), "SEW: DoDeleteDir");
 
                 opCode.wFunc = FO_DELETE;
-                opCode.pFrom = nameList;
+                opCode.pFrom = nameList.c_str();
                 opCode.fFlags = FOF_ALLOWUNDO | FOF_SILENT | FOF_NOCONFIRMATION;
-                opCode.lpszProgressTitle = "";
-                err = SHFileOperation(&opCode);
+                opCode.lpszProgressTitle = L"";
+                err = SHFileOperationW(&opCode);
             }
         }
         else
         {
-            if (!nameRmDirW.empty() ? !RemoveDirectoryW(nameRmDirW.c_str()) : SalLPRemoveDirectory(nameRmDir) == 0)
+            if (!RemoveDirectoryW(nameRmDirW.c_str()))
                 err = GetLastError();
         }
 
@@ -7312,7 +7180,7 @@ BOOL DoDeleteDir(IWorkerObserver& observer, char* name, const CQuadWord& size, C
             {
                 int ret;
                 ret = IDCANCEL;
-                ret = observer.AskFileErrorById(IDS_ERRORDELETINGDIR, (char*)nameRmDir, err);
+                ret = observer.AskFileErrorById(IDS_ERRORDELETINGDIR, name, err);
                 switch (ret)
                 {
                 case IDRETRY:
@@ -7336,7 +7204,7 @@ BOOL DoDeleteDir(IWorkerObserver& observer, char* name, const CQuadWord& size, C
             }
         }
 
-        DWORD attr2 = !nameRmDirW.empty() ? GetFileAttributesW(nameRmDirW.c_str()) : SalGetFileAttributes(nameRmDir); // get the current attribute state
+        DWORD attr2 = GetFileAttributesW(nameRmDirW.c_str()); // get the current attribute state
         if (attr2 != INVALID_FILE_ATTRIBUTES)
             attr = attr2;
     }
@@ -7498,15 +7366,13 @@ BOOL DoDeleteDirLink(IWorkerObserver& observer, char* name, const CQuadWord& siz
 {
     // if the path ends with a space/dot, we must append '\\'; otherwise CreateFile
     // and RemoveDirectory trim the spaces/dots and operate on a different path
-    const char* nameDelLink = name;
-    CPathBuffer nameDelLinkCopy; // Heap-allocated for long path support
-    MakeCopyWithBackslashIfNeeded(nameDelLink, nameDelLinkCopy);
-    std::wstring nameDelLinkW = !nameW.empty() ? MakeCopyWithBackslashIfNeededW(nameW.c_str()) : std::wstring();
+    std::wstring nameDelLinkW = MakeCopyWithBackslashIfNeededW(
+        !nameW.empty() ? nameW.c_str() : AnsiToWide(name).c_str());
 
     while (1)
     {
         DWORD err;
-        BOOL ok = !nameDelLinkW.empty() ? DoDeleteDirLinkAuxW(nameDelLinkW.c_str(), &err) : DoDeleteDirLinkAux(nameDelLink, &err);
+        BOOL ok = DoDeleteDirLinkAuxW(nameDelLinkW.c_str(), &err);
 
         if (ok)
         {
@@ -7527,7 +7393,7 @@ BOOL DoDeleteDirLink(IWorkerObserver& observer, char* name, const CQuadWord& siz
 
             int ret;
             ret = IDCANCEL;
-            ret = observer.AskFileErrorById(IDS_ERRORDELETINGDIRLINK, (char*)nameDelLink, err);
+            ret = observer.AskFileErrorById(IDS_ERRORDELETINGDIRLINK, name, err);
             switch (ret)
             {
             case IDRETRY:
@@ -7568,10 +7434,12 @@ BOOL DoConvert(IWorkerObserver& observer, char* name, char* sourceBuffer, char* 
                CConvertData& convertData, CWorkerState& workerState,
                const std::wstring& nameW = std::wstring())
 {
+    // Always have a wide path available
+    std::wstring effectiveNameW = !nameW.empty() ? nameW : AnsiToWide(name);
+
     // if the path ends with a space/dot it is invalid and we must not run the conversion,
     // CreateFile would trim the spaces/dots and convert a different file
-    BOOL invalidName = !nameW.empty() ? FileNameIsInvalidW(nameW.c_str(), TRUE)
-                                      : FileNameIsInvalid(name, TRUE);
+    BOOL invalidName = FileNameIsInvalidW(effectiveNameW.c_str(), TRUE);
 
 CONVERT_AGAIN:
 
@@ -7583,20 +7451,11 @@ CONVERT_AGAIN:
         HANDLE hSource;
         if (!invalidName)
         {
-            if (!nameW.empty())
-            {
-                hSource = CreateFileW(nameW.c_str(), GENERIC_READ,
-                                      FILE_SHARE_READ | FILE_SHARE_WRITE, NULL,
-                                      OPEN_EXISTING, FILE_FLAG_SEQUENTIAL_SCAN, NULL);
-                DWORD openErr = GetLastError();
-                HANDLES_ADD_EX(__otQuiet, hSource != INVALID_HANDLE_VALUE, __htFile, __hoCreateFile, hSource, openErr, TRUE);
-            }
-            else
-            {
-                hSource = SalCreateFileH(name, GENERIC_READ,
-                                         FILE_SHARE_READ | FILE_SHARE_WRITE, NULL,
-                                         OPEN_EXISTING, FILE_FLAG_SEQUENTIAL_SCAN, NULL);
-            }
+            hSource = CreateFileW(effectiveNameW.c_str(), GENERIC_READ,
+                                  FILE_SHARE_READ | FILE_SHARE_WRITE, NULL,
+                                  OPEN_EXISTING, FILE_FLAG_SEQUENTIAL_SCAN, NULL);
+            DWORD openErr = GetLastError();
+            HANDLES_ADD_EX(__otQuiet, hSource != INVALID_HANDLE_VALUE, __htFile, __hoCreateFile, hSource, openErr, TRUE);
         }
         else
         {
@@ -7604,58 +7463,44 @@ CONVERT_AGAIN:
         }
         if (hSource != INVALID_HANDLE_VALUE)
         {
-            // derive the path for the temporary file
-            CPathBuffer tmpPath; // Heap-allocated for long path support
-            strcpy(tmpPath, name);
-            char* terminator = strrchr(tmpPath, '\\');
-            if (terminator == NULL)
+            // derive the path for the temporary file (using wide path)
+            std::wstring tmpPathW;
+            size_t lastSlash = effectiveNameW.rfind(L'\\');
+            if (lastSlash == std::wstring::npos)
             {
-                // sanity check
                 TRACE_E("Parameter 'name' must be full path to file (including path)");
                 HANDLES(CloseHandle(hSource));
                 return FALSE;
             }
-            *(terminator + 1) = 0;
+            tmpPathW = effectiveNameW.substr(0, lastSlash + 1);
 
-            // derive the wide temp directory when wide source is available
-            std::wstring tmpPathW;
-            if (!nameW.empty())
-            {
-                size_t lastSlash = nameW.rfind(L'\\');
-                if (lastSlash != std::wstring::npos)
-                    tmpPathW = nameW.substr(0, lastSlash + 1);
-            }
+            // ANSI version for legacy temp file generation
+            CPathBuffer tmpPath; // Heap-allocated for long path support
+            strcpy(tmpPath, name);
+            char* terminator = strrchr(tmpPath, '\\');
+            if (terminator != NULL)
+                *(terminator + 1) = 0;
 
             // find a name for the temporary file and let the system create it
-            CPathBuffer tmpFileName; // Heap-allocated for long path support
+            CPathBuffer tmpFileName; // ANSI copy for error messages
             std::wstring tmpFileNameW;
             BOOL tmpFileExists = FALSE;
             while (1)
             {
-                BOOL tmpOk;
-                if (!nameW.empty())
+                tmpFileNameW = SalGetTempFileNameW(tmpPathW.c_str(), L"cnv", true);
+                BOOL tmpOk = !tmpFileNameW.empty();
+                if (tmpOk)
                 {
-                    tmpFileNameW = SalGetTempFileNameW(tmpPathW.c_str(), L"cnv", true);
-                    tmpOk = !tmpFileNameW.empty();
-                    if (tmpOk)
-                    {
-                        // keep ANSI buffer in sync for error messages
-                        WideCharToMultiByte(CP_ACP, 0, tmpFileNameW.c_str(), -1, tmpFileName, tmpFileName.Size(), NULL, NULL);
-                    }
-                }
-                else
-                {
-                    tmpOk = SalGetTempFileName(tmpPath, "cnv", tmpFileName, TRUE);
+                    // keep ANSI buffer in sync for error messages
+                    WideCharToMultiByte(CP_ACP, 0, tmpFileNameW.c_str(), -1, tmpFileName, tmpFileName.Size(), NULL, NULL);
                 }
                 if (tmpOk)
                 {
                     tmpFileExists = TRUE;
 
                     // align the temp file attributes with the source file
-                    DWORD srcAttrs = !nameW.empty() ? GetFileAttributesW(nameW.c_str())
-                                                    : SalGetFileAttributes(name);
-                    DWORD tgtAttrs = !tmpFileNameW.empty() ? GetFileAttributesW(tmpFileNameW.c_str())
-                                                           : SalGetFileAttributes(tmpFileName);
+                    DWORD srcAttrs = GetFileAttributesW(effectiveNameW.c_str());
+                    DWORD tgtAttrs = GetFileAttributesW(tmpFileNameW.c_str());
                     BOOL changeAttrs = FALSE;
                     if (srcAttrs != INVALID_FILE_ATTRIBUTES && tgtAttrs != INVALID_FILE_ATTRIBUTES && srcAttrs != tgtAttrs)
                     {
@@ -7664,68 +7509,36 @@ CONVERT_AGAIN:
                         if ((srcAttrs & FILE_ATTRIBUTE_COMPRESSED) != (tgtAttrs & FILE_ATTRIBUTE_COMPRESSED) &&
                             (srcAttrs & FILE_ATTRIBUTE_COMPRESSED) == 0)
                         {
-                            if (!tmpFileNameW.empty())
-                                UncompressFileW(tmpFileNameW.c_str(), tgtAttrs);
-                            else
-                                UncompressFile(tmpFileName, tgtAttrs);
+                            UncompressFileW(tmpFileNameW.c_str(), tgtAttrs);
                         }
                         if ((srcAttrs & FILE_ATTRIBUTE_ENCRYPTED) != (tgtAttrs & FILE_ATTRIBUTE_ENCRYPTED))
                         {
                             BOOL cancelOper = FALSE;
                             if (srcAttrs & FILE_ATTRIBUTE_ENCRYPTED)
-                            {
-                                if (!tmpFileNameW.empty())
-                                    MyEncryptFileW(observer, tmpFileNameW.c_str(), tmpFileName, tgtAttrs, 0, workerState, cancelOper, FALSE);
-                                else
-                                    MyEncryptFile(observer, tmpFileName, tgtAttrs, 0 /* allow encrypting files with the SYSTEM attribute */,
-                                                  workerState, cancelOper, FALSE);
-                            }
+                                MyEncryptFileW(observer, tmpFileNameW.c_str(), tmpFileName, tgtAttrs, 0, workerState, cancelOper, FALSE);
                             else
-                            {
-                                if (!tmpFileNameW.empty())
-                                    MyDecryptFileW(tmpFileNameW.c_str(), tgtAttrs, FALSE);
-                                else
-                                    MyDecryptFile(tmpFileName, tgtAttrs, FALSE);
-                            }
+                                MyDecryptFileW(tmpFileNameW.c_str(), tgtAttrs, FALSE);
                             if (observer.IsCancelled() || cancelOper)
                             {
                                 HANDLES(CloseHandle(hSource));
-                                if (!tmpFileNameW.empty())
-                                {
-                                    ClearReadOnlyAttrW(tmpFileNameW.c_str());
-                                    gFileSystem->DeleteFile(tmpFileNameW.c_str());
-                                }
-                                else
-                                {
-                                    ClearReadOnlyAttr(tmpFileName); // ensure it can be deleted
-                                    DeleteFileA(gFileSystem, tmpFileName);
-                                }
+                                ClearReadOnlyAttrW(tmpFileNameW.c_str());
+                                gFileSystem->DeleteFile(tmpFileNameW.c_str());
                                 return FALSE;
                             }
                         }
                         if ((srcAttrs & FILE_ATTRIBUTE_COMPRESSED) != (tgtAttrs & FILE_ATTRIBUTE_COMPRESSED) &&
                             (srcAttrs & FILE_ATTRIBUTE_COMPRESSED) != 0)
                         {
-                            if (!tmpFileNameW.empty())
-                                CompressFileW(tmpFileNameW.c_str(), tgtAttrs);
-                            else
-                                CompressFile(tmpFileName, tgtAttrs);
+                            CompressFileW(tmpFileNameW.c_str(), tgtAttrs);
                         }
                     }
 
                     // open the empty temporary file
-                    HANDLE hTarget;
-                    if (!tmpFileNameW.empty())
+                    HANDLE hTarget = CreateFileW(tmpFileNameW.c_str(), GENERIC_WRITE, 0, NULL,
+                                                 OPEN_EXISTING, FILE_FLAG_SEQUENTIAL_SCAN, NULL);
                     {
-                        hTarget = CreateFileW(tmpFileNameW.c_str(), GENERIC_WRITE, 0, NULL,
-                                              OPEN_EXISTING, FILE_FLAG_SEQUENTIAL_SCAN, NULL);
                         DWORD openErr2 = GetLastError();
                         HANDLES_ADD_EX(__otQuiet, hTarget != INVALID_HANDLE_VALUE, __htFile, __hoCreateFile, hTarget, openErr2, TRUE);
-                    }
-                    else
-                    {
-                        hTarget = SalCreateFileH(tmpFileName, GENERIC_WRITE, 0, NULL,
-                                                 OPEN_EXISTING, FILE_FLAG_SEQUENTIAL_SCAN, NULL);
                     }
                     if (hTarget != INVALID_HANDLE_VALUE)
                     {
@@ -7747,16 +7560,8 @@ CONVERT_AGAIN:
                                         HANDLES(CloseHandle(hSource));
                                     if (hTarget != NULL)
                                         HANDLES(CloseHandle(hTarget));
-                                    if (!tmpFileNameW.empty())
-                                    {
-                                        ClearReadOnlyAttrW(tmpFileNameW.c_str());
-                                        gFileSystem->DeleteFile(tmpFileNameW.c_str());
-                                    }
-                                    else
-                                    {
-                                        ClearReadOnlyAttr(tmpFileName); // ensure it can be deleted
-                                        DeleteFileA(gFileSystem, tmpFileName);
-                                    }
+                                    ClearReadOnlyAttrW(tmpFileNameW.c_str());
+                                    gFileSystem->DeleteFile(tmpFileNameW.c_str());
                                     return FALSE;
                                 }
 
@@ -7849,16 +7654,8 @@ CONVERT_AGAIN:
                                     {
                                         if (hSource == NULL && hTarget == NULL)
                                         {
-                                            if (!tmpFileNameW.empty())
-                                            {
-                                                ClearReadOnlyAttrW(tmpFileNameW.c_str());
-                                                gFileSystem->DeleteFile(tmpFileNameW.c_str());
-                                            }
-                                            else
-                                            {
-                                                ClearReadOnlyAttr(tmpFileName); // ensure it can be deleted
-                                                DeleteFileA(gFileSystem, tmpFileName);
-                                            }
+                                            ClearReadOnlyAttrW(tmpFileNameW.c_str());
+                                            gFileSystem->DeleteFile(tmpFileNameW.c_str());
                                             observer.SetProgress(0, CaclProg(totalDone, script->TotalSize));
                                             goto CONVERT_AGAIN;
                                         }
@@ -7876,16 +7673,8 @@ CONVERT_AGAIN:
                                             HANDLES(CloseHandle(hSource));
                                         if (hTarget != NULL)
                                             HANDLES(CloseHandle(hTarget));
-                                        if (!tmpFileNameW.empty())
-                                        {
-                                            ClearReadOnlyAttrW(tmpFileNameW.c_str());
-                                            gFileSystem->DeleteFile(tmpFileNameW.c_str());
-                                        }
-                                        else
-                                        {
-                                            ClearReadOnlyAttr(tmpFileName); // ensure it can be deleted
-                                            DeleteFileA(gFileSystem, tmpFileName);
-                                        }
+                                        ClearReadOnlyAttrW(tmpFileNameW.c_str());
+                                        gFileSystem->DeleteFile(tmpFileNameW.c_str());
                                         observer.SetProgress(0, CaclProg(totalDone, script->TotalSize));
                                         return TRUE;
                                     }
@@ -7939,30 +7728,17 @@ CONVERT_AGAIN:
                         totalDone += size;
                         // restore attributes (write operations have trouble with read-only)
                         if (changeAttrs)
-                        {
-                            if (!tmpFileNameW.empty())
-                                SetFileAttributesW(tmpFileNameW.c_str(), srcAttrs);
-                            else
-                                SalLPSetFileAttributes(tmpFileName, srcAttrs);
-                        }
+                            SetFileAttributesW(tmpFileNameW.c_str(), srcAttrs);
                         // overwrite the original file with the temp file
                         while (1)
                         {
-                            if (!nameW.empty())
-                                ClearReadOnlyAttrW(nameW.c_str());
-                            else
-                                ClearReadOnlyAttr(name); // ensure it can be deleted
-                            BOOL deleteOk = !nameW.empty() ? gFileSystem->DeleteFile(nameW.c_str()).success
-                                                           : DeleteFileA(gFileSystem, name).success;
+                            ClearReadOnlyAttrW(effectiveNameW.c_str());
+                            BOOL deleteOk = gFileSystem->DeleteFile(effectiveNameW.c_str()).success;
                             if (deleteOk)
                             {
                                 while (1)
                                 {
-                                    BOOL moveOk;
-                                    if (!tmpFileNameW.empty() && !nameW.empty())
-                                        moveOk = MoveFileW(tmpFileNameW.c_str(), nameW.c_str());
-                                    else
-                                        moveOk = SalMoveFile(tmpFileName, name);
+                                    BOOL moveOk = MoveFileW(tmpFileNameW.c_str(), effectiveNameW.c_str());
                                     if (moveOk)
                                         return TRUE; // success
                                     else
@@ -8003,16 +7779,8 @@ CONVERT_AGAIN:
                                 {
                                 CANCEL_CONVERT:
 
-                                    if (!tmpFileNameW.empty())
-                                    {
-                                        ClearReadOnlyAttrW(tmpFileNameW.c_str());
-                                        gFileSystem->DeleteFile(tmpFileNameW.c_str());
-                                    }
-                                    else
-                                    {
-                                        ClearReadOnlyAttr(tmpFileName); // ensure it can be deleted
-                                        DeleteFileA(gFileSystem, tmpFileName);
-                                    }
+                                    ClearReadOnlyAttrW(tmpFileNameW.c_str());
+                                    gFileSystem->DeleteFile(tmpFileNameW.c_str());
                                     return FALSE;
                                 }
 
@@ -8033,16 +7801,8 @@ CONVERT_AGAIN:
                                 {
                                 SKIP_OVERWRITE_ERROR:
 
-                                    if (!tmpFileNameW.empty())
-                                    {
-                                        ClearReadOnlyAttrW(tmpFileNameW.c_str());
-                                        gFileSystem->DeleteFile(tmpFileNameW.c_str());
-                                    }
-                                    else
-                                    {
-                                        ClearReadOnlyAttr(tmpFileName); // ensure it can be deleted
-                                        DeleteFileA(gFileSystem, tmpFileName);
-                                    }
+                                    ClearReadOnlyAttrW(tmpFileNameW.c_str());
+                                    gFileSystem->DeleteFile(tmpFileNameW.c_str());
                                     return TRUE;
                                 }
 
@@ -8065,16 +7825,8 @@ CONVERT_AGAIN:
                     if (tmpFileExists)
                     {
                         strcpy(fakeName, tmpFileName);
-                        if (!tmpFileNameW.empty())
-                        {
-                            ClearReadOnlyAttrW(tmpFileNameW.c_str());
-                            gFileSystem->DeleteFile(tmpFileNameW.c_str());
-                        }
-                        else
-                        {
-                            ClearReadOnlyAttr(tmpFileName); // ensure it can be deleted
-                            DeleteFileA(gFileSystem, tmpFileName);        // the temp file exists, try to remove it
-                        }
+                        ClearReadOnlyAttrW(tmpFileNameW.c_str());
+                        gFileSystem->DeleteFile(tmpFileNameW.c_str());
                         tmpFileExists = FALSE;
                     }
                     else
@@ -8173,14 +7925,11 @@ BOOL DoChangeAttrs(IWorkerObserver& observer, char* name, const CQuadWord& size,
     // if the path ends with a space/dot, we must append '\\'; otherwise
     // SetFileAttributes (and others) trims the spaces/dots and operates
     // on a different path
-    const char* nameSetAttrs = name;
-    CPathBuffer nameSetAttrsCopy; // Heap-allocated for long path support
-    MakeCopyWithBackslashIfNeeded(nameSetAttrs, nameSetAttrsCopy);
-
-    // Use wide path for SetFileAttributes if available
-    std::wstring nameSetAttrsW;
-    if (!nameW.empty())
-        nameSetAttrsW = MakeCopyWithBackslashIfNeededW(nameW.c_str());
+    std::wstring nameSetAttrsW = MakeCopyWithBackslashIfNeededW(
+        !nameW.empty() ? nameW.c_str() : AnsiToWide(name).c_str());
+    // Compute wide path for compress/encrypt/decrypt operations (use original nameW,
+    // not the backslash-fixed version, since those functions do their own fixup)
+    std::wstring effectiveNameW = !nameW.empty() ? nameW : AnsiToWide(name);
 
     while (1)
     {
@@ -8190,8 +7939,7 @@ BOOL DoChangeAttrs(IWorkerObserver& observer, char* name, const CQuadWord& size,
         int errTitleId = 0;
         if (changeCompression && (attrs & FILE_ATTRIBUTE_COMPRESSED) == 0)
         {
-            error = !nameW.empty() ? UncompressFileW(nameW.c_str(), fileAttr)
-                                   : UncompressFile(name, fileAttr);
+            error = UncompressFileW(effectiveNameW.c_str(), fileAttr);
             if (error != ERROR_SUCCESS)
             {
                 errTitleId = IDS_ERRORCOMPRESSING;
@@ -8201,8 +7949,7 @@ BOOL DoChangeAttrs(IWorkerObserver& observer, char* name, const CQuadWord& size,
         }
         if (error == ERROR_SUCCESS && changeEncryption && (attrs & FILE_ATTRIBUTE_ENCRYPTED) == 0)
         {
-            error = !nameW.empty() ? MyDecryptFileW(nameW.c_str(), fileAttr, TRUE)
-                                   : MyDecryptFile(name, fileAttr, TRUE);
+            error = MyDecryptFileW(effectiveNameW.c_str(), fileAttr, TRUE);
             if (error != ERROR_SUCCESS)
             {
                 errTitleId = IDS_ERRORENCRYPTING;
@@ -8212,8 +7959,7 @@ BOOL DoChangeAttrs(IWorkerObserver& observer, char* name, const CQuadWord& size,
         }
         if (error == ERROR_SUCCESS && changeCompression && (attrs & FILE_ATTRIBUTE_COMPRESSED))
         {
-            error = !nameW.empty() ? CompressFileW(nameW.c_str(), fileAttr)
-                                   : CompressFile(name, fileAttr);
+            error = CompressFileW(effectiveNameW.c_str(), fileAttr);
             if (error != ERROR_SUCCESS)
             {
                 errTitleId = IDS_ERRORCOMPRESSING;
@@ -8224,8 +7970,7 @@ BOOL DoChangeAttrs(IWorkerObserver& observer, char* name, const CQuadWord& size,
         if (error == ERROR_SUCCESS && changeEncryption && (attrs & FILE_ATTRIBUTE_ENCRYPTED))
         {
             BOOL cancelOper = FALSE;
-            error = !nameW.empty() ? MyEncryptFileW(observer, nameW.c_str(), name, fileAttr, attrs, workerState, cancelOper, TRUE)
-                                   : MyEncryptFile(observer, name, fileAttr, attrs, workerState, cancelOper, TRUE);
+            error = MyEncryptFileW(observer, effectiveNameW.c_str(), name, fileAttr, attrs, workerState, cancelOper, TRUE);
             if (observer.IsCancelled() || cancelOper)
                 return FALSE;
             if (error != ERROR_SUCCESS)
@@ -8251,8 +7996,7 @@ BOOL DoChangeAttrs(IWorkerObserver& observer, char* name, const CQuadWord& size,
             error = ERROR_SUCCESS;
         }
         if (error == ERROR_SUCCESS &&
-            (!nameSetAttrsW.empty() ? SetFileAttributesW(nameSetAttrsW.c_str(), attrs)
-                                    : SalLPSetFileAttributes(nameSetAttrs, attrs)))
+            SetFileAttributesW(nameSetAttrsW.c_str(), attrs))
         {
             BOOL isDir = ((attrs & FILE_ATTRIBUTE_DIRECTORY) != 0);
             // if any of the timestamps need to be set
@@ -8260,19 +8004,10 @@ BOOL DoChangeAttrs(IWorkerObserver& observer, char* name, const CQuadWord& size,
             {
                 HANDLE file;
                 if (attrs & FILE_ATTRIBUTE_READONLY)
-                {
-                    if (!nameSetAttrsW.empty())
-                        SetFileAttributesW(nameSetAttrsW.c_str(), attrs & (~FILE_ATTRIBUTE_READONLY));
-                    else
-                        SalLPSetFileAttributes(nameSetAttrs, attrs & (~FILE_ATTRIBUTE_READONLY));
-                }
-                file = !nameSetAttrsW.empty()
-                           ? CreateFileW(nameSetAttrsW.c_str(), GENERIC_READ | GENERIC_WRITE,
-                                         FILE_SHARE_READ | FILE_SHARE_WRITE,
-                                         NULL, OPEN_EXISTING, isDir ? FILE_FLAG_BACKUP_SEMANTICS : 0, NULL)
-                           : SalCreateFileH(nameSetAttrs, GENERIC_READ | GENERIC_WRITE,
-                                            FILE_SHARE_READ | FILE_SHARE_WRITE,
-                                            NULL, OPEN_EXISTING, isDir ? FILE_FLAG_BACKUP_SEMANTICS : 0, NULL);
+                    SetFileAttributesW(nameSetAttrsW.c_str(), attrs & (~FILE_ATTRIBUTE_READONLY));
+                file = CreateFileW(nameSetAttrsW.c_str(), GENERIC_READ | GENERIC_WRITE,
+                                   FILE_SHARE_READ | FILE_SHARE_WRITE,
+                                   NULL, OPEN_EXISTING, isDir ? FILE_FLAG_BACKUP_SEMANTICS : 0, NULL);
                 if (file != INVALID_HANDLE_VALUE)
                 {
                     FILETIME ftCreated, ftAccessed, ftModified;
@@ -8286,22 +8021,12 @@ BOOL DoChangeAttrs(IWorkerObserver& observer, char* name, const CQuadWord& size,
                     SetFileTime(file, &ftCreated, &ftAccessed, &ftModified);
                     HANDLES(CloseHandle(file));
                     if (attrs & FILE_ATTRIBUTE_READONLY)
-                    {
-                        if (!nameSetAttrsW.empty())
-                            SetFileAttributesW(nameSetAttrsW.c_str(), attrs);
-                        else
-                            SalLPSetFileAttributes(nameSetAttrs, attrs);
-                    }
+                        SetFileAttributesW(nameSetAttrsW.c_str(), attrs);
                 }
                 else
                 {
                     if (attrs & FILE_ATTRIBUTE_READONLY)
-                    {
-                        if (!nameSetAttrsW.empty())
-                            SetFileAttributesW(nameSetAttrsW.c_str(), attrs);
-                        else
-                            SalLPSetFileAttributes(nameSetAttrs, attrs);
-                    }
+                        SetFileAttributesW(nameSetAttrsW.c_str(), attrs);
                     goto SHOW_ERROR;
                 }
             }

@@ -230,6 +230,7 @@ BOOL FileNameIsInvalidW(const wchar_t* name, BOOL isFullName, BOOL ignInvalidNam
 // and if 'cutPath' is TRUE, also shortens path to the first invalid component
 // (for error message), otherwise returns TRUE
 BOOL PathContainsValidComponents(char* path, BOOL cutPath);
+BOOL PathContainsValidComponentsW(const wchar_t* path);
 
 // Creates a directory named 'name' via classic Win32 API call
 // CreateDirectory(lpSecurityAttributes==NULL); this method resolves collision of 'name'
