@@ -1606,7 +1606,7 @@ CTargetPathState GetTargetPathState(CTargetPathState upperDirState, const char* 
     {
     case tpsUnknown:
     {
-        DWORD attr = SalGetFileAttributes(targetPath);
+        DWORD attr = GetFileAttributesW(AnsiToWide(targetPath).c_str());
         if (attr == INVALID_FILE_ATTRIBUTES)
         {
             TRACE_E("GetTargetPathState(): unexpected situation, target path should always exists!");
@@ -1621,7 +1621,7 @@ CTargetPathState GetTargetPathState(CTargetPathState upperDirState, const char* 
     case tpsEncryptedExisting:
     case tpsNotEncryptedExisting:
     {
-        DWORD attr = SalGetFileAttributes(targetPath);
+        DWORD attr = GetFileAttributesW(AnsiToWide(targetPath).c_str());
         if (attr == INVALID_FILE_ATTRIBUTES) // the next subdirectory no longer exists, inherit the Encrypted attribute
             return upperDirState == tpsEncryptedExisting ? tpsEncryptedNotExisting : tpsNotEncryptedNotExisting;
         if (attr & FILE_ATTRIBUTE_ENCRYPTED)

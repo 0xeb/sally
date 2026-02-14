@@ -540,7 +540,7 @@ const char* GetCurrentDir(POINTL& pt, void* param, DWORD* effect, BOOL rButton, 
                         if (fileInt->Load(oleName, STGM_READ) == S_OK &&
                             link->GetPath(linkTgt, linkTgt.Size(), NULL, SLGP_UNCPRIORITY) == NOERROR)
                         {
-                            DWORD attr = SalGetFileAttributes(linkTgt);
+                            DWORD attr = GetFileAttributesW(AnsiToWide(linkTgt).c_str());
                             if (attr != INVALID_FILE_ATTRIBUTES && (attr & FILE_ATTRIBUTE_DIRECTORY))
                                 linkIsDir = TRUE;
                             else
@@ -621,15 +621,15 @@ int CountNumberOfItemsOnPath(const char* path)
     lstrcpyn(s, path, s.Size());
     if (SalPathAppend(s, "*.*", s.Size()))
     {
-        WIN32_FIND_DATA fileData;
-        HANDLE search = SalFindFirstFileH(s, &fileData);
+        WIN32_FIND_DATAW fileData;
+        HANDLE search = HANDLES_Q(FindFirstFileW(AnsiToWide(s).c_str(), &fileData));
         if (search != INVALID_HANDLE_VALUE)
         {
             int num = 0;
             do
             {
                 num++;
-            } while (FindNextFile(search, &fileData));
+            } while (FindNextFileW(search, &fileData));
             HANDLES(FindClose(search));
             return num;
         }

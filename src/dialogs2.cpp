@@ -865,17 +865,19 @@ BOOL CLanguageSelectorDialog::Initialize(const char* slgSearchPath, HINSTANCE pl
     else
         lstrcpyn(path, slgSearchPath, path.Size());
 
-    WIN32_FIND_DATA file;
-    HANDLE hFind = SalFindFirstFileH(path, &file);
+    WIN32_FIND_DATAW file;
+    HANDLE hFind = HANDLES_Q(FindFirstFileW(AnsiToWide(path).c_str(), &file));
     if (hFind != INVALID_HANDLE_VALUE)
     {
         do
         {
-            char* point = strrchr(file.cFileName, '.');
+            char cFileNameA[MAX_PATH];
+            WideCharToMultiByte(CP_ACP, 0, file.cFileName, -1, cFileNameA, MAX_PATH, NULL, NULL);
+            char* point = strrchr(cFileNameA, '.');
             if (point != NULL && stricmp(point + 1, "slg") == 0) // it was returning *.slg*
             {
                 CLanguage lang;
-                if (lang.Init(file.cFileName, pluginDLL))
+                if (lang.Init(cFileNameA, pluginDLL))
                 {
                     Items.Add(lang);
                     if (!Items.IsGood())
@@ -886,7 +888,7 @@ BOOL CLanguageSelectorDialog::Initialize(const char* slgSearchPath, HINSTANCE pl
                     }
                 }
             }
-        } while (FindNextFile(hFind, &file));
+        } while (FindNextFileW(hFind, &file));
         HANDLES(FindClose(hFind));
     }
     return TRUE;

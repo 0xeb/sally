@@ -1935,7 +1935,7 @@ void CFileListDialog::Validate(CTransferInfo& ti)
 
             // must not be a directory
             DWORD attr;
-            attr = SalGetFileAttributes(buffFile);
+            attr = GetFileAttributesW(AnsiToWide(buffFile).c_str());
 
             if (attr != 0xFFFFFFFF && (attr & FILE_ATTRIBUTE_DIRECTORY))
             {

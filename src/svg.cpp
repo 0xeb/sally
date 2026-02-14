@@ -5,6 +5,7 @@
 #include "precomp.h"
 
 #include "svg.h"
+#include "common/unicode/helpers.h"
 
 #define NANOSVG_IMPLEMENTATION
 #include "nanosvg\nanosvg.h"
@@ -50,11 +51,11 @@ DWORD GetSVGSysColor(int index)
 char* ReadSVGFile(const char* fileName)
 {
     char* buff = NULL;
-    HANDLE hFile = SalCreateFileH(fileName, GENERIC_READ,
+    HANDLE hFile = HANDLES_Q(CreateFileW(AnsiToWide(fileName).c_str(), GENERIC_READ,
                                         FILE_SHARE_READ, NULL,
                                         OPEN_EXISTING,
                                         FILE_FLAG_SEQUENTIAL_SCAN,
-                                        NULL);
+                                        NULL));
     if (hFile != INVALID_HANDLE_VALUE)
     {
         DWORD size = GetFileSize(hFile, NULL);

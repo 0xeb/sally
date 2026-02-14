@@ -20,11 +20,11 @@ char* ReadTable(const char* fileName, char* table)
 { // reads the 'fileName' file, converts it using 'table'; returns an error message on failure, otherwise NULL
     CALL_STACK_MESSAGE2("ReadTable(%s,)", fileName);
     char* text = NULL;
-    HANDLE hFile = SalCreateFileH(fileName, GENERIC_READ,
+    HANDLE hFile = HANDLES_Q(CreateFileW(AnsiToWide(fileName).c_str(), GENERIC_READ,
                                         FILE_SHARE_READ, NULL,
                                         OPEN_EXISTING,
                                         FILE_FLAG_SEQUENTIAL_SCAN,
-                                        NULL);
+                                        NULL));
     if (hFile != INVALID_HANDLE_VALUE)
     {
         if (GetFileSize(hFile, NULL) == 256)
@@ -334,11 +334,11 @@ CCodeTable::CCodeTable(HWND hWindow, const char* dirName)
     fileNameEnd += strlen(fileNameEnd);
     strcpy(fileNameEnd, "convert.cfg");
 
-    HANDLE hFile = SalCreateFileH(fileName, GENERIC_READ,
+    HANDLE hFile = HANDLES_Q(CreateFileW(AnsiToWide(fileName).c_str(), GENERIC_READ,
                                         FILE_SHARE_READ, NULL,
                                         OPEN_EXISTING,
                                         FILE_FLAG_SEQUENTIAL_SCAN,
-                                        NULL);
+                                        NULL));
     if (hFile != INVALID_HANDLE_VALUE)
     {
         CPathBuffer textBuf;
@@ -467,18 +467,20 @@ void CCodeTables::PreloadAllConversions()
     GetModuleFileName(NULL, path, path.Size());
     lstrcpy(strrchr(path, '\\') + 1, "convert\\*.*");
 
-    WIN32_FIND_DATA find;
-    HANDLE hFind = SalFindFirstFileH(path, &find);
+    WIN32_FIND_DATAW find;
+    HANDLE hFind = HANDLES_Q(FindFirstFileW(AnsiToWide(path).c_str(), &find));
     if (hFind != INVALID_HANDLE_VALUE)
     {
         do
         {
             if (find.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY)
             {
-                if (find.cFileName[0] != 0 && strcmp(find.cFileName, ".") != 0 && strcmp(find.cFileName, "..") != 0)
+                char cFileNameA[MAX_PATH];
+                WideCharToMultiByte(CP_ACP, 0, find.cFileName, -1, cFileNameA, MAX_PATH, NULL, NULL);
+                if (cFileNameA[0] != 0 && strcmp(cFileNameA, ".") != 0 && strcmp(cFileNameA, "..") != 0)
                 {
                     // try to open the internal convert.cfg file
-                    CCodeTable* table = new CCodeTable(NULL, find.cFileName);
+                    CCodeTable* table = new CCodeTable(NULL, cFileNameA);
                     if (table == NULL)
                     {
                         TRACE_E(LOW_MEMORY);
@@ -498,7 +500,7 @@ void CCodeTables::PreloadAllConversions()
                         delete table; //  we are not interested in the default table -- discard it
                 }
             }
-        } while (FindNextFile(hFind, &find));
+        } while (FindNextFileW(hFind, &find));
         HANDLES(FindClose(hFind));
     }
 }

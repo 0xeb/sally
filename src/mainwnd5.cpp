@@ -292,10 +292,10 @@ BOOL CompareFilesByContent(HWND hWindow, CCmpDirProgressDialog* progressDlg,
 
     //  DWORD totalTi = GetTickCount();
 
-    HANDLE hFile1 = SalCreateFileH(file1, GENERIC_READ, FILE_SHARE_READ | FILE_SHARE_WRITE,
-                                         NULL, OPEN_EXISTING, FILE_FLAG_SEQUENTIAL_SCAN, NULL);
-    HANDLE hFile2 = hFile1 != INVALID_HANDLE_VALUE ? SalCreateFileH(file2, GENERIC_READ, FILE_SHARE_READ | FILE_SHARE_WRITE,
-                                                                          NULL, OPEN_EXISTING, FILE_FLAG_SEQUENTIAL_SCAN, NULL)
+    HANDLE hFile1 = HANDLES_Q(CreateFileW(AnsiToWide(file1).c_str(), GENERIC_READ, FILE_SHARE_READ | FILE_SHARE_WRITE,
+                                         NULL, OPEN_EXISTING, FILE_FLAG_SEQUENTIAL_SCAN, NULL));
+    HANDLE hFile2 = hFile1 != INVALID_HANDLE_VALUE ? HANDLES_Q(CreateFileW(AnsiToWide(file2).c_str(), GENERIC_READ, FILE_SHARE_READ | FILE_SHARE_WRITE,
+                                                                          NULL, OPEN_EXISTING, FILE_FLAG_SEQUENTIAL_SCAN, NULL))
                                                    : INVALID_HANDLE_VALUE;
     DWORD err = GetLastError();
 
@@ -566,9 +566,9 @@ BOOL ReadDirsAndFilesAux(HWND hWindow, DWORD flags, CCmpDirProgressDialog* progr
         }
 
         DWORD counter = 0;
-        WIN32_FIND_DATA data;
+        WIN32_FIND_DATAW data;
         HANDLE hFind;
-        hFind = SalFindFirstFileH(path, &data);
+        hFind = HANDLES_Q(FindFirstFileW(AnsiToWide(path).c_str(), &data));
         if (hFind == INVALID_HANDLE_VALUE)
         {
             DWORD err = GetLastError();
@@ -588,9 +588,11 @@ BOOL ReadDirsAndFilesAux(HWND hWindow, DWORD flags, CCmpDirProgressDialog* progr
         }
         do
         {
-            if (data.cFileName[0] != 0 &&
-                (data.cFileName[0] != '.' ||
-                 (data.cFileName[1] != 0 && (data.cFileName[1] != '.' || data.cFileName[2] != 0))))
+            char cFileNameA[MAX_PATH];
+            WideCharToMultiByte(CP_ACP, 0, data.cFileName, -1, cFileNameA, MAX_PATH, NULL, NULL);
+            if (cFileNameA[0] != 0 &&
+                (cFileNameA[0] != '.' ||
+                 (cFileNameA[1] != 0 && (cFileNameA[1] != '.' || cFileNameA[2] != 0))))
             {
                 if (counter++ > 200) // after reading 200 items
                 {
@@ -620,7 +622,7 @@ BOOL ReadDirsAndFilesAux(HWND hWindow, DWORD flags, CCmpDirProgressDialog* progr
                 file.IsLink = 0;
                 file.IsOffline = 0;
 
-                int nameLen = (int)strlen(data.cFileName);
+                int nameLen = (int)strlen(cFileNameA);
 
                 //--- name
                 file.Name = (char*)malloc(nameLen + 1); // allocation
@@ -631,7 +633,7 @@ BOOL ReadDirsAndFilesAux(HWND hWindow, DWORD flags, CCmpDirProgressDialog* progr
                     *canceled = TRUE;
                     return FALSE;
                 }
-                memmove(file.Name, data.cFileName, nameLen + 1); // copy text
+                memmove(file.Name, cFileNameA, nameLen + 1); // copy text
                 file.NameLen = nameLen;
 
                 //--- extension
@@ -641,12 +643,12 @@ BOOL ReadDirsAndFilesAux(HWND hWindow, DWORD flags, CCmpDirProgressDialog* progr
                 }
                 else
                 {
-                    const char* s = data.cFileName + nameLen;
-                    while (--s >= data.cFileName && *s != '.')
+                    const char* s = cFileNameA + nameLen;
+                    while (--s >= cFileNameA && *s != '.')
                         ;
-                    //          if (s > data.cFileName) file.Ext = file.Name + (s - data.cFileName + 1); // ".cvspass" in Windows counts as an extension ...
-                    if (s >= data.cFileName)
-                        file.Ext = file.Name + (s - data.cFileName + 1);
+                    //          if (s > cFileNameA) file.Ext = file.Name + (s - cFileNameA + 1); // ".cvspass" in Windows counts as an extension ...
+                    if (s >= cFileNameA)
+                        file.Ext = file.Name + (s - cFileNameA + 1);
                     else
                         file.Ext = file.Name + file.NameLen;
                 }
@@ -691,7 +693,7 @@ BOOL ReadDirsAndFilesAux(HWND hWindow, DWORD flags, CCmpDirProgressDialog* progr
                         free(file.Name);
                 }
             }
-        } while (FindNextFile(hFind, &data));
+        } while (FindNextFileW(hFind, &data));
         DWORD err = GetLastError();
         if (err != ERROR_NO_MORE_FILES)
         {

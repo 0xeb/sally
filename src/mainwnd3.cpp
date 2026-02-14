@@ -190,23 +190,25 @@ BOOL OpenHtmlHelp(char* helpFileName, HWND parent, CHtmlHelpCommand command, DWO
                     lstrcpyn(helpPath, CurrentHelpDir, helpPath.Size());
                     if (SalPathAppend(helpPath, "*", helpPath.Size()))
                     { // try to find at least some other directory
-                        WIN32_FIND_DATA data;
-                        HANDLE find = SalFindFirstFileH(helpPath, &data);
+                        WIN32_FIND_DATAW data;
+                        HANDLE find = HANDLES_Q(FindFirstFileW(AnsiToWide(helpPath).c_str(), &data));
                         if (find != INVALID_HANDLE_VALUE)
                         {
                             do
                             {
-                                if (strcmp(data.cFileName, ".") != 0 && strcmp(data.cFileName, "..") != 0 &&
+                                char cFileNameA[MAX_PATH];
+                                WideCharToMultiByte(CP_ACP, 0, data.cFileName, -1, cFileNameA, MAX_PATH, NULL, NULL);
+                                if (strcmp(cFileNameA, ".") != 0 && strcmp(cFileNameA, "..") != 0 &&
                                     (data.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY) != 0) // only if it is a directory
                                 {
                                     lstrcpyn(helpPath, CurrentHelpDir, helpPath.Size());
-                                    if (SalPathAppend(helpPath, data.cFileName, helpPath.Size()))
+                                    if (SalPathAppend(helpPath, cFileNameA, helpPath.Size()))
                                     {
                                         ok = TRUE;
                                         break;
                                     }
                                 }
-                            } while (FindNextFile(find, &data));
+                            } while (FindNextFileW(find, &data));
                             HANDLES(FindClose(find));
                         }
                     }

@@ -12,6 +12,7 @@
 #include "fileswnd.h"
 #include "shellib.h"
 #include "svg.h"
+#include "common/unicode/helpers.h"
 
 //
 // ****************************************************************************
@@ -1314,7 +1315,7 @@ public:
         }
         if (ret)
         {
-            DWORD attrs = SalGetFileAttributes(path);
+            DWORD attrs = GetFileAttributesW(AnsiToWide(path).c_str());
             if (attrs == 0xFFFFFFFF)
                 ret = FALSE;
             else if (!(attrs & FILE_ATTRIBUTE_DIRECTORY)) // not a directory

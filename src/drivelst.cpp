@@ -869,9 +869,9 @@ BOOL CheckAndConnectUNCNetworkPath(HWND parent, const char* UNCPath, BOOL& pathI
     char* s = root + GetRootPath(root, UNCPath);
     strcpy(s, "*.*");
 
-    WIN32_FIND_DATA data;
+    WIN32_FIND_DATAW data;
     HANDLE h;
-    if ((h = SalFindFirstFileH(root, &data)) != INVALID_HANDLE_VALUE)
+    if ((h = HANDLES_Q(FindFirstFileW(AnsiToWide(root).c_str(), &data))) != INVALID_HANDLE_VALUE)
     { // UNC root path is accessible, we will not do anything
         HANDLES(FindClose(h));
     }
@@ -949,7 +949,7 @@ DWORD GetDriveFormFactor(int iDrive)
      Base article Q115828 and in the "FLOPPY" SDK sample.
   */
     sprintf(tsz, "\\\\.\\%c:", '@' + iDrive);
-    h = SalCreateFileH(tsz, 0, FILE_SHARE_WRITE, 0, OPEN_EXISTING, 0, 0);
+    h = HANDLES_Q(CreateFileW(AnsiToWide(tsz).c_str(), 0, FILE_SHARE_WRITE, 0, OPEN_EXISTING, 0, 0));
     if (h != INVALID_HANDLE_VALUE)
     {
         DISK_GEOMETRY Geom[20];
@@ -1346,11 +1346,11 @@ void InitDropboxPath()
             if (cfgAlreadyFound ||
                 SalPathAppend(sDbPath, "Dropbox\\host.db", sDbPath.Size()) && FileExists(sDbPath))
             {
-                HANDLE hFile = SalCreateFileH(sDbPath, GENERIC_READ,
+                HANDLE hFile = HANDLES_Q(CreateFileW(AnsiToWide(sDbPath).c_str(), GENERIC_READ,
                                                     FILE_SHARE_READ | FILE_SHARE_WRITE, NULL,
                                                     OPEN_EXISTING,
                                                     FILE_FLAG_SEQUENTIAL_SCAN,
-                                                    NULL);
+                                                    NULL));
                 if (hFile != INVALID_HANDLE_VALUE)
                 {
                     LARGE_INTEGER size;

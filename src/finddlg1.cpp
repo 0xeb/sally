@@ -357,7 +357,7 @@ void CFoundFilesListView::CheckAndRemoveSelectedItems(BOOL forceRemove, int last
                     fullPath[pathLen + 1] = '\0';
                 }
                 lstrcat(fullPath, ptr->Name.c_str());
-                remove = (SalGetFileAttributes(fullPath) == -1);
+                remove = (GetFileAttributesW(AnsiToWide(fullPath).c_str()) == -1);
             }
             if (remove)
             {
