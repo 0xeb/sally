@@ -18,25 +18,38 @@
 
 extern "C" {
 
+// Note: Explicit calling conventions are required because some targets
+// (e.g. salext) use /Gz (default stdcall), but the compiler emits RTC
+// calls with fixed calling conventions regardless of the /G? switch.
+
 // Called at function entry to initialize stack frame checking
-void _RTC_InitBase(void)
+void __cdecl _RTC_InitBase(void)
 {
 }
 
 // Called at program exit to report any runtime check failures
-void _RTC_Shutdown(void)
+void __cdecl _RTC_Shutdown(void)
+{
+}
+
+// Called to verify ESP is preserved across function calls (x86 only)
+void __cdecl _RTC_CheckEsp(void)
 {
 }
 
 // Called to check for stack buffer overruns
+#ifdef _M_IX86
+void __fastcall _RTC_CheckStackVars(void* frame, void* rtc_var_desc)
+#else
 void _RTC_CheckStackVars(void* frame, void* rtc_var_desc)
+#endif
 {
     (void)frame;
     (void)rtc_var_desc;
 }
 
 // Called when an uninitialized local variable is used
-void _RTC_UninitUse(const char* varname)
+void __cdecl _RTC_UninitUse(const char* varname)
 {
     (void)varname;
 }

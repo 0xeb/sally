@@ -2461,12 +2461,11 @@ void CFilesWindow::RenameFile(int specialIndex)
 #ifndef _WIN64
         if (Windows64Bit && isDir)
         {
-            CWidePathBuffer pathW(GetPathW());
-            pathW.Append(f->Name);
-            if (IsWin64RedirectedDir(pathW, NULL, FALSE))
+            CPathBuffer pathBuf(GetPath());
+            SalPathAppend(pathBuf.Get(), f->Name, pathBuf.Size());
+            if (IsWin64RedirectedDir(pathBuf, NULL, FALSE))
             {
-                // TODO: Use wide format string when IDS_ERRRENAMINGW64ALIAS supports %ls
-                gPrompter->ShowError(LoadStrW(IDS_ERRORTITLE), (std::wstring(pathW.Get()) + L" - " + LoadStrW(IDS_ERRRENAMINGW64ALIAS)).c_str());
+                gPrompter->ShowError(LoadStr(IDS_ERRORTITLE), pathBuf.Get());
                 return;
             }
         }

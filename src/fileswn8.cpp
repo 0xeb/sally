@@ -252,7 +252,7 @@ void CFilesWindow::FilesAction(CActionType type, CFilesWindow* target, int count
                 CPathBuffer msg;
                 _snprintf_s(msg, msg.Size(), _TRUNCATE,
                             LoadStr(type == atMove ? IDS_ERRMOVESELCONTW64ALIAS : IDS_ERRDELETESELCONTW64ALIAS),
-                            redirectedDir);
+                            redirectedDir.Get());
                 gPrompter->ShowError(LoadStrW(IDS_ERRORTITLE), AnsiToWide(msg).c_str());
                 // RAII: indexes auto-deleted when scope exits
                 FilesActionInProgress = FALSE;

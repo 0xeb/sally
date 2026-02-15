@@ -21,6 +21,8 @@ jobs:
         include:
           - arch: x64
             cmake_arch: x64
+          - arch: x86
+            cmake_arch: Win32
           - arch: ARM64
             cmake_arch: ARM64
 
@@ -104,7 +106,7 @@ jobs:
 
             **Core Application**
             - Full Salamander file manager with all built-in features
-            - Support for Windows x64 and ARM64
+            - Support for Windows x64, x86, and ARM64
 
             **Plugins (33 total)**
             - Archive formats: 7zip, ZIP, TAR, CAB, CHM, ARJ, LHA, ISO, RAR (x64 only), and more
