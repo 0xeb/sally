@@ -310,7 +310,7 @@ const char* GetCurrentDir(POINTL& pt, void* param, DWORD* effect, BOOL rButton, 
                         {
                             if (l > 0 && panel->DropPath[l - 1] != '\\')
                                 panel->DropPath[l++] = '\\';
-                            if (l + panel->Dirs->At(index).NameLen >= panel->DropPath.Size())
+                            if (l + (int)panel->Dirs->At(index).NameLen >= panel->DropPath.Size())
                             {
                                 TRACE_E("GetCurrentDir(): too long file name!");
                                 tgtType = idtttWindows;
@@ -477,7 +477,7 @@ const char* GetCurrentDir(POINTL& pt, void* param, DWORD* effect, BOOL rButton, 
         {
             if (panel->GetPath()[l - 1] != '\\')
                 panel->DropPath[l++] = '\\';
-            if (l + panel->Dirs->At(index).NameLen >= panel->DropPath.Size())
+            if (l + (int)panel->Dirs->At(index).NameLen >= panel->DropPath.Size())
             {
                 TRACE_E("GetCurrentDir(): too long file name!");
                 panel->SetDropTarget(-1); // hide marker
@@ -511,7 +511,7 @@ const char* GetCurrentDir(POINTL& pt, void* param, DWORD* effect, BOOL rButton, 
             if (fullName[l - 1] != '\\')
                 fullName[l++] = '\\';
             CFileData* file = &(panel->Files->At(index - panel->Dirs->Count));
-            if (l + file->NameLen >= (int)fullName.Size())
+            if (l + (int)file->NameLen >= (int)fullName.Size())
             {
                 TRACE_E("GetCurrentDir(): too long file name!");
                 panel->SetDropTarget(-1); // hide marker

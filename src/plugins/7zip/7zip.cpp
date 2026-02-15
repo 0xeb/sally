@@ -1399,7 +1399,7 @@ static BOOL TestArchive(CSalamanderForOperationsAbstract* salamander, HWND hPare
     {
         char text[1024];
         text[0] = '\0';
-        sprintf(text, LoadStr(IDS_TESTARCHIVEOK), fileName);
+        sprintf(text, LoadStr(IDS_TESTARCHIVEOK), (const char*)fileName);
         SalamanderGeneral->SalMessageBox(hParent, text, LoadStr(IDS_PLUGINNAME), MB_OK | MB_ICONINFORMATION);
         ret = TRUE;
     }
@@ -1407,7 +1407,7 @@ static BOOL TestArchive(CSalamanderForOperationsAbstract* salamander, HWND hPare
     {
         char text[1024];
         text[0] = '\0';
-        sprintf(text, LoadStr(IDS_TESTARCHIVECORRUPTED), fileName);
+        sprintf(text, LoadStr(IDS_TESTARCHIVECORRUPTED), (const char*)fileName);
         SalamanderGeneral->SalMessageBox(hParent, text, LoadStr(IDS_PLUGINNAME), MB_OK | MB_ICONINFORMATION);
         ret = FALSE;
     }
