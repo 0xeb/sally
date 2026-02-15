@@ -338,3 +338,62 @@ TEST(CPathBufferWinAPI, MemsetZero)
     EXPECT_EQ(buf[0], '\0');
     EXPECT_EQ(buf[100], '\0');
 }
+
+// ============================================================================
+// GetVolumeInformationA 16-bit overflow regression test
+//
+// Windows 10 KERNELBASE!GetVolumeInformationA has a bug: it computes the
+// internal wide buffer size as (nVolumeNameSize + 1) * 2 using 16-bit
+// arithmetic. When nVolumeNameSize >= 32767 (SAL_MAX_LONG_PATH), the result
+// overflows to 0, causing a 0-byte allocation and subsequent heap corruption.
+//
+// The same overflow applies to nFileSystemNameSize (parameter 8).
+//
+// ALWAYS pass MAX_PATH (not CPathBuffer::Size()) as the size parameter
+// to GetVolumeInformationA / GetVolumeInformation.
+// ============================================================================
+
+TEST(CPathBufferWinAPI, GetVolumeInformationA_WithMAX_PATH)
+{
+    // GetVolumeInformationA works correctly with MAX_PATH size
+    CPathBuffer volumeName;
+    char root[] = "C:\\";
+    DWORD dummy, flags;
+
+    BOOL ok = GetVolumeInformationA(root, volumeName, MAX_PATH,
+                                    NULL, &dummy, &flags, NULL, 0);
+    // Should succeed on C: drive (always present)
+    EXPECT_TRUE(ok);
+}
+
+TEST(CPathBufferWinAPI, GetVolumeInformationA_WithBoundarySize)
+{
+    // Size 32766 is the maximum safe value: (32766+1)*2 = 65534, fits in 16-bit.
+    // Size 32767 (SAL_MAX_LONG_PATH) would overflow: (32767+1)*2 = 0 in 16-bit!
+    CPathBuffer volumeName;
+    char root[] = "C:\\";
+    DWORD dummy, flags;
+
+    // 32766 should work — this is the boundary
+    BOOL ok = GetVolumeInformationA(root, volumeName, 32766,
+                                    NULL, &dummy, &flags, NULL, 0);
+    EXPECT_TRUE(ok);
+
+    // DO NOT test with 32767 (SAL_MAX_LONG_PATH) — it causes heap corruption!
+    // With page heap enabled, it crashes immediately. Without page heap, it
+    // silently corrupts adjacent heap memory.
+}
+
+TEST(CPathBufferWinAPI, GetVolumeInformationA_FileSystemName_WithMAX_PATH)
+{
+    // The same 16-bit overflow affects the file system name size parameter.
+    CPathBuffer fsName;
+    char root[] = "C:\\";
+    DWORD dummy, flags;
+
+    BOOL ok = GetVolumeInformationA(root, NULL, 0, NULL, &dummy, &flags,
+                                    fsName, MAX_PATH);
+    EXPECT_TRUE(ok);
+    // Should return something like "NTFS", "FAT32", "exFAT"
+    EXPECT_GT(strlen(fsName), 0u);
+}

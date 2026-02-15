@@ -463,7 +463,7 @@ void CFilesWindow::FilesAction(CActionType type, CFilesWindow* target, int count
             BOOL supportsADS = IsPathOnVolumeSupADS(GetPath(), NULL);
             DWORD dummy1, flags;
             CPathBuffer dummy2; // Heap-allocated for long path support
-            if (MyGetVolumeInformation(GetPath(), NULL, NULL, NULL, NULL, 0, NULL, &dummy1, &flags, dummy2, dummy2.Size()))
+            if (MyGetVolumeInformation(GetPath(), NULL, NULL, NULL, NULL, 0, NULL, &dummy1, &flags, dummy2, MAX_PATH))
                 havePermissions = (flags & FS_PERSISTENT_ACLS) != 0;
             while (1)
             {

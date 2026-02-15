@@ -604,7 +604,9 @@ BOOL CFilesWindow::BuildScriptMain2(COperations* script, BOOL copy, char* target
                 {
                     GetRootPath(root, name);
                     fsName[0] = 0;
-                    if (GetVolumeInformation(root, NULL, 0, NULL, &dummy, &flags, fsName, fsName.Size()) &&
+                    // NOTE: pass MAX_PATH, not fsName.Size() — GetVolumeInformationA has a 16-bit
+                    // arithmetic overflow bug when size >= 32767: (size+1)*2 overflows to 0.
+                    if (GetVolumeInformation(root, NULL, 0, NULL, &dummy, &flags, fsName, MAX_PATH) &&
                         StrICmp(fsName, "CDFS") == 0)
                     {
                         script->ClearReadonlyMask = ~(FILE_ATTRIBUTE_READONLY);
@@ -1208,7 +1210,7 @@ BOOL CFilesWindow::BuildScriptMain(COperations* script, CActionType type,
                 GetRootPath(root, GetPath());
                 DWORD dummy, flags;
                 fsName[0] = 0;
-                if (GetVolumeInformation(root, NULL, 0, NULL, &dummy, &flags, fsName, fsName.Size()) &&
+                if (GetVolumeInformation(root, NULL, 0, NULL, &dummy, &flags, fsName, MAX_PATH) &&
                     StrICmp(fsName, "CDFS") == 0)
                 {
                     script->ClearReadonlyMask = ~(FILE_ATTRIBUTE_READONLY);
@@ -1283,7 +1285,7 @@ BOOL CFilesWindow::BuildScriptMain(COperations* script, CActionType type,
             {
                 DWORD dummy1, flags;
                 CPathBuffer dummy2; // Heap-allocated for long path support
-                if (MyGetVolumeInformation(targetPath, NULL, NULL, NULL, NULL, 0, NULL, &dummy1, &flags, dummy2, dummy2.Size()) &&
+                if (MyGetVolumeInformation(targetPath, NULL, NULL, NULL, NULL, 0, NULL, &dummy1, &flags, dummy2, MAX_PATH) &&
                     (flags & FS_PERSISTENT_ACLS) == 0)
                 { // wants to copy permissions, but the target path doesn't support them, so we inform the user (the API function for setting security doesn't report any errors — which is poor design)
                     PromptResult res = gPrompter->AskYesNo(LoadStrW(IDS_QUESTION), LoadStrW(IDS_ACLNOTSUPPORTEDONTGTPATH));

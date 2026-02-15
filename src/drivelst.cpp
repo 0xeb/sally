@@ -1146,7 +1146,9 @@ unsigned ReadCDVolNameThreadFBody(void* param) // directory accessibility test
     {
         DWORD dummy;
         char fileSystem[11];
-        if (!GetVolumeInformation(root, buf, buf.Size(), NULL, &dummy, &dummy, fileSystem, 10))
+        // NOTE: pass MAX_PATH, not buf.Size() — GetVolumeInformationA has a 16-bit arithmetic
+        // overflow bug when nVolumeNameSize >= 32767: it computes (size+1)*2 in 16-bit, overflowing to 0.
+        if (!GetVolumeInformation(root, buf, MAX_PATH, NULL, &dummy, &dummy, fileSystem, 10))
             buf[0] = 0; // error GetVolumeInformation
         if (buf[0] == 0)
             GetDisplayNameFromSystem(root, buf, buf.Size());
@@ -1735,7 +1737,7 @@ BOOL CDrivesList::BuildData(BOOL noTimeout, TDirectArray<CDriveData>* copyDrives
                 case drvtRAMDisk:
                 {
                     DWORD flags;
-                    if (GetVolumeInformation(root, volumeName, volumeName.Size(), NULL, &dummy, &flags, NULL, 0))
+                    if (GetVolumeInformation(root, volumeName, MAX_PATH, NULL, &dummy, &flags, NULL, 0))
                     {
                         CQuadWord t;                              // total disk space
                         freeSpace = MyGetDiskFreeSpace(root, &t); // free disk space
@@ -2604,7 +2606,7 @@ BOOL CDrivesList::GetDriveBarToolTip(int index, char* text)
     {
         root[0] = item->DriveText[0];
         DWORD dummy, flags;
-        if (GetVolumeInformation(root, volumeName, volumeName.Size(), NULL, &dummy, &flags, NULL, 0))
+        if (GetVolumeInformation(root, volumeName, MAX_PATH, NULL, &dummy, &flags, NULL, 0))
         {
             CQuadWord t;                              // total disk space
             freeSpace = MyGetDiskFreeSpace(root, &t); // free disk space
