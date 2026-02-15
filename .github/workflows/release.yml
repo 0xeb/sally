@@ -2,8 +2,6 @@ name: Release Build
 
 on:
   push:
-    branches:
-      - main
     tags:
       - 'v*'
   workflow_dispatch:
@@ -43,7 +41,6 @@ jobs:
       - name: Create zip archive
         run: |
           $version = "${{ github.ref_name }}"
-          if (-not $version.StartsWith("v")) { $version = "latest" }
           $zipName = "OpenSalamander-$version-${{ matrix.arch }}.zip"
           Compress-Archive -Path "build/out/salamander/RelWithDebInfo_${{ matrix.arch }}/*" -DestinationPath $zipName
           Write-Host "Created: $zipName"
@@ -76,53 +73,3 @@ jobs:
           generate_release_notes: true
           draft: false
           prerelease: false
-
-  latest:
-    name: Update Latest Release
-    needs: build
-    runs-on: ubuntu-latest
-    if: github.ref == 'refs/heads/main'
-
-    steps:
-      - name: Download all artifacts
-        uses: actions/download-artifact@v4
-        with:
-          path: artifacts
-
-      - name: List artifacts
-        run: find artifacts -type f -name "*.zip"
-
-      - name: Update Latest Release
-        uses: softprops/action-gh-release@v2
-        with:
-          tag_name: latest
-          name: Latest Build
-          body: |
-            ## Open Salamander 5.0 - Development Build
-
-            Dual-panel file manager for Windows, built with CMake.
-
-            ### What's Included
-
-            **Core Application**
-            - Full Salamander file manager with all built-in features
-            - Support for Windows x64, x86, and ARM64
-
-            **Plugins (33 total)**
-            - Archive formats: 7zip, ZIP, TAR, CAB, CHM, ARJ, LHA, ISO, RAR (x64 only), and more
-            - Utilities: File Compare, Checksum, DB Viewer, Multimedia Viewer
-            - Automation: Scripting support via JScript/VBScript
-            - Device support: Windows Portable Devices, Windows Mobile
-
-            ### Not Yet Included
-            - FTP plugin (needs OpenSSL integration)
-            - PictView plugin (needs WIC replacement)
-
-            ---
-            **Commit:** `${{ github.sha }}`
-            **Built:** ${{ github.event.head_commit.timestamp }}
-
-            ⚠️ This is a development build - please report issues!
-          files: artifacts/**/*.zip
-          prerelease: false
-          make_latest: true
