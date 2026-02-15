@@ -1,10 +1,19 @@
 ﻿// CommentsTranslationProject: TRANSLATED
 #include <gtest/gtest.h>
 #include "../../ui/IPrompter.h"
+#include "../../common/unicode/helpers.h"
 #include <string>
 #include <vector>
 
 IPrompter* gPrompter = nullptr; // required external symbol
+
+// ANSI overloads — duplicated here because test doesn't link UIPrompter.cpp
+void IPrompter::ShowError(const char* title, const char* message) { ShowError(AnsiToWide(title).c_str(), AnsiToWide(message).c_str()); }
+void IPrompter::ShowInfo(const char* title, const char* message) { ShowInfo(AnsiToWide(title).c_str(), AnsiToWide(message).c_str()); }
+PromptResult IPrompter::ConfirmError(const char* title, const char* message) { return ConfirmError(AnsiToWide(title).c_str(), AnsiToWide(message).c_str()); }
+PromptResult IPrompter::ConfirmDelete(const char* path, bool recycleBin) { return ConfirmDelete(AnsiToWide(path).c_str(), recycleBin); }
+PromptResult IPrompter::ConfirmOverwrite(const char* path, const char* existingInfo) { return ConfirmOverwrite(path ? AnsiToWide(path).c_str() : nullptr, existingInfo ? AnsiToWide(existingInfo).c_str() : nullptr); }
+PromptResult IPrompter::AskYesNo(const char* title, const char* message) { return AskYesNo(AnsiToWide(title).c_str(), AnsiToWide(message).c_str()); }
 
 class MockPrompter : public IPrompter
 {
@@ -138,6 +147,25 @@ TEST(PrompterTest, RecordsInteractions)
     EXPECT_EQ(mock.log[2], L"ConfirmDelete:C:\\delete.txt:recycle");
     EXPECT_EQ(mock.log[3], L"ShowError:Error:oops");
     EXPECT_EQ(mock.log[4], L"ShowInfo:Info:ok");
+}
+
+TEST(PrompterTest, AnsiOverloadsConvertAndForward)
+{
+    MockPrompter mock;
+    gPrompter = &mock;
+
+    gPrompter->ShowError("Error Title", "error message");
+    gPrompter->ShowInfo("Info Title", "info message");
+    auto r1 = gPrompter->ConfirmDelete("C:\\delete.txt", false);
+    EXPECT_EQ(r1.type, PromptResult::kOk);
+    auto r2 = gPrompter->AskYesNo("Question", "proceed?");
+    EXPECT_EQ(r2.type, PromptResult::kYes);
+
+    ASSERT_EQ(mock.log.size(), 4u);
+    EXPECT_EQ(mock.log[0], L"ShowError:Error Title:error message");
+    EXPECT_EQ(mock.log[1], L"ShowInfo:Info Title:info message");
+    EXPECT_EQ(mock.log[2], L"ConfirmDelete:C:\\delete.txt:permanent");
+    EXPECT_EQ(mock.log[3], L"AskYesNo:Question:proceed?");
 }
 
 int main(int argc, char** argv)

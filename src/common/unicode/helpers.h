@@ -5,7 +5,6 @@
 
 #include <string>
 #include <windows.h>
-#include "ui/IPrompter.h" // for gPrompter
 
 // UTF-16 conversion helpers used during decoupling and Unicode work.
 inline std::wstring AnsiToWide(const char* s)
@@ -59,28 +58,3 @@ inline std::wstring FormatStrW(const wchar_t* format, Args... args)
     return out;
 }
 
-// Helper to show an error/info via gPrompter if available, otherwise fallback MessageBox.
-// The HWND parameter is optional - if omitted (or NULL), uses GetActiveWindow() for fallback.
-inline void ShowErrorViaPrompter(const wchar_t* title, const wchar_t* message, HWND hwndFallback = NULL)
-{
-    if (gPrompter != NULL)
-    {
-        gPrompter->ShowError(title, message);
-    }
-    else
-    {
-        MessageBoxW(hwndFallback ? hwndFallback : GetActiveWindow(), message, title, MB_OK | MB_ICONEXCLAMATION);
-    }
-}
-
-inline void ShowInfoViaPrompter(const wchar_t* title, const wchar_t* message, HWND hwndFallback = NULL)
-{
-    if (gPrompter != NULL)
-    {
-        gPrompter->ShowInfo(title, message);
-    }
-    else
-    {
-        MessageBoxW(hwndFallback ? hwndFallback : GetActiveWindow(), message, title, MB_OK | MB_ICONINFORMATION);
-    }
-}

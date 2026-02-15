@@ -253,3 +253,35 @@ IPrompter* GetUIPrompter()
     static CUIPrompter prompter;
     return &prompter;
 }
+
+// Non-virtual ANSI convenience overloads — convert and forward to wide versions.
+void IPrompter::ShowError(const char* title, const char* message)
+{
+    ShowError(AnsiToWide(title).c_str(), AnsiToWide(message).c_str());
+}
+
+void IPrompter::ShowInfo(const char* title, const char* message)
+{
+    ShowInfo(AnsiToWide(title).c_str(), AnsiToWide(message).c_str());
+}
+
+PromptResult IPrompter::ConfirmError(const char* title, const char* message)
+{
+    return ConfirmError(AnsiToWide(title).c_str(), AnsiToWide(message).c_str());
+}
+
+PromptResult IPrompter::ConfirmDelete(const char* path, bool recycleBin)
+{
+    return ConfirmDelete(AnsiToWide(path).c_str(), recycleBin);
+}
+
+PromptResult IPrompter::ConfirmOverwrite(const char* path, const char* existingInfo)
+{
+    return ConfirmOverwrite(path ? AnsiToWide(path).c_str() : nullptr,
+                            existingInfo ? AnsiToWide(existingInfo).c_str() : nullptr);
+}
+
+PromptResult IPrompter::AskYesNo(const char* title, const char* message)
+{
+    return AskYesNo(AnsiToWide(title).c_str(), AnsiToWide(message).c_str());
+}

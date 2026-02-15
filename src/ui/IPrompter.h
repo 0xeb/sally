@@ -69,6 +69,15 @@ public:
 
     // Error with OK and Help button - helpId is for context-sensitive help
     virtual void ShowErrorWithHelp(const wchar_t* title, const wchar_t* message, uint32_t helpId) = 0;
+
+    // Non-virtual ANSI convenience overloads (convert and forward to wide versions).
+    // Defined in UIPrompter.cpp.
+    void ShowError(const char* title, const char* message);
+    void ShowInfo(const char* title, const char* message);
+    PromptResult ConfirmError(const char* title, const char* message);
+    PromptResult ConfirmDelete(const char* path, bool recycleBin);
+    PromptResult ConfirmOverwrite(const char* path, const char* existingInfo);
+    PromptResult AskYesNo(const char* title, const char* message);
 };
 
 // Global prompter used by UI and worker code. Default is UI-backed.

@@ -2106,12 +2106,7 @@ BOOL CFilesWindow::ChangePathToArchive(const char* archive, const char* archiveP
                 {
                     if (!isRefresh) // during refresh missing-path messages are not displayed
                     {
-                        std::wstring archW = AnsiToWide(archive);
-                        std::wstring msgW = AnsiToWide(GetErrorText(err2));
-                        if (gPrompter != NULL)
-                            gPrompter->ShowError(LoadStrW(IDS_ERROROPENINGFILE), archW.empty() ? msgW.c_str() : archW.c_str());
-                        else
-                            DialogError(HWindow, BUTTONS_OK, archive, GetErrorText(err2), LoadStr(IDS_ERROROPENINGFILE));
+                        gPrompter->ShowError(LoadStr(IDS_ERROROPENINGFILE), archive ? archive : GetErrorText(err2));
                     }
                     if (failReason != NULL)
                         *failReason = CHPPFR_INVALIDPATH;

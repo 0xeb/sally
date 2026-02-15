@@ -897,26 +897,11 @@ void CFilesWindow::FilesAction(CActionType type, CFilesWindow* target, int count
         case atDelete:
         {
             if (Configuration.CnfrmFileDirDel && recycle != 1)
-            { // ask only if requested and if we don't use the SHFileOperation API for deletion
-                if (gPrompter != NULL)
-                {
-                    std::wstring msgW = AnsiToWide(str.Get());
-                    PromptResult pr = gPrompter->ConfirmDelete(msgW.c_str(), recycle == 1);
-                    res = (pr.type == PromptResult::kYes ? IDOK : IDCANCEL);
-                    UpdateWindow(MainWindow->HWindow);
-                }
-                else
-                {
-                    HICON hIcon = (HICON)HANDLES(LoadImage(Shell32DLL, MAKEINTRESOURCE(WindowsVistaAndLater ? 16777 : 161), // delete icon
-                                                           IMAGE_ICON, 32, 32, IconLRFlags));
-                    int myRes = CMessageBox(HWindow, MSGBOXEX_YESNO | MSGBOXEX_ESCAPEENABLED | MSGBOXEX_SILENT,
-                                            LoadStr(IDS_CONFIRM_DELETE_TITLE), &str, NULL,
-                                            NULL, hIcon, 0, NULL, NULL, NULL, NULL)
-                                    .Execute();
-                    HANDLES(DestroyIcon(hIcon));
-                    res = (myRes == IDYES ? IDOK : IDCANCEL);
-                    UpdateWindow(MainWindow->HWindow);
-                }
+            { 
+                // Ask only if requested and if we don't use the SHFileOperation API for deletion
+                PromptResult pr = gPrompter->ConfirmDelete(str.Get(), recycle == 1);
+                res = (pr.type == PromptResult::kYes ? IDOK : IDCANCEL);
+                UpdateWindow(MainWindow->HWindow);
             }
             else
             {
@@ -1201,9 +1186,8 @@ BOOL EmailFilesAddDirectory(CSimpleMAPI* mapi, const char* path, BOOL* errGetFil
         DWORD err = GetLastError();
         if (err != ERROR_FILE_NOT_FOUND && err != ERROR_NO_MORE_FILES)
         {
-            std::wstring pathW = AnsiToWide(path);
-            if (gPrompter->ConfirmError(LoadStrW(IDS_ERRORTITLE),
-                    (pathW + L": " + GetErrorTextW(err)).c_str()).type == PromptResult::kCancel)
+            std::wstring msg = AnsiToWide(path) + L": " + GetErrorTextW(err);
+            if (gPrompter->ConfirmError(LoadStrW(IDS_ERRORTITLE), msg.c_str()).type == PromptResult::kCancel)
             {
                 SetCursor(LoadCursor(NULL, IDC_WAIT));
                 return FALSE; // user wants to quit

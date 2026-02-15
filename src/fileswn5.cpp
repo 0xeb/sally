@@ -150,8 +150,7 @@ void CFilesWindow::Convert()
                 {
                     if (script->IsGood() && script->Count == 0)
                     {
-                        if (gPrompter != NULL)
-                            ShowInfoViaPrompter(LoadStrW(IDS_INFOTITLE), LoadStrW(IDS_NOFILE_MATCHEDMASK));
+                        gPrompter->ShowInfo(LoadStrW(IDS_INFOTITLE), LoadStrW(IDS_NOFILE_MATCHEDMASK));
 
                         SetSel(FALSE, -1, TRUE);                        // explicit repaint
                         PostMessage(HWindow, WM_USER_SELCHANGED, 0, 0); // selection change notify
@@ -807,8 +806,8 @@ void CFilesWindow::ViewFile(char* name, BOOL altView, DWORD handlerID, int enumF
                                                     plugin != NULL, plugin, &errorCode);
                     if (name == NULL)
                     {
-                        if (errorCode == DCGNE_TOOLONGNAME && gPrompter != NULL)
-                            ShowErrorViaPrompter(LoadStrW(IDS_ERRORTITLE), LoadStrW(IDS_UNPACKTOOLONGNAME));
+                        if (errorCode == DCGNE_TOOLONGNAME)
+                            gPrompter->ShowError(LoadStrW(IDS_ERRORTITLE), LoadStrW(IDS_UNPACKTOOLONGNAME));
                         return;
                     }
 
@@ -842,8 +841,8 @@ void CFilesWindow::ViewFile(char* name, BOOL altView, DWORD handlerID, int enumF
                         else
                         {
                             SetCursor(oldCur);
-                            if (renamingNotSupported && gPrompter != NULL) // to avoid repeating the same message for many plugins, display it here for all of them
-                                ShowErrorViaPrompter(LoadStrW(IDS_ERRORTITLE), LoadStrW(IDS_UNPACKINVNAMERENUNSUP));
+                            if (renamingNotSupported) // to avoid repeating the same message for many plugins, display it here for all of them
+                                gPrompter->ShowError(LoadStrW(IDS_ERRORTITLE), LoadStrW(IDS_UNPACKINVNAMERENUNSUP));
                             SetThreadPriority(GetCurrentThread(), THREAD_PRIORITY_ABOVE_NORMAL);
                             DiskCache.ReleaseName(dcFileName, FALSE); // not unpacked, nothing to cache
                             EndStopRefresh();                         // snooper will start again now
@@ -1064,8 +1063,7 @@ BOOL ViewFileInt(HWND parent, const char* name, BOOL altView, DWORD handlerID, B
                         DWORD err = GetLastError();
                         CPathBuffer buff;  // Heap-allocated for long path support
                         sprintf(buff.Get(), LoadStr(IDS_ERROREXECVIEW), expCommand.Get(), GetErrorText(err));
-                        if (gPrompter != NULL)
-                            ShowErrorViaPrompter(LoadStrW(IDS_ERRORTITLE), AnsiToWide(buff).c_str());
+                        gPrompter->ShowError(LoadStr(IDS_ERRORTITLE), buff.Get());
                     }
                     else
                     {
@@ -1082,11 +1080,7 @@ BOOL ViewFileInt(HWND parent, const char* name, BOOL altView, DWORD handlerID, B
                 }
                 else
                 {
-                if (gPrompter != NULL)
-                {
-                    std::wstring buffW = AnsiToWide(LoadStr(IDS_ERROREXECVIEW));
-                    ShowErrorViaPrompter(LoadStrW(IDS_ERRORTITLE), buffW.c_str());
-                }
+                gPrompter->ShowError(LoadStr(IDS_ERRORTITLE), LoadStr(IDS_ERROREXECVIEW));
             }
         }
             break;
@@ -1164,8 +1158,7 @@ BOOL ViewFileInt(HWND parent, const char* name, BOOL altView, DWORD handlerID, B
         CPathBuffer buff;
         int textID = altView ? IDS_CANT_VIEW_FILE_ALT : IDS_CANT_VIEW_FILE;
         sprintf(buff, LoadStr(textID), name);
-        if (gPrompter != NULL)
-            ShowErrorViaPrompter(LoadStrW(IDS_ERRORTITLE), AnsiToWide(buff).c_str());
+        gPrompter->ShowError(LoadStr(IDS_ERRORTITLE), buff.Get());
     }
     return success;
 }
@@ -1219,8 +1212,7 @@ void CFilesWindow::EditFile(char* name, DWORD handlerID)
                         strcpy(s, f->DosName);
                     else
                     {
-                        if (gPrompter != NULL)
-                            ShowErrorViaPrompter(LoadStrW(IDS_ERRORTITLE), LoadStrW(IDS_TOOLONGNAME));
+                        gPrompter->ShowError(LoadStrW(IDS_ERRORTITLE), LoadStrW(IDS_TOOLONGNAME));
                         return;
                     }
                 }
@@ -1384,8 +1376,7 @@ void CFilesWindow::EditFile(char* name, DWORD handlerID)
                     DWORD err = GetLastError();
                     CPathBuffer buff;  // Heap-allocated for long path support
                     sprintf(buff.Get(), LoadStr(IDS_ERROREXECEDIT), expCommand.Get(), GetErrorText(err));
-                    if (gPrompter != NULL)
-                        ShowErrorViaPrompter(LoadStrW(IDS_ERRORTITLE), AnsiToWide(buff).c_str());
+                    gPrompter->ShowError(LoadStr(IDS_ERRORTITLE), buff.Get());
                 }
                 else
                 {
@@ -1397,8 +1388,7 @@ void CFilesWindow::EditFile(char* name, DWORD handlerID)
             {
                 CPathBuffer buff;
                 sprintf(buff, LoadStr(IDS_ERROREXECEDIT), expCommand.Get(), LoadStr(IDS_TOOLONGNAME));
-                if (gPrompter != NULL)
-                    ShowErrorViaPrompter(LoadStrW(IDS_ERRORTITLE), AnsiToWide(buff).c_str());
+                gPrompter->ShowError(LoadStr(IDS_ERRORTITLE), buff.Get());
             }
         }
     }
@@ -1406,8 +1396,7 @@ void CFilesWindow::EditFile(char* name, DWORD handlerID)
     {
         CPathBuffer buff;
         sprintf(buff, LoadStr(IDS_CANT_EDIT_FILE), name);
-        if (gPrompter != NULL)
-            ShowErrorViaPrompter(LoadStrW(IDS_ERRORTITLE), AnsiToWide(buff).c_str());
+        gPrompter->ShowError(LoadStr(IDS_ERRORTITLE), buff.Get());
     }
 }
 
@@ -1519,7 +1508,6 @@ void CFilesWindow::EditNewFile()
                 BOOL editExisting = FALSE;
                 if (hFile == INVALID_HANDLE_VALUE && GetLastError() == ERROR_FILE_EXISTS)
                 {
-                    if (gPrompter != NULL)
                     {
                         PromptResult pr = gPrompter->ConfirmOverwrite(NULL, LoadStrW(IDS_EDITNEWALREADYEX));
                         if (pr.type == PromptResult::kYes)
@@ -1545,8 +1533,7 @@ void CFilesWindow::EditNewFile()
             }
             else
                 errText = LoadStr(errTextID);
-            if (gPrompter != NULL)
-                ShowErrorViaPrompter(LoadStrW(IDS_ERRORTITLE), AnsiToWide(errText).c_str());
+            gPrompter->ShowError(LoadStr(IDS_ERRORTITLE), errText);
         }
         else
             break;
@@ -1982,8 +1969,7 @@ void CFilesWindow::CreateDir(CFilesWindow* target)
           return; // empty string, nothing to do
         }
         */
-                if (gPrompter != NULL)
-                    ShowErrorViaPrompter(LoadStrW(IDS_ERRORCREATINGDIR), LoadStrW(errTextID));
+                gPrompter->ShowError(LoadStrW(IDS_ERRORCREATINGDIR), LoadStrW(errTextID));
                 goto CREATE_AGAIN;
             }
             else
@@ -2113,8 +2099,7 @@ void CFilesWindow::RenameFileInternal(CFileData* f, const char* formatedFileName
         CPathBuffer tgtPath; // Heap-allocated for long path support
         if (l >= tgtPath.Size() - 1) // guard against buffer overflow
         {
-            if (gPrompter != NULL)
-                ShowErrorViaPrompter(LoadStrW(IDS_ERRORTITLE), LoadStrW(IDS_TOOLONGNAME));
+            gPrompter->ShowError(LoadStrW(IDS_ERRORTITLE), LoadStrW(IDS_TOOLONGNAME));
             *tryAgain = FALSE;
             return;
         }
@@ -2315,8 +2300,7 @@ void CFilesWindow::RenameFileInternal(CFileData* f, const char* formatedFileName
 
                 if (err != ERROR_SUCCESS)
                 {
-                    if (gPrompter != NULL)
-                        ShowErrorViaPrompter(LoadStrW(IDS_ERRORRENAMINGFILE), GetErrorTextW(err));
+                    gPrompter->ShowError(LoadStrW(IDS_ERRORRENAMINGFILE), GetErrorTextW(err));
                 }
             }
             if (handsOFF)
@@ -2325,14 +2309,12 @@ void CFilesWindow::RenameFileInternal(CFileData* f, const char* formatedFileName
         }
         else
         {
-            if (gPrompter != NULL)
-                ShowErrorViaPrompter(LoadStrW(IDS_ERRORRENAMINGFILE), LoadStrW(IDS_TOOLONGNAME));
+            gPrompter->ShowError(LoadStrW(IDS_ERRORRENAMINGFILE), LoadStrW(IDS_TOOLONGNAME));
         }
     }
     else
     {
-        if (gPrompter != NULL)
-            ShowErrorViaPrompter(LoadStrW(IDS_ERRORRENAMINGFILE), GetErrorTextW(ERROR_INVALID_NAME));
+        gPrompter->ShowError(LoadStrW(IDS_ERRORRENAMINGFILE), GetErrorTextW(ERROR_INVALID_NAME));
     }
 }
 
@@ -2346,16 +2328,14 @@ void CFilesWindow::RenameFileInternalW(CFileData* f, const std::wstring& newName
         if (c == L'\\' || c == L'/' || c == L':' || c < 32 ||
             c == L'<' || c == L'>' || c == L'|' || c == L'"')
         {
-            if (gPrompter != NULL)
-                ShowErrorViaPrompter(LoadStrW(IDS_ERRORRENAMINGFILE), GetErrorTextW(ERROR_INVALID_NAME));
+            gPrompter->ShowError(LoadStrW(IDS_ERRORRENAMINGFILE), GetErrorTextW(ERROR_INVALID_NAME));
             return;
         }
     }
 
     if (newName.empty())
     {
-        if (gPrompter != NULL)
-            ShowErrorViaPrompter(LoadStrW(IDS_ERRORRENAMINGFILE), GetErrorTextW(ERROR_INVALID_NAME));
+        gPrompter->ShowError(LoadStrW(IDS_ERRORRENAMINGFILE), GetErrorTextW(ERROR_INVALID_NAME));
         return;
     }
 
@@ -2426,8 +2406,8 @@ void CFilesWindow::RenameFileInternalW(CFileData* f, const std::wstring& newName
     }
     else
     {
-        if (err != ERROR_SUCCESS && gPrompter != NULL)
-            ShowErrorViaPrompter(LoadStrW(IDS_ERRORRENAMINGFILE), GetErrorTextW(err));
+        if (err != ERROR_SUCCESS)
+            gPrompter->ShowError(LoadStrW(IDS_ERRORRENAMINGFILE), GetErrorTextW(err));
         *tryAgain = FALSE; // Don't retry on error for Unicode files
     }
 
