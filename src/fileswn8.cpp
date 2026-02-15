@@ -919,7 +919,9 @@ void CFilesWindow::FilesAction(CActionType type, CFilesWindow* target, int count
                 }
             }
             else
+            {
                 res = IDOK;
+            }
             break;
         }
 

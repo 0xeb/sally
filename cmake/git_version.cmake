@@ -7,7 +7,7 @@ find_package(Git QUIET)
 if(GIT_FOUND AND EXISTS "${CMAKE_SOURCE_DIR}/.git")
     # Get the latest tag
     execute_process(
-        COMMAND ${GIT_EXECUTABLE} describe --tags --abbrev=0
+        COMMAND ${GIT_EXECUTABLE} describe --tags --match "v*" --abbrev=0
         WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
         OUTPUT_VARIABLE GIT_TAG
         OUTPUT_STRIP_TRAILING_WHITESPACE
@@ -31,7 +31,7 @@ if(GIT_FOUND AND EXISTS "${CMAKE_SOURCE_DIR}/.git")
 
         # Check if we're exactly on the tag
         execute_process(
-            COMMAND ${GIT_EXECUTABLE} describe --tags --exact-match
+            COMMAND ${GIT_EXECUTABLE} describe --tags --match "v*" --exact-match
             WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
             OUTPUT_VARIABLE GIT_EXACT_TAG
             OUTPUT_STRIP_TRAILING_WHITESPACE

@@ -1423,7 +1423,33 @@ void CFilesWindow::EditNewFile()
     if (Configuration.UseEditNewFileDefault)
         lstrcpyn(path, Configuration.EditNewFileDefault, path.Size());
     else
-        lstrcpyn(path, LoadStr(IDS_EDITNEWFILE_DEFAULTNAME), path.Size());
+    {
+        // Try to derive name from the focused file (issue #12)
+        BOOL usedFocused = FALSE;
+        int totalCount = Dirs->Count + Files->Count;
+        if (FocusedIndex >= 0 && FocusedIndex < totalCount && FocusedIndex >= Dirs->Count)
+        {
+            // Focused on a file (not a directory, not "..")
+            CFileData* f = &Files->At(FocusedIndex - Dirs->Count);
+            const char* name = f->Name;
+            const char* dot = strrchr(name, '.');
+            if (dot != NULL && dot > name)
+            {
+                // "report.docx" -> "report-new.docx"
+                int baseLen = (int)(dot - name);
+                sprintf(path, "%.*s-new%s", baseLen, name, dot);
+                usedFocused = TRUE;
+            }
+            else
+            {
+                // "Makefile" -> "Makefile-new"
+                sprintf(path, "%s-new", name);
+                usedFocused = TRUE;
+            }
+        }
+        if (!usedFocused)
+            lstrcpyn(path, LoadStr(IDS_EDITNEWFILE_DEFAULTNAME), path.Size());
+    }
     CTruncatedString subject;
     subject.Set(LoadStr(IDS_NEWFILENAME), NULL);
 
