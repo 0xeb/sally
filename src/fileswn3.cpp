@@ -1974,7 +1974,8 @@ BOOL CFilesWindow::ChangeDir(const char* newDir, int suggestedTopIndex, const ch
     GetGeneralPath(path, path.Size(), TRUE);
     BOOL sendDirectlyToPlugin = FALSE;
     CChangeDirDlg dlg(HWindow, path, path.Size(), MainWindow->GetActivePanel()->Is(ptPluginFS) ? &sendDirectlyToPlugin : NULL);
-    dlg.SetUnicodePath(AnsiToWide(path));
+    // Note: don't call SetUnicodePath for normal ANSI paths — it creates an
+    // overlay edit that breaks combobox focus. Only use for true Unicode paths.
 
     // refresh DefaultDir
     MainWindow->UpdateDefaultDir(TRUE);

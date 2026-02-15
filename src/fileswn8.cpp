@@ -474,7 +474,10 @@ void CFilesWindow::FilesAction(CActionType type, CFilesWindow* target, int count
                                                (type == atCopy) ? IDD_COPYDIALOG : IDD_MOVEDIALOG,
                                                Configuration.CopyHistory, COPY_HISTORY_SIZE,
                                                &criteria, havePermissions, supportsADS);
-                copyMoveDlg.SetUnicodePath(AnsiToWide(path));
+                // Note: SetUnicodePath is only needed when the path contains Unicode
+                // characters that cannot be represented in ANSI (e.g., from CFileData::NameW).
+                // Do NOT call it for normal ANSI paths — it creates an overlay edit control
+                // that breaks combobox focus and dropdown behavior.
                 res = (int)copyMoveDlg.Execute();
                 if (res == IDOK && copyMoveDlg.IsUnicodeMode())
                 {

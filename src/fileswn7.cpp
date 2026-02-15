@@ -1504,7 +1504,8 @@ void CFilesWindow::Pack(CFilesWindow* target, int pluginIndex, const char* plugi
 _PACK_AGAIN:
 
     CPackDialog dlg(HWindow, fileBuf, fileBuf.Size(), fileBufAlt, &str, &PackerConfig);
-    dlg.SetUnicodePath(AnsiToWide(fileBuf));
+    // Note: don't call SetUnicodePath for normal ANSI paths — it creates an
+    // overlay edit that breaks combobox focus. Only use for true Unicode paths.
 
     // Since Windows Vista Microsoft introduced an odd behavior: quick rename selects only the name without the dot and extension
     // the same code is in another place as well
@@ -1780,7 +1781,8 @@ void CFilesWindow::Unpack(CFilesWindow* target, int pluginIndex, const char* plu
     DO_AGAIN:
 
         CUnpackDialog unpackDlg(HWindow, path, path.Size(), pathAlt, mask, &str, &UnpackerConfig, &delArchiveWhenDone);
-        unpackDlg.SetUnicodePath(AnsiToWide(path));
+        // Note: don't call SetUnicodePath for normal ANSI paths — it creates an
+        // overlay edit that breaks combobox focus. Only use for true Unicode paths.
         if (unpackDlg.Execute() == IDOK)
         {
             if (unpackDlg.IsUnicodeMode())
