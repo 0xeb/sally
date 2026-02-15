@@ -29,7 +29,7 @@ function(sal_add_plugin_lang)
 
   # RC files need defines set via source properties
   set_source_files_properties("${LANG_RC}" PROPERTIES
-    COMPILE_DEFINITIONS "_LANG;WINVER=0x0601;$<$<CONFIG:Debug>:_DEBUG>;$<$<CONFIG:Release>:NDEBUG>;$<$<EQUAL:${CMAKE_SIZEOF_VOID_P},8>:_WIN64>"
+    COMPILE_DEFINITIONS "_LANG;WINVER=0x0601;$<$<CONFIG:Debug>:_DEBUG>;$<${SAL_IS_RELEASE}:NDEBUG>;$<$<EQUAL:${CMAKE_SIZEOF_VOID_P},8>:_WIN64>"
   )
 
   add_library(${TARGET_NAME} SHARED "${LANG_RC}")
@@ -45,7 +45,7 @@ function(sal_add_plugin_lang)
     target_link_options(${TARGET_NAME} PRIVATE
       /NOENTRY
       /NOIMPLIB
-      $<$<CONFIG:Release>:/LTCG:OFF>  # No code to optimize in resource-only DLL
+      $<${SAL_IS_RELEASE}:/LTCG:OFF>  # No code to optimize in resource-only DLL
     )
   endif()
 
@@ -136,7 +136,7 @@ function(sal_add_plugin)
     ${SAL_COMMON_DEFINES}
     _USRDLL
     $<$<CONFIG:Debug>:${SAL_DEBUG_DEFINES}>
-    $<$<CONFIG:Release>:${SAL_RELEASE_DEFINES}>
+    $<${SAL_IS_RELEASE}:${SAL_RELEASE_DEFINES}>
     ${PLUGIN_DEFINES}
   )
 

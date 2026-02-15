@@ -75,11 +75,14 @@ set(SAL_DEBUG_DEFINES
   _ALLOW_RTCc_IN_STL
 )
 
-# Release-specific defines
+# Release-specific defines (apply to both Release and RelWithDebInfo)
 set(SAL_RELEASE_DEFINES
   NDEBUG
   MESSAGES_DISABLE
 )
+
+# Generator expression: true for release-like configs (Release or RelWithDebInfo)
+set(SAL_IS_RELEASE "$<OR:$<CONFIG:Release>,$<CONFIG:RelWithDebInfo>>")
 
 # Common include directories
 set(SAL_COMMON_INCLUDES

@@ -72,7 +72,7 @@ target_compile_definitions(salamander PRIVATE
   INSIDE_SALAMANDER
   ${SAL_COMMON_DEFINES}
   $<$<CONFIG:Debug>:${SAL_DEBUG_DEFINES}>
-  $<$<CONFIG:Release>:${SAL_RELEASE_DEFINES}>
+  $<${SAL_IS_RELEASE}:${SAL_RELEASE_DEFINES}>
 )
 
 target_link_libraries(salamander PRIVATE
@@ -102,7 +102,7 @@ set_target_properties(salamander PROPERTIES OUTPUT_NAME "salamand")
 
 # Resource file settings
 set_source_files_properties(${SALAMANDER_RC} PROPERTIES
-  COMPILE_DEFINITIONS "WINVER=0x0601;$<$<CONFIG:Debug>:_DEBUG>;$<$<CONFIG:Release>:NDEBUG>;$<$<EQUAL:${CMAKE_SIZEOF_VOID_P},8>:_WIN64>"
+  COMPILE_DEFINITIONS "WINVER=0x0601;$<$<CONFIG:Debug>:_DEBUG>;$<${SAL_IS_RELEASE}:NDEBUG>;$<$<EQUAL:${CMAKE_SIZEOF_VOID_P},8>:_WIN64>"
 )
 
 # bzip2 C sources need BZ_NO_STDIO
@@ -148,7 +148,7 @@ set_target_properties(salamander PROPERTIES
 
 # RC files need defines set via source properties, not target_compile_definitions
 set_source_files_properties("${SAL_SRC}/lang/lang.rc" PROPERTIES
-  COMPILE_DEFINITIONS "_LANG;_LANG_SALAMANDER;WINVER=0x0601;$<$<CONFIG:Debug>:_DEBUG>;$<$<CONFIG:Release>:NDEBUG>;$<$<EQUAL:${CMAKE_SIZEOF_VOID_P},8>:_WIN64>"
+  COMPILE_DEFINITIONS "_LANG;_LANG_SALAMANDER;WINVER=0x0601;$<$<CONFIG:Debug>:_DEBUG>;$<${SAL_IS_RELEASE}:NDEBUG>;$<$<EQUAL:${CMAKE_SIZEOF_VOID_P},8>:_WIN64>"
 )
 
 add_library(sal_lang_english SHARED "${SAL_SRC}/lang/lang.rc")
@@ -161,7 +161,7 @@ target_include_directories(sal_lang_english PRIVATE
 if(MSVC)
   target_link_options(sal_lang_english PRIVATE
     /NOENTRY /MANIFEST:NO /NOIMPLIB
-    $<$<CONFIG:Release>:/LTCG:OFF>  # No code to optimize in resource-only DLL
+    $<${SAL_IS_RELEASE}:/LTCG:OFF>  # No code to optimize in resource-only DLL
   )
 elseif(MINGW)
   # Resource-only DLL: use minimal entry stub
@@ -220,7 +220,7 @@ set(SALMON_DEBUG_DEFINES
 target_compile_definitions(salmon PRIVATE
   ${SAL_COMMON_DEFINES}
   $<$<CONFIG:Debug>:${SALMON_DEBUG_DEFINES}>
-  $<$<CONFIG:Release>:${SAL_RELEASE_DEFINES}>
+  $<${SAL_IS_RELEASE}:${SAL_RELEASE_DEFINES}>
 )
 
 target_link_libraries(salmon PRIVATE
@@ -372,8 +372,7 @@ target_compile_definitions(tserver PRIVATE
   WINVER=0x0601 _WIN32_WINNT=0x0601 _WIN32_IE=0x0800
   __TRACESERVER  # Always needed (C__MessageType, IsErrorMsg, etc.)
   $<$<CONFIG:Debug>:${TSERVER_DEBUG_DEFINES}>
-  $<$<CONFIG:Release>:NDEBUG;SAFE_ALLOC;ARRAY_NODEBUG;MULTITHREADED_HEAP_ENABLE>
-  $<$<CONFIG:RelWithDebInfo>:NDEBUG;SAFE_ALLOC;ARRAY_NODEBUG;MULTITHREADED_HEAP_ENABLE>
+  $<${SAL_IS_RELEASE}:NDEBUG;SAFE_ALLOC;ARRAY_NODEBUG;MULTITHREADED_HEAP_ENABLE>
 )
 
 target_link_libraries(tserver PRIVATE comctl32)
@@ -391,7 +390,7 @@ elseif(MINGW)
 endif()
 
 set_source_files_properties("${SAL_SRC}/tserver/tserver.rc" PROPERTIES
-  COMPILE_DEFINITIONS "WINVER=0x0601;$<$<CONFIG:Debug>:_DEBUG>;$<$<CONFIG:Release>:NDEBUG>;$<$<EQUAL:${CMAKE_SIZEOF_VOID_P},8>:_WIN64>"
+  COMPILE_DEFINITIONS "WINVER=0x0601;$<$<CONFIG:Debug>:_DEBUG>;$<${SAL_IS_RELEASE}:NDEBUG>;$<$<EQUAL:${CMAKE_SIZEOF_VOID_P},8>:_WIN64>"
 )
 
 set_target_properties(tserver PROPERTIES
@@ -476,7 +475,7 @@ target_compile_definitions(translator PRIVATE
   _MT WIN32 _WINDOWS
   WINVER=0x0601 _WIN32_WINNT=0x0601 _WIN32_IE=0x0800
   $<$<CONFIG:Debug>:${TRANSLATOR_DEBUG_DEFINES}>
-  $<$<CONFIG:Release>:NDEBUG;SAFE_ALLOC;ARRAY_NODEBUG;MESSAGES_DISABLE>
+  $<${SAL_IS_RELEASE}:NDEBUG;SAFE_ALLOC;ARRAY_NODEBUG;MESSAGES_DISABLE>
 )
 
 target_link_libraries(translator PRIVATE msimg32 comctl32)
@@ -489,7 +488,7 @@ elseif(MINGW)
 endif()
 
 set_source_files_properties("${SAL_SRC}/translator/translator.rc" PROPERTIES
-  COMPILE_DEFINITIONS "WINVER=0x0601;$<$<CONFIG:Debug>:_DEBUG>;$<$<CONFIG:Release>:NDEBUG>;$<$<EQUAL:${CMAKE_SIZEOF_VOID_P},8>:_WIN64>"
+  COMPILE_DEFINITIONS "WINVER=0x0601;$<$<CONFIG:Debug>:_DEBUG>;$<${SAL_IS_RELEASE}:NDEBUG>;$<$<EQUAL:${CMAKE_SIZEOF_VOID_P},8>:_WIN64>"
 )
 
 set_target_properties(translator PROPERTIES
@@ -524,11 +523,11 @@ target_compile_definitions(salext PRIVATE
   WINVER=0x0601 _WIN32_WINNT=0x0601 _WIN32_IE=0x0800
   LSTRFIX_WITHOUT_RTL
   $<$<CONFIG:Debug>:_DEBUG>
-  $<$<CONFIG:Release>:NDEBUG>
+  $<${SAL_IS_RELEASE}:NDEBUG>
 )
 
 set_source_files_properties("${SAL_SRC}/shellext/shellext.rc" PROPERTIES
-  COMPILE_DEFINITIONS "WINVER=0x0601;$<$<CONFIG:Debug>:_DEBUG>;$<$<CONFIG:Release>:NDEBUG>;$<$<EQUAL:${CMAKE_SIZEOF_VOID_P},8>:_WIN64>"
+  COMPILE_DEFINITIONS "WINVER=0x0601;$<$<CONFIG:Debug>:_DEBUG>;$<${SAL_IS_RELEASE}:NDEBUG>;$<$<EQUAL:${CMAKE_SIZEOF_VOID_P},8>:_WIN64>"
 )
 
 if(MSVC)
@@ -543,7 +542,7 @@ if(MSVC)
     /NODEFAULTLIB
     /NOIMPLIB
     /DEF:"${SAL_SRC}/shellext/shellext.def"
-    $<$<CONFIG:Release>:/LTCG:OFF>
+    $<${SAL_IS_RELEASE}:/LTCG:OFF>
   )
   # x86 uses StdCall calling convention
   if(SAL_PLATFORM STREQUAL "x86")
