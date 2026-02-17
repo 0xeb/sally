@@ -603,8 +603,8 @@ sal_install_plugins()
 # Resource files
 sal_install_resources()
 
-# Plugin auto-discovery file (not needed - AutoInstallStdPluginsDir scans plugins folder)
-# sal_generate_plugins_ver()
+# Plugin version file for incremental plugin updates
+sal_generate_plugins_ver()
 
 # ==============================================================================
 # Populate Target (install to build output)
