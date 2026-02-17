@@ -4872,6 +4872,11 @@ FIND_NEW_SLG_FILE:
     OleUninitialize(); // deinitialize OLE
     // OleSpyDump();       // dump leaks
 
+    // Release plugin data before global destructors run, so the heap leak checker
+    // (C__GCHeapInit destructor) doesn't report std::string/std::vector heap allocations
+    // from CPluginData objects still alive in the global Plugins array.
+    Plugins.ReleaseData();
+
     TRACE_I("End");
     return 0;
 }

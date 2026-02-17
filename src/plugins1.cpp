@@ -1617,54 +1617,16 @@ BOOL CSalamanderPluginEntry::SetBasicPluginData(const char* pluginName, DWORD fu
     }
     if (Plugin->SupportFS)
     {
-        OldFSNames.DestroyMembers();
-        OldFSNames.Add(Plugin->FSNames.GetData(), Plugin->FSNames.Count);
-        if (OldFSNames.IsGood())
-        {
-            Plugin->FSNames.DetachMembers(); // strings are now in OldFSNames
-            if (!Plugin->FSNames.IsGood())
-                Plugin->FSNames.ResetState(); // deletion occurred, nothing else matters
+        OldFSNames = std::move(Plugin->FSNames); // take ownership of old names
+        Plugin->FSNames.clear();
 
-            CPathBuffer uniqueFSName;  // Heap-allocated for long path support
-            Plugins.GetUniqueFSName(uniqueFSName, fsName, NULL, &OldFSNames);
-            char* s = DupStr(uniqueFSName);
-            if (s != NULL)
-            {
-                Plugin->FSNames.Add(s);
-                if (!Plugin->FSNames.IsGood()) // should not happen (adding the first array element), just in case
-                {
-                    Plugin->FSNames.ResetState();
-                    free(s);
-                }
-            }
-            else // cannot use a new unique name, keep at least the old one
-            {
-                if (OldFSNames.Count > 0)
-                {
-                    Plugin->FSNames.Add(OldFSNames[0]);
-                    if (!Plugin->FSNames.IsGood())
-                        Plugin->FSNames.ResetState(); // should not happen, just in case
-                    OldFSNames.Detach(0);
-                    if (!OldFSNames.IsGood())
-                        OldFSNames.ResetState(); // detachment occurred, nothing else matters
-                }
-            }
-        }
-        else
-        {
-            OldFSNames.ResetState();
-            int i;
-            for (i = Plugin->FSNames.Count - 1; i > 0; i--)
-            {
-                Plugin->FSNames.Delete(i); // remove all fs-names except the first one
-                if (!Plugin->FSNames.IsGood())
-                    Plugin->FSNames.ResetState(); // deletion occurred, nothing else matters
-            }
-        }
+        CPathBuffer uniqueFSName;  // Heap-allocated for long path support
+        Plugins.GetUniqueFSName(uniqueFSName, fsName, NULL, &OldFSNames);
+        Plugin->FSNames.push_back(uniqueFSName.Get());
     }
     else // does not support FS
     {
-        Plugin->FSNames.DestroyMembers();
+        Plugin->FSNames.clear();
     }
 
     Valid = TRUE;
@@ -1818,7 +1780,7 @@ BOOL CSalamanderPluginEntry::AddFSName(const char* fsName, int* newFSNameIndex)
         return FALSE;
     }
 
-    if (Plugin->FSNames.Count == 0)
+    if (Plugin->FSNames.empty())
     {
         TRACE_E("CSalamanderPluginEntry::AddFSName(): unable to add fs-name, first fs-name is missing!");
         return FALSE;
@@ -1826,22 +1788,9 @@ BOOL CSalamanderPluginEntry::AddFSName(const char* fsName, int* newFSNameIndex)
 
     CPathBuffer uniqueFSName;  // Heap-allocated for long path support
     Plugins.GetUniqueFSName(uniqueFSName, fsName, NULL, &OldFSNames);
-    char* s = DupStr(uniqueFSName);
-    if (s != NULL)
-    {
-        int i = Plugin->FSNames.Add(s);
-        if (!Plugin->FSNames.IsGood())
-        {
-            Plugin->FSNames.ResetState();
-            free(s);
-        }
-        else
-        {
-            *newFSNameIndex = i;
-            return TRUE;
-        }
-    }
-    return FALSE;
+    Plugin->FSNames.push_back(uniqueFSName.Get());
+    *newFSNameIndex = (int)Plugin->FSNames.size() - 1;
+    return TRUE;
 }
 
 //
@@ -1895,9 +1844,9 @@ CPluginData::CPluginData(const char* name, const char* dllName, BOOL supportPane
                          BOOL supportConfiguration, BOOL supportLoadSave, BOOL supportViewer,
                          BOOL supportFS, BOOL supportDynMenuExt, const char* version, const char* copyright,
                          const char* description, const char* regKeyName, const char* extensions,
-                         TIndirectArray<char>* fsNames, BOOL loadOnStart, char* lastSLGName,
+                         const std::vector<std::string>* fsNames, BOOL loadOnStart, char* lastSLGName,
                          const char* pluginHomePageURL)
-    : MenuItems(10, 5), Commands(1, 5), FSNames(1, 10), PluginIfaceForFS(NULL, 0),
+    : MenuItems(10, 5), Commands(1, 5), PluginIfaceForFS(NULL, 0),
       PluginIfaceForMenuExt(NULL, 0)
 {
     CALL_STACK_MESSAGE20("CPluginData::CPluginData(%s, %s, %d, %d, %d, %d, %d, %d, %d, %d, %d, %s, %s, %s, %s, %s, , %d, %s, %s)",
@@ -1929,50 +1878,10 @@ CPluginData::CPluginData(const char* name, const char* dllName, BOOL supportPane
     Description = description ? description : "";
     RegKeyName = regKeyName ? regKeyName : "";
     SupportFS = supportFS;
-    BOOL lowMem = FALSE;
     if (SupportFS && fsNames != NULL)
-    {
-        int i;
-        for (i = 0; i < fsNames->Count; i++)
-        {
-            char* s = DupStr(fsNames->At(i));
-            if (s != NULL)
-            {
-                FSNames.Add(s);
-                if (!FSNames.IsGood())
-                {
-                    free(s);
-                    break;
-                }
-            }
-            else
-            {
-                lowMem = TRUE;
-                break;
-            }
-        }
-    }
+        FSNames = *fsNames; // vector copy; throws std::bad_alloc on OOM
     LastSLGName = (lastSLGName != NULL && lastSLGName[0] != 0) ? lastSLGName : "";
     PluginHomePageURL = pluginHomePageURL != NULL ? pluginHomePageURL : "";
-    if (Name.empty() || DLLName.empty() || Version.empty() || Copyright.empty() ||
-        Description.empty() || RegKeyName.empty() || Extensions.empty() ||
-        !FSNames.IsGood() || lowMem)
-    {
-        Name.clear();
-        DLLName.clear();
-        Version.clear();
-        Copyright.clear();
-        Extensions.clear();
-        Description.clear();
-        RegKeyName.clear();
-        if (!FSNames.IsGood())
-            FSNames.ResetState();
-        FSNames.DestroyMembers();
-        if (!FSNames.IsGood())
-            FSNames.ResetState();
-        LastSLGName.clear();
-        PluginHomePageURL.clear();
-    }
     SalamanderDebug.Init(DLLName.c_str(), Version.c_str());
     SalamanderPasswordManager.Init(DLLName.c_str());
     SupportPanelView = supportPanelView;
@@ -2025,7 +1934,7 @@ CPluginData::~CPluginData()
     }
     // Name, DLLName, Version, Copyright, Extensions, Description, RegKeyName,
     // ChDrvMenuFSItemName, LastSLGName, PluginHomePageURL are std::string (auto-destruct)
-    FSNames.DestroyMembers();
+    // FSNames is std::vector<std::string> (auto-destruct)
     // BugReportMessage, BugReportEMail, UnpackDlgUnpackMask are std::string (auto-destruct)
     if (ArcCacheTmpPath != NULL)
         free(ArcCacheTmpPath);
@@ -2063,7 +1972,7 @@ BOOL CPluginData::InitDLL(HWND parent, BOOL quiet, BOOL waitCursor, BOOL showUns
     }
 #endif // _WIN64
 
-    if (DLL == NULL && IsGood())
+    if (DLL == NULL)
     {
         BOOL refreshUNCRootPaths = FALSE;
 

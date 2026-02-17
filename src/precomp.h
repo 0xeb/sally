@@ -37,6 +37,7 @@
 #endif
 #include <math.h>
 #include <string>
+#include <vector>
 
 // Long path support (Phase 1)
 #include "common/widepath.h"

@@ -238,10 +238,10 @@ void CPluginsDlg::OnSelChanged()
         buf[0] = 0;
         int remainingSize = sizeof(buf); // store the list of FS names in 'buf', names will be separated by ';'
         int i;
-        for (i = 0; remainingSize > 1 && i < p->FSNames.Count; i++)
+        for (i = 0; remainingSize > 1 && i < (int)p->FSNames.size(); i++)
         {
             _snprintf_s(buf + (sizeof(buf) - remainingSize), remainingSize, _TRUNCATE,
-                        (i + 1 != p->FSNames.Count) ? "%s;" : "%s", p->FSNames[i]);
+                        (i + 1 != (int)p->FSNames.size()) ? "%s;" : "%s", p->FSNames[i].c_str());
             remainingSize = (int)sizeof(buf) - (int)strlen(buf);
         }
         SetWindowText(GetDlgItem(HWindow, IDC_PLUGINFSNAME),

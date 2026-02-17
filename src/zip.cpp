@@ -1762,8 +1762,8 @@ void CSalamanderGeneral::GetPluginFSName(char* buf, int fsNameIndex)
         return;
     }
     CPluginData* data = Plugins.GetPluginData(Plugin);
-    if (data != NULL && data->SupportFS && fsNameIndex >= 0 && fsNameIndex < data->FSNames.Count)
-        lstrcpyn(buf, data->FSNames[fsNameIndex], MAX_PATH);
+    if (data != NULL && data->SupportFS && fsNameIndex >= 0 && fsNameIndex < (int)data->FSNames.size())
+        lstrcpyn(buf, data->FSNames[fsNameIndex].c_str(), MAX_PATH);
     else
     {
         TRACE_E("CSalamanderGeneral::GetPluginFSName(): incorrect call (not supporting FS or 'fsNameIndex' is out of range)!");

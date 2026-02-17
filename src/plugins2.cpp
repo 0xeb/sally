@@ -403,7 +403,10 @@ HICON GetIconFromDIB(HBITMAP hBitmap, int index)
 CPlugins::~CPlugins()
 {
     int i;
-    // Order elements' DLLName is now std::string (auto-destruct)
+    // Order is TDirectArray<CPluginOrder> — memmove-based, won't call destructors.
+    // Explicitly destroy std::string members before releasing raw memory.
+    for (i = 0; i < Order.Count; i++)
+        Order[i].DLLName.~basic_string();
     Order.DetachMembers();
 
     // LastPlgCmdPlugin is now std::string (auto-destruct)
@@ -428,9 +431,9 @@ BOOL CPlugins::IsPluginFS(const char* fsName, int& index, int& fsNameIndex)
         if (p->SupportFS)
         {
             int j;
-            for (j = 0; j < p->FSNames.Count; j++)
+            for (j = 0; j < (int)p->FSNames.size(); j++)
             {
-                if (StrICmp(p->FSNames[j], fsName) == 0)
+                if (StrICmp(p->FSNames[j].c_str(), fsName) == 0)
                 {
                     index = i;
                     fsNameIndex = j;
@@ -452,14 +455,14 @@ BOOL CPlugins::AreFSNamesFromSamePlugin(const char* fsName1, const char* fsName2
         if (p->SupportFS)
         {
             int j;
-            for (j = 0; j < p->FSNames.Count; j++)
+            for (j = 0; j < (int)p->FSNames.size(); j++)
             {
-                if (StrICmp(p->FSNames[j], fsName1) == 0) // fsName1 found
+                if (StrICmp(p->FSNames[j].c_str(), fsName1) == 0) // fsName1 found
                 {
                     int k;
-                    for (k = 0; k < p->FSNames.Count; k++)
+                    for (k = 0; k < (int)p->FSNames.size(); k++)
                     {
-                        if (StrICmp(p->FSNames[k], fsName2) == 0)
+                        if (StrICmp(p->FSNames[k].c_str(), fsName2) == 0)
                         {
                             fsName2Index = k;
                             return TRUE; // fsName2 found in the same plugin
@@ -1191,12 +1194,12 @@ void CPlugins::OnPluginConfiguration(HWND hParent, int index)
         TRACE_E("Unexpected situation in CPlugins::OnPluginConfiguration.");
 }
 
-BOOL LoadFSNames(HKEY itemKey, TIndirectArray<char>* fsNames)
+BOOL LoadFSNames(HKEY itemKey, std::vector<std::string>* fsNames)
 {
     char buf[1000];
     if (GetValue(itemKey, SALAMANDER_PLUGINS_FSNAME, REG_SZ, buf, 1000))
     {
-        fsNames->DestroyMembers();
+        fsNames->clear();
         char* s = buf;
         char* end = s;
         while (*end != 0)
@@ -1204,28 +1207,7 @@ BOOL LoadFSNames(HKEY itemKey, TIndirectArray<char>* fsNames)
             while (*end != 0 && *end != ':')
                 end++;
             if (end > s)
-            {
-                char* name = (char*)malloc((end - s) + 1);
-                if (name != NULL)
-                {
-                    memcpy(name, s, end - s);
-                    name[end - s] = 0;
-                    fsNames->Add(name);
-                    if (!fsNames->IsGood())
-                    {
-                        free(name);
-                        fsNames->ResetState();
-                        fsNames->DestroyMembers();
-                        return FALSE;
-                    }
-                }
-                else
-                {
-                    TRACE_E(LOW_MEMORY);
-                    fsNames->DestroyMembers();
-                    return FALSE;
-                }
-            }
+                fsNames->emplace_back(s, end);
             if (*end != 0)
                 end++;
             s = end;
@@ -1236,16 +1218,16 @@ BOOL LoadFSNames(HKEY itemKey, TIndirectArray<char>* fsNames)
         return FALSE;
 }
 
-void SaveFSNames(HKEY itemKey, TIndirectArray<char>* fsNames)
+void SaveFSNames(HKEY itemKey, std::vector<std::string>* fsNames)
 {
     char buf[1000];
     buf[0] = 0;
     int remainingSize = sizeof(buf); // we store the list of fs-names into 'buf', with names separated by ':'
     int i;
-    for (i = 0; remainingSize > 1 && i < fsNames->Count; i++)
+    for (i = 0; remainingSize > 1 && i < (int)fsNames->size(); i++)
     {
         int len = _snprintf_s(buf + (sizeof(buf) - remainingSize), remainingSize, _TRUNCATE,
-                              (i + 1 != fsNames->Count) ? "%s:" : "%s", fsNames->At(i));
+                              (i + 1 != (int)fsNames->size()) ? "%s:" : "%s", (*fsNames)[i].c_str());
         if (len < 0)
         { // small buffer
             TRACE_E("Fatal error: small buffer for storing fs-names to registry!");
@@ -1286,7 +1268,7 @@ void CPlugins::Load(HWND parent, HKEY regKey)
         CPathBuffer extensions; // Heap-allocated for long path support
         CPathBuffer description; // Heap-allocated for long path support
         CPathBuffer regKeyName; // Heap-allocated for long path support
-        TIndirectArray<char> fsNames(1, 10);
+        std::vector<std::string> fsNames;
         CPathBuffer fsCmdName; // Heap-allocated for long path support
         CPathBuffer lastSLGName; // Heap-allocated for long path support
         CPathBuffer pluginHomePageURL; // Heap-allocated for long path support
@@ -2255,8 +2237,8 @@ void CPlugins::GetUniqueRegKeyName(char* uniqueKeyName, const char* regKeyName)
     }
 }
 
-void CPlugins::GetUniqueFSName(char* uniqueFSName, const char* fsName, TIndirectArray<char>* uniqueFSNames,
-                               TIndirectArray<char>* oldFSNames)
+void CPlugins::GetUniqueFSName(char* uniqueFSName, const char* fsName, std::vector<std::string>* uniqueFSNames,
+                               std::vector<std::string>* oldFSNames)
 {
     CALL_STACK_MESSAGE2("CPlugins::GetUniqueFSName(, %s, ,)", fsName);
     int number = 2;
@@ -2286,22 +2268,20 @@ void CPlugins::GetUniqueFSName(char* uniqueFSName, const char* fsName, TIndirect
     BOOL oldFSNameUsed = FALSE;
     if (oldFSNames != NULL)
     {
-        for (i = 0; i < oldFSNames->Count; i++)
+        for (i = 0; i < (int)oldFSNames->size(); i++)
         {
-            char* s = oldFSNames->At(i);
+            const char* s = (*oldFSNames)[i].c_str();
             int len = (int)strlen(s);
             if (len >= offset && StrNICmp(s, uniqueFSName, offset) == 0)
             { // match except for a possible suffix; check if suffix is numeric (numbers are added when searching for a unique name)
-                char* num = s + offset;
+                const char* num = s + offset;
                 while (*num != 0 && *num >= '0' && *num <= '9')
                     num++;
                 if (*num == 0) // numeric suffix -> this old fs-name can be used for the sought fs-name
                 {
                     lstrcpyn(uniqueFSName + offset, s + offset, MAX_PATH - offset);
                     oldFSNameUsed = TRUE;
-                    oldFSNames->Delete(i); // remove the used fs-name from the array (reusing it makes no sense, even if the name is not unique)
-                    if (!oldFSNames->IsGood())
-                        oldFSNames->ResetState(); // deletion succeeded, nothing else matters
+                    oldFSNames->erase(oldFSNames->begin() + i); // remove the used fs-name from the array
                     break;
                 }
             }
@@ -2313,9 +2293,9 @@ void CPlugins::GetUniqueFSName(char* uniqueFSName, const char* fsName, TIndirect
         if (i == 0 && uniqueFSNames != NULL)
         {
             int j;
-            for (j = 0; j < uniqueFSNames->Count; j++)
+            for (j = 0; j < (int)uniqueFSNames->size(); j++)
             {
-                if (StrICmp(uniqueFSName, uniqueFSNames->At(j)) == 0) // not unique
+                if (StrICmp(uniqueFSName, (*uniqueFSNames)[j].c_str()) == 0) // not unique
                 {
                     if (!oldFSNameUsed)
                         sprintf(uniqueFSName + offset, "%d", number++); // change the key name
@@ -2334,9 +2314,9 @@ void CPlugins::GetUniqueFSName(char* uniqueFSName, const char* fsName, TIndirect
 
         CPluginData* plugin = Data[i];
         int j;
-        for (j = 0; j < plugin->FSNames.Count; j++)
+        for (j = 0; j < (int)plugin->FSNames.size(); j++)
         {
-            if (StrICmp(uniqueFSName, plugin->FSNames[j]) == 0) // not unique
+            if (StrICmp(uniqueFSName, plugin->FSNames[j].c_str()) == 0) // not unique
             {
                 if (!oldFSNameUsed)
                     sprintf(uniqueFSName + offset, "%d", number++); // change the key name
@@ -2357,7 +2337,7 @@ BOOL CPlugins::AddPlugin(const char* name, const char* dllName, BOOL supportPane
                          BOOL supportConfiguration, BOOL supportLoadSave, BOOL supportViewer,
                          BOOL supportFS, BOOL supportDynMenuExt, const char* version,
                          const char* copyright, const char* description, const char* regKeyName,
-                         const char* extensions, TIndirectArray<char>* fsNames, BOOL loadOnStart,
+                         const char* extensions, std::vector<std::string>* fsNames, BOOL loadOnStart,
                          char* lastSLGName, const char* pluginHomePageURL)
 {
     CALL_STACK_MESSAGE20("CPlugins::AddPlugin(%s, %s, %d, %d, %d, %d, %d, %d, %d, %d, %d, %s, %s, %s, %s, %s, , %d, %s, %s)",
@@ -2372,37 +2352,18 @@ BOOL CPlugins::AddPlugin(const char* name, const char* dllName, BOOL supportPane
         GetUniqueRegKeyName(uniqueKeyName, regKeyName);
     else
         uniqueKeyName[0] = 0;
-    TIndirectArray<char>* uniqueFSNames = NULL;
+    std::vector<std::string>* uniqueFSNames = NULL;
     if (supportFS && fsNames != NULL)
     {
-        uniqueFSNames = new TIndirectArray<char>(1, 10);
+        uniqueFSNames = new std::vector<std::string>();
         if (uniqueFSNames != NULL)
         {
             int i;
-            for (i = 0; i < fsNames->Count; i++)
+            for (i = 0; i < (int)fsNames->size(); i++)
             {
                 CPathBuffer uniqueFSName; // Heap-allocated for long path support
-                GetUniqueFSName(uniqueFSName, fsNames->At(i), uniqueFSNames, NULL);
-
-                char* s = DupStr(uniqueFSName);
-                if (s != NULL)
-                {
-                    uniqueFSNames->Add(s);
-                    if (!uniqueFSNames->IsGood())
-                    {
-                        uniqueFSNames->ResetState();
-                        free(s);
-                        delete uniqueFSNames;
-                        uniqueFSNames = NULL;
-                        break;
-                    }
-                }
-                else
-                {
-                    delete uniqueFSNames;
-                    uniqueFSNames = NULL;
-                    break;
-                }
+                GetUniqueFSName(uniqueFSName, (*fsNames)[i].c_str(), uniqueFSNames, NULL);
+                uniqueFSNames->push_back(uniqueFSName.Get());
             }
         }
         else
@@ -2417,7 +2378,7 @@ BOOL CPlugins::AddPlugin(const char* name, const char* dllName, BOOL supportPane
                                             supportDynMenuExt, version, copyright, description,
                                             uniqueKeyName, extensions, uniqueFSNames, loadOnStart,
                                             lastSLGName, pluginHomePageURL);
-        if (item != NULL && item->IsGood())
+        if (item != NULL)
         {
             HANDLES(EnterCriticalSection(&DataCS));
             Data.Add(item);
@@ -3636,10 +3597,10 @@ BOOL CPlugins::GetFirstNethoodPluginFSName(char* fsName, CPluginData** nethoodPl
     for (i = 0; i < Data.Count; i++)
     {
         CPluginData* p = Data[i];
-        if (p->PluginIsNethood && p->SupportFS && p->FSNames.Count > 0)
+        if (p->PluginIsNethood && p->SupportFS && !p->FSNames.empty())
         {
             if (fsName != NULL)
-                lstrcpyn(fsName, p->FSNames[0], MAX_PATH);
+                lstrcpyn(fsName, p->FSNames[0].c_str(), MAX_PATH);
             if (nethoodPlugin != NULL)
                 *nethoodPlugin = p;
             return TRUE;

@@ -2403,7 +2403,7 @@ public:
     std::string Description;          // short plugin description (max length MAX_PATH - 1)
     std::string RegKeyName;           // registry key name for configuration (max length MAX_PATH - 1)
     std::string Extensions;           // archive extensions separated by ';' (max length MAX_PATH - 1)
-    TIndirectArray<char> FSNames; // array of plugin filesystem names (each max length MAX_PATH - 1)
+    std::vector<std::string> FSNames; // array of plugin filesystem names (each max length MAX_PATH - 1)
 
     std::string LastSLGName; // name of the last used .SLG file (empty = none yet or same language as Salamander)
 
@@ -2483,11 +2483,9 @@ public:
                 BOOL supportConfiguration, BOOL supportLoadSave, BOOL supportViewer,
                 BOOL supportFS, BOOL supportDynMenuExt, const char* version,
                 const char* copyright, const char* description, const char* regKeyName,
-                const char* extensions, TIndirectArray<char>* fsNames, BOOL loadOnStart,
+                const char* extensions, const std::vector<std::string>* fsNames, BOOL loadOnStart,
                 char* lastSLGName, const char* pluginHomePageURL);
     ~CPluginData();
-
-    BOOL IsGood() { return !Name.empty(); } // was the constructor successful?
 
     // returns the plugin interface
     CPluginInterfaceEncapsulation* GetPluginInterface() { return &PluginIface; }
@@ -2826,6 +2824,20 @@ public:
     void EnterDataCS() { HANDLES(EnterCriticalSection(&DataCS)); }
     void LeaveDataCS() { HANDLES(LeaveCriticalSection(&DataCS)); }
 
+    // Explicitly releases all plugin data; called during shutdown before the heap
+    // leak checker runs (global destruction order is unpredictable).
+    void ReleaseData()
+    {
+        HANDLES(EnterCriticalSection(&DataCS));
+        Data.DestroyMembers();
+        HANDLES(LeaveCriticalSection(&DataCS));
+        // Order is TDirectArray<CPluginOrder> — uses memmove, won't call destructors.
+        // Explicitly destroy std::string members, then release raw memory.
+        for (int i = 0; i < Order.Count; i++)
+            Order[i].DLLName.~basic_string();
+        Order.DetachMembers();
+    }
+
     // loads the object from registry key 'regKey' or default values (if regKey==NULL) (ZIP + TAR + PAK)
     // 'parent' is the parent window for message boxes (may be NULL)
     void Load(HWND parent, HKEY regKey);
@@ -2902,7 +2914,7 @@ public:
                    BOOL supportConfiguration, BOOL supportLoadSave, BOOL supportViewer,
                    BOOL supportFS, BOOL supportDynMenuExt, const char* version,
                    const char* copyright, const char* description, const char* regKeyName,
-                   const char* extensions, TIndirectArray<char>* fsNames, BOOL loadOnStart,
+                   const char* extensions, std::vector<std::string>* fsNames, BOOL loadOnStart,
                    char* lastSLGName, const char* pluginHomePageURL);
 
     // adds a plugin; 'parent' is the parent message box window, 'fileName' is the DLL file name
@@ -2926,8 +2938,8 @@ public:
     // fs names from previous plugin loads from which a unique name is preferably selected
     // and removed (so the user's FS name doesn't change with each plugin load)
     void GetUniqueFSName(char* uniqueFSName, const char* fsName,
-                         TIndirectArray<char>* uniqueFSNames,
-                         TIndirectArray<char>* oldFSNames);
+                         std::vector<std::string>* uniqueFSNames,
+                         std::vector<std::string>* oldFSNames);
 
     // returns the number of plugins
     int GetCount() { return Data.Count; }
@@ -3225,10 +3237,10 @@ protected:
     BOOL Valid;                      // TRUE if SetBasicPluginData was called successfully
     BOOL Error;                      // has an error already been displayed?
     DWORD LoadInfo;                  // DWORD value returned by GetLoadInformation()
-    TIndirectArray<char> OldFSNames; // array of old fs-names (names from the registry, replaced during plug-in loading)
+    std::vector<std::string> OldFSNames; // array of old fs-names (names from the registry, replaced during plug-in loading)
 
 public:
-    CSalamanderPluginEntry(HWND parent, CPluginData* plugin) : OldFSNames(1, 10)
+    CSalamanderPluginEntry(HWND parent, CPluginData* plugin)
     {
         Parent = parent;
         Plugin = plugin;
