@@ -555,9 +555,9 @@ endif()
 set_target_properties(salext PROPERTIES
   OUTPUT_NAME "salext${SAL_PLATFORM}"
   SUFFIX ".dll"
-  RUNTIME_OUTPUT_DIRECTORY "${SAL_OUTPUT_BASE}/$<CONFIG>_${SAL_PLATFORM}"
-  LIBRARY_OUTPUT_DIRECTORY "${SAL_OUTPUT_BASE}/$<CONFIG>_${SAL_PLATFORM}"
-  ARCHIVE_OUTPUT_DIRECTORY "${SAL_OUTPUT_BASE}/$<CONFIG>_${SAL_PLATFORM}"
+  RUNTIME_OUTPUT_DIRECTORY "${SAL_OUTPUT_BASE}/$<CONFIG>_${SAL_PLATFORM}/utils"
+  LIBRARY_OUTPUT_DIRECTORY "${SAL_OUTPUT_BASE}/$<CONFIG>_${SAL_PLATFORM}/utils"
+  ARCHIVE_OUTPUT_DIRECTORY "${SAL_OUTPUT_BASE}/$<CONFIG>_${SAL_PLATFORM}/utils"
 )
 
 # ==============================================================================
@@ -582,10 +582,10 @@ sal_install_main(salamander)
 # Utils go in utils/
 install(TARGETS salmon salspawn salopen tserver translator RUNTIME DESTINATION utils)
 
-# Shell extension goes in root (alongside salamand.exe)
+# Shell extension goes in utils/ (Salamander looks for utils\salextx64.dll)
 install(TARGETS salext
-  LIBRARY DESTINATION .
-  RUNTIME DESTINATION .
+  LIBRARY DESTINATION utils
+  RUNTIME DESTINATION utils
 )
 
 # MSVC runtime

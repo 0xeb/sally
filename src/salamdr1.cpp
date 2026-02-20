@@ -4289,11 +4289,17 @@ FIND_NEW_SLG_FILE:
     {
         strcpy(shellExtPathSlash + 1, "utils\\salextx86.dll");
 #ifdef _WIN64
-        if (FileExists(shellExtPath))
-            SalShExtRegistered = SECRegisterToRegistry(shellExtPath, TRUE, KEY_WOW64_32KEY);
+        BOOL x86Present = FileExists(shellExtPath);
+        BOOL x86Registered = FALSE;
+        if (x86Present)
+            x86Registered = SECRegisterToRegistry(shellExtPath, TRUE, KEY_WOW64_32KEY);
         strcpy(shellExtPathSlash + 1, "utils\\salextx64.dll");
         if (FileExists(shellExtPath))
-            SalShExtRegistered &= SECRegisterToRegistry(shellExtPath, FALSE, 0);
+        {
+            SalShExtRegistered = SECRegisterToRegistry(shellExtPath, FALSE, 0);
+            if (x86Present) // if x86 DLL was present, both must register successfully
+                SalShExtRegistered &= x86Registered;
+        }
         else
             SalShExtRegistered = FALSE;
 #else  // _WIN64
