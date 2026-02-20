@@ -5705,6 +5705,7 @@ BOOL CSalamanderDirectory::FindDir(const char* path, const char*& s, int& i, con
         data.Attr = 0;
         data.LastWrite = file.LastWrite; // take the date from the first file in the directory
         data.DosName = NULL;
+        data.NameW = NULL;
         data.PluginData = 0;
         data.Hidden = 0;
         data.IsLink = 0;

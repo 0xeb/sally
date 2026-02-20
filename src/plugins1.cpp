@@ -1955,7 +1955,7 @@ BOOL CPluginData::InitDLL(HWND parent, BOOL quiet, BOOL waitCursor, BOOL showUns
 {
     CALL_STACK_MESSAGE8("CPluginData::InitDLL(0x%p, %d, %d, %d, %d) (%s v. %s)",
                         parent, quiet, waitCursor, showUnsupOnX64,
-                        releaseDynMenuIcons, DLLName, Version);
+                        releaseDynMenuIcons, DLLName.c_str(), Version.c_str());
 
     CPathBuffer bufText;
 
@@ -2372,7 +2372,7 @@ void CPluginData::AddMenuItem(int iconIndex, const char* name, DWORD hotKey, int
 {
     CALL_STACK_MESSAGE12("CPluginData::AddMenuItem(%d, %s, %u, %d, %d, 0x%X, 0x%X, 0x%X, %d) (%s v. %s)",
                          iconIndex, name, hotKey, id, callGetState, state_or, state_and,
-                         skillLevel, (int)type, DLLName, Version);
+                         skillLevel, (int)type, DLLName.c_str(), Version.c_str());
     DWORD state = 0;
     if (callGetState)
         state = -1;
@@ -2440,7 +2440,7 @@ void CPluginData::ClearSUID()
 BOOL CPluginData::Remove(HWND parent, int index, BOOL canDelPluginRegKey)
 {
     CALL_STACK_MESSAGE6("CPluginData::Remove(0x%p, %d, %d) (%s v. %s)",
-                        parent, index, canDelPluginRegKey, DLLName, Version);
+                        parent, index, canDelPluginRegKey, DLLName.c_str(), Version.c_str());
     BOOL unloaded = !GetLoaded();
     if (!unloaded)
     {
@@ -3420,7 +3420,7 @@ BOOL CPluginData::UnpackArchive(CFilesWindow* panel, const char* archiveFileName
                                 SalEnumSelection nextName, void* param)
 {
     CALL_STACK_MESSAGE6("CPluginData::UnpackArchive(, %s, , %s, %s, ,) (%s v. %s)", archiveFileName,
-                        targetDir, archiveRoot, DLLName, Version);
+                        targetDir, archiveRoot, DLLName.c_str(), Version.c_str());
     BOOL ret = FALSE;
     if (InitDLL(MainWindow->HWindow))
     {
@@ -3437,7 +3437,7 @@ BOOL CPluginData::UnpackOneFile(CFilesWindow* panel, const char* archiveFileName
                                 const char* newFileName, BOOL* renamingNotSupported)
 {
     CALL_STACK_MESSAGE7("CPluginData::UnpackOneFile(, %s, , %s, , %s, %s, ) (%s v. %s)", archiveFileName,
-                        nameInArchive, targetDir, newFileName, DLLName, Version);
+                        nameInArchive, targetDir, newFileName, DLLName.c_str(), Version.c_str());
     BOOL ret = FALSE;
     if (InitDLL(MainWindow->HWindow))
     {
@@ -3455,7 +3455,7 @@ BOOL CPluginData::PackToArchive(CFilesWindow* panel, const char* archiveFileName
                                 SalEnumSelection2 nextName, void* param)
 {
     CALL_STACK_MESSAGE7("CPluginData::PackToArchive(, %s, %s, %d, %s, ,) (%s v. %s)", archiveFileName,
-                        archiveRoot, move, sourceDir, DLLName, Version);
+                        archiveRoot, move, sourceDir, DLLName.c_str(), Version.c_str());
     BOOL ret = FALSE;
     if (InitDLL(MainWindow->HWindow))
     {
@@ -3470,7 +3470,7 @@ BOOL CPluginData::DeleteFromArchive(CFilesWindow* panel, const char* archiveFile
                                     SalEnumSelection nextName, void* param)
 {
     CALL_STACK_MESSAGE5("CPluginData::DeleteFromArchive(, %s, , %s, ,) (%s v. %s)",
-                        archiveFileName, archiveRoot, DLLName, Version);
+                        archiveFileName, archiveRoot, DLLName.c_str(), Version.c_str());
     BOOL ret = FALSE;
     if (InitDLL(MainWindow->HWindow))
     {
@@ -3484,7 +3484,7 @@ BOOL CPluginData::UnpackWholeArchive(CFilesWindow* panel, const char* archiveFil
                                      const char* targetDir, BOOL delArchiveWhenDone, CDynamicString* archiveVolumes)
 {
     CALL_STACK_MESSAGE7("CPluginData::UnpackWholeArchive(, %s, %s, %s, %d,) (%s v. %s)", archiveFileName,
-                        mask, targetDir, delArchiveWhenDone, DLLName, Version);
+                        mask, targetDir, delArchiveWhenDone, DLLName.c_str(), Version.c_str());
     BOOL ret = FALSE;
     if (InitDLL(MainWindow->HWindow))
     {
@@ -3498,7 +3498,7 @@ BOOL CPluginData::UnpackWholeArchive(CFilesWindow* panel, const char* archiveFil
 BOOL CPluginData::CanCloseArchive(CFilesWindow* panel, const char* archiveFileName, BOOL force)
 {
     CALL_STACK_MESSAGE5("CPluginData::CanCloseArchive(, %s, %d) (%s v. %s)", archiveFileName,
-                        force, DLLName, Version);
+                        force, DLLName.c_str(), Version.c_str());
     BOOL ret = TRUE;
     if (InitDLL(MainWindow->HWindow))
     {
@@ -3530,7 +3530,7 @@ BOOL CPluginData::ViewFile(const char* name, int left, int top, int width, int h
 {
     CALL_STACK_MESSAGE13("CPluginData::ViewFile(%s, %d, %d, %d, %d, %u, %d, %d, , , %d, %d) (%s v. %s)",
                          name, left, top, width, height, showCmd, alwaysOnTop, returnLock,
-                         enumFilesSourceUID, enumFilesCurrentIndex, DLLName, Version);
+                         enumFilesSourceUID, enumFilesCurrentIndex, DLLName.c_str(), Version.c_str());
     BOOL ret = FALSE;
     if (InitDLL(MainWindow->HWindow)
         /*&& PluginIfaceForViewer.NotEmpty()*/) // unnecessary, because downgrade is impossible and InitDLL checks the interfaces
@@ -3597,7 +3597,7 @@ BOOL CPluginData::ChangeDriveMenuItemContextMenu(HWND parent, int panel, int x, 
 void CPluginData::EnsureShareExistsOnServer(HWND parent, int panel, const char* server, const char* share)
 {
     CALL_STACK_MESSAGE6("CPluginData::EnsureShareExistsOnServer(, %d, %s, %s) (%s v. %s)",
-                        panel, server, share, DLLName, Version);
+                        panel, server, share, DLLName.c_str(), Version.c_str());
     if (InitDLL(parent, TRUE) &&     // we don't want to report possible load errors; EnsureShareExistsOnServer provides only supplementary info (if it isn't called, almost nothing happens)
         PluginIsNethood &&           // in case the plug-in stops replacing Network (i.e., it does not call SetPluginIsNethood()) right during this load
         PluginIfaceForFS.NotEmpty()) // PluginIsNethood is independent of PluginIfaceForFS, so we check it separately
@@ -3657,7 +3657,7 @@ void CPluginData::GetCacheInfo(char* arcCacheTmpPath, BOOL* arcCacheOwnDelete, B
 void CPluginData::DeleteTmpCopy(const char* fileName, BOOL firstFile)
 {
     CALL_STACK_MESSAGE5("CPluginData::DeleteTmpCopy(%s, %d) (%s v. %s)",
-                        fileName, firstFile, DLLName, Version);
+                        fileName, firstFile, DLLName.c_str(), Version.c_str());
     if (PluginIfaceForArchiver.NotEmpty())
         PluginIfaceForArchiver.DeleteTmpCopy(fileName, firstFile);
     else
@@ -3667,7 +3667,7 @@ void CPluginData::DeleteTmpCopy(const char* fileName, BOOL firstFile)
 BOOL CPluginData::PrematureDeleteTmpCopy(HWND parent, int copiesCount)
 {
     CALL_STACK_MESSAGE4("CPluginData::PrematureDeleteTmpCopy(, %d) (%s v. %s)",
-                        copiesCount, DLLName, Version);
+                        copiesCount, DLLName.c_str(), Version.c_str());
     if (PluginIfaceForArchiver.NotEmpty())
     {
         return PluginIfaceForArchiver.PrematureDeleteTmpCopy(parent, copiesCount);

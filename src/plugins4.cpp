@@ -21,12 +21,8 @@ int CPlugins::AddPluginToOrder(const char* dllName, BOOL showInBar)
     o.Flags = 0;
     if (!o.DLLName.empty())
     {
-        index = Order.Add(o);
-        if (!Order.IsGood())
-        {
-            index = -1;
-            Order.ResetState();
-        }
+        index = (int)Order.size();
+        Order.push_back(std::move(o));
     }
     return index;
 }
@@ -62,7 +58,7 @@ void CPlugins::QuickSortPluginsByName(int left, int right)
 BOOL CPlugins::PluginVisibleInBar(const char* dllName)
 {
     int i;
-    for (i = 0; i < Order.Count; i++)
+    for (i = 0; i < (int)Order.size(); i++)
     {
         CPluginOrder* order = &Order[i];
         if (stricmp(dllName, order->DLLName.c_str()) == 0)
@@ -79,7 +75,7 @@ void CPlugins::UpdatePluginsOrder(BOOL sortByName)
 
     // initialize a helper flag so we can later remove plugins that no longer exist
     int i;
-    for (i = 0; i < Order.Count; i++)
+    for (i = 0; i < (int)Order.size(); i++)
         Order[i].Flags = 0;
 
     for (i = 0; i < Data.Count; i++)
@@ -88,7 +84,7 @@ void CPlugins::UpdatePluginsOrder(BOOL sortByName)
 
         int foundIndex = -1;
         int j;
-        for (j = 0; j < Order.Count; j++)
+        for (j = 0; j < (int)Order.size(); j++)
         {
             CPluginOrder* order = &Order[j];
             if (order->Flags == 0 && stricmp(pluginData->DLLName.c_str(), order->DLLName.c_str()) == 0)
@@ -116,18 +112,17 @@ void CPlugins::UpdatePluginsOrder(BOOL sortByName)
     }
 
     // remove plugins that no longer exist
-    for (i = Order.Count - 1; i >= 0; i--)
+    for (i = (int)Order.size() - 1; i >= 0; i--)
     {
         if (Order[i].Flags == 0)
         {
-            /* Order[i].DLLName is std::string */
-            Order.Delete(i);
+            Order.erase(Order.begin() + i);
         }
     }
 
     // find the first newly added plugin
     int index = -1;
-    for (i = 0; i < Order.Count; i++)
+    for (i = 0; i < (int)Order.size(); i++)
     {
         if (Order[i].Flags == 2)
         {
@@ -137,19 +132,19 @@ void CPlugins::UpdatePluginsOrder(BOOL sortByName)
     }
 
     // if we found a newly added plugin and there are more after it, sort them
-    if (Order.Count > 1 && !sortByName && (index != -1 && index < Order.Count - 1))
-        QuickSortPluginsByName(index, Order.Count - 1);
-    if (Order.Count > 1 && sortByName)
-        QuickSortPluginsByName(0, Order.Count - 1);
+    if ((int)Order.size() > 1 && !sortByName && (index != -1 && index < (int)Order.size() - 1))
+        QuickSortPluginsByName(index, (int)Order.size() - 1);
+    if ((int)Order.size() > 1 && sortByName)
+        QuickSortPluginsByName(0, (int)Order.size() - 1);
 }
 
 BOOL CPlugins::ChangePluginsOrder(int index, int newIndex)
 {
-    if (index < 0 || index >= Order.Count)
+    if (index < 0 || index >= (int)Order.size())
     {
         return FALSE;
     }
-    if (newIndex < 0 || newIndex >= Order.Count)
+    if (newIndex < 0 || newIndex >= (int)Order.size())
     {
         return FALSE;
     }
@@ -184,7 +179,7 @@ BOOL CPlugins::ChangePluginsOrder(int index, int newIndex)
 
 int CPlugins::GetIndexByOrder(int index)
 {
-    if (index < 0 || index >= Order.Count)
+    if (index < 0 || index >= (int)Order.size())
         return -1;
     return Order[index].Index;
 }
@@ -192,7 +187,7 @@ int CPlugins::GetIndexByOrder(int index)
 int CPlugins::GetPluginOrderIndex(const CPluginData* plugin)
 {
     int i;
-    for (i = 0; i < Order.Count; i++)
+    for (i = 0; i < (int)Order.size(); i++)
     {
         int orderIndex = Order[i].Index;
         if (plugin != NULL && plugin == Data[orderIndex])

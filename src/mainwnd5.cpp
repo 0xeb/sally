@@ -608,6 +608,7 @@ BOOL ReadDirsAndFilesAux(HWND hWindow, DWORD flags, CCmpDirProgressDialog* progr
                 CFileData file;
                 // initialize structure members we won't modify further
                 file.DosName = NULL;
+                file.NameW = NULL;
                 file.PluginData = -1;
                 file.Association = 0;
                 file.Selected = 0;

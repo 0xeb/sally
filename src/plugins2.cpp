@@ -403,11 +403,7 @@ HICON GetIconFromDIB(HBITMAP hBitmap, int index)
 CPlugins::~CPlugins()
 {
     int i;
-    // Order is TDirectArray<CPluginOrder> — memmove-based, won't call destructors.
-    // Explicitly destroy std::string members before releasing raw memory.
-    for (i = 0; i < Order.Count; i++)
-        Order[i].DLLName.~basic_string();
-    Order.DetachMembers();
+    Order.clear();
 
     // LastPlgCmdPlugin is now std::string (auto-destruct)
     for (i = 0; i < Data.Count; i++)
@@ -590,7 +586,7 @@ void CPlugins::InitMenuItems(HWND parent, CMenuPopup* root)
     // (new numbers will be assigned)
     count = RootMenuItemsCount;
     UpdatePluginsOrder(Configuration.KeepPluginsSorted);
-    for (i = 0; i < Order.Count; i++)
+    for (i = 0; i < (int)Order.size(); i++)
     {
         int orderIndex = Order[i].Index;
         CPluginData* p = Data[orderIndex];
@@ -744,7 +740,7 @@ BOOL CPlugins::InitPluginsBar(CToolBar* bar)
     UpdatePluginsOrder(Configuration.KeepPluginsSorted);
     TLBI_ITEM_INFO2 tii;
     int i;
-    for (i = 0; i < Order.Count; i++)
+    for (i = 0; i < (int)Order.size(); i++)
     {
         int orderIndex = Order[i].Index;
         CPluginData* plugin = Plugins.Get(orderIndex);
@@ -1026,7 +1022,7 @@ void CPlugins::AddNamesToListView(HWND hListView, BOOL setOnly, int* numOfLoaded
 
     int loaded = 0;
     int i;
-    for (i = 0; i < Order.Count; i++)
+    for (i = 0; i < (int)Order.size(); i++)
     {
         int orderIndex = Order[i].Index;
         CPluginData* plugin = Data[orderIndex];
@@ -1089,7 +1085,7 @@ BOOL CPlugins::AddNamesToMenu(CMenuPopup* menu, DWORD firstID, int maxCount, BOO
 {
     CALL_STACK_MESSAGE5("CPlugins::AddNamesToMenu(0x%p, %u, %d, %d)", menu, firstID, maxCount, configurableOnly);
     UpdatePluginsOrder(Configuration.KeepPluginsSorted);
-    int count = min(Order.Count, maxCount);
+    int count = min((int)Order.size(), maxCount);
     MENU_ITEM_INFO mii;
     mii.Mask = MENU_MASK_TYPE | MENU_MASK_ID | MENU_MASK_STRING | MENU_MASK_IMAGEINDEX;
     mii.Type = MENU_TYPE_STRING;
@@ -1136,7 +1132,7 @@ BOOL CPlugins::AddItemsToChangeDrvMenu(CDrivesList* drvList, int& currentFSIndex
 
     UpdatePluginsOrder(Configuration.KeepPluginsSorted);
     int i;
-    for (i = 0; i < Order.Count; i++)
+    for (i = 0; i < (int)Order.size(); i++)
     {
         int orderIndex = Order[i].Index;
         CPluginData* p = Data[orderIndex];
@@ -1743,7 +1739,7 @@ void CPlugins::Save(HWND parent, HKEY regKey, HKEY regKeyConfig, HKEY regKeyOrde
         HKEY itemKey;
         char buf[30];
         int i;
-        for (i = 0; i < Order.Count; i++)
+        for (i = 0; i < (int)Order.size(); i++)
         {
             itoa(i + 1, buf, 10);
             if (CreateKey(regKeyOrder, buf, itemKey))

@@ -2781,7 +2781,7 @@ protected:
     TIndirectArray<CPluginData> Data;
     CRITICAL_SECTION DataCS; // critical section used only to synchronize data accessed by GetIndex() method
 
-    TDirectArray<CPluginOrder> Order; // order in which plugins are displayed
+    std::vector<CPluginOrder> Order; // order in which plugins are displayed
 
     BOOL DefaultConfiguration; // TRUE => ZIP+TAR+PAK; allows recoding of old archiver data
 
@@ -2804,7 +2804,7 @@ public:                     // helper variables for handling menu items coming f
     DWORD LoadInfoBase; // base for creating flag returned via CSalamanderPluginEntry::GetLoadInformation()
 
 public:
-    CPlugins() : Data(30, 10), Order(30, 10), PluginFSTimers(10, 50)
+    CPlugins() : Data(30, 10), PluginFSTimers(10, 50)
     {
         LastSUID = -1;
         RootMenuItemsCount = -1;
@@ -2831,11 +2831,7 @@ public:
         HANDLES(EnterCriticalSection(&DataCS));
         Data.DestroyMembers();
         HANDLES(LeaveCriticalSection(&DataCS));
-        // Order is TDirectArray<CPluginOrder> — uses memmove, won't call destructors.
-        // Explicitly destroy std::string members, then release raw memory.
-        for (int i = 0; i < Order.Count; i++)
-            Order[i].DLLName.~basic_string();
-        Order.DetachMembers();
+        Order.clear();
     }
 
     // loads the object from registry key 'regKey' or default values (if regKey==NULL) (ZIP + TAR + PAK)
