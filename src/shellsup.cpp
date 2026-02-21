@@ -2143,8 +2143,10 @@ MENU_TEMPLATE_ITEM PanelBkgndMenu[] =
 
                     if (GetMenuItemCount(h) > 0) // protection against completely stripped menu
                     {
-                        cmd = TrackPopupMenuEx(h, TPM_RETURNCMD | TPM_LEFTALIGN |
-                                               TPM_RIGHTBUTTON, pt.x, pt.y, panel->GetListBoxHWND(), NULL);
+                        CMenuPopup contextPopup;
+                        contextPopup.SetTemplateMenu(h);
+                        cmd = contextPopup.Track(MENU_TRACK_RETURNCMD | MENU_TRACK_RIGHTBUTTON,
+                                                 pt.x, pt.y, panel->GetListBoxHWND(), NULL);
                     }
                     else
                         cmd = 0;
