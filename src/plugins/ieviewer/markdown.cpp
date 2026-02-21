@@ -1,4 +1,4 @@
-﻿// SPDX-FileCopyrightText: 2023 Open Salamander Authors
+// SPDX-FileCopyrightText: 2023 Open Salamander Authors
 // SPDX-License-Identifier: GPL-2.0-or-later
 // CommentsTranslationProject: TRANSLATED
 
@@ -11,137 +11,146 @@
 #include "ieviewer.h"
 #include "dbg.h"
 
-// TODO: MD viewer doesn't display images, one solution is documented in:
-// https://blog.kowalczyk.info/article/g9ne/showing-html-from-memory-in-embedded-web-control-on-windows.html
-// https://github.com/sumatrapdfreader/sumatrapdf/blob/master/src/utils/HtmlWindow.cpp (BSD license)
+#include "markdown.h"
 
-FILE* OpenMarkdownCSS()
+static std::string LoadMarkdownCSS()
 {
-    CPathBuffer path; // Heap-allocated for long path support
-    if (GetModuleFileName(DLLInstance, path, path.Size()) == 0)
+    wchar_t pathBuf[MAX_PATH];
+    if (GetModuleFileNameW(DLLInstance, pathBuf, MAX_PATH) == 0)
     {
-        TRACE_E("GetModuleFileName() failed");
-        return NULL;
+        TRACE_E("GetModuleFileNameW() failed");
+        return {};
     }
-    char* name = strrchr(path.Get(), '\\');
-    if (name == NULL)
+    std::wstring path(pathBuf);
+    auto pos = path.rfind(L'\\');
+    if (pos == std::wstring::npos)
     {
-        TRACE_E("Extension not found");
-        return NULL;
+        TRACE_E("Backslash not found in module path");
+        return {};
     }
-    strcpy(name + 1, "css\\custom.css");
-    FILE* fp = fopen(path, "r");
-    if (fp == NULL)
+    std::wstring dir = path.substr(0, pos + 1);
+
+    // Try custom.css first, fall back to githubmd.css
+    std::wstring cssPath = dir + L"css\\custom.css";
+    FILE* fp = _wfopen(cssPath.c_str(), L"r");
+    if (fp == nullptr)
     {
-        TRACE_I(path << " not found, we will try githubmd.css instead");
-        strcpy(name + 1, "css\\githubmd.css");
-        fp = fopen(path, "r");
-        if (fp == NULL)
-        {
-            TRACE_I(path << " not found, we will display unstyled html");
-            return NULL;
-        }
+        cssPath = dir + L"css\\githubmd.css";
+        fp = _wfopen(cssPath.c_str(), L"r");
+        if (fp == nullptr)
+            return {};
     }
-    return fp;
+
+    std::string css;
+    char buffer[4096];
+    size_t bytes;
+    while ((bytes = fread(buffer, 1, sizeof(buffer), fp)) > 0)
+        css.append(buffer, bytes);
+    fclose(fp);
+    return css;
 }
 
-const char* extension_names[] = {
+static std::wstring GetDirectoryFromPath(const std::wstring& filePath)
+{
+    auto pos = filePath.rfind(L'\\');
+    if (pos == std::wstring::npos)
+        pos = filePath.rfind(L'/');
+    if (pos != std::wstring::npos)
+        return filePath.substr(0, pos + 1);
+    return L".\\";
+}
+
+// Convert a directory path to a file:// URL for the <base> tag.
+// Backslashes become forward slashes, and the URL is properly formatted.
+static std::string MakeBaseHref(const std::wstring& dir)
+{
+    // Convert wide to UTF-8
+    int len = WideCharToMultiByte(CP_UTF8, 0, dir.c_str(), (int)dir.size(), nullptr, 0, nullptr, nullptr);
+    std::string utf8(len, '\0');
+    WideCharToMultiByte(CP_UTF8, 0, dir.c_str(), (int)dir.size(), utf8.data(), len, nullptr, nullptr);
+
+    // Replace backslashes with forward slashes
+    for (char& c : utf8)
+    {
+        if (c == '\\')
+            c = '/';
+    }
+
+    return "file:///" + utf8;
+}
+
+static const char* extension_names[] = {
     "autolink",
     "strikethrough",
     "table",
     "tagfilter",
     "tasklist",
-    NULL,
+    nullptr,
 };
 
-IStream* ConvertMarkdownToHTML(const char* name)
+std::string ConvertMarkdownToHTML(const std::wstring& filePath)
 {
     cmark_gfm_core_extensions_ensure_registered();
 
-    int options = CMARK_OPT_DEFAULT; // Default options
+    int options = CMARK_OPT_DEFAULT;
     cmark_parser* parser = cmark_parser_new(options);
 
     for (const char** it = extension_names; *it; ++it)
     {
-        const char* extension_name = *it;
-        cmark_syntax_extension* syntax_extension = cmark_find_syntax_extension(extension_name);
+        cmark_syntax_extension* syntax_extension = cmark_find_syntax_extension(*it);
         if (!syntax_extension)
         {
-            TRACE_E("Invalid syntax extension: " << extension_name);
+            TRACE_E("Invalid syntax extension: " << *it);
+            cmark_parser_free(parser);
             cmark_release_plugins();
-            return NULL;
+            return {};
         }
         cmark_parser_attach_syntax_extension(parser, syntax_extension);
     }
 
-    FILE* fp = fopen(name, "r");
-    if (fp == NULL)
+    FILE* fp = _wfopen(filePath.c_str(), L"r");
+    if (fp == nullptr)
     {
-        TRACE_E("fopen failed");
+        TRACE_E("_wfopen failed");
+        cmark_parser_free(parser);
         cmark_release_plugins();
-        return NULL;
+        return {};
     }
 
-    size_t bytes;
     char buffer[10000];
+    size_t bytes;
     while ((bytes = fread(buffer, 1, sizeof(buffer), fp)) > 0)
     {
         cmark_parser_feed(parser, buffer, bytes);
         if (bytes < sizeof(buffer))
-        {
             break;
-        }
     }
     fclose(fp);
 
     cmark_node* doc = cmark_parser_finish(parser);
-
-    char* html = cmark_render_html(doc, options, NULL);
+    char* html = cmark_render_html(doc, options, nullptr);
 
     cmark_node_free(doc);
     cmark_parser_free(parser);
 
-    IStream* oStream = NULL;
-    DWORD written;
-    HRESULT hr = CreateStreamOnHGlobal(NULL, TRUE, &oStream);
-    if (FAILED(hr))
-    {
-        TRACE_E("CreateStreamOnHGlobal() failed");
-        free(html);
-        cmark_release_plugins();
-        return NULL;
-    }
+    // Build the complete HTML document
+    std::string css = LoadMarkdownCSS();
+    std::wstring dir = GetDirectoryFromPath(filePath);
+    std::string baseHref = MakeBaseHref(dir);
 
-    char buff[10 * 1024];
-    //sprintf_s(buff, "<!DOCTYPE html><html lang=\"cs\" dir=\"ltr\"><head><meta charset=\"utf-8\"><title>zzzz</title><style>\n");
-    sprintf_s(buff, "<!DOCTYPE html><html lang=\"cs\" dir=\"ltr\"><head><meta charset=\"utf-8\"><style>\n");
-    oStream->Write(buff, (ULONG)strlen(buff), &written);
-
-    // if we find CSS, inline it
-    FILE* fpCSS = OpenMarkdownCSS();
-    if (fpCSS != NULL)
-    {
-        size_t bytes;
-        while ((bytes = fread(buff, 1, sizeof(buff), fpCSS)) > 0)
-            oStream->Write(buff, (ULONG)bytes, &written);
-        fclose(fpCSS);
-        sprintf_s(buff, "\n");
-        oStream->Write(buff, (ULONG)strlen(buff), &written);
-    }
-
-    sprintf_s(buff, "</style></head><body><article class=\"markdown-body\">\n");
-    oStream->Write(buff, (ULONG)strlen(buff), &written);
-    oStream->Write(html, (ULONG)strlen(html), &written);
-    sprintf_s(buff, "</article></body></html>\n");
-    oStream->Write(buff, (ULONG)strlen(buff), &written);
-
-    // set the pointer to the start of the stream; IE will read from it
-    LARGE_INTEGER seek;
-    seek.QuadPart = 0;
-    oStream->Seek(seek, STREAM_SEEK_SET, NULL);
+    std::string result;
+    result.reserve(css.size() + strlen(html) + 512);
+    result += "<!DOCTYPE html><html lang=\"en\" dir=\"ltr\"><head><meta charset=\"utf-8\">\n";
+    result += "<base href=\"";
+    result += baseHref;
+    result += "\">\n<style>\n";
+    result += css;
+    result += "\n</style></head><body><article class=\"markdown-body\">\n";
+    result += html;
+    result += "</article></body></html>\n";
 
     free(html);
     cmark_release_plugins();
 
-    return oStream;
+    return result;
 }

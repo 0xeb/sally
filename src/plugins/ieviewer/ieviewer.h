@@ -1,8 +1,15 @@
-﻿// SPDX-FileCopyrightText: 2023 Open Salamander Authors
+// SPDX-FileCopyrightText: 2023 Open Salamander Authors
 // SPDX-License-Identifier: GPL-2.0-or-later
 // CommentsTranslationProject: TRANSLATED
 
 #pragma once
+
+#include <string>
+#include <wrl.h>
+#include <WebView2.h>
+
+using Microsoft::WRL::ComPtr;
+using Microsoft::WRL::Callback;
 
 BOOL InitViewer();
 void ReleaseViewer();
@@ -56,373 +63,75 @@ public:
 
 //***********************************************************************************
 //
-// CImpIOleClientSite
+// CWebView2Host
+//
+// Wraps a WebView2 browser control in a parent window.
 //
 
-class CSite;
-class CIEWindow;
-
-class CImpIOleClientSite : public IOleClientSite
+class CWebView2Host
 {
-protected:
-    ULONG m_cRef;
-    CSite* m_pSite;
-    LPUNKNOWN m_pUnkOuter;
+    ComPtr<ICoreWebView2Environment> m_environment;
+    ComPtr<ICoreWebView2Controller> m_controller;
+    ComPtr<ICoreWebView2> m_webview;
+    HWND m_hwndParent = nullptr;
+
+    // For Ctrl+R refresh of markdown files
+    std::wstring m_markdownPath;
+    std::string m_lastHtml;
 
 public:
-    CImpIOleClientSite(CSite* pSite, IUnknown* pUnkOuter);
-    ~CImpIOleClientSite();
+    // Synchronously creates WebView2 (pumps messages until ready).
+    // Returns true on success.
+    bool Create(HWND hwndParent);
 
-    // IUnknown methods
-    //
-    STDMETHODIMP QueryInterface(REFIID riid, void** ppvObj);
-    STDMETHODIMP_(ULONG)
-    AddRef();
-    STDMETHODIMP_(ULONG)
-    Release();
-
-    // IOleClientSite methods
-    //
-    STDMETHODIMP SaveObject();
-    STDMETHODIMP GetMoniker(DWORD dwAssign, DWORD dwWhichMoniker, LPMONIKER FAR* ppmk);
-    STDMETHODIMP GetContainer(LPOLECONTAINER* ppContainer);
-    STDMETHODIMP ShowObject();
-    STDMETHODIMP OnShowWindow(BOOL fShow);
-    STDMETHODIMP RequestNewObjectLayout();
-};
-
-//***********************************************************************************
-//
-// CImpIOleInPlaceSite
-//
-
-class CImpIOleInPlaceSite : public IOleInPlaceSite
-{
-protected:
-    ULONG m_cRef;
-    CSite* m_pSite;
-    LPUNKNOWN m_pUnkOuter;
-
-public:
-    CImpIOleInPlaceSite(CSite* pSite, IUnknown* pUnkOuter);
-    ~CImpIOleInPlaceSite();
-
-    // IUnknown methods
-    //
-    STDMETHODIMP QueryInterface(REFIID riid, void** ppvObj);
-    STDMETHODIMP_(ULONG)
-    AddRef();
-    STDMETHODIMP_(ULONG)
-    Release();
-
-    // IOleWindow methods
-    //
-    STDMETHODIMP GetWindow(HWND* lphwnd);
-    STDMETHODIMP ContextSensitiveHelp(BOOL fEnterMode);
-
-    // IOleInPlaceSite methods
-    //
-    STDMETHODIMP CanInPlaceActivate();
-    STDMETHODIMP OnInPlaceActivate();
-    STDMETHODIMP OnUIActivate();
-    STDMETHODIMP GetWindowContext(LPOLEINPLACEFRAME* lplpFrame,
-                                  LPOLEINPLACEUIWINDOW* lplpDoc,
-                                  LPRECT lprcPosRect,
-                                  LPRECT lprcClipRect,
-                                  LPOLEINPLACEFRAMEINFO lpFrameInfo);
-    STDMETHODIMP Scroll(SIZE scrollExtent);
-    STDMETHODIMP OnUIDeactivate(BOOL fUndoable);
-    STDMETHODIMP OnInPlaceDeactivate();
-    STDMETHODIMP DiscardUndoState();
-    STDMETHODIMP DeactivateAndUndo();
-    STDMETHODIMP OnPosRectChange(LPCRECT lprcPosRect);
-};
-
-//***********************************************************************************
-//
-// CImpIOleInPlaceFrame
-//
-
-class CImpIOleInPlaceFrame : public IOleInPlaceFrame
-{
-protected:
-    ULONG m_cRef;
-    CSite* m_pSite;
-    LPUNKNOWN m_pUnkOuter;
-
-public:
-    CImpIOleInPlaceFrame(CSite* pSite, IUnknown* pUnkOuter);
-    ~CImpIOleInPlaceFrame();
-
-    // IUnknown methods
-    //
-    STDMETHODIMP QueryInterface(REFIID riid, LPVOID* ppvObj);
-    STDMETHODIMP_(ULONG)
-    AddRef();
-    STDMETHODIMP_(ULONG)
-    Release();
-
-    // IOleWindow methods
-    //
-    STDMETHODIMP GetWindow(HWND* lphwnd);
-    STDMETHODIMP ContextSensitiveHelp(BOOL fEnterMode);
-
-    // IOleInPlaceUIWindow methods
-    //
-    STDMETHODIMP GetBorder(LPRECT lprectBorder);
-    STDMETHODIMP RequestBorderSpace(LPCBORDERWIDTHS lpborderwidths);
-    STDMETHODIMP SetBorderSpace(LPCBORDERWIDTHS lpborderwidths);
-    STDMETHODIMP SetActiveObject(LPOLEINPLACEACTIVEOBJECT lpActiveObject, LPCOLESTR lpszObjName);
-
-    // IOleInPlaceFrame methods
-    //
-    STDMETHODIMP InsertMenus(HMENU hmenuShared, LPOLEMENUGROUPWIDTHS lpMenuWidths);
-    STDMETHODIMP SetMenu(HMENU hmenuShared, HOLEMENU holemenu, HWND hwndActiveObject);
-    STDMETHODIMP RemoveMenus(HMENU hmenuShared);
-    STDMETHODIMP SetStatusText(LPCOLESTR lpszStatusText);
-    STDMETHODIMP EnableModeless(BOOL fEnable);
-    STDMETHODIMP TranslateAccelerator(LPMSG lpmsg, WORD wID);
-};
-
-//***********************************************************************************
-//
-// CImpIOleControlSite
-//
-
-class CImpIOleControlSite : public IOleControlSite
-{
-protected:
-    ULONG m_cRef;
-    CSite* m_pSite;
-    LPUNKNOWN m_pUnkOuter;
-
-public:
-    CImpIOleControlSite(CSite* pSite, IUnknown* pUnkOuter);
-    ~CImpIOleControlSite();
-
-    // IUnknown methods
-    //
-    STDMETHODIMP QueryInterface(REFIID riid, LPVOID* ppvObj);
-    STDMETHODIMP_(ULONG)
-    AddRef();
-    STDMETHODIMP_(ULONG)
-    Release();
-
-    // CImpIOleControlSite methods
-    //
-    STDMETHODIMP OnControlInfoChanged();
-    STDMETHODIMP LockInPlaceActive(BOOL fLock);
-    STDMETHODIMP GetExtendedControl(LPDISPATCH* ppDisp);
-    STDMETHODIMP TransformCoords(POINTL* lpptlHimetric, POINTF* lpptfContainer,
-                                 DWORD flags);
-    STDMETHODIMP TranslateAccelerator(LPMSG lpMsg, DWORD grfModifiers);
-    STDMETHODIMP OnFocus(BOOL fGotFocus);
-    STDMETHODIMP ShowPropertyFrame();
-};
-
-//***********************************************************************************
-//
-// CImpIAdviseSink
-//
-/*
-class CImpIAdviseSink: public IAdviseSink
-{
-  protected:
-    ULONG               m_cRef;
-    CSite              *m_pSite;
-    LPUNKNOWN           m_pUnkOuter;
-
-  public:
-    CImpIAdviseSink(CSite *pSite, IUnknown *pUnkOuter);
-    ~CImpIAdviseSink();
-
-    // IUnknown methods
-    //
-    STDMETHODIMP QueryInterface(REFIID riid, LPVOID *ppvObj);
-    STDMETHODIMP_(ULONG) AddRef();
-    STDMETHODIMP_(ULONG) Release();
-
-    // IAdviseSink methods
-    //
-    STDMETHODIMP_(void) OnDataChange (FORMATETC FAR* pFormatetc, STGMEDIUM FAR* pStgmed);
-    STDMETHODIMP_(void) OnViewChange (DWORD dwAspect, LONG lindex);
-    STDMETHODIMP_(void) OnRename (LPMONIKER pmk);
-    STDMETHODIMP_(void) OnSave ();
-    STDMETHODIMP_(void) OnClose ();
-};
-*/
-//***********************************************************************************
-//
-// CImpIDispatch
-//
-
-class CImpIDispatch : public IDispatch
-{
-protected:
-    ULONG m_cRef;
-    CSite* m_pSite;
-    LPUNKNOWN m_pUnkOuter;
-
-public:
-    CImpIDispatch(CSite* pSite, IUnknown* pUnkOuter);
-    ~CImpIDispatch();
-
-    // IUnknown methods
-    //
-    STDMETHODIMP QueryInterface(REFIID riid, LPVOID* ppvObj);
-    STDMETHODIMP_(ULONG)
-    AddRef();
-    STDMETHODIMP_(ULONG)
-    Release();
-
-    // IDispatch methods
-    //
-    STDMETHODIMP GetTypeInfoCount(unsigned int* pctinfo);
-    STDMETHODIMP GetTypeInfo(unsigned int itinfo, LCID lcid, ITypeInfo** pptinfo);
-    STDMETHODIMP GetIDsOfNames(REFIID riid,
-                               OLECHAR** rgszNames,
-                               unsigned int cNames,
-                               LCID lcid,
-                               DISPID* rgdispid);
-    STDMETHODIMP Invoke(DISPID dispID,
-                        REFIID riid,
-                        LCID lcid,
-                        unsigned short wFlags,
-                        DISPPARAMS* pDispParams,
-                        VARIANT* pVarResult,
-                        EXCEPINFO* pExcepInfo,
-                        unsigned int* puArgErr);
-
-protected:
-    BOOL CanonizeURL(char* psz);
-};
-
-//***********************************************************************************
-//
-// The CSite class, a COM object with the interfaces
-//   IOleClientSite,
-//   IOleInPlaceSite
-//   IOleInPlaceFrame
-//
-
-class CSite : public IUnknown
-{
-    friend CImpIOleClientSite;
-    friend CImpIOleInPlaceSite;
-    friend CImpIOleInPlaceFrame;
-    friend CImpIOleControlSite;
-    //  friend CImpIAdviseSink;
-    friend CImpIDispatch;
-    friend CIEWindow;
-    friend void NavigateAux(CSite* m_pSite, const char* fileName, IStream* contentStream);
-
-protected:
-    ULONG m_cRef;
-    HWND m_hParentWnd; //Parent window
-    RECT m_rect;       //Object position
-
-    BOOL m_fInitialized; //Something here?
-    BOOL m_fCreated;
-
-    BOOL m_fCanClose; // protection against crashes with XML files
-    BOOL m_fOpening;  // do not allow closing during loading
-
-    DWORD m_dwCookie; //connection point identifier for m_pConnectionPoint
-
-    CPathBuffer MarkdownFilename; // Heap-allocated for long path support
-
-    //Object interfaces
-    IUnknown* m_pIUnknown;
-    IWebBrowser* m_pIWebBrowser;
-    IWebBrowser2* m_pIWebBrowser2; // if unsupported, it will be equal to NULL
-    IOleObject* m_pIOleObject;
-    IOleInPlaceObject* m_pIOleInPlaceObject;
-    IOleInPlaceActiveObject* m_pIOleInPlaceActiveObject;
-    IViewObject* m_pIViewObject;
-    IConnectionPoint* m_pConnectionPoint;
-
-    //Our interfaces
-    CImpIOleClientSite* m_pImpIOleClientSite;
-    CImpIOleInPlaceSite* m_pImpIOleInPlaceSite;
-    CImpIOleInPlaceFrame* m_pImpIOleInPlaceFrame;
-    CImpIOleControlSite* m_pImpIOleControlSite;
-    //    CImpIAdviseSink         *m_pImpIAdviseSink;
-    CImpIDispatch* m_pImpIDispatch;
-
-    //Our methods
-protected:
-    BOOL ObjectInitialize();
-
-    void ConnectEvents();
-    void DisconnectEvents();
-
-public:
-    CSite();
-    ~CSite();
-
-    // IUnknown methods for delegation
-    //
-    STDMETHODIMP QueryInterface(REFIID riid, void** ppvObj);
-    STDMETHODIMP_(ULONG)
-    AddRef();
-    STDMETHODIMP_(ULONG)
-    Release();
-
-    BOOL Create(HWND hParentWnd);
+    // Releases all COM objects and closes the controller.
     void Close();
-    HRESULT DoVerb(LONG iVerb);
-};
 
-//***********************************************************************************
-//
-// CIEWindow
-//
-// wraps Internet Explorer
-//
+    // Navigate to a file:// URL.
+    void Navigate(const std::wstring& url);
 
-class CIEWindow
-{
-public:
-    HWND HWindow;
+    // Navigate to in-memory HTML content (for Markdown).
+    void NavigateToString(const std::string& htmlContent);
 
-protected:
-    CSite m_Site;
+    // Resize the WebView2 control to fill the parent.
+    void Resize(int width, int height);
 
-public:
-    CIEWindow() { HWindow = NULL; }
+    // Store markdown path for Ctrl+R refresh.
+    void SetMarkdownPath(const std::wstring& path) { m_markdownPath = path; }
+    const std::wstring& GetMarkdownPath() const { return m_markdownPath; }
 
-    // create and connect to IE
-    BOOL CreateSite(HWND hParent);
-    // perform IE cleanup !! must be called before destroying the window
-    void CloseSite();
-    // jump to the requested URL
-    void Navigate(LPCTSTR lpszURL, IStream* contentStream);
-    // unfortunately we have to call this from the message loop
-    HRESULT TranslateAccelerator(LPMSG lpmsg);
-    BOOL CanClose();
+    // Store the last HTML for refresh.
+    void SetLastHtml(const std::string& html) { m_lastHtml = html; }
+    const std::string& GetLastHtml() const { return m_lastHtml; }
+
+    // Get the underlying webview for event hookup.
+    ICoreWebView2* GetWebView() const { return m_webview.Get(); }
+    ICoreWebView2Controller* GetController() const { return m_controller.Get(); }
+
+    bool IsReady() const { return m_webview != nullptr; }
 };
 
 //
 // ****************************************************************************
-// CIEMainWindow
+// CViewerMainWindow
 //
 
-struct CIEMainWindowQueueItem
+struct CViewerWindowQueueItem
 {
     HWND HWindow;
-    CIEMainWindowQueueItem* Next;
+    CViewerWindowQueueItem* Next;
 
-    CIEMainWindowQueueItem(HWND hWindow)
+    CViewerWindowQueueItem(HWND hWindow)
     {
         HWindow = hWindow;
         Next = NULL;
     }
 };
 
-class CIEMainWindowQueue
+class CViewerWindowQueue
 {
 protected:
-    CIEMainWindowQueueItem* Head;
+    CViewerWindowQueueItem* Head;
 
     struct CCS // access from multiple threads -> synchronization required
     {
@@ -436,37 +145,34 @@ protected:
     } CS;
 
 public:
-    CIEMainWindowQueue() { Head = NULL; }
-    ~CIEMainWindowQueue();
+    CViewerWindowQueue() { Head = NULL; }
+    ~CViewerWindowQueue();
 
-    BOOL Add(CIEMainWindowQueueItem* item); // add an item to the queue, returns success
+    BOOL Add(CViewerWindowQueueItem* item); // add an item to the queue, returns success
     void Remove(HWND hWindow);              // remove an item from the queue
     BOOL Empty();                           // returns TRUE if the queue is empty
 
-    // broadcast WM_CLOSE, then wait for an empty queue (max time according to 'force', either 'forceWaitTime'
-    // or 'waitTime'); returns TRUE if the queue is empty (all windows closed)
-    // or 'force' is TRUE; time INFINITE = unlimited wait
-    // Note: with 'force' TRUE it always returns TRUE, no point in waiting, so forceWaitTime = 0
+    // broadcast WM_CLOSE, then wait for an empty queue
     BOOL CloseAllWindows(BOOL force, int waitTime = 1000, int forceWaitTime = 0);
 };
 
-class CIEMainWindow
+class CViewerMainWindow
 {
 public:
-    HWND HWindow;                                // viewer window handle
-    HANDLE Lock;                                 // 'lock' object or NULL (becomes signaled after we close the file)
-    static CIEMainWindowQueue ViewerWindowQueue; // list of all viewer windows
-    static CThreadQueue ThreadQueue;             // list of all window threads
+    HWND HWindow;                                    // viewer window handle
+    HANDLE Lock;                                     // 'lock' object or NULL
+    static CViewerWindowQueue ViewerWindowQueue;     // list of all viewer windows
+    static CThreadQueue ThreadQueue;                 // list of all window threads
 
-    CIEWindow m_IEViewer;
+    CWebView2Host m_viewer;
 
 public:
-    CIEMainWindow();
+    CViewerMainWindow();
 
     HANDLE GetLock();
 
-    static LRESULT CALLBACK CIEMainWindowProc(HWND hwnd, UINT uMsg,
-                                              WPARAM wParam, LPARAM lParam);
+    static LRESULT CALLBACK ViewerMainWindowProc(HWND hwnd, UINT uMsg,
+                                                 WPARAM wParam, LPARAM lParam);
 
 protected:
     virtual LRESULT WindowProc(UINT uMsg, WPARAM wParam, LPARAM lParam);

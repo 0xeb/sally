@@ -475,3 +475,28 @@ add_test(NAME gtest_worker_wide COMMAND gtest_worker_wide)
 set_target_properties(gtest_worker_wide PROPERTIES
     RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/tests"
 )
+
+# WebView2 integration tests (ieviewer plugin: path utilities, markdown, WebView2 runtime)
+add_executable(gtest_webview2
+    gtest_webview2.cpp
+)
+
+target_include_directories(gtest_webview2 PRIVATE
+    "${WEBVIEW2_INCLUDE}"
+)
+
+target_compile_definitions(gtest_webview2 PRIVATE
+    WIN32 _WINDOWS _CRT_SECURE_NO_WARNINGS
+)
+
+target_link_libraries(gtest_webview2
+    GTest::gtest GTest::gtest_main
+    "${WEBVIEW2_LIB}"
+    ole32 shell32
+)
+
+add_test(NAME gtest_webview2 COMMAND gtest_webview2)
+
+set_target_properties(gtest_webview2 PROPERTIES
+    RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/tests"
+)
