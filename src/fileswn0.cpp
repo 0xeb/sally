@@ -483,14 +483,11 @@ void CFilesWindow::SafeHandleMenuNewMsg2(UINT uMsg, WPARAM wParam, LPARAM lParam
     {
         IContextMenu3* contextMenu3 = NULL;
         *plResult = 0;
-        if (uMsg == WM_MENUCHAR)
+        if (SUCCEEDED(ContextSubmenuNew->GetMenu2()->QueryInterface(IID_IContextMenu3, (void**)&contextMenu3)))
         {
-            if (SUCCEEDED(ContextSubmenuNew->GetMenu2()->QueryInterface(IID_IContextMenu3, (void**)&contextMenu3)))
-            {
-                contextMenu3->HandleMenuMsg2(uMsg, wParam, lParam, plResult);
-                contextMenu3->Release();
-                return;
-            }
+            contextMenu3->HandleMenuMsg2(uMsg, wParam, lParam, plResult);
+            contextMenu3->Release();
+            return;
         }
         ContextSubmenuNew->GetMenu2()->HandleMenuMsg(uMsg, wParam, lParam);
     }

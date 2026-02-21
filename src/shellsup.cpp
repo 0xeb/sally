@@ -2001,7 +2001,7 @@ void ShellAction(CFilesWindow* panel, CShellAction action, BOOL useSelection,
                         ShellActionAux5(flags, panel, h);
                     RemoveUselessSeparatorsFromMenu(h);
 
-                    char cmdName[2000]; // intentionally 2000 instead of 200, shell-extensions sometimes write double (reasoning: unicode = 2 * "character count"), etc.
+                    char cmdName[2000] = {0}; // intentionally 2000 instead of 200, shell-extensions sometimes write double (reasoning: unicode = 2 * "character count"), etc.
                     if (onlyPanelMenu)
                     {
                         if (panel->ContextSubmenuNew->MenuIsAssigned())
@@ -2143,13 +2143,8 @@ MENU_TEMPLATE_ITEM PanelBkgndMenu[] =
 
                     if (GetMenuItemCount(h) > 0) // protection against completely stripped menu
                     {
-                        CMenuPopup contextPopup;
-                        contextPopup.SetTemplateMenu(h);
-                        cmd = contextPopup.Track(MENU_TRACK_RETURNCMD | MENU_TRACK_RIGHTBUTTON,
-                                                 pt.x, pt.y, panel->GetListBoxHWND(), NULL);
-                        //            for testing only -- show menu via Windows API
-                        //            cmd = TrackPopupMenuEx(h, TPM_RETURNCMD | TPM_LEFTALIGN |
-                        //                                   TPM_LEFTBUTTON, pt.x, pt.y, panel->GetListBoxHWND(), NULL);
+                        cmd = TrackPopupMenuEx(h, TPM_RETURNCMD | TPM_LEFTALIGN |
+                                               TPM_RIGHTBUTTON, pt.x, pt.y, panel->GetListBoxHWND(), NULL);
                     }
                     else
                         cmd = 0;
