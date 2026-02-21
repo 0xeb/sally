@@ -315,7 +315,11 @@ void SalmonSetSLG(const char* slgName)
     {
         if (!SalmonNotRunningReported && HLanguage != NULL)
         {
+#ifdef _DEBUG
+            TRACE_E("Salmon is not running (debug build, suppressing dialog)");
+#else
             MessageBox(NULL, LoadStr(IDS_SALMON_NOT_RUNNING), SALAMANDER_TEXT_VERSION, MB_OK | MB_ICONERROR);
+#endif
             SalmonNotRunningReported = TRUE;
         }
     }
@@ -336,7 +340,11 @@ void SalmonCheckBugs()
     {
         if (!SalmonNotRunningReported && HLanguage != NULL)
         {
+#ifdef _DEBUG
+            TRACE_E("Salmon is not running (debug build, suppressing dialog)");
+#else
             MessageBox(NULL, LoadStr(IDS_SALMON_NOT_RUNNING), SALAMANDER_TEXT_VERSION, MB_OK | MB_ICONERROR);
+#endif
             SalmonNotRunningReported = TRUE;
         }
     }
