@@ -624,7 +624,7 @@ sal_add_plugin(NAME zip
 )
 
 # -----------------------------------------------------------------------------
-# ieviewer - Internet Explorer-based HTML/Markdown viewer
+# ieviewer - WebView2-based HTML/Markdown viewer
 # -----------------------------------------------------------------------------
 sal_add_plugin(NAME ieviewer
   SOURCES
@@ -679,8 +679,9 @@ sal_add_plugin(NAME ieviewer
     "${SAL_PLUGINS}/ieviewer/cmark-gfm/extensions"
     "${SAL_PLUGINS}/ieviewer/cmark-gfm/build/src"
     "${SAL_PLUGINS}/ieviewer/cmark-gfm/build/extensions"
+    "${WEBVIEW2_INCLUDE}"
   DEFINES CMARK_GFM_STATIC_DEFINE CMARK_GFM_EXTENSIONS_STATIC_DEFINE
-  LIBS comsuppw
+  LIBS "${WEBVIEW2_LIB}"
   NO_SHARED
 )
 

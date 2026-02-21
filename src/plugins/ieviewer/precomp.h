@@ -1,4 +1,4 @@
-﻿// SPDX-FileCopyrightText: 2023 Open Salamander Authors
+// SPDX-FileCopyrightText: 2023 Open Salamander Authors
 // SPDX-License-Identifier: GPL-2.0-or-later
 // CommentsTranslationProject: TRANSLATED
 
@@ -9,15 +9,16 @@
 #include <windows.h>
 #include <commdlg.h>
 #include <crtdbg.h>
-#include <ostream>
-#include <olectl.h>
 #include <commctrl.h>
+#include <objbase.h>
+#include <process.h>
 #include <limits.h>
 #include <stdio.h>
-#include <exdisp.h>
-#include <process.h>
-#include <objbase.h>
-#include <exdispid.h> // IExplorer Dispatch Events
+#include <ostream>
+
+#include <string>
+#include <wrl.h>
+#include <WebView2.h>
 
 #if defined(_DEBUG) && defined(_MSC_VER) // without passing file+line to 'new' operator, list of memory leaks shows only 'crtdbg.h(552)'
 #define new new (_NORMAL_BLOCK, __FILE__, __LINE__)

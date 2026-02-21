@@ -1,4 +1,4 @@
-﻿//
+//
 // lang.rc2 - resources Microsoft Visual C++ does not edit directly
 //
 
@@ -14,9 +14,9 @@
 
 STRINGTABLE
 {
- IDS_PLUGIN_DESCRIPTION, "Lightweight HTML and XML viewer based on Internet Explorer."
+ IDS_PLUGIN_DESCRIPTION, "Lightweight HTML, XML, and Markdown viewer based on Microsoft Edge WebView2."
  IDS_ABOUT, "About Plugin"
- IDS_PLUGINNAME, "Internet Explorer Viewer"
- IDS_UNABLETOOPENIE, "Unable to open Internet Explorer Viewer.\nPlease report this problem to support@altap.cz."
+ IDS_PLUGINNAME, "Web Viewer"
+ IDS_UNABLETOOPENIE, "Unable to open Web Viewer.\nPlease ensure the Microsoft Edge WebView2 Runtime is installed."
  IDS_ERRORTITLE, "Error"
 }

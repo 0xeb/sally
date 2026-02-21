@@ -54,6 +54,9 @@ set(CMAKE_C_STANDARD 11)
 # Load common settings
 include(${CMAKE_CURRENT_SOURCE_DIR}/cmake/sal_common.cmake)
 
+# Restore NuGet packages (WebView2 SDK, etc.)
+include(${CMAKE_CURRENT_SOURCE_DIR}/cmake/sal_nuget.cmake)
+
 # ==============================================================================
 # Main Executable: salamander
 # ==============================================================================

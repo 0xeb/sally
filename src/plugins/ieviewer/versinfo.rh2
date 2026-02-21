@@ -1,4 +1,4 @@
-﻿// WARNING: cannot be replaced by "#pragma once" because it is included from .rc file and it seems resource compiler does not support "#pragma once"
+// WARNING: cannot be replaced by "#pragma once" because it is included from .rc file and it seems resource compiler does not support "#pragma once"
 #ifndef __IEVIEWER_VERSINFO_RH2
 #define __IEVIEWER_VERSINFO_RH2
 
@@ -9,16 +9,16 @@
 // defines for plugin.SPL and plugin.SLG VERSIONINFO
 // look at shared\versinfo.rc
 
-#define VERSINFO_MAJOR       1
-#define VERSINFO_MINORA      1
-#define VERSINFO_MINORB      2
+#define VERSINFO_MAJOR       2
+#define VERSINFO_MINORA      0
+#define VERSINFO_MINORB      0
 
 #include "spl_vers.h" // pull version numbers + build
 
 #define VERSINFO_COPYRIGHT   "Copyright © 1999-2023 Open Salamander Authors"
 #define VERSINFO_COMPANY     "Open Salamander"
 
-#define VERSINFO_DESCRIPTION "Internet Explorer Viewer for Open Salamander"
+#define VERSINFO_DESCRIPTION "Web Viewer for Open Salamander"
 
 #ifdef _LANG
 #define VERSINFO_INTERNAL    "ENGLISH"
