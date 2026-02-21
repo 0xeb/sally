@@ -63,6 +63,8 @@ public:
 
     int GetSelectedIndex(); // returns -1 if no item is selected; otherwise the zero-based index of the item
 
+    void CopyLineToClipboard(HWND hOwner);
+
     void SwitchDeltaMode();
     BOOL GetDeltaMode() { return DeltaMode; }
 

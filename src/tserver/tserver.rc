@@ -67,6 +67,7 @@ BEGIN
         MENUITEM SEPARATOR
         MENUITEM "&Show line in source code",   CM_SHOWINMSVC
         MENUITEM "Show line &details...\tTab",  CM_DETAILS
+        MENUITEM "&Copy Line\tCtrl+C",         CM_COPY
         MENUITEM SEPARATOR
         MENUITEM "Show time &differences\tSpace", CM_DIFFTIME
         MENUITEM SEPARATOR
@@ -92,6 +93,17 @@ BEGIN
         MENUITEM SEPARATOR
         MENUITEM "&Exit",                       CM_EXIT
     END
+END
+
+
+/////////////////////////////////////////////////////////////////////////////
+//
+// Accelerator
+//
+
+IDA_MAIN ACCELERATORS
+BEGIN
+    "C", CM_COPY, VIRTKEY, CONTROL
 END
 
 

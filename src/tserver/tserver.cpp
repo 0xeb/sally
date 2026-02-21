@@ -1068,6 +1068,8 @@ wWinMain(HINSTANCE hInstance, HINSTANCE /*hPrevInstance*/, LPWSTR /*cmdLine*/, i
 
                             if (InitializeServer(MainWindow->HWindow))
                             {
+                                HACCEL hAccel = LoadAccelerators(hInstance, MAKEINTRESOURCE(IDA_MAIN));
+
                                 // Application loop
                                 MSG msg;
                                 while (GetMessage(&msg, NULL, 0, 0))
@@ -1075,8 +1077,11 @@ wWinMain(HINSTANCE hInstance, HINSTANCE /*hPrevInstance*/, LPWSTR /*cmdLine*/, i
                                     CWindowsObject* wnd = WindowsManager.GetWindowPtr(GetActiveWindow());
                                     if (wnd == NULL || !wnd->Is(otDialog) || !IsDialogMessage(wnd->HWindow, &msg))
                                     {
-                                        TranslateMessage(&msg);
-                                        DispatchMessage(&msg);
+                                        if (!TranslateAccelerator(MainWindow->HWindow, hAccel, &msg))
+                                        {
+                                            TranslateMessage(&msg);
+                                            DispatchMessage(&msg);
+                                        }
                                     }
                                 }
 

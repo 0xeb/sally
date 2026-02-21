@@ -9,10 +9,12 @@
 #define CM_SHOWINMSVC                   104
 #define CM_DETAILS                      105
 #define CM_DIFFTIME                     106
+#define CM_COPY                         107
 #define CM_CONFIGURATION                110
 #define CM_ABOUT                        120
 #define IDM_ICON_POPUP                  150
-#define IDC_OD_LISTBOX                  160
+#define IDA_MAIN                        160
+#define IDC_OD_LISTBOX                  161
 #define IDD_ABOUT                       500
 #define IDC_ABOUT_TEXT1                 501
 #define IDD_PSP_GENERAL                 510

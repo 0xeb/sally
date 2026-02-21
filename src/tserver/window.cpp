@@ -619,6 +619,12 @@ CMainWindow::WindowProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
             return 0;
         }
 
+        case CM_COPY:
+        {
+            TabList->CopyLineToClipboard(HWindow);
+            return 0;
+        }
+
         case CM_DETAILS:
         {
             ShowMessageDetails();

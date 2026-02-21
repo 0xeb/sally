@@ -6,6 +6,7 @@
 
 #include <crtdbg.h>
 #include <ostream>
+#include <string>
 #include <stdio.h>
 #include <commctrl.h>
 #include <limits.h>
@@ -488,6 +489,47 @@ int CTabList::GetSelectedIndex()
 {
     int index = ListView_GetNextItem(HListView, -1, LVNI_SELECTED);
     return index;
+}
+
+void CTabList::CopyLineToClipboard(HWND hOwner)
+{
+    int sel = GetSelectedIndex();
+    if (sel == -1)
+        return;
+
+    // Build tab-separated text from visible columns
+    std::wstring line;
+    int visibleCount = 0;
+    for (int i = 0; i < HEADER_ITEMS; i++)
+    {
+        if (*(&(ConfigData.ViewColumnVisible_Type) + i))
+            visibleCount++;
+    }
+
+    for (int col = 0; col < visibleCount; col++)
+    {
+        WCHAR buff[1000];
+        buff[0] = 0;
+        GetText(sel, ColumnIndex[col], buff, _countof(buff));
+        if (col > 0)
+            line += L'\t';
+        line += buff;
+    }
+
+    if (OpenClipboard(hOwner))
+    {
+        EmptyClipboard();
+        SIZE_T cb = (line.size() + 1) * sizeof(WCHAR);
+        HGLOBAL hMem = GlobalAlloc(GMEM_MOVEABLE, cb);
+        if (hMem != NULL)
+        {
+            WCHAR* pMem = (WCHAR*)GlobalLock(hMem);
+            memcpy(pMem, line.c_str(), cb);
+            GlobalUnlock(hMem);
+            SetClipboardData(CF_UNICODETEXT, hMem);
+        }
+        CloseClipboard();
+    }
 }
 
 void CTabList::GetText(int iItem, int index, WCHAR* buff, int buffMax, BOOL preferEndOfText)
