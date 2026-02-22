@@ -476,7 +476,7 @@ set_target_properties(gtest_worker_wide PROPERTIES
     RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/tests"
 )
 
-# WebView2 integration tests (ieviewer plugin: path utilities, markdown, WebView2 runtime)
+# WebView2 integration tests (webviewer plugin: path utilities, markdown, WebView2 runtime)
 add_executable(gtest_webview2
     gtest_webview2.cpp
 )

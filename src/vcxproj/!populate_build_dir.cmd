@@ -127,7 +127,7 @@ call :mycopy_with_mkdir_bat *.tab       ..\..\convert\westeuro %1\convert\westeu
 
 call :mycopy_with_mkdir_bat *.* ..\plugins\automation\sample-scripts %1\plugins\automation\scripts
 
-call :mycopy_with_mkdir_bat *.* ..\plugins\ieviewer\cmark-gfm\css %1\plugins\ieviewer\css
+call :mycopy_with_mkdir_bat *.* ..\plugins\webviewer\cmark-gfm\css %1\plugins\webviewer\css
 
 call :mycopy_with_mkdir_bat readme.txt     ..\plugins\zip\zip2sfx %1\plugins\zip\zip2sfx
 call :mycopy_with_mkdir_bat sam_cz.set     ..\plugins\zip\zip2sfx %1\plugins\zip\zip2sfx

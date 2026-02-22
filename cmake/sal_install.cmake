@@ -128,10 +128,10 @@ function(sal_install_resources)
     )
   endif()
 
-  # IEViewer CSS
-  if(EXISTS "${SAL_PLUGINS}/ieviewer/cmark-gfm/css")
-    install(DIRECTORY "${SAL_PLUGINS}/ieviewer/cmark-gfm/css/"
-      DESTINATION "plugins/ieviewer/css"
+  # WebViewer CSS
+  if(EXISTS "${SAL_PLUGINS}/webviewer/cmark-gfm/css")
+    install(DIRECTORY "${SAL_PLUGINS}/webviewer/cmark-gfm/css/"
+      DESTINATION "plugins/webviewer/css"
       FILES_MATCHING PATTERN "*.*"
     )
   endif()

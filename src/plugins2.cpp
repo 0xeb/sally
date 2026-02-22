@@ -1537,11 +1537,11 @@ void CPlugins::Load(HWND parent, HKEY regKey)
                        "Copyright © 1999-2023 Open Salamander Authors",
                        "This plug-ing adds support for Quake PAK archives.",
                        "PAK", "pak", NULL, FALSE, NULL, NULL) ||
-            !AddPlugin("Internet Explorer Viewer", "ieviewer\\ieviewer.spl",
+            !AddPlugin("Web Viewer", "webviewer\\webviewer.spl",
                        FALSE, FALSE, FALSE, FALSE, FALSE, TRUE, TRUE, FALSE, FALSE,
                        "1.1", "Copyright © 1999-2023 Open Salamander Authors",
-                       "Internet Explorer Viewer for Open Salamander.",
-                       "IEVIEWER", "", NULL, FALSE, NULL, NULL))
+                       "Web Viewer for Open Salamander.",
+                       "WEBVIEWER", "", NULL, FALSE, NULL, NULL))
         {
             HANDLES(EnterCriticalSection(&DataCS));
             Data.DestroyMembers();

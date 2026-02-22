@@ -987,7 +987,7 @@
 			</OBJECT>
 		<UL>
 			<OBJECT type="text/sitemap">
-				<param name="Merge" value="ieviewer.chm::\ieviewer.hhc">
+				<param name="Merge" value="webviewer.chm::\webviewer.hhc">
 			</OBJECT>
 		</UL>
 

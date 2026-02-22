@@ -6,8 +6,8 @@ salamand        0x04000000
 lang            0x30000000
 demoplug        0x20100000
 lang_demoplug   0x30100000
-ieviewer        0x20200000
-lang_ieviewer   0x30200000
+webviewer       0x20200000
+lang_webviewer  0x30200000
 wmobile         0x20300000
 lang_wmobile    0x30300000
 checksum        0x20400000

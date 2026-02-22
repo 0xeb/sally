@@ -1,4 +1,4 @@
-// Integration tests for the WebView2 ieviewer plugin
+// Integration tests for the WebView2 webviewer plugin
 // Tests Markdown conversion, path utilities, and WebView2 environment creation.
 
 #include <gtest/gtest.h>
@@ -16,7 +16,7 @@ using Microsoft::WRL::Callback;
 namespace fs = std::filesystem;
 
 // ---------------------------------------------------------------------------
-// Path/URL utility tests (standalone, matching ieviewer.cpp logic)
+// Path/URL utility tests (standalone, matching webviewer.cpp logic)
 // ---------------------------------------------------------------------------
 
 static std::wstring PathToFileUrl(const std::wstring& path)
@@ -148,7 +148,7 @@ protected:
     {
         wchar_t buf[MAX_PATH];
         GetTempPathW(MAX_PATH, buf);
-        tempDir = fs::path(buf) / L"ieviewer_test";
+        tempDir = fs::path(buf) / L"webviewer_test";
         fs::create_directories(tempDir);
     }
 
@@ -268,7 +268,7 @@ TEST(WebView2Runtime, EnvironmentCanBeCreated)
 
     wchar_t tempPath[MAX_PATH];
     GetTempPathW(MAX_PATH, tempPath);
-    std::wstring userDataFolder = std::wstring(tempPath) + L"ieviewer_test_webview2";
+    std::wstring userDataFolder = std::wstring(tempPath) + L"webviewer_test_webview2";
 
     HRESULT hr = CreateCoreWebView2EnvironmentWithOptions(
         nullptr,
@@ -348,7 +348,7 @@ TEST(WebView2Runtime, ControllerCanBeCreated)
 
     wchar_t tempPath[MAX_PATH];
     GetTempPathW(MAX_PATH, tempPath);
-    std::wstring userDataFolder = std::wstring(tempPath) + L"ieviewer_test_webview2_ctrl";
+    std::wstring userDataFolder = std::wstring(tempPath) + L"webviewer_test_webview2_ctrl";
 
     ComPtr<ICoreWebView2Environment> environment;
     ComPtr<ICoreWebView2Controller> controller;

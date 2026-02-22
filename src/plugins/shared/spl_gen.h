@@ -1877,15 +1877,15 @@ public:
 
     // determines if plugin is installed (but doesn't determine if it can be loaded - if user
     // e.g. deleted it only from disk); 'pluginSPL' identifies plugin - it's required
-    // ending part of full path to plugin's .SPL file (e.g. "ieviewer\\ieviewer.spl" identifies
-    // IEViewer shipped with Salamander); returns TRUE if plugin is installed
+    // ending part of full path to plugin's .SPL file (e.g. "webviewer\\webviewer.spl" identifies
+    // Web Viewer shipped with Salamander); returns TRUE if plugin is installed
     // limitation: main thread (otherwise plugin configuration may change during call)
     virtual BOOL WINAPI IsPluginInstalled(const char* pluginSPL) = 0;
 
     // opens file in viewer implemented in plugin or internal text/hex viewer;
     // if 'pluginSPL' is NULL, internal text/hex viewer should be used, otherwise identifies plugin
     // viewer - it's required ending part of full path to plugin's .SPL file (e.g.
-    // "ieviewer\\ieviewer.spl" identifies IEViewer shipped with Salamander); 'pluginData'
+    // "webviewer\\webviewer.spl" identifies Web Viewer shipped with Salamander); 'pluginData'
     // is data structure containing viewed file name and optionally contains extended
     // viewer parameters (see CSalamanderPluginViewerData description); if 'useCache' is FALSE,
     // 'rootTmpPath' and 'fileNameInCache' are ignored and file is just opened in viewer;

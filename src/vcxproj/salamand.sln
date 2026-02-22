@@ -45,7 +45,7 @@ Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "lang_folders", "..\plugins\
 EndProject
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "lang_ftp", "..\plugins\ftp\vcxproj\lang_ftp.vcxproj", "{901157D5-E77F-448A-8FE1-9296CFBDAB29}"
 EndProject
-Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "lang_ieviewer", "..\plugins\ieviewer\vcxproj\lang_ieviewer.vcxproj", "{FFC3DC5D-8E4B-40E9-BFE6-609709565ED0}"
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "lang_webviewer", "..\plugins\webviewer\vcxproj\lang_webviewer.vcxproj", "{FFC3DC5D-8E4B-40E9-BFE6-609709565ED0}"
 EndProject
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "lang_mmviewer", "..\plugins\mmviewer\vcxproj\lang_mmviewer.vcxproj", "{0C16BFF5-47AC-48C8-81EC-2788FFAA42BB}"
 EndProject
@@ -145,7 +145,7 @@ Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "chmlib", "..\plugins\unchm\
 EndProject
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "unrar", "..\plugins\unrar\vcxproj\unrar.vcxproj", "{15B58457-3161-47C4-AE3B-D3CE92D72618}"
 EndProject
-Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "ieviewer", "..\plugins\ieviewer\vcxproj\ieviewer.vcxproj", "{61BC1DA8-A452-4FB1-B8C6-533D351A66E2}"
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "webviewer", "..\plugins\webviewer\vcxproj\webviewer.vcxproj", "{61BC1DA8-A452-4FB1-B8C6-533D351A66E2}"
 EndProject
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "salextx86", "shellext\salextx86.vcxproj", "{2817FDA4-F692-47A1-8373-B4DF20DEF383}"
 EndProject
