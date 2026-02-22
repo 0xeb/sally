@@ -1256,7 +1256,7 @@ void CPlugins::Load(HWND parent, HKEY regKey)
         char buf[30];
         int i = 1;
         strcpy(buf, "1");
-        BOOL view, edit, pack, unpack, config, loadsave, viewer, fs, loadOnStart, dynMenuExt;
+        BOOL view, edit, pack, unpack, config, loadsave, viewer, fs, loadOnStart, dynMenuExt, legacyCompatApproved;
         CPathBuffer name; // Heap-allocated for long path support
         CPathBuffer dllName; // Heap-allocated for long path support
         CPathBuffer version; // Heap-allocated for long path support
@@ -1278,6 +1278,7 @@ void CPlugins::Load(HWND parent, HKEY regKey)
             BOOL err = TRUE;
             BOOL ok = FALSE;
             loadOnStart = FALSE;
+            legacyCompatApproved = FALSE;
             thumbnailMasks[0] = 0;
             lastSLGName[0] = 0;
             pluginHomePageURL[0] = 0;
@@ -1332,6 +1333,12 @@ void CPlugins::Load(HWND parent, HKEY regKey)
                 if (GetValue(itemKey, SALAMANDER_PLUGINS_LOADONSTART, REG_DWORD, &loadOnStartDWORD, sizeof(DWORD)))
                 {
                     loadOnStart = loadOnStartDWORD != 0;
+                }
+
+                DWORD legacyCompatApprovedDWORD;
+                if (GetValue(itemKey, SALAMANDER_PLUGINS_LEGACYCOMPATAPPROVED, REG_DWORD, &legacyCompatApprovedDWORD, sizeof(DWORD)))
+                {
+                    legacyCompatApproved = legacyCompatApprovedDWORD != 0;
                 }
 
                 // these values don't have to be loaded (they may be missing in the configuration)
@@ -1396,6 +1403,7 @@ void CPlugins::Load(HWND parent, HKEY regKey)
                         p->PluginIconIndex = pluginIconIndex;
                         p->PluginSubmenuIconIndex = pluginSubmenuIconIndex;
                         p->ShowSubmenuInPluginsBar = showSubmenuPluginsBar;
+                        p->LegacyCompatApproved = legacyCompatApproved;
 
                         if (thumbnailMasks[0] != 0)
                         {
@@ -1610,6 +1618,11 @@ void CPlugins::Save(HWND parent, HKEY regKey, HKEY regKeyConfig, HKEY regKeyOrde
                 {
                     DWORD loadOnStartDWORD = TRUE;
                     SetValue(itemKey, SALAMANDER_PLUGINS_LOADONSTART, REG_DWORD, &loadOnStartDWORD, sizeof(DWORD));
+                }
+
+                if (p->LegacyCompatApproved) // store only TRUE to save space in the registry
+                {
+                    SetValue(itemKey, SALAMANDER_PLUGINS_LEGACYCOMPATAPPROVED, REG_DWORD, &p->LegacyCompatApproved, sizeof(DWORD));
                 }
 
                 if (!p->ChDrvMenuFSItemName.empty()) // we have an FS command for the change-drive menu

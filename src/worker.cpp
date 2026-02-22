@@ -5958,9 +5958,10 @@ BOOL DoMoveFile(COperation* op, IWorkerObserver& observer, void* buffer,
 
             OPERATION_DONE:
 
+                DWORD curAttrs = INVALID_FILE_ATTRIBUTES;
                 if (script->CopyAttrs) // check whether the source file attributes were preserved
                 {
-                    DWORD curAttrs = GetFileAttributesW(targetNameMvDirW.c_str());
+                    curAttrs = GetFileAttributesW(targetNameMvDirW.c_str());
                     if (curAttrs == INVALID_FILE_ATTRIBUTES || (curAttrs & DISPLAYED_ATTRIBUTES) != (op->Attr & DISPLAYED_ATTRIBUTES))
                     {                                                              // attributes probably were not preserved, warn the user
                         observer.WaitIfSuspended(); // if we should be in suspend mode, wait ...
@@ -6833,6 +6834,7 @@ BOOL DoCreateDir(IWorkerObserver& observer, char* name, DWORD attr,
             }
             if (newAttr != -1)
             {
+                DWORD curAttrs = INVALID_FILE_ATTRIBUTES;
                 if (script->CopyAttrs || createAsEncrypted) // set Compressed & Encrypted attributes based on the source directory
                 {
                     if (createAsEncrypted)
@@ -6917,7 +6919,7 @@ BOOL DoCreateDir(IWorkerObserver& observer, char* name, DWORD attr,
 
                 if (script->CopyAttrs) // verify whether the source file attributes were preserved
                 {
-                    DWORD curAttrs = GetFileAttributesW(nameCrDirW.c_str());
+                    curAttrs = GetFileAttributesW(nameCrDirW.c_str());
                     if (curAttrs == INVALID_FILE_ATTRIBUTES || (curAttrs & DISPLAYED_ATTRIBUTES) != (newAttr & DISPLAYED_ATTRIBUTES))
                     {                                                              // attributes probably did not transfer; warn the user
                         observer.WaitIfSuspended(); // if we should be in suspend mode, wait ...

@@ -735,6 +735,7 @@ const char* SALAMANDER_PLUGINS_REGKEYNAME = "Configuration Key";
 const char* SALAMANDER_PLUGINS_FSNAME = "FS Name";
 const char* SALAMANDER_PLUGINS_FUNCTIONS = "Functions";
 const char* SALAMANDER_PLUGINS_LOADONSTART = "Load On Start";
+const char* SALAMANDER_PLUGINS_LEGACYCOMPATAPPROVED = "Legacy Compat Approved";
 const char* SALAMANDER_PLUGINS_MENU = "Menu";
 const char* SALAMANDER_PLUGINS_MENUITEMNAME = "Name";
 const char* SALAMANDER_PLUGINS_MENUITEMSTATE = "State";

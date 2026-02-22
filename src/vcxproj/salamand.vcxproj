@@ -269,6 +269,14 @@
     </ClCompile>
     <ClCompile Include="..\common\winlib.cpp">
     </ClCompile>
+    <ClCompile Include="..\common\Win32Clipboard.cpp">
+    </ClCompile>
+    <ClCompile Include="..\common\Win32Environment.cpp">
+    </ClCompile>
+    <ClCompile Include="..\common\Win32FileSystem.cpp">
+    </ClCompile>
+    <ClCompile Include="..\common\fsutil.cpp">
+    </ClCompile>
     <ClCompile Include="..\common\widepath.cpp">
     </ClCompile>
     <ClCompile Include="..\common\dep\crypt\aescrypt.c">
@@ -572,6 +580,8 @@
     <ClCompile Include="..\toolbar8.cpp">
     </ClCompile>
     <ClCompile Include="..\tooltip.cpp">
+    </ClCompile>
+    <ClCompile Include="..\ui\UIPrompter.cpp">
     </ClCompile>
     <ClCompile Include="..\versinfo.cpp">
     </ClCompile>

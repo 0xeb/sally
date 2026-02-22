@@ -3,10 +3,10 @@
 // CommentsTranslationProject: TRANSLATED
 
 #include "precomp.h"
-#include "ui/IPrompter.h"
-#include "mainwnd.h"
-#include "dialogs.h"
-#include "common/unicode/helpers.h"
+#include "IPrompter.h"
+#include "../mainwnd.h"
+#include "../dialogs.h"
+#include "../common/unicode/helpers.h"
 
 IPrompter* gPrompter = nullptr;
 

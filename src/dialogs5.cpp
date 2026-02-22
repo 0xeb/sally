@@ -2271,21 +2271,21 @@ CCfgPageViewers::DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
                 int srcIndex = index;
                 int dstIndex = dispInfo->NewIndex;
 
-                CViewerMasksItem tmp = std::move(*ViewerMasks[srcIndex]);
+                CViewerMasksItem* tmp = ViewerMasks[srcIndex];
 
                 if (srcIndex < dstIndex)
                 {
                     int i;
                     for (i = srcIndex; i < dstIndex; i++)
-                        *ViewerMasks[i] = std::move(*ViewerMasks[i + 1]);
+                        ViewerMasks[i] = ViewerMasks[i + 1];
                 }
                 else
                 {
                     int i;
                     for (i = srcIndex; i > dstIndex; i--)
-                        *ViewerMasks[i] = std::move(*ViewerMasks[i - 1]);
+                        ViewerMasks[i] = ViewerMasks[i - 1];
                 }
-                *ViewerMasks[dstIndex] = std::move(tmp);
+                ViewerMasks[dstIndex] = tmp;
 
                 SetWindowLongPtr(HWindow, DWLP_MSGRESULT, FALSE); // allow change
                 return TRUE;
@@ -2626,21 +2626,21 @@ CCfgPageEditors::DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
                 int srcIndex = index;
                 int dstIndex = dispInfo->NewIndex;
 
-                CEditorMasksItem tmp = std::move(*EditorMasks[srcIndex]);
+                CEditorMasksItem* tmp = EditorMasks[srcIndex];
 
                 if (srcIndex < dstIndex)
                 {
                     int i;
                     for (i = srcIndex; i < dstIndex; i++)
-                        *EditorMasks[i] = std::move(*EditorMasks[i + 1]);
+                        EditorMasks[i] = EditorMasks[i + 1];
                 }
                 else
                 {
                     int i;
                     for (i = srcIndex; i > dstIndex; i--)
-                        *EditorMasks[i] = std::move(*EditorMasks[i - 1]);
+                        EditorMasks[i] = EditorMasks[i - 1];
                 }
-                *EditorMasks[dstIndex] = std::move(tmp);
+                EditorMasks[dstIndex] = tmp;
 
                 SetWindowLongPtr(HWindow, DWLP_MSGRESULT, FALSE); // allow change
                 return TRUE;

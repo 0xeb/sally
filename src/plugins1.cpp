@@ -1893,6 +1893,7 @@ CPluginData::CPluginData(const char* name, const char* dllName, BOOL supportPane
     SupportViewer = supportViewer;
     SupportDynMenuExt = supportDynMenuExt;
     LoadOnStart = loadOnStart;
+    LegacyCompatApproved = FALSE;
     // ChDrvMenuFSItemName default-constructs to empty
     ChDrvMenuFSItemVisible = TRUE;
     ChDrvMenuFSItemIconIndex = -1;
@@ -2061,6 +2062,31 @@ BOOL CPluginData::InitDLL(HWND parent, BOOL quiet, BOOL waitCursor, BOOL showUns
                     }
                 }
                 BOOL oldVer = BuiltForVersion < PLUGIN_REQVER;
+                BOOL suppressOldVerError = FALSE;
+                if (oldVer && BuiltForVersion == PLUGIN_LEGACY_REQVER)
+                {
+                    if (LegacyCompatApproved)
+                    {
+                        oldVer = FALSE;
+                    }
+                    else if (!quiet)
+                    {
+                        std::wstring msg;
+                        if (Name.empty() || Name[0] == 0)
+                            msg = FormatStrW(LoadStrW(IDS_OLDPLUGINVERSION_CONFIRM2), AnsiToWide(s).c_str());
+                        else
+                            msg = FormatStrW(LoadStrW(IDS_OLDPLUGINVERSION_CONFIRM), AnsiToWide(Name.c_str()).c_str(), AnsiToWide(s).c_str());
+                        if (gPrompter->AskYesNo(LoadStrW(IDS_QUESTION), msg.c_str()).type == PromptResult::kYes)
+                        {
+                            LegacyCompatApproved = TRUE; // persist in configuration so this path is not prompted again
+                            oldVer = FALSE;
+                        }
+                        else
+                        {
+                            suppressOldVerError = TRUE; // user already refused in this attempt
+                        }
+                    }
+                }
                 if (!oldVer)
                 {
                     if (!PluginHomePageURL.empty())
@@ -2117,7 +2143,7 @@ BOOL CPluginData::InitDLL(HWND parent, BOOL quiet, BOOL waitCursor, BOOL showUns
                 }
                 else // clear the other parts of the plugin interface as well
                 {
-                    if (salamander.ShowError() && oldVer) // old version and it has not been reported yet...
+                    if (salamander.ShowError() && oldVer && !suppressOldVerError) // old version and it has not been reported yet...
                     {
                         if (!quiet)
                         {

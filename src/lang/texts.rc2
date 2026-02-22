@@ -1247,6 +1247,8 @@ STRINGTABLE
  IDS_PLUGININVALID2, "This plugin (%s) has not been loaded. Plugin is not valid Open Salamander Plugin or some plugin internal error has occurred."
  IDS_OLDPLUGINVERSION, "%s plugin (%s) is not supported by this version of Open Salamander. Please get updated version of this plugin."
  IDS_OLDPLUGINVERSION2, "The plugin (%s) is not supported by this version of Open Salamander. Please get updated version of this plugin."
+ IDS_OLDPLUGINVERSION_CONFIRM, "%s plugin (%s) targets legacy commercial SDK version 4.0 (required version 102).\nIt may be ABI-incompatible with this Open Salamander build and can be unstable.\n\nDo you want to load this plugin anyway?\nChoosing YES permanently trusts this plugin path."
+ IDS_OLDPLUGINVERSION_CONFIRM2, "The plugin (%s) targets legacy commercial SDK version 4.0 (required version 102).\nIt may be ABI-incompatible with this Open Salamander build and can be unstable.\n\nDo you want to load this plugin anyway?\nChoosing YES permanently trusts this plugin path."
 
  IDS_UPDATEFAILED, "Packing of updated file(s) into archive has failed. Do you want to try it again? If you choose NO, you'll get back to the Archive Update dialog, so you'll be able to copy updated file(s) to chosen disk folder (for later packing into the archive)."
 

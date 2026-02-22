@@ -6,6 +6,7 @@
 
 // when changing this header search for "BuiltForVersion" - tests for older plugin versions will no longer make sense and should be removed
 #define PLUGIN_REQVER 103 // ("5.0") load only plugins that return at least this required Salamander version
+#define PLUGIN_LEGACY_REQVER 102 // ("4.0") legacy commercial plugins; requires explicit user approval per plugin path
 
 //
 // ****************************************************************************
@@ -2397,6 +2398,7 @@ public:
     BOOL SupportDynMenuExt;    // TRUE => menu is added in PluginIfaceForMenuExt::BuildMenu instead of PluginIface::Connect (menu is dynamic and rebuilt before each plugin menu open)
 
     BOOL LoadOnStart; // should the plugin load at every Salamander start?
+    BOOL LegacyCompatApproved; // TRUE => user approved loading a req==102 plugin for this plugin path
 
     std::string Version;              // plugin version (max length MAX_PATH - 1)
     std::string Copyright;            // manufacturer's copyright (max length MAX_PATH - 1)

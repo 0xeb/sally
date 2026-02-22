@@ -1457,6 +1457,10 @@
 #define IDS_PLUGININVALID2           12025
 // error loading plug-in DLL: this plug-in (with unknown name) version is not supported (old plug-in)
 #define IDS_OLDPLUGINVERSION2        12026
+// legacy req==102 plugin: ask whether to allow loading anyway (name known)
+#define IDS_OLDPLUGINVERSION_CONFIRM 12027
+// legacy req==102 plugin: ask whether to allow loading anyway (name unknown)
+#define IDS_OLDPLUGINVERSION_CONFIRM2 12028
 
 // edit or assoc from archive: update failed, do you want to try it again?
 #define IDS_UPDATEFAILED             12033
