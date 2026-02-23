@@ -53,6 +53,15 @@ public:
     virtual FileResult CreateDirectory(const wchar_t* path) = 0;
     virtual FileResult RemoveDirectory(const wchar_t* path) = 0;
 
+    // Generic file open/create operation
+    virtual HANDLE CreateFile(const wchar_t* path,
+                              DWORD desiredAccess,
+                              DWORD shareMode,
+                              LPSECURITY_ATTRIBUTES securityAttributes,
+                              DWORD creationDisposition,
+                              DWORD flagsAndAttributes,
+                              HANDLE templateFile) = 0;
+
     // File handle operations (for copy loops, etc.)
     virtual HANDLE OpenFileForRead(const wchar_t* path, DWORD shareMode = FILE_SHARE_READ) = 0;
     virtual HANDLE CreateFileForWrite(const wchar_t* path, bool failIfExists) = 0;
@@ -143,4 +152,38 @@ inline FileResult GetFileInfoA(IFileSystem* fs, const char* path, FileInfo& info
     if (widePath.empty() && path && *path)
         return FileResult::Error(GetLastError());
     return fs->GetFileInfo(widePath.c_str(), info);
+}
+
+inline FileResult CreateDirectoryA(IFileSystem* fs, const char* path)
+{
+    std::wstring widePath = AnsiPathToWide(path);
+    if (widePath.empty() && path && *path)
+        return FileResult::Error(GetLastError());
+    return fs->CreateDirectory(widePath.c_str());
+}
+
+inline FileResult RemoveDirectoryA(IFileSystem* fs, const char* path)
+{
+    std::wstring widePath = AnsiPathToWide(path);
+    if (widePath.empty() && path && *path)
+        return FileResult::Error(GetLastError());
+    return fs->RemoveDirectory(widePath.c_str());
+}
+
+inline HANDLE CreateFileA(IFileSystem* fs, const char* path,
+                          DWORD desiredAccess,
+                          DWORD shareMode,
+                          LPSECURITY_ATTRIBUTES securityAttributes,
+                          DWORD creationDisposition,
+                          DWORD flagsAndAttributes,
+                          HANDLE templateFile)
+{
+    std::wstring widePath = AnsiPathToWide(path);
+    if (widePath.empty() && path && *path)
+    {
+        SetLastError(ERROR_INVALID_PARAMETER);
+        return INVALID_HANDLE_VALUE;
+    }
+    return fs->CreateFile(widePath.c_str(), desiredAccess, shareMode, securityAttributes,
+                          creationDisposition, flagsAndAttributes, templateFile);
 }

@@ -25,6 +25,7 @@ public:
     bool existsResult = true;
     FileResult opResult = FileResult::Ok();
     DWORD attributesResult = FILE_ATTRIBUTE_NORMAL;
+    HANDLE handleResult = INVALID_HANDLE_VALUE;
 
     bool FileExists(const wchar_t* path) override
     {
@@ -88,6 +89,18 @@ public:
     {
         calls.push_back({L"RemoveDirectory", path ? path : L"", L""});
         return opResult;
+    }
+
+    HANDLE CreateFile(const wchar_t* path,
+                      DWORD desiredAccess,
+                      DWORD shareMode,
+                      LPSECURITY_ATTRIBUTES securityAttributes,
+                      DWORD creationDisposition,
+                      DWORD flagsAndAttributes,
+                      HANDLE templateFile) override
+    {
+        calls.push_back({L"CreateFile", path ? path : L"", L""});
+        return handleResult;
     }
 
     HANDLE OpenFileForRead(const wchar_t* path, DWORD shareMode) override
@@ -192,6 +205,19 @@ TEST(FileSystemMockTest, RuntimeSwap)
     EXPECT_EQ(mock2.calls.size(), 1u);
     EXPECT_EQ(mock1.calls[0].path, L"test1");
     EXPECT_EQ(mock2.calls[0].path, L"test2");
+}
+
+TEST(FileSystemMockTest, CreateFileDelegatesToImplementation)
+{
+    MockFileSystem mock;
+    mock.handleResult = reinterpret_cast<HANDLE>(0x1234);
+
+    HANDLE h = mock.CreateFile(L"C:\\test.bin", GENERIC_READ, FILE_SHARE_READ, NULL, OPEN_EXISTING, 0, NULL);
+    EXPECT_EQ(h, reinterpret_cast<HANDLE>(0x1234));
+
+    ASSERT_EQ(mock.calls.size(), 1u);
+    EXPECT_EQ(mock.calls[0].op, L"CreateFile");
+    EXPECT_EQ(mock.calls[0].path, L"C:\\test.bin");
 }
 
 int main(int argc, char** argv)

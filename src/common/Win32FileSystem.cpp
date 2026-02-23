@@ -163,6 +163,24 @@ public:
         return FileResult::Error(GetLastError());
     }
 
+    HANDLE CreateFile(const wchar_t* path,
+                      DWORD desiredAccess,
+                      DWORD shareMode,
+                      LPSECURITY_ATTRIBUTES securityAttributes,
+                      DWORD creationDisposition,
+                      DWORD flagsAndAttributes,
+                      HANDLE templateFile) override
+    {
+        LongPath lp(path);
+        if (!lp.IsValid())
+        {
+            SetLastError(LastErrorOr(ERROR_INVALID_PARAMETER));
+            return INVALID_HANDLE_VALUE;
+        }
+        return ::CreateFileW(lp.Get(), desiredAccess, shareMode, securityAttributes,
+                             creationDisposition, flagsAndAttributes, templateFile);
+    }
+
     HANDLE OpenFileForRead(const wchar_t* path, DWORD shareMode) override
     {
         LongPath lp(path);

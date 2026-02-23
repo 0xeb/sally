@@ -14,6 +14,7 @@
 #include <stdlib.h>
 #include <string.h>
 
+#include "IFileSystem.h"
 #include "widepath.h"
 
 //
@@ -390,6 +391,23 @@ BOOL CWidePathBuffer::Append(const char* name)
 // Convenience wrappers
 //
 
+static IFileSystem* GetActiveFileSystem()
+{
+    if (gFileSystem == NULL)
+        gFileSystem = GetWin32FileSystem();
+    return gFileSystem;
+}
+
+static BOOL ResultToBool(const FileResult& result)
+{
+    if (!result.success)
+    {
+        SetLastError(result.errorCode);
+        return FALSE;
+    }
+    return TRUE;
+}
+
 HANDLE SalLPCreateFile(
     const char* fileName,
     DWORD dwDesiredAccess,
@@ -399,6 +417,11 @@ HANDLE SalLPCreateFile(
     DWORD dwFlagsAndAttributes,
     HANDLE hTemplateFile)
 {
+    IFileSystem* fs = GetActiveFileSystem();
+    if (fs != NULL)
+        return CreateFileA(fs, fileName, dwDesiredAccess, dwShareMode, lpSecurityAttributes,
+                           dwCreationDisposition, dwFlagsAndAttributes, hTemplateFile);
+
     SalWidePath widePath(fileName);
     if (!widePath.IsValid())
     {
@@ -417,6 +440,10 @@ HANDLE SalLPCreateFile(
 
 DWORD SalLPGetFileAttributes(const char* fileName)
 {
+    IFileSystem* fs = GetActiveFileSystem();
+    if (fs != NULL)
+        return GetFileAttributesA(fs, fileName);
+
     SalWidePath widePath(fileName);
     if (!widePath.IsValid())
     {
@@ -428,6 +455,10 @@ DWORD SalLPGetFileAttributes(const char* fileName)
 
 BOOL SalLPSetFileAttributes(const char* fileName, DWORD dwFileAttributes)
 {
+    IFileSystem* fs = GetActiveFileSystem();
+    if (fs != NULL)
+        return ResultToBool(SetFileAttributesA(fs, fileName, dwFileAttributes));
+
     SalWidePath widePath(fileName);
     if (!widePath.IsValid())
     {
@@ -439,6 +470,10 @@ BOOL SalLPSetFileAttributes(const char* fileName, DWORD dwFileAttributes)
 
 BOOL SalLPDeleteFile(const char* fileName)
 {
+    IFileSystem* fs = GetActiveFileSystem();
+    if (fs != NULL)
+        return ResultToBool(DeleteFileA(fs, fileName));
+
     SalWidePath widePath(fileName);
     if (!widePath.IsValid())
     {
@@ -450,6 +485,10 @@ BOOL SalLPDeleteFile(const char* fileName)
 
 BOOL SalLPRemoveDirectory(const char* dirName)
 {
+    IFileSystem* fs = GetActiveFileSystem();
+    if (fs != NULL)
+        return ResultToBool(RemoveDirectoryA(fs, dirName));
+
     SalWidePath widePath(dirName);
     if (!widePath.IsValid())
     {
@@ -461,6 +500,10 @@ BOOL SalLPRemoveDirectory(const char* dirName)
 
 BOOL SalLPCreateDirectory(const char* pathName, LPSECURITY_ATTRIBUTES lpSecurityAttributes)
 {
+    IFileSystem* fs = GetActiveFileSystem();
+    if (fs != NULL && lpSecurityAttributes == NULL)
+        return ResultToBool(CreateDirectoryA(fs, pathName));
+
     SalWidePath widePath(pathName);
     if (!widePath.IsValid())
     {
@@ -472,6 +515,10 @@ BOOL SalLPCreateDirectory(const char* pathName, LPSECURITY_ATTRIBUTES lpSecurity
 
 BOOL SalLPMoveFile(const char* existingFileName, const char* newFileName)
 {
+    IFileSystem* fs = GetActiveFileSystem();
+    if (fs != NULL)
+        return ResultToBool(MoveFileA(fs, existingFileName, newFileName));
+
     SalWidePath wideExisting(existingFileName);
     SalWidePath wideNew(newFileName);
 
@@ -485,6 +532,10 @@ BOOL SalLPMoveFile(const char* existingFileName, const char* newFileName)
 
 BOOL SalLPCopyFile(const char* existingFileName, const char* newFileName, BOOL failIfExists)
 {
+    IFileSystem* fs = GetActiveFileSystem();
+    if (fs != NULL)
+        return ResultToBool(CopyFileA(fs, existingFileName, newFileName, failIfExists != FALSE));
+
     SalWidePath wideExisting(existingFileName);
     SalWidePath wideNew(newFileName);
 

@@ -302,6 +302,30 @@ set_target_properties(gtest_cpathbuffer_winapi PROPERTIES
     RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/tests"
 )
 
+add_executable(gtest_widepath_filesystem_bridge
+    gtest_widepath_filesystem_bridge.cpp
+    ../widepath_standalone.cpp
+)
+
+target_include_directories(gtest_widepath_filesystem_bridge PRIVATE
+    ${CMAKE_CURRENT_SOURCE_DIR}/../..
+    ${CMAKE_CURRENT_SOURCE_DIR}/../../common
+)
+
+target_compile_definitions(gtest_widepath_filesystem_bridge PRIVATE
+    WIN32 _WINDOWS _CRT_SECURE_NO_WARNINGS
+)
+
+target_link_libraries(gtest_widepath_filesystem_bridge
+    GTest::gtest GTest::gtest_main kernel32
+)
+
+add_test(NAME gtest_widepath_filesystem_bridge COMMAND gtest_widepath_filesystem_bridge)
+
+set_target_properties(gtest_widepath_filesystem_bridge PROPERTIES
+    RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/tests"
+)
+
 # SalGetFullNameW tests
 add_executable(gtest_salgetfullname
     gtest_salgetfullname.cpp
