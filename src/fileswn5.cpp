@@ -718,13 +718,13 @@ void CFilesWindow::ViewFile(char* name, BOOL altView, DWORD handlerID, int enumF
                 strcpy(s, f->Name);
                 // try whether the file name is valid, otherwise try its DOS name
                 // (handles files accessible only through Unicode or DOS names)
-                if (f->DosName != NULL && GetFileAttributesW(AnsiToWide(path).c_str()) == INVALID_FILE_ATTRIBUTES)
+                if (f->DosName != NULL && SalLPGetFileAttributes(path) == INVALID_FILE_ATTRIBUTES)
                 {
                     DWORD err = GetLastError();
                     if (err == ERROR_FILE_NOT_FOUND || err == ERROR_INVALID_NAME)
                     {
                         strcpy(s, f->DosName);
-                        if (GetFileAttributesW(AnsiToWide(path).c_str()) == INVALID_FILE_ATTRIBUTES) // still error -> revert to the long name
+                        if (SalLPGetFileAttributes(path) == INVALID_FILE_ATTRIBUTES) // still error -> revert to the long name
                             strcpy(s, f->Name);
                     }
                 }
@@ -1220,7 +1220,7 @@ void CFilesWindow::EditFile(char* name, DWORD handlerID)
                     strcpy(s, f->Name);
                 // try whether the file name is valid, otherwise try its DOS name as well
                 // (handles files accessible only through Unicode or DOS names)
-                if (f->DosName != NULL && GetFileAttributesW(AnsiToWide(path).c_str()) == INVALID_FILE_ATTRIBUTES)
+                if (f->DosName != NULL && SalLPGetFileAttributes(path) == INVALID_FILE_ATTRIBUTES)
                 {
                     DWORD err = GetLastError();
                     if (err == ERROR_FILE_NOT_FOUND || err == ERROR_INVALID_NAME)
@@ -1228,7 +1228,7 @@ void CFilesWindow::EditFile(char* name, DWORD handlerID)
                         if (strlen(f->DosName) + (s - path) < (int)path.Size())
                         {
                             strcpy(s, f->DosName);
-                            if (GetFileAttributesW(AnsiToWide(path).c_str()) == INVALID_FILE_ATTRIBUTES) // still error -> revert to the long name
+                            if (SalLPGetFileAttributes(path) == INVALID_FILE_ATTRIBUTES) // still error -> revert to the long name
                             {
                                 if ((s - path) + f->NameLen < (int)path.Size())
                                     strcpy(s, f->Name);

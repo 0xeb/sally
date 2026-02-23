@@ -530,3 +530,28 @@ set_target_properties(gtest_plugins PROPERTIES
 )
 
 add_dependencies(gtest_plugins test_dummy_plugin)
+
+# Long path viewer integration tests (issue #24)
+add_executable(gtest_longpath_viewer
+    gtest_longpath_viewer.cpp
+    ../widepath_standalone.cpp
+)
+
+target_include_directories(gtest_longpath_viewer PRIVATE
+    ${CMAKE_CURRENT_SOURCE_DIR}/../..
+    ${CMAKE_CURRENT_SOURCE_DIR}/../../common
+)
+
+target_compile_definitions(gtest_longpath_viewer PRIVATE
+    WIN32 _WINDOWS _CRT_SECURE_NO_WARNINGS
+)
+
+target_link_libraries(gtest_longpath_viewer
+    GTest::gtest GTest::gtest_main kernel32
+)
+
+add_test(NAME gtest_longpath_viewer COMMAND gtest_longpath_viewer)
+
+set_target_properties(gtest_longpath_viewer PROPERTIES
+    RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/tests"
+)
