@@ -1,4 +1,4 @@
-LIBRARY MMVIEWER.SPL
+LIBRARY MMVIEWER.DLL
 
 EXPORTS SalamanderPluginEntry
 EXPORTS SalamanderPluginGetReqVer

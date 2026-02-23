@@ -1,4 +1,4 @@
-LIBRARY unfat.spl
+LIBRARY unfat.dll
 
 EXPORTS SalamanderPluginEntry
 EXPORTS SalamanderPluginGetReqVer

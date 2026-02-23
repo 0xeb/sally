@@ -1,4 +1,4 @@
-LIBRARY filecomp.spl
+LIBRARY filecomp.dll
 
 EXPORTS SalamanderPluginEntry
 EXPORTS SalamanderPluginGetReqVer

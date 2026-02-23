@@ -1,4 +1,4 @@
-LIBRARY uniso.spl
+LIBRARY uniso.dll
 
 EXPORTS SalamanderPluginEntry
 EXPORTS SalamanderPluginGetReqVer

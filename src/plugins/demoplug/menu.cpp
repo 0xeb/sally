@@ -248,7 +248,7 @@ CPluginInterfaceForMenuExt::ExecuteMenuItem(CSalamanderForOperationsAbstract* sa
       char *res = SalamanderGeneral->NumberToStr(buffer, 1234567);
 */
         // test IsPluginInstalled
-        //      BOOL installed = SalamanderGeneral->IsPluginInstalled("webviewer\\webviewer.spl");
+        //      BOOL installed = SalamanderGeneral->IsPluginInstalled("webviewer\\webviewer.dll");
         /*
       // test ViewFileInPluginViewer
 //      CSalamanderPluginViewerData viewerData;
@@ -269,9 +269,9 @@ CPluginInterfaceForMenuExt::ExecuteMenuItem(CSalamanderForOperationsAbstract* sa
           HANDLES(CloseHandle(file));
 
           int err;
-//          BOOL ok = SalamanderGeneral->ViewFileInPluginViewer("webviewer\\webviewer.spl",
+//          BOOL ok = SalamanderGeneral->ViewFileInPluginViewer("webviewer\\webviewer.dll",
 //                                                              &viewerData, FALSE, NULL, NULL, err);
-//          BOOL ok = SalamanderGeneral->ViewFileInPluginViewer("webviewer\\webviewer.spl",
+//          BOOL ok = SalamanderGeneral->ViewFileInPluginViewer("webviewer\\webviewer.dll",
 //                                                              &viewerData, TRUE, NULL, "test.txt", err);
 //          BOOL ok = SalamanderGeneral->ViewFileInPluginViewer(NULL, &viewerData, FALSE, NULL, NULL, err);
           viewerData.Mode = 1;  // hex mode

@@ -865,17 +865,6 @@ CPluginsDlg::DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
         case IDB_PLUGINFOCUS:
         {
             CPluginData* p = GetSelectedPlugin();
-#ifdef _WIN64 // FIXME_X64_WINSCP - this will probably need to be solved differently... (ignoring the missing WinSCP in the x64 version of Salamander)
-            if (p != NULL && IsPluginUnsupportedOnX64(p->DLLName.c_str()))
-            {
-                // inform the user that this plugin is available only in the 32-bit version (x86)
-                // IDS_PLUGINISX86ONLY is not an ideal text but I don't care, it will do,
-                // and we won't bother translators unnecessarily
-                std::wstring msg = FormatStrW(LoadStrW(IDS_PLUGINISX86ONLY), AnsiToWide(p->Name.c_str()).c_str());
-                gPrompter->ShowInfo(LoadStrW(IDS_INFOTITLE), msg.c_str());
-                return 0;
-            }
-#endif // _WIN64
             if (p != NULL)
             {
                 CPathBuffer buf; // Heap-allocated for long path support

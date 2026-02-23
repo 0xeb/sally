@@ -1,4 +1,4 @@
-LIBRARY DBVIEWER.SPL
+LIBRARY DBVIEWER.DLL
 
 EXPORTS SalamanderPluginEntry
 EXPORTS SalamanderPluginGetReqVer

@@ -1,5 +1,5 @@
 # 7-Zip plugin and dependencies for Open Salamander
-# Builds: 7za.dll (library), 7zwrapper.dll (wrapper), 7zip.spl (plugin)
+# Builds: 7za.dll (library), 7zwrapper.dll (wrapper), sal7zip.dll (plugin)
 
 include_guard(GLOBAL)
 
@@ -119,7 +119,7 @@ set_target_properties(7zwrapper PROPERTIES
 )
 
 # =============================================================================
-# 7zip.spl - Salamander plugin
+# sal7zip.dll - Salamander plugin
 # =============================================================================
 
 sal_add_plugin(NAME 7zip
@@ -149,6 +149,9 @@ sal_add_plugin(NAME 7zip
   INCLUDES
     "${SEVENZIP_7ZA}/cpp"
 )
+
+# Rename to sal7zip.dll to avoid clash with 7-Zip library DLLs
+set_target_properties(plugin_7zip PROPERTIES OUTPUT_NAME "sal7zip")
 
 # Plugin depends on wrapper and library being built
 add_dependencies(plugin_7zip 7za 7zwrapper)

@@ -1,4 +1,4 @@
-LIBRARY PEVIEWER.SPL
+LIBRARY PEVIEWER.DLL
 
 EXPORTS SalamanderPluginEntry
 EXPORTS SalamanderPluginGetReqVer

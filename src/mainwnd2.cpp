@@ -145,7 +145,7 @@
 // so that new plug-ins are auto-installed and the plugins.ver counter resets.
 //
 
-const DWORD THIS_CONFIG_VERSION = 105;
+const DWORD THIS_CONFIG_VERSION = 106; // 106 = plugins renamed from .spl to .dll
 
 // Configuration roots for individual Open Salamander versions.
 // The root of the current (youngest) configuration is at index 0.

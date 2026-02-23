@@ -1,4 +1,4 @@
-LIBRARY renamer.spl
+LIBRARY renamer.dll
 
 EXPORTS SalamanderPluginEntry
 EXPORTS SalamanderPluginGetReqVer

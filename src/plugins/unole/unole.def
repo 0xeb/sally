@@ -1,4 +1,4 @@
-LIBRARY unole.spl
+LIBRARY unole.dll
 
 EXPORTS SalamanderPluginEntry
 EXPORTS SalamanderPluginGetReqVer

@@ -194,6 +194,9 @@ if(SAL_PLATFORM STREQUAL "x64")
     NO_SHARED
   )
 
+  # Rename to salunrar.dll to avoid clash with RARLab's unrar.dll
+  set_target_properties(plugin_unrar PROPERTIES OUTPUT_NAME "salunrar")
+
   # Copy unrar.dll to build output (needed at runtime via LoadLibrary)
   add_custom_command(TARGET plugin_unrar POST_BUILD
     COMMAND ${CMAKE_COMMAND} -E copy_if_different

@@ -1,4 +1,4 @@
-LIBRARY CHECKVER.SPL
+LIBRARY CHECKVER.DLL
 
 EXPORTS SalamanderPluginEntry
 EXPORTS SalamanderPluginGetReqVer

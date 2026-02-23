@@ -1802,7 +1802,7 @@ public:
     // entry-point is running, method can only be called from main thread)
     virtual void WINAPI PostUnloadThisPlugin() = 0;
 
-    // returns Salamander modules one by one (executable and .spl files of installed
+    // returns Salamander modules one by one (executable and .dll files of installed
     // plugins, all including versions); 'index' is input/output variable, points to int
     // which is 0 on first call, function stores value for next call on return
     // (usage: zero at start, then don't change); 'module' is buffer for module name
@@ -1877,15 +1877,15 @@ public:
 
     // determines if plugin is installed (but doesn't determine if it can be loaded - if user
     // e.g. deleted it only from disk); 'pluginSPL' identifies plugin - it's required
-    // ending part of full path to plugin's .SPL file (e.g. "webviewer\\webviewer.spl" identifies
+    // ending part of full path to plugin's .dll file (e.g. "webviewer\\webviewer.dll" identifies
     // Web Viewer shipped with Salamander); returns TRUE if plugin is installed
     // limitation: main thread (otherwise plugin configuration may change during call)
     virtual BOOL WINAPI IsPluginInstalled(const char* pluginSPL) = 0;
 
     // opens file in viewer implemented in plugin or internal text/hex viewer;
     // if 'pluginSPL' is NULL, internal text/hex viewer should be used, otherwise identifies plugin
-    // viewer - it's required ending part of full path to plugin's .SPL file (e.g.
-    // "webviewer\\webviewer.spl" identifies Web Viewer shipped with Salamander); 'pluginData'
+    // viewer - it's required ending part of full path to plugin's .dll file (e.g.
+    // "webviewer\\webviewer.dll" identifies Web Viewer shipped with Salamander); 'pluginData'
     // is data structure containing viewed file name and optionally contains extended
     // viewer parameters (see CSalamanderPluginViewerData description); if 'useCache' is FALSE,
     // 'rootTmpPath' and 'fileNameInCache' are ignored and file is just opened in viewer;

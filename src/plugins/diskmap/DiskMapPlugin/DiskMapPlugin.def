@@ -1,4 +1,4 @@
-LIBRARY DISKMAP.SPL
+LIBRARY DISKMAP.DLL
 
 EXPORTS SalamanderPluginEntry
 EXPORTS SalamanderPluginGetReqVer

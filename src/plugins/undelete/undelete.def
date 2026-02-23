@@ -1,4 +1,4 @@
-LIBRARY undelete.spl
+LIBRARY undelete.dll
 
 EXPORTS SalamanderPluginEntry
 EXPORTS SalamanderPluginGetReqVer

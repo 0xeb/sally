@@ -2502,7 +2502,7 @@ public:
     // 'parent' is the parent window for message boxes; if it is 'quiet'==TRUE no error messages are shown
     // (however, messages from inside the plugin are still displayed)
     // 'waitCursor' shows the Wait cursor while loading the DLL library
-    // if 'showUnsupOnX64' is TRUE, a message box warns about plugins unsupported on x64
+    // 'showUnsupOnX64' is unused (kept for API compatibility)
     // if 'releaseDynMenuIcons' is TRUE, plugins`s dynamic menu icons are released (they are reloaded before opening the menu)
     BOOL InitDLL(HWND parent, BOOL quiet = FALSE, BOOL waitCursor = TRUE, BOOL showUnsupOnX64 = TRUE,
                  BOOL releaseDynMenuIcons = TRUE);
@@ -2857,7 +2857,7 @@ public:
     // adjusts all archive-related data structures -> ensures data consistency
     void CheckData();
 
-    // removes from Data all plugins whose .spl file no longer exists; if 'canDelPluginRegKey' is TRUE,
+    // removes from Data all plugins whose .dll file no longer exists; if 'canDelPluginRegKey' is TRUE,
     // their configuration in the registry is also deleted. in the 'notLoadedPluginNames' (buffer of size
     // 'notLoadedPluginNamesSize') returns a list of names (up to 'maxNotLoadedPluginNames' names) of
     // plugins that were not loaded but with the configuration in the registry(either removed or failed InitDLL()),
@@ -2873,7 +2873,7 @@ public:
                                        HWND parent = NULL);
 
     // automatically installs plugins from the standard "plugins" directory (adds only
-    // those not yet added) and automatically uninstalls plugins whose .spl files disappeared
+    // those not yet added) and automatically uninstalls plugins whose .dll files disappeared
     void AutoInstallStdPluginsDir(HWND parent);
 
     // handles addition of newly installed plugins (reads plugins.ver); returns TRUE if a new
@@ -3421,7 +3421,3 @@ BOOL CreateGrayscaleDIB(HBITMAP hSource, COLORREF transparent, HBITMAP& hGraysca
 // CPluginInterfaceForFSAbstract::ConvertPathToExternal())
 void PluginFSConvertPathToExternal(char* path);
 
-#ifdef _WIN64 // FIXME_X64_WINSCP
-// test whether this is a plugin missing in the x64 version of Salamander: currently only WinSCP
-BOOL IsPluginUnsupportedOnX64(const char* dllName, const char** pluginNameEN = NULL);
-#endif // _WIN64

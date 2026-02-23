@@ -1,4 +1,4 @@
-LIBRARY WMOBILE.SPL
+LIBRARY WMOBILE.DLL
 
 EXPORTS SalamanderPluginEntry
 EXPORTS SalamanderPluginGetReqVer

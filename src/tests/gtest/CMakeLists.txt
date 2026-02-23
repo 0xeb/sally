@@ -500,3 +500,33 @@ add_test(NAME gtest_webview2 COMMAND gtest_webview2)
 set_target_properties(gtest_webview2 PROPERTIES
     RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/tests"
 )
+
+# Tiny DLL with SalamanderPluginEntry export (for testing PE validation)
+add_library(test_dummy_plugin SHARED test_dummy_plugin.cpp)
+
+# Plugin PE export validation tests
+add_executable(gtest_plugins
+    gtest_plugins.cpp
+    ../../common/peutils.cpp
+)
+
+target_include_directories(gtest_plugins PRIVATE
+    "${CMAKE_SOURCE_DIR}/src/common"
+)
+
+target_compile_definitions(gtest_plugins PRIVATE
+    WIN32 _WINDOWS _CRT_SECURE_NO_WARNINGS
+    TEST_DUMMY_PLUGIN_PATH="$<TARGET_FILE:test_dummy_plugin>"
+)
+
+target_link_libraries(gtest_plugins
+    GTest::gtest GTest::gtest_main
+)
+
+add_test(NAME gtest_plugins COMMAND gtest_plugins)
+
+set_target_properties(gtest_plugins PROPERTIES
+    RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/tests"
+)
+
+add_dependencies(gtest_plugins test_dummy_plugin)

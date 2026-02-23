@@ -1,4 +1,4 @@
-LIBRARY PAK.SPL
+LIBRARY PAK.DLL
 
 EXPORTS SalamanderPluginEntry
 EXPORTS SalamanderPluginGetReqVer

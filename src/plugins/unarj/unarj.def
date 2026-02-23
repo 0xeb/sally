@@ -1,4 +1,4 @@
-LIBRARY unarj.spl
+LIBRARY unarj.dll
 
 EXPORTS SalamanderPluginEntry
 EXPORTS SalamanderPluginGetReqVer

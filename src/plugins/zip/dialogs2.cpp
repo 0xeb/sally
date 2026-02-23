@@ -1053,7 +1053,7 @@ BOOL CAdvancedSEDialog::OnImport()
                 }
 
                 CPathBuffer zip2sfxDir; // Heap-allocated for long path support
-                if (GetModuleFileName(DLLInstance, zip2sfxDir, zip2sfxDir.Size() - 1)) // -1 is the length difference between "zip2sfx\\" and "zip.spl"
+                if (GetModuleFileName(DLLInstance, zip2sfxDir, zip2sfxDir.Size() - 1)) // -1 is the length difference between "zip2sfx\\" and "zip.dll"
                 {
                     char* name = strrchr(zip2sfxDir.Get(), '\\');
                     if (name != NULL)

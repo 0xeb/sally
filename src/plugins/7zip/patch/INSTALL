@@ -68,7 +68,7 @@ Jan Patera 2009.06.07 - END
 Building 7ZA.DLL
 ----------------
 
-This document describes how to build the patched 7za.dll so it works with 7zip.spl
+This document describes how to build the patched 7za.dll so it works with sal7zip.dll
 (the Open Salamander plugin).
 
 I use Unix commands. Either use Cygwin or UnxUtils (http://unxutils.sourceforge.org/).

@@ -1,4 +1,4 @@
-LIBRARY 7zip.spl
+LIBRARY sal7zip.dll
 
 EXPORTS SalamanderPluginEntry
 EXPORTS SalamanderPluginGetReqVer

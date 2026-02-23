@@ -1,4 +1,4 @@
-LIBRARY uncab.spl
+LIBRARY uncab.dll
 
 EXPORTS SalamanderPluginEntry
 EXPORTS SalamanderPluginGetReqVer

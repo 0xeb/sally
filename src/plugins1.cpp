@@ -1960,19 +1960,6 @@ BOOL CPluginData::InitDLL(HWND parent, BOOL quiet, BOOL waitCursor, BOOL showUns
 
     CPathBuffer bufText;
 
-#ifdef _WIN64 // FIXME_X64_WINSCP - this probably needs a different solution... (ignoring missing WinSCP in the x64 version of Salamander)
-    const char* pluginNameEN;
-    if (IsPluginUnsupportedOnX64(DLLName.c_str(), &pluginNameEN))
-    {
-        if (showUnsupOnX64) // inform the user this plugin is available only in the 32-bit version (x86)
-        {
-            std::wstring msg = FormatStrW(LoadStrW(IDS_PLUGINISX86ONLY), AnsiToWide(Name.empty() ? pluginNameEN : Name.c_str()).c_str());
-            gPrompter->ShowInfo(LoadStrW(IDS_INFOTITLE), msg.c_str());
-        }
-        return FALSE;
-    }
-#endif // _WIN64
-
     if (DLL == NULL)
     {
         BOOL refreshUNCRootPaths = FALSE;

@@ -1,4 +1,4 @@
-LIBRARY unmime.spl
+LIBRARY unmime.dll
 
 EXPORTS SalamanderPluginEntry
 EXPORTS SalamanderPluginGetReqVer

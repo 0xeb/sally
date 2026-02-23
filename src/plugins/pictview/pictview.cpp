@@ -445,7 +445,7 @@ const char* WINAPI GetExtText(int msgID)
 
 BOOL WINAPI DllMain(HINSTANCE hinstDLL, DWORD fdwReason, LPVOID lpvReserved)
 {
-    if (fdwReason == DLL_PROCESS_ATTACH) // start PictView.spl
+    if (fdwReason == DLL_PROCESS_ATTACH) // start PictView.dll
     {
         DLLInstance = hinstDLL;
     }
@@ -1640,7 +1640,7 @@ public:
 /*
 unsigned WINAPI ViewerThreadBody(void *param)
 {
-  CALL_STACK_MESSAGE3(_T("ViewerThreadBody() PictView.spl %s %hs"), VERSINFO_VERSION, PVW32DLL.Version);
+  CALL_STACK_MESSAGE3(_T("ViewerThreadBody() PictView.dll %s %hs"), VERSINFO_VERSION, PVW32DLL.Version);
   SetThreadNameInVCAndTrace(PLUGIN_NAME_EN);
   TRACE_I("Begin");
   RECT    r;
@@ -1759,7 +1759,7 @@ unsigned __stdcall ViewerThread(void *param)
 unsigned
 CViewerThread::Body()
 {
-    CALL_STACK_MESSAGE3(_T("ViewerThreadBody() PictView.spl %s %hs"), VERSINFO_VERSION, PVW32DLL.Version);
+    CALL_STACK_MESSAGE3(_T("ViewerThreadBody() PictView.dll %s %hs"), VERSINFO_VERSION, PVW32DLL.Version);
     SetThreadNameInVCAndTrace(PLUGIN_NAME_EN);
     TRACE_I("Begin");
 

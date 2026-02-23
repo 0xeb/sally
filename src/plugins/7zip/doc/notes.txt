@@ -1,13 +1,13 @@
 As of v4.62, 7za.dll can't really be built as truly single-threaded.
 It still launches new threads, when a new type of encoder is needed
-(namely brancher for executables). As a result, the callback to 7zip.spl
+(namely brancher for executables). As a result, the callback to sal7zip.dll
 can get invoked from the original thread used to call 7za.dll but
 also from threads launched by 7za.dll itself. Because Windows GUI and many
 Salamander's functions are not thread-safe or can only be called
 from the main Salamander's thread, the following environment is used.
 
 Here "main thread" means the thread of Salamander that calls the methods
-of CPluginInterfaceForArchiver in 7zip.spl.
+of CPluginInterfaceForArchiver in sal7zip.dll.
 1) ProgressBar dialog is subclassed by the main thread.
 2) The main thread calls LaunchAndDo7ZipTask that launches a new worker
   thread. The main thread processes message loop as long as the worker

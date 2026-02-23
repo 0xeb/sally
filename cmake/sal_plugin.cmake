@@ -117,7 +117,7 @@ function(sal_add_plugin)
   # Set output name and extension
   set_target_properties(${TARGET_NAME} PROPERTIES
     OUTPUT_NAME "${PLUGIN_NAME}"
-    SUFFIX ".spl"
+    SUFFIX ".dll"
     PREFIX ""
     # Output to plugins/<name>/ subdirectory
     RUNTIME_OUTPUT_DIRECTORY "${SAL_OUTPUT_BASE}/$<CONFIG>_${SAL_PLATFORM}/plugins/${PLUGIN_NAME}"
@@ -178,6 +178,9 @@ function(sal_add_plugin)
       message(STATUS "  PCH: not found (${PLUGIN_PCH})")
     endif()
   endif()
+
+  # Store original plugin name for install paths (directory name stays the same even if OUTPUT_NAME differs)
+  set_target_properties(${TARGET_NAME} PROPERTIES SAL_PLUGIN_NAME "${PLUGIN_NAME}")
 
   # Add to global list of plugins
   set_property(GLOBAL APPEND PROPERTY SAL_PLUGINS_LIST ${TARGET_NAME})

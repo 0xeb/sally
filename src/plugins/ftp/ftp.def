@@ -1,4 +1,4 @@
-LIBRARY FTP.SPL
+LIBRARY FTP.DLL
 
 EXPORTS SalamanderPluginEntry
 EXPORTS SalamanderPluginGetReqVer

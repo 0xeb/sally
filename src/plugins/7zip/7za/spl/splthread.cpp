@@ -25,10 +25,10 @@ RunThreadWithCallStackObject(LPTHREAD_START_ROUTINE startAddress, LPVOID paramet
     HMODULE module = NULL;
     FThreadBody addCallStackObject = NULL;
 
-    if ((module = ::GetModuleHandle("7zip.spl")) != NULL &&
+    if ((module = ::GetModuleHandle("sal7zip.dll")) != NULL &&
         (addCallStackObject = (FThreadBody)::GetProcAddress(module, "AddCallStackObject")) != NULL)
     {
-        // successfully obtained AddCallStackObject from 7zip.spl
+        // successfully obtained AddCallStackObject from sal7zip.dll
         AddCallStackObjectParam p;
         p.StartAddress = startAddress;
         p.Parameter = parameter;

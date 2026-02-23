@@ -63,10 +63,10 @@ endfunction()
 function(sal_install_plugins)
   sal_get_all_plugins(PLUGINS)
   foreach(PLUGIN_TARGET ${PLUGINS})
-    get_target_property(PLUGIN_OUTPUT_NAME ${PLUGIN_TARGET} OUTPUT_NAME)
+    get_target_property(PLUGIN_DIR_NAME ${PLUGIN_TARGET} SAL_PLUGIN_NAME)
     install(TARGETS ${PLUGIN_TARGET}
-      LIBRARY DESTINATION "plugins/${PLUGIN_OUTPUT_NAME}"
-      RUNTIME DESTINATION "plugins/${PLUGIN_OUTPUT_NAME}"
+      LIBRARY DESTINATION "plugins/${PLUGIN_DIR_NAME}"
+      RUNTIME DESTINATION "plugins/${PLUGIN_DIR_NAME}"
     )
   endforeach()
 
@@ -91,9 +91,10 @@ function(sal_generate_plugins_ver)
   set(PLUGINS_VER_CONTENT "1\n")
 
   foreach(PLUGIN_TARGET ${PLUGINS})
+    get_target_property(PLUGIN_DIR_NAME ${PLUGIN_TARGET} SAL_PLUGIN_NAME)
     get_target_property(PLUGIN_OUTPUT_NAME ${PLUGIN_TARGET} OUTPUT_NAME)
     # Use forward slashes in the file, Salamander handles both
-    string(APPEND PLUGINS_VER_CONTENT "1:plugins/${PLUGIN_OUTPUT_NAME}/${PLUGIN_OUTPUT_NAME}.spl\n")
+    string(APPEND PLUGINS_VER_CONTENT "1:plugins/${PLUGIN_DIR_NAME}/${PLUGIN_OUTPUT_NAME}.dll\n")
   endforeach()
 
   # Write to build directory

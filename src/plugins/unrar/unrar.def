@@ -1,4 +1,4 @@
-LIBRARY unrar.spl
+LIBRARY salunrar.dll
 
 EXPORTS SalamanderPluginEntry
 EXPORTS SalamanderPluginGetReqVer

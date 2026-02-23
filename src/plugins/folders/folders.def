@@ -1,4 +1,4 @@
-LIBRARY folders.spl
+LIBRARY folders.dll
 
 EXPORTS SalamanderPluginEntry
 EXPORTS SalamanderPluginGetReqVer

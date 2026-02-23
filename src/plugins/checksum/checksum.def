@@ -1,4 +1,4 @@
-LIBRARY checksum.spl
+LIBRARY checksum.dll
 
 EXPORTS SalamanderPluginEntry
 EXPORTS SalamanderPluginGetReqVer

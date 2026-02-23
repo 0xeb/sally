@@ -1,4 +1,4 @@
-LIBRARY DEMOVIEW.SPL
+LIBRARY DEMOVIEW.DLL
 
 EXPORTS SalamanderPluginEntry
 EXPORTS SalamanderPluginGetReqVer

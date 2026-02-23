@@ -1,4 +1,4 @@
-LIBRARY splitcbn.spl
+LIBRARY splitcbn.dll
 
 EXPORTS SalamanderPluginEntry
 EXPORTS SalamanderPluginGetReqVer
