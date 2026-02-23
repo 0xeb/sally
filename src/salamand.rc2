@@ -18,10 +18,10 @@ CREATEPROCESS_MANIFEST_RESOURCE_ID RT_MANIFEST "manifest.xml"
 
 #include "plugins\\shared\\versinfo.rc2"
 
-IDI_SALAMANDER ICON "res\\salamand.ico"
+IDI_SALAMANDER ICON "res\\sal_b.ico"
 IDI_SALAMANDER_RED ICON "res\\sal_r.ico"
 IDI_SALAMANDER_GREEN ICON "res\\sal_g.ico"
-IDI_SALAMANDER_BLUE ICON "res\\sal_b.ico"
+IDI_SALAMANDER_BLUE ICON "res\\salamand.ico"
 IDI_UPPERDIR ICON "res\\updir.ico"
 IDI_ARCHIVE ICON "res\\archive.ico"
 IDI_PLUGIN ICON "res\\plugin.ico"

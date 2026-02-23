@@ -244,7 +244,7 @@ STRINGTABLE
  IDS_EXEFILTER, "Executables (*.exe, *.pif, *.com)|*.exe;*.pif;*.com|All files (*.*)|*.*|"
  IDS_REGFILTER, "Registry file (*.reg)|*.reg|"
  IDS_ICOFILTER, "Icon files (*exe, *.dll, *.ico)|*.exe;*.dll;*.ico|Programs (*.exe)|*exe|Libraries (*.dll)|*.dll|Icons (*.ico)|*.ico|All files (*.*)|*.*|"
- IDS_PLUGINFILTER, "Plugin files (*.spl)|*.spl|All files (*.*)|*.*|"
+ IDS_PLUGINFILTER, "Plugin files (*.dll;*.spl)|*.dll;*.spl|All files (*.*)|*.*|"
 
  IDS_NETWORKERROR, "Network Error"
 
@@ -1775,7 +1775,7 @@ STRINGTABLE
  IDS_SALAMANDERICON_DEFAULT, "Default"
  IDS_SALAMANDERICON_RED, "Red"
  IDS_SALAMANDERICON_GREEN, "Green"
- IDS_SALAMANDERICON_BLUE, "Blue"
+ IDS_SALAMANDERICON_BLUE, "Yellow (Classic)"
  
  IDS_PROGDLGHOURS, "%d hr"
  IDS_PROGDLGMINUTES, "%d min"
