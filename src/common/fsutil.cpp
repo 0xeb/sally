@@ -4,6 +4,7 @@
 
 #include "precomp.h"
 #include "fsutil.h"
+#include "IPathService.h"
 #include "widepath.h"
 
 SalFileInfo GetFileInfoW(const wchar_t* fullPath)
@@ -18,41 +19,24 @@ SalFileInfo GetFileInfoW(const wchar_t* fullPath)
         return info;
     }
 
-    // Check if we need to add \\?\ prefix for long paths
-    size_t pathLen = wcslen(fullPath);
-    const wchar_t* pathToUse = fullPath;
-    wchar_t* prefixedPath = NULL;
-
-    if (pathLen >= SAL_LONG_PATH_THRESHOLD &&
-        !(fullPath[0] == L'\\' && fullPath[1] == L'\\' && fullPath[2] == L'?' && fullPath[3] == L'\\'))
+    if (gPathService == NULL)
+        gPathService = GetWin32PathService();
+    if (gPathService == NULL)
     {
-        // Need to add prefix
-        BOOL isUNC = (fullPath[0] == L'\\' && fullPath[1] == L'\\');
-        size_t prefixLen = isUNC ? 8 : 4; // Prefix: "\\?\UNC\" or "\\?\"
-        size_t skipLen = isUNC ? 2 : 0;   // Skip leading backslashes for UNC
+        info.LastError = ERROR_INVALID_FUNCTION;
+        return info;
+    }
 
-        prefixedPath = (wchar_t*)malloc((prefixLen + pathLen - skipLen + 1) * sizeof(wchar_t));
-        if (prefixedPath == NULL)
-        {
-            info.LastError = ERROR_NOT_ENOUGH_MEMORY;
-            return info;
-        }
-
-        if (isUNC)
-        {
-            wcscpy(prefixedPath, L"\\\\?\\UNC\\");
-            wcscpy(prefixedPath + 8, fullPath + 2);
-        }
-        else
-        {
-            wcscpy(prefixedPath, L"\\\\?\\");
-            wcscpy(prefixedPath + 4, fullPath);
-        }
-        pathToUse = prefixedPath;
+    std::wstring pathToUse;
+    PathResult pathRes = gPathService->ToLongPath(fullPath, pathToUse);
+    if (!pathRes.success)
+    {
+        info.LastError = pathRes.errorCode;
+        return info;
     }
 
     WIN32_FIND_DATAW findData;
-    HANDLE hFind = FindFirstFileW(pathToUse, &findData);
+    HANDLE hFind = FindFirstFileW(pathToUse.c_str(), &findData);
 
     if (hFind != INVALID_HANDLE_VALUE)
     {
@@ -71,9 +55,6 @@ SalFileInfo GetFileInfoW(const wchar_t* fullPath)
     {
         info.LastError = GetLastError();
     }
-
-    if (prefixedPath != NULL)
-        free(prefixedPath);
 
     return info;
 }

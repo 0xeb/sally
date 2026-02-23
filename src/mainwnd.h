@@ -43,6 +43,7 @@ class CMenuBar;
 class CMenuNew;
 class CToolTip;
 class CAnimate;
+class CPathBuffer;
 
 //****************************************************************************
 //
@@ -515,7 +516,7 @@ public:
     void SaveConfig(HWND parent = NULL); // parent: NULL = MainWindow->HWindow
     BOOL LoadConfig(BOOL importingOldConfig, const CCommandLineParams* cmdLineParams);
     void SavePanelConfig(CFilesWindow* panel, HKEY hSalamander, const char* reg);
-    void LoadPanelConfig(char* panelPath, int panelPathSize, CFilesWindow* panel, HKEY hSalamander, const char* reg);
+    void LoadPanelConfig(CPathBuffer& panelPath, CFilesWindow* panel, HKEY hSalamander, const char* reg);
     void DeleteOldConfigurations(BOOL* deleteConfigurations, BOOL autoImportConfig,
                                  const char* autoImportConfigFromKey, BOOL doNotDeleteImportedCfg);
 

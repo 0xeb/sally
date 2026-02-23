@@ -438,7 +438,8 @@ TEST(CPathBuffer, DefaultConstruction)
 {
     CPathBuffer buf;
     EXPECT_TRUE(buf.IsValid());
-    EXPECT_EQ(buf.Size(), SAL_MAX_LONG_PATH);
+    EXPECT_EQ(buf.Size(), SAL_PATH_BUFFER_INITIAL_CAPACITY);
+    EXPECT_EQ(buf.MaxCapacity(), SAL_MAX_LONG_PATH);
     EXPECT_STREQ(buf.Get(), "");
 }
 
@@ -480,7 +481,8 @@ TEST(CWidePathBuffer, DefaultConstruction)
 {
     CWidePathBuffer buf;
     EXPECT_TRUE(buf.IsValid());
-    EXPECT_EQ(buf.Size(), SAL_MAX_LONG_PATH);
+    EXPECT_EQ(buf.Size(), SAL_WIDE_PATH_BUFFER_INITIAL_CAPACITY);
+    EXPECT_EQ(buf.MaxCapacity(), SAL_MAX_LONG_PATH);
     EXPECT_STREQ(buf.Get(), L"");
 }
 
@@ -630,6 +632,7 @@ TEST(CPathBufferStructTest, LongStringBeyondMaxPath)
     longPath += "file.txt";
     EXPECT_GT(longPath.size(), 260u);
 
+    ASSERT_TRUE(buf.EnsureCapacity((int)longPath.size() + 1));
     lstrcpynA(buf, longPath.c_str(), buf.Size());
     EXPECT_STREQ(buf, longPath.c_str());
 }

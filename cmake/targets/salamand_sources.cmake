@@ -27,6 +27,7 @@ set(SALAMANDER_SOURCES
   "${SAL_SRC}/common/trace.cpp"
   "${SAL_SRC}/common/widepath.cpp"
   "${SAL_SRC}/common/fsutil.cpp"
+  "${SAL_SRC}/common/Win32PathService.cpp"
   "${SAL_SRC}/common/Win32FileSystem.cpp"
   "${SAL_SRC}/common/Win32Clipboard.cpp"
   "${SAL_SRC}/common/Win32Registry.cpp"

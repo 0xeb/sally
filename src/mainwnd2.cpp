@@ -7,6 +7,7 @@
 #include "ui/IPrompter.h"
 #include "common/unicode/helpers.h"
 #include "common/IEnvironment.h"
+#include "common/IRegistry.h"
 #include <shlwapi.h>
 #undef PathIsPrefix // otherwise, collision with CSalamanderGeneral::PathIsPrefix
 
@@ -2394,13 +2395,40 @@ void CMainWindow::SaveConfig(HWND parent)
     }
 }
 
-void CMainWindow::LoadPanelConfig(char* panelPath, int panelPathSize, CFilesWindow* panel, HKEY hSalamander, const char* reg)
+void CMainWindow::LoadPanelConfig(CPathBuffer& panelPath, CFilesWindow* panel, HKEY hSalamander, const char* reg)
 {
+    auto readPanelPathViaRegistryService = [](HKEY key, CPathBuffer& outPath) -> BOOL
+    {
+        if (gRegistry == NULL || key == NULL)
+            return FALSE;
+
+        std::wstring panelPathW;
+        RegistryResult result = gRegistry->GetString(key, AnsiToWideReg(PANEL_PATH_REG).c_str(), panelPathW);
+        if (!result.success)
+            return FALSE;
+
+        int requiredChars = WideCharToMultiByte(CP_ACP, 0, panelPathW.c_str(), -1, NULL, 0, NULL, NULL);
+        if (requiredChars <= 0 || !outPath.EnsureCapacity(requiredChars))
+            return FALSE;
+
+        return WideCharToMultiByte(CP_ACP, 0, panelPathW.c_str(), -1, outPath.Get(), outPath.Size(), NULL, NULL) > 0;
+    };
+
     HKEY actKey;
     if (OpenKey(hSalamander, reg, actKey))
     {
         DWORD value;
-        if (GetValue(actKey, PANEL_PATH_REG, REG_SZ, panelPath, panelPathSize))
+        DWORD panelPathSize = 0;
+        BOOL panelPathLoaded = readPanelPathViaRegistryService(actKey, panelPath);
+        if (!panelPathLoaded &&
+            GetSize(actKey, PANEL_PATH_REG, REG_SZ, panelPathSize) &&
+            panelPath.EnsureCapacity((int)panelPathSize) &&
+            GetValue(actKey, PANEL_PATH_REG, REG_SZ, panelPath.Get(), panelPath.Size()))
+        {
+            panelPathLoaded = TRUE;
+        }
+
+        if (panelPathLoaded)
         {
             if (GetValue(actKey, PANEL_HEADER_REG, REG_DWORD, &value, sizeof(DWORD)))
                 panel->HeaderLineVisible = value;
@@ -3816,8 +3844,8 @@ BOOL CMainWindow::LoadConfig(BOOL importingOldConfig, const CCommandLineParams* 
         strcpy(rightPanelPath, leftPanelPath);
         CPathBuffer sysDefDir;
         lstrcpyn(sysDefDir, DefaultDir[LowerCase[leftPanelPath[0]] - 'a'], sysDefDir.Size());
-        LoadPanelConfig(leftPanelPath, leftPanelPath.Size(), LeftPanel, salamander, SALAMANDER_LEFTP_REG);
-        LoadPanelConfig(rightPanelPath, rightPanelPath.Size(), RightPanel, salamander, SALAMANDER_RIGHTP_REG);
+        LoadPanelConfig(leftPanelPath, LeftPanel, salamander, SALAMANDER_LEFTP_REG);
+        LoadPanelConfig(rightPanelPath, RightPanel, salamander, SALAMANDER_RIGHTP_REG);
 
         CloseKey(salamander);
         salamander = NULL;

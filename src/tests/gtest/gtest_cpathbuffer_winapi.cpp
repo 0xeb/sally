@@ -243,6 +243,7 @@ TEST(CPathBufferLongPath, CanHoldPathLongerThanMAX_PATH)
     std::string path = "C:\\" + longDir + "\\file.txt";
     ASSERT_GT(path.length(), (size_t)MAX_PATH);
 
+    ASSERT_TRUE(buf.EnsureCapacity((int)path.length() + 1));
     strcpy(buf, path.c_str());
     EXPECT_STREQ(buf, path.c_str());
     EXPECT_EQ(strlen(buf), path.length());
@@ -257,6 +258,7 @@ TEST(CPathBufferLongPath, PathConcatExceedingMAX_PATH)
     std::string fullPath = "C:\\" + dir + "\\" + name;
     ASSERT_GT(fullPath.length(), (size_t)MAX_PATH);
 
+    ASSERT_TRUE(buf.EnsureCapacity((int)fullPath.length() + 1));
     strcpy(buf, "C:\\");
     strcat(buf, dir.c_str());
     strcat(buf, "\\");
@@ -264,18 +266,19 @@ TEST(CPathBufferLongPath, PathConcatExceedingMAX_PATH)
     EXPECT_STREQ(buf, fullPath.c_str());
 }
 
-TEST(CPathBufferLongPath, SizeReturnsFullCapacity)
+TEST(CPathBufferLongPath, SizeStartsAtInitialCapacity)
 {
     CPathBuffer buf;
-    // SAL_MAX_LONG_PATH = 32767
-    EXPECT_EQ(buf.Size(), 32767);
-    EXPECT_GT(buf.Size(), MAX_PATH);
+    EXPECT_EQ(buf.Size(), SAL_PATH_BUFFER_INITIAL_CAPACITY);
+    EXPECT_EQ(buf.MaxCapacity(), SAL_MAX_LONG_PATH);
+    EXPECT_GT(buf.MaxCapacity(), MAX_PATH);
 }
 
 TEST(CPathBufferLongPath, LstrcpynWithLongPath)
 {
     CPathBuffer buf;
     std::string longPath(500, 'x');
+    ASSERT_TRUE(buf.EnsureCapacity((int)longPath.size() + 1));
     lstrcpynA(buf, longPath.c_str(), buf.Size());
     EXPECT_EQ(strlen(buf), 500u);
 }
@@ -286,6 +289,7 @@ TEST(CPathBufferLongPath, MemmoveWithLongPath)
     CPathBuffer buf;
     std::string prefix = "C:\\";
     std::string suffix(300, 's');
+    ASSERT_TRUE(buf.EnsureCapacity((int)(prefix.length() + suffix.length() + 1)));
     strcpy(buf, suffix.c_str());
     // Insert prefix at start
     memmove(buf.Get() + prefix.length(), buf.Get(), strlen(buf) + 1);
@@ -300,11 +304,12 @@ TEST(CPathBufferLongPath, MemmoveWithLongPath)
 // Buffer size checks
 // ============================================================================
 
-TEST(CPathBufferWinAPI, SizeIsSAL_MAX_LONG_PATH)
+TEST(CPathBufferWinAPI, SizeStartsAtInitialCapacity)
 {
     CPathBuffer buf;
-    EXPECT_EQ(buf.Size(), SAL_MAX_LONG_PATH);
-    EXPECT_EQ(buf.Size(), 32767);
+    EXPECT_EQ(buf.Size(), SAL_PATH_BUFFER_INITIAL_CAPACITY);
+    EXPECT_EQ(buf.MaxCapacity(), SAL_MAX_LONG_PATH);
+    EXPECT_EQ(buf.MaxCapacity(), 32767);
 }
 
 TEST(CPathBufferWinAPI, CanStoreVeryLongPath)
@@ -315,7 +320,8 @@ TEST(CPathBufferWinAPI, CanStoreVeryLongPath)
         longPath += "verylongsegment\\";
     longPath.pop_back();
 
-    ASSERT_LT(longPath.size(), (size_t)buf.Size());
+    ASSERT_LT(longPath.size(), (size_t)buf.MaxCapacity());
+    ASSERT_TRUE(buf.EnsureCapacity((int)longPath.size() + 1));
     strcpy(buf, longPath.c_str());
     EXPECT_STREQ(buf, longPath.c_str());
 }
@@ -349,7 +355,7 @@ TEST(CPathBufferWinAPI, MemsetZero)
 //
 // The same overflow applies to nFileSystemNameSize (parameter 8).
 //
-// ALWAYS pass MAX_PATH (not CPathBuffer::Size()) as the size parameter
+// ALWAYS pass MAX_PATH (not CPathBuffer::MaxCapacity()) as the size parameter
 // to GetVolumeInformationA / GetVolumeInformation.
 // ============================================================================
 

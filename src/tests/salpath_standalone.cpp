@@ -14,6 +14,7 @@
 #include <windows.h>
 #include <string>
 #include <algorithm>
+#include <string.h>
 
 #include "../common/widepath.h"
 
@@ -205,39 +206,86 @@ bool CutDirectoryW(std::wstring& path, std::wstring* cutDir)
 //****************************************************************************
 
 CWidePathBuffer::CWidePathBuffer()
-    : m_buffer(NULL)
+    : m_buffer(m_inline), m_capacity(SAL_WIDE_PATH_BUFFER_INITIAL_CAPACITY)
 {
-    m_buffer = (wchar_t*)malloc(SAL_MAX_LONG_PATH * sizeof(wchar_t));
-    if (m_buffer != NULL)
-    {
-        m_buffer[0] = L'\0';
-    }
+    m_inline[0] = L'\0';
 }
 
 CWidePathBuffer::CWidePathBuffer(const wchar_t* initialPath)
-    : m_buffer(NULL)
+    : m_buffer(m_inline), m_capacity(SAL_WIDE_PATH_BUFFER_INITIAL_CAPACITY)
 {
-    m_buffer = (wchar_t*)malloc(SAL_MAX_LONG_PATH * sizeof(wchar_t));
-    if (m_buffer != NULL)
-    {
-        if (initialPath != NULL)
-        {
-            wcsncpy(m_buffer, initialPath, SAL_MAX_LONG_PATH - 1);
-            m_buffer[SAL_MAX_LONG_PATH - 1] = L'\0';
-        }
-        else
-        {
-            m_buffer[0] = L'\0';
-        }
-    }
+    m_inline[0] = L'\0';
+    Assign(initialPath);
 }
 
 CWidePathBuffer::~CWidePathBuffer()
 {
-    if (m_buffer != NULL)
-    {
+    if (m_buffer != NULL && m_buffer != m_inline)
         free(m_buffer);
+    m_buffer = NULL;
+    m_capacity = 0;
+}
+
+BOOL CWidePathBuffer::EnsureCapacity(int requiredChars)
+{
+    if (requiredChars <= 0)
+        requiredChars = 1;
+    if (requiredChars <= m_capacity)
+        return TRUE;
+    if (requiredChars > SAL_MAX_LONG_PATH)
+        return FALSE;
+
+    int newCapacity = m_capacity;
+    while (newCapacity < requiredChars)
+    {
+        if (newCapacity >= SAL_MAX_LONG_PATH / 2)
+        {
+            newCapacity = SAL_MAX_LONG_PATH;
+            break;
+        }
+        newCapacity *= 2;
     }
+    if (newCapacity < requiredChars)
+        newCapacity = requiredChars;
+    if (newCapacity > SAL_MAX_LONG_PATH)
+        newCapacity = SAL_MAX_LONG_PATH;
+    if (newCapacity < requiredChars)
+        return FALSE;
+
+    wchar_t* newBuffer = (wchar_t*)malloc((size_t)newCapacity * sizeof(wchar_t));
+    if (newBuffer == NULL)
+        return FALSE;
+
+    wcsncpy(newBuffer, m_buffer, (size_t)newCapacity - 1);
+    newBuffer[newCapacity - 1] = L'\0';
+
+    if (m_buffer != m_inline)
+        free(m_buffer);
+    m_buffer = newBuffer;
+    m_capacity = newCapacity;
+    return TRUE;
+}
+
+void CWidePathBuffer::Clear()
+{
+    if (m_buffer != NULL)
+        m_buffer[0] = L'\0';
+}
+
+BOOL CWidePathBuffer::Assign(const wchar_t* text)
+{
+    if (text == NULL)
+    {
+        Clear();
+        return TRUE;
+    }
+
+    size_t len = wcslen(text);
+    if (!EnsureCapacity((int)len + 1))
+        return FALSE;
+
+    memcpy(m_buffer, text, (len + 1) * sizeof(wchar_t));
+    return TRUE;
 }
 
 BOOL CWidePathBuffer::Append(const wchar_t* name)
@@ -252,7 +300,7 @@ BOOL CWidePathBuffer::Append(const wchar_t* name)
     BOOL needsBackslash = (currentLen > 0 && m_buffer[currentLen - 1] != L'\\');
     size_t totalLen = currentLen + (needsBackslash ? 1 : 0) + nameLen;
 
-    if (totalLen >= SAL_MAX_LONG_PATH)
+    if (!EnsureCapacity((int)totalLen + 1))
         return FALSE; // Would overflow
 
     if (needsBackslash)

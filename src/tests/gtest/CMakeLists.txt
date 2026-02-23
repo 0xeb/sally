@@ -87,6 +87,32 @@ set_target_properties(gtest_fileenumerator PROPERTIES
     RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/tests"
 )
 
+add_executable(gtest_pathservice
+    gtest_pathservice.cpp
+    ../../common/Win32PathService.cpp
+)
+
+target_include_directories(gtest_pathservice PRIVATE
+    ${CMAKE_CURRENT_SOURCE_DIR}/../..
+    ${CMAKE_CURRENT_SOURCE_DIR}/../../common
+)
+
+target_compile_definitions(gtest_pathservice PRIVATE
+    WIN32 _WINDOWS _CRT_SECURE_NO_WARNINGS
+)
+
+target_link_libraries(gtest_pathservice
+    GTest::gtest
+    GTest::gtest_main
+    kernel32
+)
+
+add_test(NAME gtest_pathservice COMMAND gtest_pathservice)
+
+set_target_properties(gtest_pathservice PROPERTIES
+    RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/tests"
+)
+
 add_executable(gtest_process
     gtest_process.cpp
 )

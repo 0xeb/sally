@@ -18,6 +18,8 @@
 #pragma once
 
 #include <windows.h>
+#include <stdlib.h>
+#include <string.h>
 
 // Threshold for adding \\?\ prefix (leave some margin below MAX_PATH)
 #define SAL_LONG_PATH_THRESHOLD 240
@@ -25,10 +27,22 @@
 // Maximum path length with \\?\ prefix (Windows limit)
 #define SAL_MAX_LONG_PATH 32767
 
+// Default heap capacity for CPathBuffer instances.
+// CPathBuffer starts at 4KB and can grow up to SAL_MAX_LONG_PATH on demand.
+#define SAL_PATH_BUFFER_INITIAL_CAPACITY 4096
+
+// Inline fallback capacity for CPathBuffer (used before heap allocation succeeds).
+#define SAL_PATH_BUFFER_INLINE_CAPACITY MAX_PATH
+
+// Initial capacity for CWidePathBuffer (kept at MAX_PATH).
+#define SAL_WIDE_PATH_BUFFER_INITIAL_CAPACITY MAX_PATH
+
 //
 // CPathBuffer
 //
-// RAII heap-allocated buffer for path operations. Supports full OS path limit.
+// RAII path buffer.
+// Starts with a 4KB heap buffer and grows on demand up to SAL_MAX_LONG_PATH.
+// Keeps a MAX_PATH inline fallback only for low-memory allocation failure.
 // Use this instead of char[MAX_PATH] for paths that may exceed 260 characters.
 //
 // Usage:
@@ -43,45 +57,138 @@
 class CPathBuffer
 {
 public:
-    // Constructs empty buffer (heap-allocated, full OS limit)
-    CPathBuffer() : m_buffer(NULL)
+    // Constructs empty buffer (pre-allocates default 4KB heap capacity)
+    CPathBuffer() : m_buffer(m_inline), m_capacity(SAL_PATH_BUFFER_INLINE_CAPACITY)
     {
-        m_buffer = (char*)malloc(SAL_MAX_LONG_PATH);
-        if (m_buffer != NULL)
-            m_buffer[0] = '\0';
+        m_inline[0] = '\0';
+        EnsureCapacity(SAL_PATH_BUFFER_INITIAL_CAPACITY);
     }
 
     // Constructs buffer initialized with a path
-    explicit CPathBuffer(const char* initialPath) : m_buffer(NULL)
+    explicit CPathBuffer(const char* initialPath) : m_buffer(m_inline), m_capacity(SAL_PATH_BUFFER_INLINE_CAPACITY)
     {
-        m_buffer = (char*)malloc(SAL_MAX_LONG_PATH);
-        if (m_buffer != NULL)
-        {
-            if (initialPath != NULL)
-                lstrcpyn(m_buffer, initialPath, SAL_MAX_LONG_PATH);
-            else
-                m_buffer[0] = '\0';
-        }
+        m_inline[0] = '\0';
+        EnsureCapacity(SAL_PATH_BUFFER_INITIAL_CAPACITY);
+        Assign(initialPath);
     }
 
     // Destructor frees allocated memory
     ~CPathBuffer()
     {
-        if (m_buffer != NULL)
-        {
+        if (m_buffer != NULL && m_buffer != m_inline)
             free(m_buffer);
-            m_buffer = NULL;
+        m_buffer = NULL;
+        m_capacity = 0;
+    }
+
+    // Move support (copy remains disabled)
+    CPathBuffer(CPathBuffer&& other) : m_buffer(m_inline), m_capacity(SAL_PATH_BUFFER_INLINE_CAPACITY)
+    {
+        m_inline[0] = '\0';
+        MoveFrom(other);
+    }
+    CPathBuffer& operator=(CPathBuffer&& other)
+    {
+        if (this != &other)
+        {
+            if (m_buffer != NULL && m_buffer != m_inline)
+                free(m_buffer);
+            m_buffer = m_inline;
+            m_capacity = SAL_PATH_BUFFER_INLINE_CAPACITY;
+            m_inline[0] = '\0';
+            MoveFrom(other);
         }
+        return *this;
     }
 
     // Returns pointer to the buffer
     char* Get() { return m_buffer; }
     const char* Get() const { return m_buffer; }
+    char* Data() { return m_buffer; }
+    const char* CStr() const { return m_buffer; }
 
-    // Returns buffer size (SAL_MAX_LONG_PATH)
-    int Size() const { return SAL_MAX_LONG_PATH; }
+    // Returns current buffer capacity in characters including null terminator.
+    // NOTE: legacy call sites may expect this as "buffer size".
+    int Size() const { return m_capacity; }
+    int Capacity() const { return m_capacity; }
+    int MaxCapacity() const { return SAL_MAX_LONG_PATH; }
+    int Length() const { return (m_buffer != NULL) ? (int)strlen(m_buffer) : 0; }
+
+    // Ensures the buffer can hold at least requiredChars characters (including '\0').
+    BOOL EnsureCapacity(int requiredChars)
+    {
+        if (requiredChars <= 0)
+            requiredChars = 1;
+        if (requiredChars <= m_capacity)
+            return TRUE;
+        if (requiredChars > SAL_MAX_LONG_PATH)
+            return FALSE;
+
+        int newCapacity = m_capacity;
+        if (newCapacity < SAL_PATH_BUFFER_INITIAL_CAPACITY)
+            newCapacity = SAL_PATH_BUFFER_INITIAL_CAPACITY;
+        while (newCapacity < requiredChars)
+        {
+            if (newCapacity >= SAL_MAX_LONG_PATH / 2)
+            {
+                newCapacity = SAL_MAX_LONG_PATH;
+                break;
+            }
+            newCapacity *= 2;
+        }
+        if (newCapacity < requiredChars)
+            newCapacity = requiredChars;
+        if (newCapacity > SAL_MAX_LONG_PATH)
+            newCapacity = SAL_MAX_LONG_PATH;
+        if (newCapacity < requiredChars)
+            return FALSE;
+
+        char* newBuffer = (char*)malloc((size_t)newCapacity);
+        if (newBuffer == NULL)
+            return FALSE;
+
+        lstrcpynA(newBuffer, m_buffer, newCapacity);
+        if (m_buffer != m_inline)
+            free(m_buffer);
+        m_buffer = newBuffer;
+        m_capacity = newCapacity;
+        return TRUE;
+    }
+
+    void Clear()
+    {
+        if (m_buffer != NULL)
+            m_buffer[0] = '\0';
+    }
+
+    BOOL Assign(const char* text)
+    {
+        if (text == NULL)
+        {
+            Clear();
+            return TRUE;
+        }
+        size_t len = strlen(text);
+        if (!EnsureCapacity((int)len + 1))
+            return FALSE;
+        memcpy(m_buffer, text, len + 1);
+        return TRUE;
+    }
+
+    BOOL Append(const char* text)
+    {
+        if (text == NULL)
+            return TRUE;
+        size_t curLen = strlen(m_buffer);
+        size_t addLen = strlen(text);
+        if (!EnsureCapacity((int)(curLen + addLen + 1)))
+            return FALSE;
+        memcpy(m_buffer + curLen, text, addLen + 1);
+        return TRUE;
+    }
 
     // Implicit conversion for convenience
+    // NOTE: kept for compatibility during migration. Prefer Data()/CStr().
     operator char*() { return m_buffer; }
     operator const char*() const { return m_buffer; }
 
@@ -90,16 +197,38 @@ public:
 
 private:
     char* m_buffer;
+    int m_capacity;
+    char m_inline[SAL_PATH_BUFFER_INLINE_CAPACITY];
 
     // Disable copy
     CPathBuffer(const CPathBuffer&);
     CPathBuffer& operator=(const CPathBuffer&);
+
+    void MoveFrom(CPathBuffer& other)
+    {
+        if (other.m_buffer == other.m_inline)
+        {
+            if (!EnsureCapacity(other.m_capacity))
+                return;
+            lstrcpynA(m_buffer, other.m_inline, m_capacity);
+        }
+        else
+        {
+            m_buffer = other.m_buffer;
+            m_capacity = other.m_capacity;
+        }
+
+        other.m_buffer = other.m_inline;
+        other.m_capacity = SAL_PATH_BUFFER_INLINE_CAPACITY;
+        other.m_inline[0] = '\0';
+    }
 };
 
 //
 // CWidePathBuffer
 //
-// RAII heap-allocated wide buffer for path operations. Supports full OS path limit.
+// RAII wide path buffer with inline storage and grow-on-demand behavior.
+// Starts at MAX_PATH capacity and grows up to SAL_MAX_LONG_PATH as needed.
 // Use this instead of wchar_t[MAX_PATH] for paths that may exceed 260 characters.
 //
 // Usage:
@@ -109,7 +238,7 @@ private:
 class CWidePathBuffer
 {
 public:
-    // Constructs empty buffer (heap-allocated, full OS limit)
+    // Constructs empty buffer (inline storage, grows on demand)
     CWidePathBuffer();
 
     // Constructs buffer initialized with a path
@@ -121,16 +250,27 @@ public:
     // Returns pointer to the buffer
     wchar_t* Get() { return m_buffer; }
     const wchar_t* Get() const { return m_buffer; }
+    wchar_t* Data() { return m_buffer; }
+    const wchar_t* CStr() const { return m_buffer; }
 
-    // Returns buffer size (SAL_MAX_LONG_PATH)
-    int Size() const { return SAL_MAX_LONG_PATH; }
+    // Returns current buffer capacity in characters including null terminator.
+    int Size() const { return m_capacity; }
+    int Capacity() const { return m_capacity; }
+    int MaxCapacity() const { return SAL_MAX_LONG_PATH; }
+    int Length() const { return (m_buffer != NULL) ? (int)wcslen(m_buffer) : 0; }
 
     // Implicit conversion for convenience
+    // NOTE: kept for compatibility during migration. Prefer Data()/CStr().
     operator wchar_t*() { return m_buffer; }
     operator const wchar_t*() const { return m_buffer; }
 
     // Returns TRUE if allocation succeeded
     BOOL IsValid() const { return m_buffer != NULL; }
+
+    // Ensures the buffer can hold at least requiredChars characters (including '\0').
+    BOOL EnsureCapacity(int requiredChars);
+    void Clear();
+    BOOL Assign(const wchar_t* text);
 
     // Appends a path component (adds backslash if needed)
     // Returns TRUE on success, FALSE if buffer full or invalid
@@ -142,6 +282,8 @@ public:
 
 private:
     wchar_t* m_buffer;
+    int m_capacity;
+    wchar_t m_inline[SAL_WIDE_PATH_BUFFER_INITIAL_CAPACITY];
 
     // Disable copy
     CWidePathBuffer(const CWidePathBuffer&);

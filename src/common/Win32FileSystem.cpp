@@ -4,88 +4,38 @@
 
 #include "precomp.h"
 #include "IFileSystem.h"
+#include "IPathService.h"
+#include <string>
 
-// Threshold for adding long path prefix (leave margin below MAX_PATH)
-#define LONG_PATH_THRESHOLD 240
-
-// Helper to add long path prefix for paths that need it
-// Returns allocated string that must be freed, or NULL on error
-static wchar_t* MakeLongPath(const wchar_t* path)
-{
-    if (path == nullptr)
-        return nullptr;
-
-    size_t len = wcslen(path);
-
-    // Check if already has long path prefix
-    if (len >= 4 && wcsncmp(path, L"\\?\\", 4) == 0)
-    {
-        // Already has prefix - just copy
-        wchar_t* result = (wchar_t*)malloc((len + 1) * sizeof(wchar_t));
-        if (result)
-            wcscpy(result, path);
-        return result;
-    }
-
-    // Check if path needs prefix (long path or has trailing space/dot)
-    bool needsPrefix = (len >= LONG_PATH_THRESHOLD);
-
-    // Also add prefix if path ends with space or dot (Windows quirk)
-    if (!needsPrefix && len > 0)
-    {
-        wchar_t lastChar = path[len - 1];
-        if (lastChar == L' ' || lastChar == L'.')
-            needsPrefix = true;
-    }
-
-    if (!needsPrefix)
-    {
-        // Short path - just copy
-        wchar_t* result = (wchar_t*)malloc((len + 1) * sizeof(wchar_t));
-        if (result)
-            wcscpy(result, path);
-        return result;
-    }
-
-    // Check for UNC path
-    bool isUNC = (len >= 2 && path[0] == L'\\' && path[1] == L'\\');
-
-    if (isUNC)
-    {
-        // UNC path - add long path prefix, skip leading backslashes
-        size_t newLen = len + 6;  // "\?\UNC\" minus "\\"
-        wchar_t* result = (wchar_t*)malloc((newLen + 1) * sizeof(wchar_t));
-        if (result)
-        {
-            wcscpy(result, L"\\?\UNC\\");
-            wcscat(result, path + 2);
-        }
-        return result;
-    }
-    else
-    {
-        // Local path - add \?\ prefix
-        size_t newLen = len + 4;
-        wchar_t* result = (wchar_t*)malloc((newLen + 1) * sizeof(wchar_t));
-        if (result)
-        {
-            wcscpy(result, L"\\?\\");
-            wcscat(result, path);
-        }
-        return result;
-    }
-}
-
-// RAII wrapper for MakeLongPath result
+// RAII wrapper for ToLongPath result
 class LongPath
 {
 public:
-    explicit LongPath(const wchar_t* path) : m_path(MakeLongPath(path)) {}
-    ~LongPath() { free(m_path); }
-    const wchar_t* Get() const { return m_path; }
-    bool IsValid() const { return m_path != nullptr; }
+    explicit LongPath(const wchar_t* path) : m_valid(false)
+    {
+        if (gPathService == nullptr)
+            gPathService = GetWin32PathService();
+        if (gPathService == nullptr)
+        {
+            SetLastError(ERROR_INVALID_FUNCTION);
+            return;
+        }
+
+        PathResult res = gPathService->ToLongPath(path, m_path);
+        if (!res.success)
+        {
+            SetLastError(res.errorCode);
+            return;
+        }
+        m_valid = true;
+    }
+
+    const wchar_t* Get() const { return m_path.c_str(); }
+    bool IsValid() const { return m_valid; }
+
 private:
-    wchar_t* m_path;
+    std::wstring m_path;
+    bool m_valid;
     LongPath(const LongPath&);
     LongPath& operator=(const LongPath&);
 };
@@ -94,6 +44,12 @@ private:
 class Win32FileSystem : public IFileSystem
 {
 public:
+    static DWORD LastErrorOr(DWORD fallback)
+    {
+        DWORD err = GetLastError();
+        return err != ERROR_SUCCESS ? err : fallback;
+    }
+
     bool FileExists(const wchar_t* path) override
     {
         LongPath lp(path);
@@ -116,7 +72,7 @@ public:
     {
         LongPath lp(path);
         if (!lp.IsValid())
-            return FileResult::Error(ERROR_NOT_ENOUGH_MEMORY);
+            return FileResult::Error(LastErrorOr(ERROR_INVALID_PARAMETER));
 
         WIN32_FILE_ATTRIBUTE_DATA data;
         if (!GetFileAttributesExW(lp.Get(), GetFileExInfoStandard, &data))
@@ -136,7 +92,7 @@ public:
         LongPath lp(path);
         if (!lp.IsValid())
         {
-            SetLastError(ERROR_NOT_ENOUGH_MEMORY);
+            SetLastError(LastErrorOr(ERROR_INVALID_PARAMETER));
             return INVALID_FILE_ATTRIBUTES;
         }
         return ::GetFileAttributesW(lp.Get());
@@ -146,7 +102,7 @@ public:
     {
         LongPath lp(path);
         if (!lp.IsValid())
-            return FileResult::Error(ERROR_NOT_ENOUGH_MEMORY);
+            return FileResult::Error(LastErrorOr(ERROR_INVALID_PARAMETER));
         if (::SetFileAttributesW(lp.Get(), attributes))
             return FileResult::Ok();
         return FileResult::Error(GetLastError());
@@ -156,7 +112,7 @@ public:
     {
         LongPath lp(path);
         if (!lp.IsValid())
-            return FileResult::Error(ERROR_NOT_ENOUGH_MEMORY);
+            return FileResult::Error(LastErrorOr(ERROR_INVALID_PARAMETER));
         if (::DeleteFileW(lp.Get()))
             return FileResult::Ok();
         return FileResult::Error(GetLastError());
@@ -167,7 +123,7 @@ public:
         LongPath lpSrc(source);
         LongPath lpDst(target);
         if (!lpSrc.IsValid() || !lpDst.IsValid())
-            return FileResult::Error(ERROR_NOT_ENOUGH_MEMORY);
+            return FileResult::Error(LastErrorOr(ERROR_INVALID_PARAMETER));
         if (::MoveFileW(lpSrc.Get(), lpDst.Get()))
             return FileResult::Ok();
         return FileResult::Error(GetLastError());
@@ -178,7 +134,7 @@ public:
         LongPath lpSrc(source);
         LongPath lpDst(target);
         if (!lpSrc.IsValid() || !lpDst.IsValid())
-            return FileResult::Error(ERROR_NOT_ENOUGH_MEMORY);
+            return FileResult::Error(LastErrorOr(ERROR_INVALID_PARAMETER));
         if (::CopyFileW(lpSrc.Get(), lpDst.Get(), failIfExists ? TRUE : FALSE))
             return FileResult::Ok();
         return FileResult::Error(GetLastError());
@@ -188,7 +144,7 @@ public:
     {
         LongPath lp(path);
         if (!lp.IsValid())
-            return FileResult::Error(ERROR_NOT_ENOUGH_MEMORY);
+            return FileResult::Error(LastErrorOr(ERROR_INVALID_PARAMETER));
         if (::CreateDirectoryW(lp.Get(), NULL))
             return FileResult::Ok();
         DWORD err = GetLastError();
@@ -201,7 +157,7 @@ public:
     {
         LongPath lp(path);
         if (!lp.IsValid())
-            return FileResult::Error(ERROR_NOT_ENOUGH_MEMORY);
+            return FileResult::Error(LastErrorOr(ERROR_INVALID_PARAMETER));
         if (::RemoveDirectoryW(lp.Get()))
             return FileResult::Ok();
         return FileResult::Error(GetLastError());
@@ -212,7 +168,7 @@ public:
         LongPath lp(path);
         if (!lp.IsValid())
         {
-            SetLastError(ERROR_NOT_ENOUGH_MEMORY);
+            SetLastError(LastErrorOr(ERROR_INVALID_PARAMETER));
             return INVALID_HANDLE_VALUE;
         }
         return ::CreateFileW(lp.Get(), GENERIC_READ, shareMode, NULL,
@@ -224,7 +180,7 @@ public:
         LongPath lp(path);
         if (!lp.IsValid())
         {
-            SetLastError(ERROR_NOT_ENOUGH_MEMORY);
+            SetLastError(LastErrorOr(ERROR_INVALID_PARAMETER));
             return INVALID_HANDLE_VALUE;
         }
         DWORD disposition = failIfExists ? CREATE_NEW : CREATE_ALWAYS;

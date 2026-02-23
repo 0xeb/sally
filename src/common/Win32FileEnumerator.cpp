@@ -4,77 +4,9 @@
 
 #include "precomp.h"
 #include "IFileEnumerator.h"
+#include "IPathService.h"
 #include <string>
 #include <stdlib.h>
-
-// Threshold for adding long path prefix
-#define LONG_PATH_THRESHOLD 240
-
-// Helper to add long path prefix for enumeration paths
-static wchar_t* MakeEnumLongPath(const wchar_t* path)
-{
-    if (path == nullptr)
-        return nullptr;
-
-    size_t len = wcslen(path);
-
-    // Check if already has long path prefix
-    if (len >= 4 && wcsncmp(path, L"\\\\?\\", 4) == 0)
-    {
-        wchar_t* result = (wchar_t*)malloc((len + 1) * sizeof(wchar_t));
-        if (result)
-            wcscpy(result, path);
-        return result;
-    }
-
-    // Check if path needs prefix
-    bool needsPrefix = (len >= LONG_PATH_THRESHOLD);
-
-    // Also add prefix if path ends with space or dot
-    if (!needsPrefix && len > 0)
-    {
-        // Find last char before any wildcard pattern
-        const wchar_t* p = path + len - 1;
-        while (p > path && (*p == L'*' || *p == L'?' || *p == L'\\'))
-            p--;
-        if (p >= path && (*p == L' ' || *p == L'.'))
-            needsPrefix = true;
-    }
-
-    if (!needsPrefix)
-    {
-        wchar_t* result = (wchar_t*)malloc((len + 1) * sizeof(wchar_t));
-        if (result)
-            wcscpy(result, path);
-        return result;
-    }
-
-    // Check for UNC path
-    bool isUNC = (len >= 2 && path[0] == L'\\' && path[1] == L'\\');
-
-    if (isUNC)
-    {
-        size_t newLen = len + 6;
-        wchar_t* result = (wchar_t*)malloc((newLen + 1) * sizeof(wchar_t));
-        if (result)
-        {
-            wcscpy(result, L"\\\\?\\UNC\\");
-            wcscat(result, path + 2);
-        }
-        return result;
-    }
-    else
-    {
-        size_t newLen = len + 4;
-        wchar_t* result = (wchar_t*)malloc((newLen + 1) * sizeof(wchar_t));
-        if (result)
-        {
-            wcscpy(result, L"\\\\?\\");
-            wcscat(result, path);
-        }
-        return result;
-    }
-}
 
 // Internal enumeration state
 struct EnumState
@@ -112,11 +44,19 @@ public:
                 searchPath += L'*';
         }
 
-        // Add long path prefix if needed
-        wchar_t* longPath = MakeEnumLongPath(searchPath.c_str());
-        if (!longPath)
+        if (gPathService == nullptr)
+            gPathService = GetWin32PathService();
+        if (gPathService == nullptr)
         {
-            SetLastError(ERROR_NOT_ENOUGH_MEMORY);
+            SetLastError(ERROR_INVALID_FUNCTION);
+            return INVALID_HENUM;
+        }
+
+        std::wstring longPath;
+        PathResult pathRes = gPathService->ToLongPath(searchPath.c_str(), longPath);
+        if (!pathRes.success)
+        {
+            SetLastError(pathRes.errorCode);
             return INVALID_HENUM;
         }
 
@@ -124,14 +64,12 @@ public:
         EnumState* state = (EnumState*)malloc(sizeof(EnumState));
         if (!state)
         {
-            free(longPath);
             SetLastError(ERROR_NOT_ENOUGH_MEMORY);
             return INVALID_HENUM;
         }
         memset(state, 0, sizeof(EnumState));
 
-        state->hFind = FindFirstFileW(longPath, &state->findData);
-        free(longPath);
+        state->hFind = FindFirstFileW(longPath.c_str(), &state->findData);
 
         if (state->hFind == INVALID_HANDLE_VALUE)
         {
