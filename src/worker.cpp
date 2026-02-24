@@ -850,9 +850,8 @@ HANDLE COperation::FindFirstTarget(WIN32_FIND_DATAW* findData) const
     if (HasWideTarget())
     {
         IFileSystem* fileSystem = GetWorkerFileSystem();
-        if (fileSystem != NULL)
-            return fileSystem->FindFirstFile(TargetNameW.c_str(), findData);
-        return FindFirstFileW(TargetNameW.c_str(), findData);
+        return fileSystem != NULL ? fileSystem->FindFirstFile(TargetNameW.c_str(), findData)
+                                  : INVALID_HANDLE_VALUE;
     }
     else
         return SalFindFirstFileHW(TargetName, findData);
@@ -864,9 +863,8 @@ HANDLE COperation::FindFirstSource(WIN32_FIND_DATAW* findData) const
     if (HasWideSource())
     {
         IFileSystem* fileSystem = GetWorkerFileSystem();
-        if (fileSystem != NULL)
-            return fileSystem->FindFirstFile(SourceNameW.c_str(), findData);
-        return FindFirstFileW(SourceNameW.c_str(), findData);
+        return fileSystem != NULL ? fileSystem->FindFirstFile(SourceNameW.c_str(), findData)
+                                  : INVALID_HANDLE_VALUE;
     }
     else
         return SalFindFirstFileHW(SourceName, findData);
@@ -1619,7 +1617,7 @@ void GetDirInfoW(char* buffer, const wchar_t* dir)
         WIN32_FIND_DATAW data;
         IFileSystem* fileSystem = GetWorkerFileSystem();
         HANDLE find = fileSystem != NULL ? fileSystem->FindFirstFile(dirPath.c_str(), &data)
-                                         : FindFirstFileW(dirPath.c_str(), &data);
+                                         : INVALID_HANDLE_VALUE;
         if (find != INVALID_HANDLE_VALUE)
         {
             HANDLES(FindClose(find));
@@ -1665,7 +1663,7 @@ BOOL IsDirectoryEmptyW(const wchar_t* name) // directories/subdirectories contai
     IFileSystem* fileSystem = GetWorkerFileSystem();
     WIN32_FIND_DATAW fileData;
     HANDLE search = fileSystem != NULL ? fileSystem->FindFirstFile(pattern.c_str(), &fileData)
-                                       : FindFirstFileW(pattern.c_str(), &fileData);
+                                       : INVALID_HANDLE_VALUE;
     if (search != INVALID_HANDLE_VALUE)
     {
         do
@@ -1689,8 +1687,7 @@ BOOL IsDirectoryEmptyW(const wchar_t* name) // directories/subdirectories contai
                 HANDLES(FindClose(search)); // a file exists here
                 return FALSE;
             }
-        } while (fileSystem != NULL ? fileSystem->FindNextFile(search, &fileData)
-                                    : FindNextFileW(search, &fileData));
+        } while (fileSystem != NULL && fileSystem->FindNextFile(search, &fileData));
         HANDLES(FindClose(search));
     }
     return TRUE;
@@ -6638,7 +6635,7 @@ BOOL SalCreateDirectoryEx(const char* name, DWORD* err)
             IFileSystem* fileSystem = GetWorkerFileSystem();
             WIN32_FIND_DATAW data;
             HANDLE find = fileSystem != NULL ? fileSystem->FindFirstFile(nameW.c_str(), &data)
-                                             : HANDLES_Q(FindFirstFileW(nameW.c_str(), &data));
+                                             : INVALID_HANDLE_VALUE;
             if (find != INVALID_HANDLE_VALUE)
             {
                 HANDLES(FindClose(find));
