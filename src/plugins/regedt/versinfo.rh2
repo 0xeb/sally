@@ -15,10 +15,10 @@
 
 #include "spl_vers.h" // vytahneme cisla verzi + buildu
 
-#define VERSINFO_COPYRIGHT   "Copyright © 2003-2023 Open Salamander Authors"
-#define VERSINFO_COMPANY     "Open Salamander"
+#define VERSINFO_COPYRIGHT   "Copyright © 2003-2026 Sally Authors"
+#define VERSINFO_COMPANY     "Sally"
 
-#define VERSINFO_DESCRIPTION "Registry Editor for Open Salamander"
+#define VERSINFO_DESCRIPTION "Registry Editor for Sally"
 
 #ifdef _LANG
 #define VERSINFO_INTERNAL    "ENGLISH"
@@ -29,7 +29,7 @@
 #endif
 
 // for SLG translators
-#define VERSINFO_SLG_WEB     "www.altap.cz"
+#define VERSINFO_SLG_WEB     "github.com/0xeb/sally"
 #define VERSINFO_SLG_COMMENT "English version"
 
 #endif // __REGEDT_VERSINFO_RH2

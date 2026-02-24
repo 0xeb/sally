@@ -19,7 +19,7 @@
 #define VERSINFO_COPYRIGHT   "Copyright © 2009-2023 Ondrej Zarevucky"
 #define VERSINFO_COMPANY     "Ondrej Zarevucky"
 
-#define VERSINFO_DESCRIPTION "DiskMap Plugin for Open Salamander"
+#define VERSINFO_DESCRIPTION "DiskMap Plugin for Sally"
 
 #ifdef _LANG
 #define VERSINFO_INTERNAL    "ENGLISH"
@@ -30,7 +30,7 @@
 #endif
 
 // for SLG translators
-#define VERSINFO_SLG_WEB     "www.altap.cz"
+#define VERSINFO_SLG_WEB     "github.com/0xeb/sally"
 #define VERSINFO_SLG_COMMENT "English version"
 
 #endif // __DISKMAPPLUGIN_VERSINFO_RH2

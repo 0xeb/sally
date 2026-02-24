@@ -23,10 +23,10 @@
 
 #include "spl_vers.h" // retrieve version and build numbers
 
-#define VERSINFO_COPYRIGHT   "Copyright © 2009-2023 Open Salamander Authors"
-#define VERSINFO_COMPANY     "Open Salamander"
+#define VERSINFO_COPYRIGHT   "Copyright © 2009-2026 Sally Authors"
+#define VERSINFO_COMPANY     "Sally"
 
-#define VERSINFO_DESCRIPTION "Sample plugin for Open Salamander"
+#define VERSINFO_DESCRIPTION "Sample plugin for Sally"
 
 #ifdef _LANG
 #define VERSINFO_INTERNAL    "ENGLISH"
@@ -37,7 +37,7 @@
 #endif
 
 // for SLG translators
-#define VERSINFO_SLG_WEB     "www.altap.cz"
+#define VERSINFO_SLG_WEB     "github.com/0xeb/sally"
 #define VERSINFO_SLG_COMMENT "English version"
 
 #endif // __DEMOMENU_VERSINFO_RH2

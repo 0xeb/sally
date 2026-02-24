@@ -42,7 +42,7 @@ BEGIN
             VALUE "InternalName", "ExifDLL" "\0"
             VALUE "OriginalFilename", "Exif.dll" "\0"
             VALUE "ProductVersion", VERSINFO_SALAMANDER_VERSION "\0"
-            VALUE "ProductName", "Open Salamander\0"
+            VALUE "ProductName", "Sally\0"
         END
     END
     BLOCK "VarFileInfo"

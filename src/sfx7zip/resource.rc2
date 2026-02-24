@@ -27,12 +27,12 @@ BEGIN
     BEGIN
         BLOCK "040904b0"
         BEGIN
-            VALUE "CompanyName", "Open Salamander"
-            VALUE "FileDescription", "Open Salamander Setup"
+            VALUE "CompanyName", "Sally"
+            VALUE "FileDescription", "Sally Setup"
             VALUE "FileVersion", "2.0.0.0"
-            VALUE "InternalName", "Open Salamander Installer"
+            VALUE "InternalName", "Sally Installer"
             VALUE "OriginalFilename", "sfx7zip.exe"
-            VALUE "LegalCopyright", "Copyright © 1997-2023 Open Salamander Authors"
+            VALUE "LegalCopyright", "Copyright \xA9 1997-2026 Sally Authors"
         END
     END
     BLOCK "VarFileInfo"
