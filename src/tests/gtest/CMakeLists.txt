@@ -565,7 +565,7 @@ set_target_properties(gtest_webview2 PROPERTIES
 )
 
 # Tiny DLL with SalamanderPluginEntry export (for testing PE validation)
-add_library(test_dummy_plugin SHARED test_dummy_plugin.cpp)
+add_library(test_dummy_plugin SHARED test_dummy_plugin.cpp test_dummy_plugin.def)
 
 # Plugin PE export validation tests
 add_executable(gtest_plugins
