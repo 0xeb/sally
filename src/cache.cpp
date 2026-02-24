@@ -11,6 +11,7 @@
 #include "common/IFileSystem.h"
 #include "ui/IPrompter.h"
 #include "common/unicode/helpers.h"
+#include "common/widepath.h"
 #include "common/IEnvironment.h"
 
 CDiskCache DiskCache;
@@ -379,7 +380,7 @@ BOOL CCacheDirData::ContainTmpName(const char* tmpName, const char* rootTmpPath,
                 }
 
                 WIN32_FIND_DATAW data;
-                HANDLE find = HANDLES_Q(FindFirstFileW(AnsiToWide(tmpFullName).c_str(), &data));
+                HANDLE find = SalFindFirstFileHW(tmpFullName, &data);
                 if (find != INVALID_HANDLE_VALUE)
                 {
                     HANDLES(FindClose(find));
@@ -1469,7 +1470,7 @@ void CDiskCache::ClearTEMPIfNeeded(HWND parent, HWND hActivePanel)
             TIndirectArray<char> tmpDirs(10, 50);
 
             WIN32_FIND_DATAW data;
-            HANDLE find = HANDLES_Q(FindFirstFileW(AnsiToWide(tmpDir).c_str(), &data));
+            HANDLE find = SalFindFirstFileHW(tmpDir, &data);
             if (find != INVALID_HANDLE_VALUE)
             {
                 do
@@ -1496,7 +1497,7 @@ void CDiskCache::ClearTEMPIfNeeded(HWND parent, HWND hActivePanel)
                             }
                         }
                     }
-                } while (FindNextFileW(find, &data));
+                } while (SalLPFindNextFile(find, &data));
                 HANDLES(FindClose(find));
             }
 
