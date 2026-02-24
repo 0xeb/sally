@@ -5,6 +5,7 @@
 #include "precomp.h"
 
 #include "ui/IPrompter.h"
+#include "common/IRegistry.h"
 #include "common/unicode/helpers.h"
 #include "menu.h"
 #include "cfgdlg.h"
@@ -19,6 +20,11 @@
 #include "dialogs.h"
 
 CPlugins Plugins;
+
+static IRegistry* GetPluginsRegistry()
+{
+    return gRegistry != nullptr ? gRegistry : GetWin32Registry();
+}
 
 // global "time" (counter) for obtaining the FS creation "time"
 DWORD CPluginFSInterfaceEncapsulation::PluginFSTime = 1; // zero is used as the "uninitialized time"
@@ -2815,10 +2821,11 @@ void CPluginData::CallLoadOrSaveConfiguration(BOOL load,
         {
             LoadSaveToRegistryMutex.Enter();
             HKEY salamander;
+            IRegistry* registry = GetPluginsRegistry();
             if (SALAMANDER_ROOT_REG != NULL &&
-                OpenKeyAux(NULL, HKEY_CURRENT_USER, SALAMANDER_ROOT_REG, salamander)) // check whether the Salamander key exists at all (otherwise nothing is saved)
-            {                                                                         // OpenKeyAux, because we do not want a Load Configuration message
-                CloseKeyAux(salamander);
+                OpenKeyReadA(registry, HKEY_CURRENT_USER, SALAMANDER_ROOT_REG, salamander).success) // check whether the Salamander key exists at all (otherwise nothing is saved)
+            {
+                registry->CloseKey(salamander);
                 if (CreateKey(HKEY_CURRENT_USER, SALAMANDER_ROOT_REG, salamander))
                 {
                     BOOL cfgIsOK = TRUE;
@@ -2826,8 +2833,8 @@ void CPluginData::CallLoadOrSaveConfiguration(BOOL load,
                     if (deleteSALAMANDER_SAVE_IN_PROGRESS)
                     {
                         DWORD saveInProgress = 1;
-                        if (GetValueAux(NULL, salamander, SALAMANDER_SAVE_IN_PROGRESS, REG_DWORD, &saveInProgress, sizeof(DWORD)))
-                        {                    // GetValueAux, because we do not want a Load Configuration message
+                        if (GetDWordA(registry, salamander, SALAMANDER_SAVE_IN_PROGRESS, saveInProgress).success)
+                        {
                             cfgIsOK = FALSE; // corrupted configuration; saving won't fix it (not all data is stored)
                             TRACE_E("CPluginData::CallLoadOrSaveConfiguration(): unable to save configuration, configuration key in registry is corrupted, plugin: " << Name);
                         }
@@ -2887,10 +2894,11 @@ BOOL CPluginData::Unload(HWND parent, BOOL ask)
                     LoadSaveToRegistryMutex.Enter();
                     BOOL salKeyDoesNotExist = FALSE;
                     HKEY salamander;
+                    IRegistry* registry = GetPluginsRegistry();
                     if (SALAMANDER_ROOT_REG != NULL &&
-                        OpenKeyAux(NULL, HKEY_CURRENT_USER, SALAMANDER_ROOT_REG, salamander)) // check whether the Salamander key exists at all (otherwise nothing is saved)
-                    {                                                                         // OpenKeyAux because we do not want a Load Configuration message
-                        CloseKeyAux(salamander);
+                        OpenKeyReadA(registry, HKEY_CURRENT_USER, SALAMANDER_ROOT_REG, salamander).success) // check whether the Salamander key exists at all (otherwise nothing is saved)
+                    {
+                        registry->CloseKey(salamander);
                         if (CreateKey(HKEY_CURRENT_USER, SALAMANDER_ROOT_REG, salamander))
                         {
                             BOOL cfgIsOK = TRUE;
@@ -2898,8 +2906,8 @@ BOOL CPluginData::Unload(HWND parent, BOOL ask)
                             if (deleteSALAMANDER_SAVE_IN_PROGRESS)
                             {
                                 DWORD saveInProgress = 1;
-                                if (GetValueAux(NULL, salamander, SALAMANDER_SAVE_IN_PROGRESS, REG_DWORD, &saveInProgress, sizeof(DWORD)))
-                                {                    // GetValueAux because we do not want a Load Configuration message
+                                if (GetDWordA(registry, salamander, SALAMANDER_SAVE_IN_PROGRESS, saveInProgress).success)
+                                {
                                     cfgIsOK = FALSE; // corrupted configuration; saving won't fix it (not all data is stored)
                                     salKeyDoesNotExist = TRUE;
                                     TRACE_E("CPluginData::Unload(): unable to save configuration, configuration key in registry is corrupted, plugin: " << Name);
