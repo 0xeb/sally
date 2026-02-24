@@ -4,10 +4,8 @@
 
 #include <gtest/gtest.h>
 #include <gmock/gmock.h>
+#include <algorithm>
 #include "../../common/IRegistry.h"
-
-// For test build: provide gRegistry definition
-IRegistry* gRegistry = nullptr;
 
 // Mock implementation for testing
 class MockRegistry : public IRegistry
@@ -170,6 +168,34 @@ TEST_F(RegistryTest, AnsiHelper_DeleteKeyRecursiveA)
 
     auto res = DeleteKeyRecursiveA(gRegistry, HKEY_CURRENT_USER, "Software\\TestRecursive");
     EXPECT_TRUE(res.success);
+}
+
+TEST(Win32RegistryIntegration, EnumValuesSupportsLongValueNames)
+{
+    IRegistry* registry = GetWin32Registry();
+    ASSERT_NE(registry, nullptr);
+
+    std::wstring subKey = L"Software\\OpenSalamander\\Tests\\RegistryEnumValues\\";
+    subKey += std::to_wstring(GetCurrentProcessId());
+    subKey += L"_";
+    subKey += std::to_wstring(static_cast<unsigned long long>(GetTickCount64()));
+
+    HKEY key = NULL;
+    RegistryResult createResult = registry->CreateKey(HKEY_CURRENT_USER, subKey.c_str(), key);
+    ASSERT_TRUE(createResult.success) << createResult.errorCode;
+
+    std::wstring longValueName(300, L'V');
+    RegistryResult setResult = registry->SetDWord(key, longValueName.c_str(), 42);
+    EXPECT_TRUE(setResult.success) << setResult.errorCode;
+
+    std::vector<std::wstring> valueNames;
+    RegistryResult enumResult = registry->EnumValues(key, valueNames);
+    EXPECT_TRUE(enumResult.success) << enumResult.errorCode;
+    EXPECT_NE(std::find(valueNames.begin(), valueNames.end(), longValueName), valueNames.end());
+
+    registry->CloseKey(key);
+    RegistryResult deleteResult = registry->DeleteKeyRecursive(HKEY_CURRENT_USER, subKey.c_str());
+    EXPECT_TRUE(deleteResult.success) << deleteResult.errorCode;
 }
 
 TEST(RegistryResultTest, NotFound_Works)

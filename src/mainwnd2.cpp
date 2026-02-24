@@ -2896,9 +2896,7 @@ BOOL CMainWindow::LoadConfig(BOOL importingOldConfig, const CCommandLineParams* 
 
         if (OpenKey(salamander, SALAMANDER_DEFDIRS_REG, actKey))
         {
-            IRegistry* registry = gRegistry;
-            if (registry == NULL)
-                registry = GetWin32Registry();
+            IRegistry* registry = GetMainWindowRegistry();
             std::vector<std::wstring> valueNames;
             RegistryResult enumResult = registry != NULL ? registry->EnumValues(actKey, valueNames)
                                                          : RegistryResult::Error(ERROR_INVALID_FUNCTION);

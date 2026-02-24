@@ -57,12 +57,25 @@ set_target_properties(gtest_clipboard PROPERTIES
 
 add_executable(gtest_registry
     gtest_registry.cpp
+    ../../common/Win32Registry.cpp
+)
+
+target_include_directories(gtest_registry PRIVATE
+    ${CMAKE_CURRENT_SOURCE_DIR}/../..
+    ${CMAKE_CURRENT_SOURCE_DIR}/../../common
+)
+
+target_compile_definitions(gtest_registry PRIVATE
+    WIN32 _WINDOWS _CRT_SECURE_NO_WARNINGS
 )
 
 target_link_libraries(gtest_registry
     GTest::gtest
     GTest::gtest_main
     GTest::gmock
+    kernel32
+    advapi32
+    shlwapi
 )
 
 add_test(NAME gtest_registry COMMAND gtest_registry)

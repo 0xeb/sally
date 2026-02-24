@@ -2,8 +2,8 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 // CommentsTranslationProject: TRANSLATED
 
-#include "precomp.h"
 #include "IRegistry.h"
+#include <shlwapi.h>
 
 class Win32Registry : public IRegistry
 {
