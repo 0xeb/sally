@@ -21,11 +21,11 @@ char* ReadTable(const char* fileName, char* table)
 { // reads the 'fileName' file, converts it using 'table'; returns an error message on failure, otherwise NULL
     CALL_STACK_MESSAGE2("ReadTable(%s,)", fileName);
     char* text = NULL;
-    HANDLE hFile = HANDLES_Q(CreateFileW(AnsiToWide(fileName).c_str(), GENERIC_READ,
-                                        FILE_SHARE_READ, NULL,
-                                        OPEN_EXISTING,
-                                        FILE_FLAG_SEQUENTIAL_SCAN,
-                                        NULL));
+    HANDLE hFile = SalCreateFileH(fileName, GENERIC_READ,
+                                  FILE_SHARE_READ, NULL,
+                                  OPEN_EXISTING,
+                                  FILE_FLAG_SEQUENTIAL_SCAN,
+                                  NULL);
     if (hFile != INVALID_HANDLE_VALUE)
     {
         if (GetFileSize(hFile, NULL) == 256)
@@ -335,11 +335,11 @@ CCodeTable::CCodeTable(HWND hWindow, const char* dirName)
     fileNameEnd += strlen(fileNameEnd);
     strcpy(fileNameEnd, "convert.cfg");
 
-    HANDLE hFile = HANDLES_Q(CreateFileW(AnsiToWide(fileName).c_str(), GENERIC_READ,
-                                        FILE_SHARE_READ, NULL,
-                                        OPEN_EXISTING,
-                                        FILE_FLAG_SEQUENTIAL_SCAN,
-                                        NULL));
+    HANDLE hFile = SalCreateFileH(fileName, GENERIC_READ,
+                                  FILE_SHARE_READ, NULL,
+                                  OPEN_EXISTING,
+                                  FILE_FLAG_SEQUENTIAL_SCAN,
+                                  NULL);
     if (hFile != INVALID_HANDLE_VALUE)
     {
         CPathBuffer textBuf;
