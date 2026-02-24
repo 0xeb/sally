@@ -15,6 +15,19 @@
     - `build/tests/Debug/gtest_cpathbuffer_winapi.exe --gtest_brief=1`
     - `build/tests/Debug/gtest_worker_wide.exe --gtest_brief=1`
 
+## Exit-Crash Triage (Latest)
+- Dump analyzed: `c:\temo\salamand.dmp` with `C:\Users\elias\Tools\dbgtools\cdb.exe`
+- Key finding:
+  - Fault bucket: single-step at function epilogue (`_RTC_CheckStackVars` path)
+  - Fault location: `src/fileswn1.cpp:1281` (`IconThreadThreadFBody` return path)
+  - Root cause: icon-reader path setup wrote wide data into `CWidePathBuffer` using ANSI-length math without ensuring wide capacity first.
+- Fix applied in:
+  - `bb8d91b` `Fix icon reader wide-path buffer overwrite on long paths`
+  - `src/fileswn1.cpp` now computes required wide size first, calls `EnsureCapacity`, then converts safely.
+- Post-fix validation:
+  - Debug/Release `salamander` builds pass
+  - focused gtests pass (same set listed above)
+
 ## Completed In This Cycle
 - Registry decoupling extended through:
   - `src/mainwnd2.cpp`
@@ -124,4 +137,3 @@ rg -n --glob '!src/common/dep/**' --glob '!src/tests/**' $pattern src |
 - `7d2cb1a` Decouple CSystemPolicies registry reads through IRegistry
 - `7960f15` Use IRegistry helpers in plugins1 save/load registry checks
 - `ed18a06` Use IRegistry helpers for Shell Icon Size refresh in mainwnd3
-
