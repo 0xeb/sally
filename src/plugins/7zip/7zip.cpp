@@ -1,4 +1,5 @@
 ﻿// SPDX-FileCopyrightText: 2023 Open Salamander Authors
+// SPDX-FileCopyrightText: 2026 Sally Authors
 // SPDX-License-Identifier: GPL-2.0-or-later
 // CommentsTranslationProject: TRANSLATED
 
@@ -177,7 +178,7 @@ CPluginInterfaceAbstract* WINAPI SalamanderPluginEntry(CSalamanderPluginEntryAbs
                                    VERSINFO_VERSION_NO_PLATFORM, VERSINFO_COPYRIGHT, LoadStr(IDS_PLUGIN_DESCRIPTION),
                                    "7zip", "7z");
 
-    salamander->SetPluginHomePageURL("www.altap.cz");
+    salamander->SetPluginHomePageURL("github.com/0xeb/sally");
 
     return &PluginInterface;
 }

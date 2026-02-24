@@ -1,4 +1,5 @@
 ﻿// SPDX-FileCopyrightText: 2023 Open Salamander Authors
+// SPDX-FileCopyrightText: 2026 Sally Authors
 // SPDX-License-Identifier: GPL-2.0-or-later
 // CommentsTranslationProject: TRANSLATED
 
@@ -9,8 +10,7 @@
 
 STRING(STR_WELCOME_MESSAGE,
        "\n"
-       "Zip2Sfx 2.9  Copyright (c) 2000-2023 Open Salamander Authors   Home page: www.altap.cz\n"
-       "                                             E-mail:    support@altap.cz\n\n")
+       "Zip2Sfx 2.9  Copyright (c) 2000-2026 Sally Authors   Home page: github.com/0xeb/sally\n\n")
 STRING(STR_HELP,
        "Usage:\tzip2sfx [options] zipfile [exefile]\n"
        "\n"

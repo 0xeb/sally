@@ -1,4 +1,5 @@
 ﻿// SPDX-FileCopyrightText: 2023 Open Salamander Authors
+// SPDX-FileCopyrightText: 2026 Sally Authors
 // SPDX-License-Identifier: GPL-2.0-or-later
 // CommentsTranslationProject: TRANSLATED
 
@@ -32,7 +33,7 @@ const char* CONFIG_PATHFORMAT = "Tooltip Path Format";
 
 char* LoadStr(int resID);
 
-TCHAR szPluginWebsite[] = TEXT("www.altap.cz"); // original domain not running: http://salamander.diskmap.net
+TCHAR szPluginWebsite[] = TEXT("github.com/0xeb/sally"); // original domain not running: http://salamander.diskmap.net
 
 HINSTANCE DLLInstance = NULL; // handle to SPL - language-independent resources
 HINSTANCE HLanguage = NULL;   // handle to SLG - language-dependent resources

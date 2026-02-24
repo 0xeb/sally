@@ -1,4 +1,5 @@
 ﻿// SPDX-FileCopyrightText: 2023 Open Salamander Authors
+// SPDX-FileCopyrightText: 2026 Sally Authors
 // SPDX-License-Identifier: GPL-2.0-or-later
 // CommentsTranslationProject: TRANSLATED
 
@@ -616,9 +617,9 @@ CConfiguration::~CConfiguration()
 BOOL CConfiguration::InitWithSalamanderGeneral()
 {
     // allocated through SalamanderGeneral, therefore it has to be here
-    FTPServerList.AddServer("ALTAP",
-                            "ftp.altap.cz",
-                            "/pub/altap/salamand");
+    FTPServerList.AddServer("Sally",
+                            "ftp.gnu.org",
+                            "/");
 
     // description of the string in the array: "visible,ID,nameStrID,nameStr,descrStrID,descrStr,colType,emptyValue,leftAlignment,fixedWidth,width"
     const char* unix1Columns[] = {"1,name,0,\\0,0,\\0,1,\\0",    // name

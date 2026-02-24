@@ -1,4 +1,5 @@
 ﻿// SPDX-FileCopyrightText: 2023 Open Salamander Authors
+// SPDX-FileCopyrightText: 2026 Sally Authors
 // SPDX-License-Identifier: GPL-2.0-or-later
 // CommentsTranslationProject: TRANSLATED
 
@@ -264,7 +265,7 @@ CPluginInterfaceAbstract* WINAPI SalamanderPluginEntry(CSalamanderPluginEntryAbs
                                    String<char>::LoadStr(IDS_DESCRIPTION),
                                    "UNDELETE" /* DO NOT TRANSLATE! */, NULL, "del");
 
-    salamander->SetPluginHomePageURL("www.altap.cz");
+    salamander->SetPluginHomePageURL("github.com/0xeb/sally");
 
     // get our FS-name (it could be different than "del", Salamander could change it)
     SalamanderGeneral->GetPluginFSName(AssignedFSName, 0);

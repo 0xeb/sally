@@ -1,4 +1,6 @@
 // SPDX-FileCopyrightText: 2023 Open Salamander Authors
+// SPDX-FileCopyrightText: 2026 Sally Authors
+// SPDX-FileCopyrightText: 2026 Sally Authors
 // SPDX-License-Identifier: GPL-2.0-or-later
 // CommentsTranslationProject: TRANSLATED
 
@@ -1015,7 +1017,7 @@ CLanguageSelectorDialog::DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
         if (PluginName != NULL && LOWORD(wParam) == IDCANCEL)
             return 0;
         if (LOWORD(wParam) == IDB_GETMORELANGS)
-            ShellExecute(HWindow, "open", "https://forum.altap.cz/viewforum.php?f=23", NULL, NULL, SW_SHOWNORMAL);
+            ShellExecute(HWindow, "open", "https://github.com/0xeb/sally/discussions", NULL, NULL, SW_SHOWNORMAL);
         if (LOWORD(wParam) == IDB_REFRESHLANGS)
         {
             ListView_DeleteAllItems(HListView);

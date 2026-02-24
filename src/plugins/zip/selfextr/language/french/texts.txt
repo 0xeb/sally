@@ -10,4 +10,4 @@
 
 "Self-Extractor © 2000-2023 Open Salamander Authors"
 
-"https://www.altap.cz"
+"https://github.com/0xeb/sally"

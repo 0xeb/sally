@@ -1,4 +1,5 @@
 ﻿// SPDX-FileCopyrightText: 2023 Open Salamander Authors
+// SPDX-FileCopyrightText: 2026 Sally Authors
 // SPDX-License-Identifier: GPL-2.0-or-later
 // CommentsTranslationProject: TRANSLATED
 
@@ -2072,9 +2073,9 @@ CBetaExpiredDialog::DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
 
             const char* url =
 #ifndef THIS_IS_EAP_VERSION
-                english ? "https://www.altap.cz/salamander/downloads/beta" : "https://www.altap.cz/cz/salamander/downloads/beta";
+                "https://github.com/0xeb/sally/releases";
 #else  // THIS_IS_EAP_VERSION
-                english ? "https://www.altap.cz/salamander/downloads/eap" : "https://www.altap.cz/cz/salamander/downloads/eap";
+                "https://github.com/0xeb/sally/releases";
 #endif // THIS_IS_EAP_VERSION
 
             SetDlgItemText(HWindow, IDC_BETAEXPIREDURL, url + 8);
