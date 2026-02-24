@@ -19,7 +19,7 @@
 #include "registry.h"
 #include "config.h"
 
-#define PATH_SOFTWARE_TSERVER L"Software\\Open Salamander\\Trace Server"
+#define PATH_SOFTWARE_TSERVER L"Software\\Sally\\Trace Server"
 
 CRegistry Registry;
 CConfigData ConfigData;
