@@ -175,18 +175,30 @@ public:
     RegistryResult EnumSubKeys(HKEY key, std::vector<std::wstring>& subKeys) override
     {
         subKeys.clear();
-        wchar_t name[256];
+        DWORD maxSubKeyNameLen = 0;
+        LONG infoRes = RegQueryInfoKeyW(key, nullptr, nullptr, nullptr,
+                                        nullptr, &maxSubKeyNameLen, nullptr,
+                                        nullptr, nullptr, nullptr, nullptr, nullptr);
+        if (infoRes != ERROR_SUCCESS)
+            return RegistryResult::Error(infoRes);
+
+        std::vector<wchar_t> name(maxSubKeyNameLen + 1, L'\0');
         DWORD index = 0;
 
         while (true)
         {
-            DWORD nameSize = 256;
-            LONG res = RegEnumKeyExW(key, index, name, &nameSize, nullptr, nullptr, nullptr, nullptr);
+            DWORD nameSize = static_cast<DWORD>(name.size());
+            LONG res = RegEnumKeyExW(key, index, name.data(), &nameSize, nullptr, nullptr, nullptr, nullptr);
             if (res == ERROR_NO_MORE_ITEMS)
                 break;
+            if (res == ERROR_MORE_DATA)
+            {
+                name.resize(name.size() * 2);
+                continue;
+            }
             if (res != ERROR_SUCCESS)
                 return RegistryResult::Error(res);
-            subKeys.push_back(name);
+            subKeys.emplace_back(name.data(), nameSize);
             index++;
         }
         return RegistryResult::Ok();
@@ -195,18 +207,30 @@ public:
     RegistryResult EnumValues(HKEY key, std::vector<std::wstring>& valueNames) override
     {
         valueNames.clear();
-        wchar_t name[256];
+        DWORD maxValueNameLen = 0;
+        LONG infoRes = RegQueryInfoKeyW(key, nullptr, nullptr, nullptr,
+                                        nullptr, nullptr, nullptr, nullptr,
+                                        &maxValueNameLen, nullptr, nullptr, nullptr);
+        if (infoRes != ERROR_SUCCESS)
+            return RegistryResult::Error(infoRes);
+
+        std::vector<wchar_t> name(maxValueNameLen + 1, L'\0');
         DWORD index = 0;
 
         while (true)
         {
-            DWORD nameSize = 256;
-            LONG res = RegEnumValueW(key, index, name, &nameSize, nullptr, nullptr, nullptr, nullptr);
+            DWORD nameSize = static_cast<DWORD>(name.size());
+            LONG res = RegEnumValueW(key, index, name.data(), &nameSize, nullptr, nullptr, nullptr, nullptr);
             if (res == ERROR_NO_MORE_ITEMS)
                 break;
+            if (res == ERROR_MORE_DATA)
+            {
+                name.resize(name.size() * 2);
+                continue;
+            }
             if (res != ERROR_SUCCESS)
                 return RegistryResult::Error(res);
-            valueNames.push_back(name);
+            valueNames.emplace_back(name.data(), nameSize);
             index++;
         }
         return RegistryResult::Ok();

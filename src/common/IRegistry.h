@@ -160,6 +160,16 @@ inline RegistryResult SetDWordA(IRegistry* reg, HKEY key, const char* valueName,
     return reg->SetDWord(key, AnsiToWideReg(valueName).c_str(), value);
 }
 
+inline RegistryResult DeleteKeyA(IRegistry* reg, HKEY root, const char* subKey)
+{
+    return reg->DeleteKey(root, AnsiToWideReg(subKey).c_str());
+}
+
+inline RegistryResult DeleteKeyRecursiveA(IRegistry* reg, HKEY root, const char* subKey)
+{
+    return reg->DeleteKeyRecursive(root, AnsiToWideReg(subKey).c_str());
+}
+
 inline RegistryResult DeleteValueA(IRegistry* reg, HKEY key, const char* valueName)
 {
     return reg->DeleteValue(key, AnsiToWideReg(valueName).c_str());

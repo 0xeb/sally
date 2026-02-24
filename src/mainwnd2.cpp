@@ -782,6 +782,61 @@ const char* SALAMANDER_SIMPLEICONSINARCHIVES = "Simple Icons In Archives";
 
 const char* SALAMANDER_PWDMNGR_REG = "Password Manager";
 
+static IRegistry* GetMainWindowRegistry()
+{
+    IRegistry* registry = gRegistry;
+    if (registry == NULL)
+        registry = GetWin32Registry();
+    return registry;
+}
+
+static BOOL GetRegistryDWordA(IRegistry* registry, HKEY key, const char* valueName, DWORD& value)
+{
+    return registry != NULL && GetDWordA(registry, key, valueName, value).success;
+}
+
+static BOOL GetRegistryStringA(IRegistry* registry, HKEY key, const char* valueName,
+                               char* buffer, DWORD bufferSize)
+{
+    return registry != NULL && GetStringA(registry, key, valueName, buffer, bufferSize).success;
+}
+
+static BOOL ClearRegistryKeyTree(IRegistry* registry, HKEY key)
+{
+    if (registry == NULL || key == NULL)
+        return FALSE;
+
+    std::vector<std::wstring> subKeys;
+    if (!registry->EnumSubKeys(key, subKeys).success)
+        return FALSE;
+
+    for (const std::wstring& subKeyName : subKeys)
+    {
+        HKEY subKey = NULL;
+        if (!registry->OpenKeyReadWrite(key, subKeyName.c_str(), subKey).success)
+            return FALSE;
+
+        BOOL subKeyCleared = ClearRegistryKeyTree(registry, subKey);
+        registry->CloseKey(subKey);
+        if (!subKeyCleared)
+            return FALSE;
+
+        if (!registry->DeleteKey(key, subKeyName.c_str()).success)
+            return FALSE;
+    }
+
+    std::vector<std::wstring> valueNames;
+    if (!registry->EnumValues(key, valueNames).success)
+        return FALSE;
+
+    for (const std::wstring& valueName : valueNames)
+    {
+        if (!registry->DeleteValue(key, valueName.c_str()).success)
+            return FALSE;
+    }
+    return TRUE;
+}
+
 //****************************************************************************
 //
 // GetUpgradeInfo
@@ -811,9 +866,7 @@ BOOL GetUpgradeInfo(BOOL* autoImportConfig, char* autoImportConfigFromKey, int a
     HKEY rootKey = NULL;
     DWORD saveInProgress; // dummy
     BOOL doNotExit = TRUE;
-    IRegistry* registry = gRegistry;
-    if (registry == NULL)
-        registry = GetWin32Registry();
+    IRegistry* registry = GetMainWindowRegistry();
     if (autoImportConfigFromKeySize > 0)
         *autoImportConfigFromKey = 0;
     LoadSaveToRegistryMutex.Enter();
@@ -913,12 +966,12 @@ BOOL GetUpgradeInfo(BOOL* autoImportConfig, char* autoImportConfigFromKey, int a
                 if (clearCfg &&
                     OpenKeyReadWriteA(registry, HKEY_CURRENT_USER, SalamanderConfigurationRoots[0], cfgKey).success)
                 { // delete the configuration and leave only "AutoImportConfig" (recreate it)
-                    ClearKey(cfgKey);
+                    ClearRegistryKeyTree(registry, cfgKey);
                     lstrcpyn(oldKeyName, autoImportConfigFromKey, 200);
                     char* keyName;
                     if (!CutDirectory(oldKeyName, &keyName))
                         keyName = oldKeyName; // theoretically cannot happen
-                    SetValue(cfgKey, SALAMANDER_AUTO_IMPORT_CONFIG, REG_SZ, keyName, -1);
+                    SetStringA(registry, cfgKey, SALAMANDER_AUTO_IMPORT_CONFIG, keyName);
                     registry->CloseKey(cfgKey);
                 }
             }
@@ -953,9 +1006,7 @@ BOOL FindLanguageFromPrevVerOfSal(char* slgName)
     int rootIndex = 0;
     const char* root;
     DWORD saveInProgress; // dummy
-    IRegistry* registry = gRegistry;
-    if (registry == NULL)
-        registry = GetWin32Registry();
+    IRegistry* registry = GetMainWindowRegistry();
 
     slgName[0] = 0;
     LoadSaveToRegistryMutex.Enter();
@@ -1032,24 +1083,26 @@ void CheckShutdownParams()
     // W2K and XP have it; I could not find it on Vista but supposedly it is there (info from the internet)
 
     BOOL showWarning = FALSE;
+    IRegistry* registry = GetMainWindowRegistry();
     HKEY key;
-    if (OpenKeyAux(NULL, HKEY_CURRENT_USER, "Control Panel\\Desktop", key))
+    if (registry != NULL &&
+        OpenKeyReadA(registry, HKEY_CURRENT_USER, "Control Panel\\Desktop", key).success)
     {
         char num[100];
         DWORD value;
-        if (GetValueAux(NULL, key, "WaitToKillAppTimeout", REG_SZ, num, 100) &&
+        if (GetRegistryStringA(registry, key, "WaitToKillAppTimeout", num, _countof(num)) &&
             GetNumFromStr(num, &value) && value < 20000)
         {
             TRACE_E("CheckShutdownParams(): WaitToKillAppTimeout is '" << num << "' (" << value << ")");
             showWarning = TRUE;
         }
-        if (GetValueAux(NULL, key, "AutoEndTasks", REG_SZ, num, 100) &&
+        if (GetRegistryStringA(registry, key, "AutoEndTasks", num, _countof(num)) &&
             GetNumFromStr(num, &value) && value != 0)
         {
             TRACE_E("CheckShutdownParams(): AutoEndTasks is '" << num << "' (" << value << ")");
             showWarning = TRUE;
         }
-        CloseKeyAux(key);
+        registry->CloseKey(key);
     }
 
     if (showWarning)
@@ -1059,28 +1112,37 @@ void CheckShutdownParams()
 BOOL MyRegRenameKey(HKEY key, const char* name, const char* newName)
 {
     BOOL ret = FALSE;
+    IRegistry* registry = GetMainWindowRegistry();
+    if (registry == NULL)
+    {
+        TRACE_E("MyRegRenameKey(): registry service unavailable");
+        return FALSE;
+    }
     // There is also NtRenameKey but I could not get it working (requires UNICODE_STRING
     // and probably the key opened via NtOpenKey with the key passed via OBJECT_ATTRIBUTES initialized through
     // InitializeObjectAttributes). It's overly complicated and not frequently used code,
     // so we'll do it the slow but simple way... copy the key to a new one and then delete the original
     HKEY newKey;
-    if (!OpenKeyAux(NULL, key, newName, newKey)) // verify if the target key does not already exist
+    if (!OpenKeyReadA(registry, key, newName, newKey).success) // verify if the target key does not already exist
     {
-        if (CreateKeyAux(NULL, key, newName, newKey)) // create the target key
+        if (CreateKeyA(registry, key, newName, newKey).success) // create the target key
         {
             // I also tried RegCopyTree (didn't work without KEY_ALL_ACCESS) and the speed was the same as SHCopyKey
             if (SHCopyKey(key, name, newKey, 0) == ERROR_SUCCESS) // copy into the target key
                 ret = TRUE;
-            CloseKeyAux(newKey);
-            if (ret)
-                SHDeleteKey(key, name);
+            registry->CloseKey(newKey);
+            if (ret &&
+                !registry->DeleteKeyRecursive(key, AnsiToWideReg(name).c_str()).success)
+            {
+                TRACE_E("MyRegRenameKey(): unable to delete source key after copy: " << name);
+            }
         }
         else
             TRACE_E("MyRegRenameKey(): unable to create target key: " << newName);
     }
     else
     {
-        CloseKeyAux(newKey);
+        registry->CloseKey(newKey);
         TRACE_E("MyRegRenameKey(): target key already exists: " << newName);
     }
     return ret;
@@ -1108,9 +1170,7 @@ BOOL FindLatestConfiguration(BOOL* deleteConfigurations, const char*& loadConfig
     const char* root;
     DWORD saveInProgress; // dummy
     HKEY hCfgKey;
-    IRegistry* registry = gRegistry;
-    if (registry == NULL)
-        registry = GetWin32Registry();
+    IRegistry* registry = GetMainWindowRegistry();
 
     CImportConfigDialog dlg;
     ZeroMemory(dlg.ConfigurationExist, sizeof(dlg.ConfigurationExist)); // none of the configurations found yet
@@ -1124,19 +1184,21 @@ BOOL FindLatestConfiguration(BOOL* deleteConfigurations, const char*& loadConfig
     char backup[200];
     sprintf_s(backup, "%s.backup.63A7CD13", SalamanderConfigurationRoots[0]); // "63A7CD13" prevents the key name from matching the user name
     HKEY backupKey;
-    BOOL backupFound = OpenKeyAux(NULL, HKEY_CURRENT_USER, backup, backupKey);
+    BOOL backupFound = registry != NULL &&
+                       OpenKeyReadA(registry, HKEY_CURRENT_USER, backup, backupKey).success;
     if (backupFound)
     {
         DWORD copyIsOK;
-        if (GetValueAux(NULL, backupKey, SALAMANDER_COPY_IS_OK, REG_DWORD, &copyIsOK, sizeof(DWORD)))
+        if (GetRegistryDWordA(registry, backupKey, SALAMANDER_COPY_IS_OK, copyIsOK))
             copyIsOK = 1; // backup is valid
         else
             copyIsOK = 0; // backup is corrupted
-        CloseKeyAux(backupKey);
+        registry->CloseKey(backupKey);
         if (!copyIsOK) // delete the corrupted backup and pretend it never existed (it probably wasn't fully created)
         {
             TRACE_I("Configuration backup is incomplete, removing... " << backup);
-            SHDeleteKey(HKEY_CURRENT_USER, backup);
+            if (!DeleteKeyRecursiveA(registry, HKEY_CURRENT_USER, backup).success)
+                TRACE_E("FindLatestConfiguration(): unable to delete corrupted backup: " << backup);
             backupFound = FALSE;
         }
         else
@@ -1147,26 +1209,27 @@ BOOL FindLatestConfiguration(BOOL* deleteConfigurations, const char*& loadConfig
     {
         root = SalamanderConfigurationRoots[rootIndex];
         // check whether the key exists
-        BOOL rootFound = OpenKeyAux(NULL, HKEY_CURRENT_USER, root, hRootKey);
+        BOOL rootFound = registry != NULL &&
+                         OpenKeyReadA(registry, HKEY_CURRENT_USER, root, hRootKey).success;
         if (rootFound &&
-            GetValueAux(NULL, hRootKey, SALAMANDER_SAVE_IN_PROGRESS, REG_DWORD, &saveInProgress, sizeof(DWORD)))
+            GetRegistryDWordA(registry, hRootKey, SALAMANDER_SAVE_IN_PROGRESS, saveInProgress))
         { // this configuration is corrupted
             TRACE_E("Configuration is corrupted!");
             rootFound = FALSE;
-            CloseKeyAux(hRootKey);
+            registry->CloseKey(hRootKey);
             if (rootIndex == 0 && backupFound) // use the backup, if available and don't bother the user
             {
                 char corrupted[200];
                 sprintf_s(corrupted, "%s.corrupted.63A7CD13", root); // "63A7CD13" prevents the key name from matching the user name
-                SHDeleteKey(HKEY_CURRENT_USER, corrupted);           // if we already have a corrupted configuration, remove it-one is enough
+                DeleteKeyRecursiveA(registry, HKEY_CURRENT_USER, corrupted); // if we already have a corrupted configuration, remove it-one is enough
                 if (MyRegRenameKey(HKEY_CURRENT_USER, root, corrupted) &&
                     MyRegRenameKey(HKEY_CURRENT_USER, backup, root))
                 {
                     backupFound = FALSE;
-                    if (CreateKeyAux(NULL, HKEY_CURRENT_USER, root, hRootKey))
+                    if (CreateKeyA(registry, HKEY_CURRENT_USER, root, hRootKey).success)
                     {
-                        DeleteValueAux(hRootKey, SALAMANDER_COPY_IS_OK);
-                        CloseKeyAux(hRootKey);
+                        DeleteValueA(registry, hRootKey, SALAMANDER_COPY_IS_OK);
+                        registry->CloseKey(hRootKey);
                     }
                     TRACE_I("Corrupted configuration was moved to: " << corrupted);
                     TRACE_I("Using configuration backup instead ...");
@@ -1214,26 +1277,28 @@ MENU_TEMPLATE_ITEM MsgBoxButtons[] =
                     OpenKeyReadWriteA(registry, HKEY_CURRENT_USER, root, hRootKey).success)
                 { // delete the corrupted configuration (if it's still there - user might have renamed it for backup)
                     TRACE_I("Deleting corrupted configuration on user demand: " << root);
-                    ClearKeyAux(hRootKey);
-                    CloseKeyAux(hRootKey);
-                    DeleteKeyAux(HKEY_CURRENT_USER, root);
+                    ClearRegistryKeyTree(registry, hRootKey);
+                    registry->CloseKey(hRootKey);
+                    DeleteKeyRecursiveA(registry, HKEY_CURRENT_USER, root);
                 }
             }
         }
-        BOOL cfgFound = rootFound && OpenKeyAux(NULL, hRootKey, SALAMANDER_CONFIG_REG, hCfgKey);
+        BOOL cfgFound = rootFound &&
+                        OpenKeyReadA(registry, hRootKey, SALAMANDER_CONFIG_REG, hCfgKey).success;
         if (rootFound)
-            CloseKeyAux(hRootKey);
+            registry->CloseKey(hRootKey);
 
         if (rootIndex == 0 && backupFound) // backup not needed, remove it
         {
             TRACE_I("Removing unnecessary configuration backup: " << backup);
-            SHDeleteKey(HKEY_CURRENT_USER, backup);
+            if (!DeleteKeyRecursiveA(registry, HKEY_CURRENT_USER, backup).success)
+                TRACE_E("FindLatestConfiguration(): unable to remove unnecessary backup: " << backup);
             backupFound = FALSE;
         }
 
         if (cfgFound) // a key is considered a configuration key only if the "Configuration" subkey exists (mere existence of the key isn't enough because it may contain only "AutoImportConfig")
         {
-            CloseKeyAux(hCfgKey);
+            registry->CloseKey(hCfgKey);
             if (rootIndex == 0)
             {
                 // this is the key for the active program version => confirm loading it and return
@@ -1306,6 +1371,7 @@ void CMainWindow::DeleteOldConfigurations(BOOL* deleteConfigurations, BOOL autoI
         analysing.Create();
         EnableWindow(HWindow, FALSE);
         LoadSaveToRegistryMutex.Enter();
+        IRegistry* registry = GetMainWindowRegistry();
         int rootIndex;
         for (rootIndex = 0; rootIndex < SALCFG_ROOTS_COUNT; rootIndex++)
         {
@@ -1313,11 +1379,12 @@ void CMainWindow::DeleteOldConfigurations(BOOL* deleteConfigurations, BOOL autoI
             {
                 HKEY hKey;
                 const char* key = SalamanderConfigurationRoots[rootIndex];
-                if (CreateKeyAux(NULL, HKEY_CURRENT_USER, key, hKey))
+                if (registry != NULL &&
+                    CreateKeyA(registry, HKEY_CURRENT_USER, key, hKey).success)
                 {
-                    ClearKeyAux(hKey);
-                    CloseKeyAux(hKey);
-                    DeleteKeyAux(HKEY_CURRENT_USER, key);
+                    ClearRegistryKeyTree(registry, hKey);
+                    registry->CloseKey(hKey);
+                    DeleteKeyRecursiveA(registry, HKEY_CURRENT_USER, key);
                 }
             }
         }
@@ -1325,9 +1392,6 @@ void CMainWindow::DeleteOldConfigurations(BOOL* deleteConfigurations, BOOL autoI
         {
             BOOL ok = FALSE;
             HKEY cfgKey;
-            IRegistry* registry = gRegistry;
-            if (registry == NULL)
-                registry = GetWin32Registry();
             if (registry != NULL &&
                 OpenKeyReadWriteA(registry, HKEY_CURRENT_USER, SalamanderConfigurationRoots[0], cfgKey).success)
             { // remove "AutoImportConfig" value from the new key
@@ -1348,9 +1412,9 @@ void CMainWindow::DeleteOldConfigurations(BOOL* deleteConfigurations, BOOL autoI
                     if (registry != NULL &&
                         OpenKeyReadWriteA(registry, HKEY_CURRENT_USER, autoImportConfigFromKey, cfgKey).success)
                     {
-                        ClearKeyAux(cfgKey);
+                        ClearRegistryKeyTree(registry, cfgKey);
                         registry->CloseKey(cfgKey);
-                        DeleteKeyAux(HKEY_CURRENT_USER, autoImportConfigFromKey);
+                        DeleteKeyRecursiveA(registry, HKEY_CURRENT_USER, autoImportConfigFromKey);
                     }
                 }
             }
@@ -1435,9 +1499,11 @@ void CMainWindow::SaveConfig(HWND parent)
         BOOL deleteSALAMANDER_SAVE_IN_PROGRESS = !IsSetSALAMANDER_SAVE_IN_PROGRESS;
         if (deleteSALAMANDER_SAVE_IN_PROGRESS)
         {
+            IRegistry* registry = GetMainWindowRegistry();
             DWORD saveInProgress = 1;
-            if (GetValueAux(NULL, salamander, SALAMANDER_SAVE_IN_PROGRESS, REG_DWORD, &saveInProgress, sizeof(DWORD)))
-            {                    // use GetValueAux so we don't show the "Load Configuration" message
+            if (registry != NULL &&
+                GetRegistryDWordA(registry, salamander, SALAMANDER_SAVE_IN_PROGRESS, saveInProgress))
+            {
                 cfgIsOK = FALSE; // the configuration is corrupted; saving won't fix it (it wasn't stored completely)
                 TRACE_E("CMainWindow::SaveConfig(): unable to save configuration, configuration key in registry is corrupted");
             }

@@ -154,6 +154,24 @@ TEST_F(RegistryTest, AnsiHelper_DeleteValueA)
     EXPECT_TRUE(res.success);
 }
 
+TEST_F(RegistryTest, AnsiHelper_DeleteKeyA)
+{
+    EXPECT_CALL(mockRegistry, DeleteKey(HKEY_CURRENT_USER, testing::StrEq(L"Software\\Test")))
+        .WillOnce(testing::Return(RegistryResult::Ok()));
+
+    auto res = DeleteKeyA(gRegistry, HKEY_CURRENT_USER, "Software\\Test");
+    EXPECT_TRUE(res.success);
+}
+
+TEST_F(RegistryTest, AnsiHelper_DeleteKeyRecursiveA)
+{
+    EXPECT_CALL(mockRegistry, DeleteKeyRecursive(HKEY_CURRENT_USER, testing::StrEq(L"Software\\TestRecursive")))
+        .WillOnce(testing::Return(RegistryResult::Ok()));
+
+    auto res = DeleteKeyRecursiveA(gRegistry, HKEY_CURRENT_USER, "Software\\TestRecursive");
+    EXPECT_TRUE(res.success);
+}
+
 TEST(RegistryResultTest, NotFound_Works)
 {
     auto res = RegistryResult::Error(ERROR_FILE_NOT_FOUND);
