@@ -1764,7 +1764,7 @@ BOOL IsWin64RedirectedDirAux(const char* subDir, const char* redirectedDir, cons
         HANDLE h;
         if (failIfDirWithSameNameExists)
         {
-            h = HANDLES_Q(FindFirstFileW(AnsiToWide(winDir).c_str(), &find));
+            h = SalFindFirstFileHW(winDir, &find);
             if (h != INVALID_HANDLE_VALUE)
             {
                 HANDLES(FindClose(h));
@@ -1773,7 +1773,7 @@ BOOL IsWin64RedirectedDirAux(const char* subDir, const char* redirectedDir, cons
         }
 
         strcat(winDirEnd, "\\*");
-        h = HANDLES_Q(FindFirstFileW(AnsiToWide(winDir).c_str(), &find));
+        h = SalFindFirstFileHW(winDir, &find);
         if (h != INVALID_HANDLE_VALUE)
         {
             HANDLES(FindClose(h));
@@ -1867,7 +1867,7 @@ BOOL AddWin64RedirectedDirAux(const char* path, const char* subDir, const char* 
         {
             HANDLE h;
             WIN32_FIND_DATAW fileDataW;
-            h = HANDLES_Q(FindFirstFileW(AnsiToWide(findPath).c_str(), &fileDataW)); // find-data for redirected-dir can be obtained from the "." directory in the listing of redirected-dir
+            h = SalFindFirstFileHW(findPath, &fileDataW); // find-data for redirected-dir can be obtained from the "." directory in the listing of redirected-dir
             if (h != INVALID_HANDLE_VALUE)
             {
                 BOOL found = FALSE;
@@ -1886,7 +1886,7 @@ BOOL AddWin64RedirectedDirAux(const char* path, const char* subDir, const char* 
                         found = TRUE;
                         break;
                     }
-                } while (FindNextFileW(h, &fileDataW));
+                } while (SalLPFindNextFile(h, &fileDataW));
                 HANDLES(FindClose(h));
                 if (found)
                 {
@@ -1898,7 +1898,7 @@ BOOL AddWin64RedirectedDirAux(const char* path, const char* subDir, const char* 
                     if (CutDirectory(findPath)) // find out if there's a directory with the same name as redirected-dir on the disk (it does not need to be in the 'dirs' array, e.g. because of the command "Hide Selected Names")
                     {
                         WIN32_FIND_DATAW fd;
-                        h = HANDLES_Q(FindFirstFileW(AnsiToWide(findPath).c_str(), &fd));
+                        h = SalFindFirstFileHW(findPath, &fd);
                         if (h != INVALID_HANDLE_VALUE)
                         {
                             HANDLES(FindClose(h));
@@ -2287,7 +2287,7 @@ CHANGE_AGAIN:
                         WIN32_FIND_DATAW find;
                         HANDLE h;
                         if (!pathEndsWithSpaceOrDot)
-                            h = HANDLES_Q(FindFirstFileW(AnsiToWide(copy).c_str(), &find));
+                            h = SalFindFirstFileHW(copy, &find);
                         else
                             h = INVALID_HANDLE_VALUE;
                         DWORD err;
@@ -2314,7 +2314,7 @@ CHANGE_AGAIN:
                                     }
                                     else
                                     {
-                                        h = HANDLES_Q(FindFirstFileW(AnsiToWide(copy).c_str(), &find));
+                                        h = SalFindFirstFileHW(copy, &find);
                                         if (h != INVALID_HANDLE_VALUE)
                                             break; // we've found an accessible component, continuing...
                                         err = GetLastError();
@@ -2327,7 +2327,7 @@ CHANGE_AGAIN:
                                 {
                                     if ((int)strlen(copy) < copy.Size() - 10 && SalPathAppend(copy, "*.*", copy.Size()))
                                     {
-                                        h = HANDLES_Q(FindFirstFileW(AnsiToWide(copy).c_str(), &find));
+                                        h = SalFindFirstFileHW(copy, &find);
                                         CutDirectory(copy);
                                         if (h != INVALID_HANDLE_VALUE) // the path can be listed
                                         {

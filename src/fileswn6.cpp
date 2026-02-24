@@ -362,7 +362,7 @@ BOOL CFilesWindow::MoveFiles(const char* source, const char* target, const char*
         strcpy(sourceDir + len, "*");
 
         WIN32_FIND_DATAW file;
-        HANDLE find = HANDLES_Q(FindFirstFileW(AnsiToWide(sourceDir).c_str(), &file));
+        HANDLE find = SalFindFirstFileHW(sourceDir, &file);
         if (find == INVALID_HANDLE_VALUE)
         {
             FreeScript(script);
@@ -435,7 +435,7 @@ BOOL CFilesWindow::MoveFiles(const char* source, const char* target, const char*
                         }
                     }
                 }
-            } while (FindNextFileW(find, &file));
+            } while (SalLPFindNextFile(find, &file));
             HANDLES(FindClose(find));
             int i;
             for (i = 0; i < script->Count; i++)
@@ -1863,7 +1863,7 @@ BOOL CFilesWindow::BuildScriptDir(COperations* script, CActionType type, char* s
                             if (SalPathAppend(finalName, "*", 2 * MAX_PATH + 200))
                             {
                                 WIN32_FIND_DATAW f;
-                                HANDLE search = HANDLES_Q(FindFirstFileW(AnsiToWide(finalName).c_str(), &f));
+                                HANDLE search = SalFindFirstFileHW(finalName, &f);
                                 if (search == INVALID_HANDLE_VALUE)
                                 {
                                     DWORD err = GetLastError();
@@ -2049,7 +2049,7 @@ BOOL CFilesWindow::BuildScriptDir(COperations* script, CActionType type, char* s
     {
         WIN32_FIND_DATAW f;
         strcpy(st, "\\*");
-        HANDLE search = HANDLES_Q(FindFirstFileW(AnsiToWide(sourcePath).c_str(), &f));
+        HANDLE search = SalFindFirstFileHW(sourcePath, &f);
         *st = 0; // remove "\\*"
         if (search == INVALID_HANDLE_VALUE)
         {
@@ -2061,7 +2061,7 @@ BOOL CFilesWindow::BuildScriptDir(COperations* script, CActionType type, char* s
                     SalPathAppend(finalName, dirDOSName, 2 * MAX_PATH + 200) &&
                     SalPathAppend(finalName, "*", 2 * MAX_PATH + 200))
                 {
-                    search = HANDLES_Q(FindFirstFileW(AnsiToWide(finalName).c_str(), &f));
+                    search = SalFindFirstFileHW(finalName, &f);
                     if (search != INVALID_HANDLE_VALUE)
                     {
                         strcpy(*sourceEnd == '\\' ? sourceEnd + 1 : sourceEnd, dirDOSName); // modify sourcePath (it's used further for handling found files and directories)
@@ -2183,7 +2183,7 @@ BOOL CFilesWindow::BuildScriptDir(COperations* script, CActionType type, char* s
                     else
                         canDelDirAfterMove = FALSE; // not everything is being moved (filter skipped something); the source directory cannot be deleted (it would not be empty)
                 }
-            } while (FindNextFileW(search, &f));
+            } while (SalLPFindNextFile(search, &f));
             DWORD err = GetLastError();
             HANDLES(FindClose(search));
 
@@ -2549,7 +2549,7 @@ BOOL CFilesWindow::BuildScriptFile(COperations* script, CActionType type, char* 
                 {
                     HANDLE find;
                     WIN32_FIND_DATAW dataOut;
-                    find = HANDLES_Q(FindFirstFileW(AnsiToWide(op.TargetName).c_str(), &dataOut));
+                    find = SalFindFirstFileHW(op.TargetName, &dataOut);
                     if (find != INVALID_HANDLE_VALUE)
                     {
                         HANDLES(FindClose(find));
@@ -3151,7 +3151,7 @@ void CFilesWindow::ExecuteFromArchive(int index, BOOL edit, HWND editWithMenuPar
             SetCursor(oldCur);
             SetThreadPriority(GetCurrentThread(), THREAD_PRIORITY_ABOVE_NORMAL);
 
-            HANDLE find = HANDLES_Q(FindFirstFileW(AnsiToWide(name).c_str(), &data));
+            HANDLE find = SalFindFirstFileHW(name, &data);
             if (find != INVALID_HANDLE_VALUE)
             {
                 HANDLES(FindClose(find));
@@ -3208,7 +3208,7 @@ void CFilesWindow::ExecuteFromArchive(int index, BOOL edit, HWND editWithMenuPar
 
     if (fileSize == CQuadWord(-1, -1))
     {
-        HANDLE find = HANDLES_Q(FindFirstFileW(AnsiToWide(name).c_str(), &data));
+        HANDLE find = SalFindFirstFileHW(name, &data);
         if (find != INVALID_HANDLE_VALUE)
         {
             HANDLES(FindClose(find));
