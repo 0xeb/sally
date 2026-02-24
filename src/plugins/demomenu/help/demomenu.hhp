@@ -13,7 +13,7 @@ Language=0x409 English (United States)
 Title=DemoMenu Help
 
 [WINDOWS]
-$global_ssdefault=,"salamand.chm::\salamand.hhc","demomenu.hhk","hh\demomenu\introduction_intro.htm","hh\demomenu\introduction_intro.htm",,,,"Web Help",0x3520,,0x180e,,,,,,,,0
+$global_ssdefault=,"sally.chm::\salamand.hhc","demomenu.hhk","hh\demomenu\introduction_intro.htm","hh\demomenu\introduction_intro.htm",,,,"Web Help",0x3520,,0x180e,,,,,,,,0
 
 [FILES]
 hh\salamander_help.css
@@ -28,7 +28,7 @@ IDH_TESTCMD=hh\demomenu\basic_testcmd.htm
 #include "..\lang\lang.rh"
 
 [MERGE FILES]
-salamand.chm
+sally.chm
 zip.chm
 filecomp.chm
 7zip.chm

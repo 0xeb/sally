@@ -13,7 +13,7 @@ Language=0x409 English (United States)
 Title=DiskMap Help
 
 [WINDOWS]
-$global_ssdefault=,"salamand.chm::\salamand.hhc","diskmap.hhk","hh\diskmap\introduction_intro.htm","hh\diskmap\introduction_intro.htm",,,,"Web Help",0x3520,,0x180e,,,,,,,,0
+$global_ssdefault=,"sally.chm::\salamand.hhc","diskmap.hhk","hh\diskmap\introduction_intro.htm","hh\diskmap\introduction_intro.htm",,,,"Web Help",0x3520,,0x180e,,,,,,,,0
 
 [FILES]
 hh\salamander_help.css
@@ -28,7 +28,7 @@ IDH_SHOWDISKMAP=hh\diskmap\using_showdiskmap.htm
 #include "..\DiskMapPlugin\DiskMapPlugin.rh"
 
 [MERGE FILES]
-salamand.chm
+sally.chm
 zip.chm
 filecomp.chm
 7zip.chm

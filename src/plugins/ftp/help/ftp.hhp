@@ -13,14 +13,14 @@ Language=0x409 English (United States)
 Title=FTP Client Help
 
 [WINDOWS]
-$global_ssdefault=,"salamand.chm::\salamand.hhc","ftp.hhk","hh\ftp\introduction_intro.htm","hh\ftp\introduction_intro.htm",,,,"Web Help",0x3520,,0x180e,,,,,,,,0
+$global_ssdefault=,"sally.chm::\salamand.hhc","ftp.hhk","hh\ftp\introduction_intro.htm","hh\ftp\introduction_intro.htm",,,,"Web Help",0x3520,,0x180e,,,,,,,,0
 
 [FILES]
 hh\salamander_help.css
 hh\salamander_help_shared.css
 
 [ALIAS]
-IDH_DISCONNECT_F12=ms-its:salamand.chm::/hh\salamand\disk_net.htm
+IDH_DISCONNECT_F12=ms-its:sally.chm::/hh\salamand\disk_net.htm
 IDH_CONNECTFTPSERVER=hh\ftp\using_connect.htm
 IDH_ORGANIZEBOOKMARKS=hh\ftp\using_orgbookmarks.htm
 IDH_SHOWLOGS=hh\ftp\using_showlogs.htm
@@ -61,7 +61,7 @@ IDH_SOLVEERROR=hh\ftp\dlgboxes_solveerror.htm
 #include "..\lang\lang.rh"
 
 [MERGE FILES]
-salamand.chm
+sally.chm
 zip.chm
 demoplug.chm
 demoview.chm

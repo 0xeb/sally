@@ -13,7 +13,7 @@ Language=0x409 English (United States)
 Title=Undelete Help
 
 [WINDOWS]
-$global_ssdefault=,"salamand.chm::\salamand.hhc","undelete.hhk","hh\undelete\introduction_intro.htm","hh\undelete\introduction_intro.htm",,,,"Web Help",0x3520,,0x180e,,,,,,,,0
+$global_ssdefault=,"sally.chm::\salamand.hhc","undelete.hhk","hh\undelete\introduction_intro.htm","hh\undelete\introduction_intro.htm",,,,"Web Help",0x3520,,0x180e,,,,,,,,0
 
 [FILES]
 hh\salamander_help.css
@@ -32,7 +32,7 @@ IDD_CONNECT=hh\undelete\dlgboxes_undelete.htm
 #include "..\lang\lang.rh"
 
 [MERGE FILES]
-salamand.chm
+sally.chm
 zip.chm
 demoplug.chm
 demoview.chm

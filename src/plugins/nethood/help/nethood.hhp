@@ -13,7 +13,7 @@ Language=0x409 English (United States)
 Title=Network Help
 
 [WINDOWS]
-$global_ssdefault=,"salamand.chm::\salamand.hhc","nethood.hhk","hh\nethood\introduction_intro.htm","hh\nethood\introduction_intro.htm",,,,"Web Help",0x3520,,0x180e,,,,,,,,0
+$global_ssdefault=,"sally.chm::\salamand.hhc","nethood.hhk","hh\nethood\introduction_intro.htm","hh\nethood\introduction_intro.htm",,,,"Web Help",0x3520,,0x180e,,,,,,,,0
 
 [FILES]
 hh\salamander_help.css
@@ -28,7 +28,7 @@ IDD_CONFIG=hh\nethood\dlgboxes_config.htm
 #include "..\lang\lang.rh"
 
 [MERGE FILES]
-salamand.chm
+sally.chm
 zip.chm
 demoplug.chm
 demoview.chm
