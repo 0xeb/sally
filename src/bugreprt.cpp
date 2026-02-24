@@ -6,6 +6,7 @@
 
 #include <tlhelp32.h>
 #include "common/IEnvironment.h"
+#include "common/IRegistry.h"
 
 // Cross-architecture register access macros for CONTEXT structure
 #ifdef _WIN64
@@ -49,6 +50,11 @@ static struct CBugReportReasonBreak_Init
 
 TIndirectArray<char> GlobalModulesStore(50, 20);
 TDirectArray<DWORD> GlobalModulesListTimeStore(50, 20); // x64_OK
+
+static IRegistry* GetBugReportRegistry()
+{
+    return gRegistry != nullptr ? gRegistry : GetWin32Registry();
+}
 
 //
 // ****************************************************************************
@@ -1823,10 +1829,10 @@ void CCallStack::PrintBugReport(EXCEPTION_POINTERS* Exception, DWORD ThreadID, D
     }
 
     HKEY hKey;
+    IRegistry* registry = GetBugReportRegistry();
     __try
     {
-        if (NOHANDLES(RegOpenKeyEx(HKEY_LOCAL_MACHINE, "Software\\Microsoft\\Internet Explorer", 0,
-                                   KEY_READ, &hKey)) == ERROR_SUCCESS)
+        if (OpenKeyReadA(registry, HKEY_LOCAL_MACHINE, "Software\\Microsoft\\Internet Explorer", hKey).success)
         {
             static char iver[50];
             static char build[50];
@@ -1834,9 +1840,9 @@ void CCallStack::PrintBugReport(EXCEPTION_POINTERS* Exception, DWORD ThreadID, D
             iver[0] = 0;
             build[0] = 0;
             version[0] = 0;
-            GetValueAux(NULL, hKey, "IVer", REG_SZ, iver, 50);
-            GetValueAux(NULL, hKey, "Build", REG_SZ, build, 50);
-            GetValueAux(NULL, hKey, "Version", REG_SZ, version, 50);
+            GetStringA(registry, hKey, "IVer", iver, _countof(iver));
+            GetStringA(registry, hKey, "Build", build, _countof(build));
+            GetStringA(registry, hKey, "Version", version, _countof(version));
 
             if (iver[0] != 0 || build[0] != 0 || version[0] != 0)
             {
@@ -1861,29 +1867,28 @@ void CCallStack::PrintBugReport(EXCEPTION_POINTERS* Exception, DWORD ThreadID, D
                 PrintLine(param, buf, TRUE);
             }
 
-            NOHANDLES(RegCloseKey(hKey));
+            registry->CloseKey(hKey);
         }
 
         sprintf(buf, "COMCTL32.DLL Version.c_str(): %u.%u", CCVerMajor, CCVerMinor);
         PrintLine(param, buf, TRUE);
 
-        if (NOHANDLES(RegOpenKeyEx(HKEY_LOCAL_MACHINE,
-                                   "SOFTWARE\\Microsoft\\Windows NT\\CurrentVersion", 0,
-                                   KEY_READ, &hKey)) == ERROR_SUCCESS)
+        if (OpenKeyReadA(registry, HKEY_LOCAL_MACHINE,
+                         "SOFTWARE\\Microsoft\\Windows NT\\CurrentVersion", hKey).success)
         {
             char myBuff[100];
 
-            if (GetValueAux(NULL, hKey, "ProductName", REG_SZ, myBuff, 100))
+            if (GetStringA(registry, hKey, "ProductName", myBuff, _countof(myBuff)).success)
             {
                 sprintf(buf, "ProductName (from registry): %s", myBuff);
                 PrintLine(param, buf, TRUE);
             }
-            if (GetValueAux(NULL, hKey, "CurrentVersion", REG_SZ, myBuff, 100))
+            if (GetStringA(registry, hKey, "CurrentVersion", myBuff, _countof(myBuff)).success)
             {
                 sprintf(buf, "CurrentVersion (from registry): %s", myBuff);
                 PrintLine(param, buf, TRUE);
             }
-            NOHANDLES(RegCloseKey(hKey));
+            registry->CloseKey(hKey);
         }
 
         // try to locate the main LiteStep window
@@ -1965,19 +1970,19 @@ void CCallStack::PrintBugReport(EXCEPTION_POINTERS* Exception, DWORD ThreadID, D
         PrintLine(param, buf, TRUE);
         sprintf(buf, "Processor Level: %u", si.wProcessorLevel);
         PrintLine(param, buf, TRUE);
-        if (NOHANDLES(RegOpenKeyEx(HKEY_LOCAL_MACHINE, "Hardware\\Description\\System\\CentralProcessor\\0", 0,
-                                   KEY_READ, &hKey)) == ERROR_SUCCESS)
+        if (OpenKeyReadA(registry, HKEY_LOCAL_MACHINE,
+                         "Hardware\\Description\\System\\CentralProcessor\\0", hKey).success)
         {
             static char processorName[200];
             static char vendorName[200];
             DWORD mhz;
 
-            if (!GetValueAux(NULL, hKey, "ProcessorNameString", REG_SZ, processorName, 200))
-                if (!GetValueAux(NULL, hKey, "Identifier", REG_SZ, processorName, 200)) // probably unnecessary on W2K+
+            if (!GetStringA(registry, hKey, "ProcessorNameString", processorName, _countof(processorName)).success)
+                if (!GetStringA(registry, hKey, "Identifier", processorName, _countof(processorName)).success) // probably unnecessary on W2K+
                     processorName[0] = 0;
-            if (!GetValueAux(NULL, hKey, "VendorIdentifier", REG_SZ, vendorName, 200))
+            if (!GetStringA(registry, hKey, "VendorIdentifier", vendorName, _countof(vendorName)).success)
                 vendorName[0] = 0;
-            if (!GetValueAux(NULL, hKey, "~MHz", REG_DWORD, &mhz, sizeof(DWORD)))
+            if (!GetDWordA(registry, hKey, "~MHz", mhz).success)
             {
                 if (!GetProcessorSpeed(&mhz))
                     mhz = 0;
@@ -1997,7 +2002,7 @@ void CCallStack::PrintBugReport(EXCEPTION_POINTERS* Exception, DWORD ThreadID, D
                 sprintf(buf, "Processor Speed: ~%u MHz", mhz);
             PrintLine(param, buf, TRUE);
 
-            NOHANDLES(RegCloseKey(hKey));
+            registry->CloseKey(hKey);
         }
 
         sprintf(buf, "Page size: %u", si.dwPageSize);
@@ -2029,8 +2034,8 @@ void CCallStack::PrintBugReport(EXCEPTION_POINTERS* Exception, DWORD ThreadID, D
             PrintLine(param, buf, TRUE);
         }
 
-        if (NOHANDLES(RegOpenKeyEx(HKEY_LOCAL_MACHINE, "Hardware\\Description\\System", 0,
-                                   KEY_READ, &hKey)) == ERROR_SUCCESS)
+        if (OpenKeyReadA(registry, HKEY_LOCAL_MACHINE,
+                         "Hardware\\Description\\System", hKey).success)
         {
             static char bios[200];
 
@@ -2053,7 +2058,7 @@ void CCallStack::PrintBugReport(EXCEPTION_POINTERS* Exception, DWORD ThreadID, D
                 sprintf(buf, "BIOS Date: %s", bios);
                 PrintLine(param, buf, TRUE);
             }
-            NOHANDLES(RegCloseKey(hKey));
+            registry->CloseKey(hKey);
         }
 
         MonitorEnumProcData enumData;
