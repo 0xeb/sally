@@ -79,6 +79,14 @@ const int SPLIT_LINE_WIDTH = 3; // width of the split line in points
 
 const int MIN_WIN_WIDTH = 2; // minimal panel width
 
+static IRegistry* GetMainWindow3Registry()
+{
+    IRegistry* registry = gRegistry;
+    if (registry == NULL)
+        registry = GetWin32Registry();
+    return registry;
+}
+
 extern BOOL CacheNextSetFocus;
 
 BOOL MainFrameIsActive = FALSE;
@@ -6411,20 +6419,22 @@ MENU_TEMPLATE_ITEM AddToSystemMenu[] =
         if (uMsg == WM_QUERYENDSESSION && (lParam & ENDSESSION_CRITICAL) != 0) // this applies to Vista+
         {
             BOOL cfgOK = FALSE;
+            IRegistry* registry = GetMainWindow3Registry();
             if (SALAMANDER_ROOT_REG != NULL)
             {
                 // ensure exclusive access to the configuration in the registry
                 LoadSaveToRegistryMutex.Enter();
 
                 HKEY salamander;
-                if (OpenKeyAux(NULL, HKEY_CURRENT_USER, SALAMANDER_ROOT_REG, salamander))
+                if (registry != NULL &&
+                    OpenKeyReadA(registry, HKEY_CURRENT_USER, SALAMANDER_ROOT_REG, salamander).success)
                 {
-                    DWORD saveInProgress;
-                    if (!GetValueAux(NULL, salamander, SALAMANDER_SAVE_IN_PROGRESS, REG_DWORD, &saveInProgress, sizeof(DWORD)))
+                    DWORD saveInProgress = 0;
+                    if (!GetDWordA(registry, salamander, SALAMANDER_SAVE_IN_PROGRESS, saveInProgress).success)
                     { // configuration is not corrupted
                         cfgOK = TRUE;
                     }
-                    CloseKeyAux(salamander);
+                    registry->CloseKey(salamander);
                 }
                 if (!cfgOK)
                     LoadSaveToRegistryMutex.Leave(); // done with the configuration; exit the section
@@ -6436,24 +6446,29 @@ MENU_TEMPLATE_ITEM AddToSystemMenu[] =
             {
                 char backup[200];
                 sprintf_s(backup, "%s.backup.63A7CD13", SALAMANDER_ROOT_REG); // "63A7CD13" prevents the key name from matching a user key
-                SHDeleteKey(HKEY_CURRENT_USER, backup);                       // delete the old backup if one exists
-                HKEY salBackup;
-                if (!OpenKeyAux(NULL, HKEY_CURRENT_USER, backup, salBackup)) // check that no backup exists
+                if (registry != NULL)
+                    DeleteKeyRecursiveA(registry, HKEY_CURRENT_USER, backup); // delete the old backup if one exists
+                if (registry != NULL)
                 {
-                    if (CreateKeyAux(NULL, HKEY_CURRENT_USER, backup, salBackup)) // create a key for the backup
+                    HKEY salBackup = NULL;
+                    RegistryResult openBackupRes = OpenKeyReadA(registry, HKEY_CURRENT_USER, backup, salBackup);
+                    if (!openBackupRes.success) // check that no backup exists
                     {
-                        // I tried RegCopyTree (without KEY_ALL_ACCESS it failed) and it was as fast as SHCopyKey
-                        if (SHCopyKey(HKEY_CURRENT_USER, SALAMANDER_ROOT_REG, salBackup, 0) == ERROR_SUCCESS)
-                        { // creating the backup
-                            DWORD copyIsOK = 1;
-                            if (SetValueAux(NULL, salBackup, SALAMANDER_COPY_IS_OK, REG_DWORD, &copyIsOK, sizeof(DWORD)))
-                                backupOK = TRUE;
+                        if (CreateKeyA(registry, HKEY_CURRENT_USER, backup, salBackup).success) // create a key for the backup
+                        {
+                            // I tried RegCopyTree (without KEY_ALL_ACCESS it failed) and it was as fast as SHCopyKey
+                            if (SHCopyKey(HKEY_CURRENT_USER, SALAMANDER_ROOT_REG, salBackup, 0) == ERROR_SUCCESS)
+                            { // creating the backup
+                                DWORD copyIsOK = 1;
+                                if (SetDWordA(registry, salBackup, SALAMANDER_COPY_IS_OK, copyIsOK).success)
+                                    backupOK = TRUE;
+                            }
+                            registry->CloseKey(salBackup);
                         }
-                        CloseKeyAux(salBackup);
                     }
+                    else
+                        registry->CloseKey(salBackup);
                 }
-                else
-                    CloseKeyAux(salBackup);
                 if (!backupOK)
                     LoadSaveToRegistryMutex.Leave(); // done with the configuration; exit the section
             }
