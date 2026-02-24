@@ -2856,7 +2856,7 @@ HWND CWaitWindow::Create(HWND hForegroundWnd)
 
     CreateEx(WS_EX_DLGMODALFRAME | WS_EX_TOOLWINDOW,
              SAVEBITS_CLASSNAME,
-             Caption.empty() ? "Open Salamander" : Caption.c_str(),
+             Caption.empty() ? "Sally" : Caption.c_str(),
              WS_BORDER | WS_OVERLAPPED | (ShowCloseButton ? WS_SYSMENU : 0),
              0, 0, width, height,
              HParent,

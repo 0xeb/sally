@@ -118,7 +118,7 @@ int MyEntryPoint()
         ret = WinMainCRTStartup();
     }
     else
-        MessageBox(NULL, "Open Salamander Bug Reporter (salmon.exe) initialization has failed. Please reinstall Open Salamander.",
+        MessageBox(NULL, "Sally Bug Reporter (salmon.exe) initialization has failed. Please reinstall Sally.",
                    SALAMANDER_TEXT_VERSION, MB_OK | MB_ICONSTOP);
 
     // the debugger no longer reaches here, we get killed in RTL (tested under VC 2008 with our RTL)
@@ -226,7 +226,7 @@ const char* SALCF_FAKE_REALPATH = "SalFakeRealPath";
 const char* SALCF_FAKE_SRCTYPE = "SalFakeSrcType";
 const char* SALCF_FAKE_SRCFSPATH = "SalFakeSrcFSPath";
 
-const char* MAINWINDOW_NAME = "Open Salamander";
+const char* MAINWINDOW_NAME = "Sally";
 const char* CMAINWINDOW_CLASSNAME = "SalamanderMainWindowVer25";
 const char* SAVEBITS_CLASSNAME = "SalamanderSaveBits";
 const char* SHELLEXECUTE_CLASSNAME = "SalamanderShellExecute";
@@ -4014,9 +4014,9 @@ FIND_NEW_SLG_FILE:
         else // shouldn't happen at all - .SLG file was already tested
         {
             sprintf(errorText, "File %s was not found or is not valid language file.\n"
-                               "Please run Open Salamander again and try to choose some other language file.",
+                               "Please run Sally again and try to choose some other language file.",
                     path.Get());
-            MessageBox(NULL, errorText, "Open Salamander", MB_OK | MB_ICONERROR);
+            MessageBox(NULL, errorText, "Sally", MB_OK | MB_ICONERROR);
             goto EXIT_1a;
         }
     }
@@ -4604,7 +4604,7 @@ FIND_NEW_SLG_FILE:
                                         HWND hParent = NULL;
                                         if (MainWindow != NULL)
                                             hParent = MainWindow->HWindow;
-                                        MessageBox(hParent, "_CrtCheckMemory failed. Look to the Trace Server for details.", "Open Salamander", MB_OK | MB_ICONERROR);
+                                        MessageBox(hParent, "_CrtCheckMemory failed. Look to the Trace Server for details.", "Sally", MB_OK | MB_ICONERROR);
                                     }
                                     LastCrtCheckMemoryTime = GetTickCount();
                                 }

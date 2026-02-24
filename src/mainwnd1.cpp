@@ -32,9 +32,9 @@
 #endif
 
 #if defined(GIT_VERSION_AVAILABLE) && defined(GIT_VERSION)
-const char* SALAMANDER_TEXT_VERSION = "Open Salamander " GIT_VERSION " (" SAL_VER_PLATFORM ")";
+const char* SALAMANDER_TEXT_VERSION = "Sally " GIT_VERSION " (" SAL_VER_PLATFORM ")";
 #else
-const char* SALAMANDER_TEXT_VERSION = "Open Salamander " VERSINFO_VERSION;
+const char* SALAMANDER_TEXT_VERSION = "Sally " VERSINFO_VERSION;
 #endif
 
 //****************************************************************************
