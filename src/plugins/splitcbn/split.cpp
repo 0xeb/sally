@@ -1,4 +1,5 @@
 ﻿// SPDX-FileCopyrightText: 2023 Open Salamander Authors
+// SPDX-FileCopyrightText: 2026 Sally Authors
 // SPDX-License-Identifier: GPL-2.0-or-later
 // CommentsTranslationProject: TRANSLATED
 
@@ -317,7 +318,7 @@ static BOOL SplitFile(LPTSTR fileName, LPTSTR targetDir, CQuadWord& qwPartSize,
         sprintf(line, LoadStr(IDS_BATFILE_DESCR), batfile);
         sprintf(batfile,
                 "@echo off\r\n"
-                "rem %s, https://www.altap.cz\r\n"
+                "rem %s, https://github.com/0xeb/sally\r\n"
                 "rem name=%s\r\n"
                 "rem crc32=%X\r\n"
                 "rem time=%d-%d-%d %d:%02d:%02d\r\n"

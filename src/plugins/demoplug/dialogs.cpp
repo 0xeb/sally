@@ -1,4 +1,5 @@
 ﻿// SPDX-FileCopyrightText: 2023 Open Salamander Authors
+// SPDX-FileCopyrightText: 2026 Sally Authors
 // SPDX-License-Identifier: GPL-2.0-or-later
 // CommentsTranslationProject: TRANSLATED
 
@@ -387,7 +388,7 @@ BOOL CCtrlExampleDialog::CreateChilds()
     hl = SalamanderGUI->AttachHyperLink(HWindow, IDC_CE_HLOPEN, STF_UNDERLINE | STF_HYPERLINK_COLOR);
     if (hl == NULL)
         return FALSE;
-    hl->SetActionOpen("https://www.altap.cz");
+    hl->SetActionOpen("https://github.com/0xeb/sally");
 
     hl = SalamanderGUI->AttachHyperLink(HWindow, IDC_CE_HLCOMMAND, STF_UNDERLINE | STF_HYPERLINK_COLOR);
     if (hl == NULL)

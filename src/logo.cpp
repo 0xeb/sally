@@ -1,4 +1,5 @@
 ﻿// SPDX-FileCopyrightText: 2023 Open Salamander Authors
+// SPDX-FileCopyrightText: 2026 Sally Authors
 // SPDX-License-Identifier: GPL-2.0-or-later
 // CommentsTranslationProject: TRANSLATED
 
@@ -421,7 +422,7 @@ CAboutDialog::DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
         hl = new CHyperLink(HWindow, IDC_ABOUT_WWW);
         if (hl != NULL)
         {
-            const char* url = "https://github.com/0xeb/salamander";
+            const char* url = "https://github.com/0xeb/sally";
             SetDlgItemText(HWindow, IDC_ABOUT_WWW, url + 8); // skip "https://"
             hl->SetActionOpen(url);
         }
