@@ -14,6 +14,7 @@
 #include "execute.h"
 #include "pack.h"
 #include "common/unicode/helpers.h"
+#include "common/widepath.h"
 #include "fileswnd.h"
 #include "edtlbwnd.h"
 
@@ -599,7 +600,7 @@ BOOL CPackACDialog::DirectorySearch(char* path)
     BOOL mustStop = FALSE;
     WIN32_FIND_DATAW findData;
     // try to find the first file
-    HANDLE fileFind = HANDLES_Q(FindFirstFileW(AnsiToWide(fileName).c_str(), &findData));
+    HANDLE fileFind = SalFindFirstFileHW(fileName, &findData);
     if (fileFind != INVALID_HANDLE_VALUE)
     {
         do
@@ -667,7 +668,7 @@ BOOL CPackACDialog::DirectorySearch(char* path)
             DWORD ret = WaitForSingleObject(StopSearch, 0);
             if (ret != WAIT_TIMEOUT)
                 mustStop = TRUE;
-        } while (FindNextFileW(fileFind, &findData) && !mustStop);
+        } while (SalLPFindNextFile(fileFind, &findData) && !mustStop);
         HANDLES(FindClose(fileFind));
     }
     HANDLES(GlobalFree((HGLOBAL)fileName));

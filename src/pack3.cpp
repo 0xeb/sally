@@ -12,6 +12,7 @@
 #include "plugins.h"
 #include "pack.h"
 #include "common/IFileSystem.h"
+#include "common/widepath.h"
 #include "fileswnd.h"
 #include "common/unicode/helpers.h"
 
@@ -1223,7 +1224,7 @@ const char* WINAPI PackExpArcDosName(HWND msgParent, void* param)
                 {
                     sprintf(s, "%X.*", randNum);
                     WIN32_FIND_DATAW findData;
-                    HANDLE find = HANDLES_Q(FindFirstFileW(AnsiToWide(path).c_str(), &findData));
+                    HANDLE find = SalFindFirstFileHW(path, &findData);
                     if (find != INVALID_HANDLE_VALUE)
                         HANDLES(FindClose(find)); // this name already exists with some extension, searching again
                     else

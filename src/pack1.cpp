@@ -1603,7 +1603,7 @@ BOOL PackUniversalUncompress(HWND parent, const char* command, TPackErrorTable* 
                 r++; // skip the backslash in the original rootPath
             strcat(srcDir, "\\*");
 
-            HANDLE found = HANDLES_Q(FindFirstFileW(AnsiToWide(srcDir).c_str(), &foundFile));
+            HANDLE found = SalFindFirstFileHW(srcDir, &foundFile);
             if (found == INVALID_HANDLE_VALUE)
             {
                 strcpy(buffer, "FindFirstFile: ");
@@ -1618,7 +1618,7 @@ BOOL PackUniversalUncompress(HWND parent, const char* command, TPackErrorTable* 
                    wcscmp(foundFile.cFileName, L".") == 0 || // we ignore "." and ".."
                    wcscmp(foundFile.cFileName, L"..") == 0)
             {
-                if (!FindNextFileW(found, &foundFile))
+                if (!SalLPFindNextFile(found, &foundFile))
                 {
                     HANDLES(FindClose(found));
                     strcpy(buffer, "FindNextFile: ");
@@ -1862,7 +1862,7 @@ BOOL PackUnpackOneFile(CFilesWindow* panel, const char* archiveFileName,
     // find the extracted file - the name may not match due to the Czech characters and long names :-(
     std::string extractedFile = std::string(tmpDirNameBuf) + "\\*";
     WIN32_FIND_DATAW foundFile;
-    HANDLE found = HANDLES_Q(FindFirstFileW(AnsiToWide(extractedFile.c_str()).c_str(), &foundFile));
+    HANDLE found = SalFindFirstFileHW(extractedFile.c_str(), &foundFile);
     if (found == INVALID_HANDLE_VALUE)
     {
         char buffer[1000];
@@ -1874,7 +1874,7 @@ BOOL PackUnpackOneFile(CFilesWindow* panel, const char* archiveFileName,
     while (foundFile.cFileName[0] == 0 ||
            wcscmp(foundFile.cFileName, L".") == 0 || wcscmp(foundFile.cFileName, L"..") == 0)
     {
-        if (!FindNextFileW(found, &foundFile))
+        if (!SalLPFindNextFile(found, &foundFile))
         {
             char buffer[1000];
             strcpy(buffer, "FindNextFile: ");

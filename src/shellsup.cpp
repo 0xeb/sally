@@ -7,6 +7,7 @@
 #include "menu.h"
 #include "ui/IPrompter.h"
 #include "common/unicode/helpers.h"
+#include "common/widepath.h"
 #include "common/IEnvironment.h"
 #include "cfgdlg.h"
 #include "plugins.h"
@@ -622,14 +623,14 @@ int CountNumberOfItemsOnPath(const char* path)
     if (SalPathAppend(s, "*.*", s.Size()))
     {
         WIN32_FIND_DATAW fileData;
-        HANDLE search = HANDLES_Q(FindFirstFileW(AnsiToWide(s).c_str(), &fileData));
+        HANDLE search = SalFindFirstFileHW(s, &fileData);
         if (search != INVALID_HANDLE_VALUE)
         {
             int num = 0;
             do
             {
                 num++;
-            } while (FindNextFileW(search, &fileData));
+            } while (SalLPFindNextFile(search, &fileData));
             HANDLES(FindClose(search));
             return num;
         }
@@ -2650,11 +2651,11 @@ BOOL MakeFileAvailOfflineIfOneDriveOnWin81(HWND parent, const char *name)
     {
       BOOL makeOffline = FALSE;
       WIN32_FIND_DATAW findData;
-      HANDLE hFind = HANDLES_Q(FindFirstFileW(AnsiToWide(name).c_str(), &findData));
+      HANDLE hFind = SalFindFirstFileHW(name, &findData);
       if (hFind != INVALID_HANDLE_VALUE)
       {
         makeOffline = IsFilePlaceholderW(&findData);
-        FindClose(hFind);
+        HANDLES(FindClose(hFind));
       }
 
       if (makeOffline)  // convert file to offline

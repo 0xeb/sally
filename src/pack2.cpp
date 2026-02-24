@@ -9,6 +9,7 @@
 #include "plugins.h"
 #include "pack.h"
 #include "common/IFileSystem.h"
+#include "common/widepath.h"
 #include "common/unicode/helpers.h"
 
 //
@@ -499,7 +500,7 @@ BOOL PackUniversalCompress(HWND parent, const char* command, TPackErrorTable* co
         int i;
         for (i = 0; i < 2; i++)
         {
-            HANDLE find = HANDLES_Q(FindFirstFileW(AnsiToWide(path).c_str(), &findData));
+            HANDLE find = SalFindFirstFileHW(path, &findData);
             if (find != INVALID_HANDLE_VALUE)
             {
                 do
@@ -539,7 +540,7 @@ BOOL PackUniversalCompress(HWND parent, const char* command, TPackErrorTable* co
                             TRACE_E("Error (" << err << ") in SalMoveFile(" << src << ", " << dst << ").");
                         }
                     }
-                } while (FindNextFileW(find, &findData));
+                } while (SalLPFindNextFile(find, &findData));
                 HANDLES(FindClose(find)); // this name already exists with some extension, searching further
             }
         }
