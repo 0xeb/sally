@@ -38,7 +38,7 @@ STRINGTABLE
  IDS_TARERR_FWRITE, "Error writing to output file: "
  IDS_TARERR_WRSIZE, "The WriteFile function refused to write all the data requested."
  IDS_GZERR_BADBLOCKTYPE, "Invalid block in GZip stream encountered, unable to extract."
- IDS_ERR_INTERNAL, "Internal error in TAR plugin, please let us know on email support@altap.cz."
+ IDS_ERR_INTERNAL, "Internal error in TAR plugin, please let us know on email github.com/0xeb/sally/issues."
  IDS_ERR_MEMORY, "Memory allocation error."
  IDS_GZERR_CRC, "CRC error."
  IDS_ERR_CORRUPT, "Unexpected data in compressed stream, archive corrupted."

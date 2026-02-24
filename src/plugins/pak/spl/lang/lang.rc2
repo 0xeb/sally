@@ -42,7 +42,7 @@ STRINGTABLE
  IDS_TOOLONGNAME2, "Can't add file because of too long name."
  IDS_PACKING, "packing: "
  IDS_UNABLEREAD, "Unable to read from file: "
- IDS_ERRCONNECT, "Unable to connect plugin to Open Salamander."
+ IDS_ERRCONNECT, "Unable to connect plugin to Sally."
  IDS_OPTIMIZING, "optimizing, please wait..."
  IDS_OPTPROGTITLE, "Optimizing PAK Archive - %s"
  IDS_NEEDOPT, "Files deleting was not finished successfully. You may need to run PAK optimalization from the PAK Plugin menu to preserve wasting of disk space."

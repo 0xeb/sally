@@ -1,8 +1,8 @@
 ﻿//****************************************************************************
 //
-// Copyright (c) 2023 Open Salamander Authors
+// Copyright (c) 2023 Sally Authors
 //
-// This is a part of the Open Salamander SDK library.
+// This is a part of the Sally SDK library.
 //
 //****************************************************************************
 
@@ -54,7 +54,7 @@ STRINGTABLE DISCARDABLE
     IDS_CANT_CREATE_DIR,        "Can not create directory '%s'."
     IDS_MAKEISOHEAD,            "Create file sample for UnISO troubleshooting..."
     IDS_MAKEISOHEAD_TITLE,      "UnISO troubleshooting"
-    IDS_MAKEISOHEAD_MSG,        "If you cannot open ISO image or content is incorrect, you can send us first 1MB of this file.\nWe will support this format in new version of UnISO plugin.\n\nPress OK to copy part of ISO image to the temporary directory and focus it in the panel.\nPack this file using Alt+F5 and email it to the support@altap.cz.\n\nThank you for helping us to make UnISO plugin better!"
+    IDS_MAKEISOHEAD_MSG,        "If you cannot open ISO image or content is incorrect, you can send us first 1MB of this file.\nWe will support this format in new version of UnISO plugin.\n\nPress OK to copy part of ISO image to the temporary directory and focus it in the panel.\nPack this file using Alt+F5 and email it to the github.com/0xeb/sally/issues.\n\nThank you for helping us to make UnISO plugin better!"
     IDS_YES,                    "Yes"
     IDS_NO,                     "No"
     IDS_PVD_NOT_FOUND,          "Primary Volume Descriptor not found."

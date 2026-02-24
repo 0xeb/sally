@@ -60,13 +60,13 @@ END
 
 IDD_BETAEXPIRED DIALOGEX 84, 53, 291, 80
 STYLE DS_SETFONT | DS_MODALFRAME | DS_FIXEDSYS | WS_POPUP | WS_VISIBLE | WS_CAPTION | WS_SYSMENU
-CAPTION "Open Salamander"
+CAPTION "Sally"
 FONT 8, "MS Shell Dlg", 400, 0, 0x1
 BEGIN
     DEFPUSHBUTTON   "E&xit",IDCANCEL,92,57,50,14,WS_GROUP
     PUSHBUTTON      "&Continue",IDOK,149,57,50,14
     LTEXT           "This beta version has expired. Please download and install updated beta version:",IDC_STATIC_1,10,10,274,8
-    LTEXT           "www.altap.cz/salamander/downloads/beta",IDC_BETAEXPIREDURL,10,23,274,8,WS_TABSTOP
+    LTEXT           "github.com/0xeb/sally",IDC_BETAEXPIREDURL,10,23,274,8,WS_TABSTOP
     LTEXT           "Today is %s and this version expired on %s.",IDC_BETAEXPIREDDATE,10,36,274,16
 END
 
@@ -141,7 +141,7 @@ BEGIN
     GROUPBOX        " Code page conversion tables ",IDC_STATIC_2,1,77,295,40
     LTEXT           "To view or change conversion tables used in viewers and Convert command, click Details.",IDC_STATIC_3,8,91,220,16
     PUSHBUTTON      "&Details...",IDB_CONVERSION,237,93,52,14,WS_GROUP
-    LTEXT           "Choose a language for Open Salamander. The setting affects the language for text that appears in dialog boxes, menus, toolbars, and helps.",IDC_STATIC_4,8,17,281,16
+    LTEXT           "Choose a language for Sally. The setting affects the language for text that appears in dialog boxes, menus, toolbars, and helps.",IDC_STATIC_4,8,17,281,16
     LTEXT           "",IDC_CFGREG_INCOMPLETE_TITLE,5,153,287,8
     LTEXT           "",IDC_CFGREG_INCOMPLETE_TEXT,5,165,287,16
     LTEXT           "",IDC_CFGREG_INCOMPLETE_URL,5,185,287,8
@@ -634,10 +634,10 @@ BEGIN
     LTEXT           "",IDC_ABOUT_LOGO,174,1,123,104
     DEFPUSHBUTTON   "Close",IDOK,124,162,50,14,WS_GROUP
     LTEXT           "Version",IDS_ABOUT_SALAMANDER,10,86,201,8
-    LTEXT           "Copyright © 1997-2026 Open Salamander Authors",IDC_STATIC_1,10,97,196,8
+    LTEXT           "Copyright © 1997-2026 Sally Authors",IDC_STATIC_1,10,97,196,8
     LTEXT           "GitHub:",IDC_STATIC_3,10,108,28,8
-    LTEXT           "github.com/0xeb/salamander",IDC_ABOUT_WWW,40,108,160,8,WS_TABSTOP
-    LTEXT           "Open Salamander is free software",IDC_STATIC_4,10,119,165,8
+    LTEXT           "github.com/0xeb/sally",IDC_ABOUT_WWW,40,108,160,8,WS_TABSTOP
+    LTEXT           "Sally is free software",IDC_STATIC_4,10,119,165,8
     LTEXT           "Licensed under GNU General Public License version 2 or later",IDC_STATIC_5,10,130,214,8
     CONTROL         "",IDC_ABOUT_BOTTOM,"Static",SS_ETCHEDHORZ | WS_GROUP,2,154,294,1
 END
@@ -1117,7 +1117,7 @@ CAPTION "Main Window"
 FONT 8, "MS Shell Dlg", 400, 0, 0x1
 BEGIN
     CONTROL         "Show &splash screen at startup",IDC_SPLASHSCREEN,"Button",BS_AUTOCHECKBOX | WS_TABSTOP,1,3,113,12
-    CONTROL         "Show &icon of Open Salamander in the Status area of Taskbar",IDC_STATUSAREA,
+    CONTROL         "Show &icon of Sally in the Status area of Taskbar",IDC_STATUSAREA,
                     "Button",BS_AUTOCHECKBOX | WS_TABSTOP,1,17,217,12
     CONTROL         "&Display current path in main window title as:",IDC_TITLEBAR_PATH,
                     "Button",BS_AUTOCHECKBOX | WS_TABSTOP,1,31,162,12
@@ -1165,7 +1165,7 @@ STYLE DS_SETFONT | DS_FIXEDSYS | DS_CONTROL | WS_CHILD | WS_CAPTION
 CAPTION "Keyboard"
 FONT 8, "MS Shell Dlg", 400, 0, 0x1
 BEGIN
-    LTEXT           "Shortcuts for Open Salamander commands cannot be changed in this version.",IDC_STATIC_1,2,4,264,8
+    LTEXT           "Shortcuts for Sally commands cannot be changed in this version.",IDC_STATIC_1,2,4,264,8
     LTEXT           "You can see a comprehensive list of keyboard shortcuts in",IDC_STATIC_2,2,17,196,8
     LTEXT           "help",IDC_KEYBOARD_SHORTCUTS,198,17,17,8,WS_TABSTOP
     LTEXT           "You can define keyboard shortcuts for the plugins commands:\r  1. From the Plugins menu choose the Plugins Manager command\r  2. Select desired plugin\r  3. Click the Keyboard button",IDC_STATIC_3,2,31,282,32
@@ -1194,10 +1194,10 @@ END
 
 IDD_TASKLIST DIALOGEX 12, 24, 324, 149
 STYLE DS_SETFONT | DS_MODALFRAME | DS_FIXEDSYS | WS_POPUP | WS_VISIBLE | WS_CAPTION | WS_SYSMENU
-CAPTION "Open Salamander Task List"
+CAPTION "Sally Task List"
 FONT 8, "MS Shell Dlg", 400, 0, 0x1
 BEGIN
-    LTEXT           "&List of running Open Salamander tasks:",IDC_STATIC_1,6,4,150,8
+    LTEXT           "&List of running Sally tasks:",IDC_STATIC_1,6,4,150,8
     LISTBOX         IDC_SALAMLIST,6,14,252,129,LBS_NOINTEGRALHEIGHT | WS_GROUP | WS_TABSTOP
     DEFPUSHBUTTON   "&Highlight",IDB_SHOWTASK,267,14,50,14,WS_GROUP
     PUSHBUTTON      "&Break...",IDB_BREAKTASK,267,33,50,14
@@ -1558,7 +1558,7 @@ BEGIN
     DEFPUSHBUTTON   "OK",IDOK,36,109,50,14,WS_GROUP
     PUSHBUTTON      "Cancel",IDCANCEL,94,109,50,14
     PUSHBUTTON      "Help",IDHELP,152,109,50,14
-    LTEXT           "As you will increase your skill level, you will get control over full power of Open Salamander step by step.",IDC_STATIC_2,6,28,224,16
+    LTEXT           "As you will increase your skill level, you will get control over full power of Sally step by step.",IDC_STATIC_2,6,28,224,16
 END
 
 IDD_CFGPAGE_HISTORY DIALOGEX 65, 18, 299, 231
@@ -1566,7 +1566,7 @@ STYLE DS_SETFONT | DS_FIXEDSYS | DS_CONTROL | WS_CHILD | WS_CAPTION
 CAPTION "History"
 FONT 8, "MS Shell Dlg", 400, 0, 0x1
 BEGIN
-    LTEXT           "You can choose whether recently used values (history) will be stored in Registry as a part of configuration of Open Salamander and plugins.",IDC_STATIC_2,1,4,254,16
+    LTEXT           "You can choose whether recently used values (history) will be stored in Registry as a part of configuration of Sally and plugins.",IDC_STATIC_2,1,4,254,16
     CONTROL         "&Save history",IDC_HISTORY_SAVEHISTORY,"Button",BS_AUTOCHECKBOX | WS_TABSTOP,1,24,54,12
     CONTROL         "Save List of &Working Directories",IDC_HISTORY_WORKDIRS,
                     "Button",BS_AUTOCHECKBOX | WS_TABSTOP,11,37,118,12
@@ -1740,11 +1740,11 @@ END
 
 IDD_EXITINGOPENSAL DIALOGEX 10, 24, 259, 88
 STYLE DS_SETFONT | DS_MODALFRAME | DS_FIXEDSYS | WS_POPUP | WS_VISIBLE | WS_CAPTION | WS_SYSMENU
-CAPTION "Exiting Open Salamander"
+CAPTION "Exiting Sally"
 FONT 8, "MS Shell Dlg", 400, 0, 0x1
 BEGIN
     DEFPUSHBUTTON   "Cancel",IDCANCEL,195,67,50,14
-    LTEXT           "Unable to exit Open Salamander until all disk operations are finished. Please wait until these operations are finished or cancel them now. If you do not want to exit Open Salamander now, press the Cancel button.",IDC_STATIC_1,8,9,244,32
+    LTEXT           "Unable to exit Sally until all disk operations are finished. Please wait until these operations are finished or cancel them now. If you do not want to exit Sally now, press the Cancel button.",IDC_STATIC_1,8,9,244,32
     LTEXT           "Number of running operations:",IDC_STATIC_2,8,45,107,8
     LTEXT           "",IDT_RUNNINGOPERS,116,45,60,8
     PUSHBUTTON      "Cancel &All Operations",IDB_CANCELALLOPERS,13,67,86,14,WS_GROUP
@@ -1753,20 +1753,20 @@ END
 
 IDD_COMPATIBILITY_MODE DIALOGEX 35, 37, 254, 148
 STYLE DS_SETFONT | DS_MODALFRAME | DS_FIXEDSYS | WS_POPUP | WS_VISIBLE | WS_CAPTION | WS_SYSMENU
-CAPTION "Open Salamander"
+CAPTION "Sally"
 FONT 8, "MS Shell Dlg", 400, 0, 0x1
 BEGIN
     DEFPUSHBUTTON   "&Yes",IDOK,71,127,50,14,WS_GROUP
     PUSHBUTTON      "&No",IDCANCEL,132,127,50,14
-    LTEXT           "It looks like you are running Open Salamander in Compatibility Mode.",IDC_STATIC_1,8,7,234,8
-    LTEXT           "This may lead to Open Salamander instability or cause other problems.",IDC_STATIC_2,8,16,239,8
+    LTEXT           "It looks like you are running Sally in Compatibility Mode.",IDC_STATIC_1,8,7,234,8
+    LTEXT           "This may lead to Sally instability or cause other problems.",IDC_STATIC_2,8,16,239,8
     LTEXT           "You can turn off Compatibility Mode:",IDC_STATIC_3,8,31,131,8
-    LTEXT           "1) Right–click the icon of the Open Salamander",IDC_STATIC_4,17,41,184,8
+    LTEXT           "1) Right–click the icon of the Sally",IDC_STATIC_4,17,41,184,8
     LTEXT           "2) Click Properties",IDC_STATIC_5,17,50,130,8
     LTEXT           "3) Click Compatibility tab",IDC_STATIC_9,17,59,118,8
     LTEXT           "4) Uncheck Run this program in Compatibility Mode",IDC_STATIC_6,17,69,223,8
-    LTEXT           "Note: if you cannot turn it off, start Open Salamander, open Help menu, choose the Technical Support item and send us Bug Report.",IDC_STATIC_7,8,85,239,16
-    LTEXT           "Do you want to start Open Salamander?",IDC_STATIC_8,8,109,137,8
+    LTEXT           "Note: if you cannot turn it off, start Sally, open Help menu, choose the Technical Support item and send us Bug Report.",IDC_STATIC_7,8,85,239,16
+    LTEXT           "Do you want to start Sally?",IDC_STATIC_8,8,109,137,8
 END
 
 IDD_CONFIRMADSLOSS DIALOGEX 15, 34, 352, 100
@@ -1993,7 +1993,7 @@ CAPTION "Security"
 FONT 8, "MS Shell Dlg", 400, 0, 0x1
 BEGIN
     GROUPBOX        " Master Password ",IDC_STATIC_1,1,4,293,77
-    LTEXT           "A Master Password is used to protect sensitive information like FTP or WinSCP passwords by strong AES cipher. If you create a Master Password you will be asked to enter it once per session when Open Salamander retrieves protected information.",IDC_STATIC_2,9,20,267,32
+    LTEXT           "A Master Password is used to protect sensitive information like FTP or WinSCP passwords by strong AES cipher. If you create a Master Password you will be asked to enter it once per session when Sally retrieves protected information.",IDC_STATIC_2,9,20,267,32
     CONTROL         "&Use Master Password",IDC_SEC_ENABLE_MASTERPWD,"Button",BS_AUTOCHECKBOX | WS_GROUP | WS_TABSTOP,9,60,168,12
     PUSHBUTTON      "Change &Master Password...",IDC_SEC_CHANGE_MASTERPWD,180,59,104,14
 END
@@ -2066,10 +2066,10 @@ END
 
 IDD_SALMON_MAIN DIALOGEX 81, 47, 351, 199
 STYLE DS_SETFONT | DS_MODALFRAME | DS_FIXEDSYS | WS_POPUP | WS_VISIBLE | WS_CAPTION | WS_SYSMENU
-CAPTION "Open Salamander Bug Reporter"
+CAPTION "Sally Bug Reporter"
 FONT 8, "MS Shell Dlg", 400, 0, 0x1
 BEGIN
-    LTEXT           "A problem has occured, forcing Open Salamander to close. To help us avoid similar problems in the future, please send an error report below.",IDC_SALMON_INTRO,8,9,336,16
+    LTEXT           "A problem has occured, forcing Sally to close. To help us avoid similar problems in the future, please send an error report below.",IDC_SALMON_INTRO,8,9,336,16
     LTEXT           "Privacy Policy: we don't give out any of your information to any third party.",IDC_SALMON_PRIVACY,8,33,259,8
     LTEXT           "...",IDC_SALMON_UPLOADING,8,42,84,8
     LTEXT           "Error description (optional)",IDC_SALMON_DESCRIPTION,8,51,169,8
@@ -2078,7 +2078,7 @@ BEGIN
     EDITTEXT        IDC_SALMON_ACTION,8,79,336,54,ES_MULTILINE | ES_AUTOVSCROLL | ES_AUTOHSCROLL | ES_WANTRETURN | WS_VSCROLL
     LTEXT           "&Contact email:",IDC_SALMON_EMAIL_LABEL,8,144,50,8
     EDITTEXT        IDC_SALMON_EMAIL,8,154,336,14,ES_AUTOHSCROLL
-    CONTROL         "&Restart Open Salamander",IDC_SALMON_RESTART,"Button",BS_AUTOCHECKBOX | WS_TABSTOP,8,178,98,10
+    CONTROL         "&Restart Sally",IDC_SALMON_RESTART,"Button",BS_AUTOCHECKBOX | WS_TABSTOP,8,178,98,10
     DEFPUSHBUTTON   "&Send Report",IDOK,158,176,90,14
     PUSHBUTTON      "&Do Not Send Report",IDCANCEL,254,176,90,14
 END

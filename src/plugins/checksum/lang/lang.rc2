@@ -53,7 +53,7 @@ STRINGTABLE
  IDS_CONFIG_CHANGES_EFFECT "The changes will take effect when the 'Calculate Checksums' window is opened next time."
  IDS_ALLOK "All files OK"
  IDS_RESULT "%d corrupted, %d missing, %d skipped"
- IDS_BUSY "Open Salamander is busy. The requested command cannot be accomplished, please try it again later."
+ IDS_BUSY "Sally is busy. The requested command cannot be accomplished, please try it again later."
  IDS_CLOSE "&Close"
  IDS_READINGTREE "Reading directory tree, please wait..."
  IDS_ERRORREADINGDIR "Error reading directory"

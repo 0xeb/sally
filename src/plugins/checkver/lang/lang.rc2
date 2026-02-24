@@ -14,7 +14,7 @@
 
 STRINGTABLE
 {
- IDS_PLUGIN_DESCRIPTION, "Check for updates of Open Salamander and plugins."
+ IDS_PLUGIN_DESCRIPTION, "Check for updates of Sally and plugins."
  IDS_ABOUT, "About Plugin"
  IDS_CTXMENU_OPEN, "Open"
  IDS_CTXMENU_COPY, "Copy URL to Clipboard"
@@ -28,7 +28,7 @@ STRINGTABLE
  IDS_ABORT_DOWNLOAD, "Plugin is working with Internet.\nDo you want to abort this Internet session?"
  IDS_INET_INIT, "Initializing Internet connection..."
  IDS_INET_INIT_FAILED, "Initializing failed: %s"
- IDS_INET_CONNECT, "Connecting to \tuwww.altap.cz\tlhttps://www.altap.cz\tn..."
+ IDS_INET_CONNECT, "Connecting to \tugithub.com/0xeb/sally\tlhttps://github.com/0xeb/sally\tn..."
  IDS_INET_CONNECT_FAILED, "Connecting failed: %s"
  IDS_INET_READ, "Reading information about new versions..."
  IDS_INET_READ_FAILED, "Reading failed: %s"
@@ -48,7 +48,7 @@ STRINGTABLE
  IDS_NONEW_MODULES, "No new modules are available now."
  IDS_BTN_CHECK, "Check &Now"
  IDS_BTN_STOP, "&Stop"
- IDS_COPYRIGHT1, "CheckVer %s - Check for the latest versions of Open Salamander and plugins."
+ IDS_COPYRIGHT1, "CheckVer %s - Check for the latest versions of Sally and plugins."
  IDS_COPYRIGHT2, "Click Configure to change Internet connection settings or to change checking frequency."
  IDS_LAST_CHECK, "Date of the last check: %s."
  IDS_SKIP_CHECK, "Press Close button to skip checking."

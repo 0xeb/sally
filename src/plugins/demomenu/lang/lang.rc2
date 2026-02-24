@@ -1,8 +1,8 @@
 ﻿//****************************************************************************
 //
-// Copyright (c) 2023 Open Salamander Authors
+// Copyright (c) 2023 Sally Authors
 //
-// This is a part of the Open Salamander SDK library.
+// This is a part of the Sally SDK library.
 //
 //****************************************************************************
 
@@ -25,6 +25,6 @@ STRINGTABLE
  IDS_PLUGINNAME,             "DemoMenu"
  IDS_ABOUT,                  "About Plugin"
  IDS_PLUGIN_DESCRIPTION,     "This plugin should help you to make your own menu extension plugin."
- IDS_PLUGIN_HOME,            "www.altap.cz"
+ IDS_PLUGIN_HOME,            "github.com/0xeb/sally"
  IDS_TESTCMD,                "&Test Command"
 }
