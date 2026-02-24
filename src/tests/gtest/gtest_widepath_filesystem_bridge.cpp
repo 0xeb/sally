@@ -26,6 +26,9 @@ public:
     FileResult removeDirResult = FileResult::Error(ERROR_PATH_NOT_FOUND);
     FileResult setAttrsResult = FileResult::Error(ERROR_FILE_NOT_FOUND);
     HANDLE createFileResult = INVALID_HANDLE_VALUE;
+    HANDLE findHandleResult = INVALID_HANDLE_VALUE;
+    bool findNextResult = false;
+    WIN32_FIND_DATAW findDataResult = {};
     DWORD createFileDesiredAccess = 0;
     DWORD createFileShareMode = 0;
     DWORD createFileDisposition = 0;
@@ -123,6 +126,24 @@ public:
         createFileDisposition = creationDisposition;
         createFileFlags = flagsAndAttributes;
         return createFileResult;
+    }
+
+    HANDLE FindFirstFile(const wchar_t* path, WIN32_FIND_DATAW* findData) override
+    {
+        lastOp = L"FindFirstFile";
+        lastPath = path ? path : L"";
+        if (findData != nullptr)
+            *findData = findDataResult;
+        return findHandleResult;
+    }
+
+    BOOL FindNextFile(HANDLE findHandle, WIN32_FIND_DATAW* findData) override
+    {
+        (void)findHandle;
+        lastOp = L"FindNextFile";
+        if (findData != nullptr)
+            *findData = findDataResult;
+        return findNextResult ? TRUE : FALSE;
     }
 
     HANDLE OpenFileForRead(const wchar_t* path, DWORD shareMode) override
@@ -223,4 +244,29 @@ TEST_F(WidePathFileSystemBridgeTest, CreateDirectoryUsesIFileSystemWhenSecurityN
     EXPECT_TRUE(SalLPCreateDirectory("C:\\temp\\newdir", NULL));
     EXPECT_EQ(mockFileSystem.lastOp, L"CreateDirectory");
     EXPECT_EQ(mockFileSystem.lastPath, L"C:\\temp\\newdir");
+}
+
+TEST_F(WidePathFileSystemBridgeTest, FindFirstFileUsesIFileSystem)
+{
+    mockFileSystem.findHandleResult = reinterpret_cast<HANDLE>(0x8888);
+    wcscpy_s(mockFileSystem.findDataResult.cFileName, L"alpha.txt");
+    WIN32_FIND_DATAW fd = {};
+
+    HANDLE h = SalLPFindFirstFile("C:\\temp\\*.txt", &fd);
+
+    EXPECT_EQ(h, reinterpret_cast<HANDLE>(0x8888));
+    EXPECT_EQ(mockFileSystem.lastOp, L"FindFirstFile");
+    EXPECT_EQ(mockFileSystem.lastPath, L"C:\\temp\\*.txt");
+    EXPECT_STREQ(fd.cFileName, L"alpha.txt");
+}
+
+TEST_F(WidePathFileSystemBridgeTest, FindNextFileAUsesIFileSystem)
+{
+    mockFileSystem.findNextResult = true;
+    wcscpy_s(mockFileSystem.findDataResult.cFileName, L"beta.txt");
+    WIN32_FIND_DATAA fd = {};
+
+    EXPECT_TRUE(SalLPFindNextFileA(reinterpret_cast<HANDLE>(0x1111), &fd));
+    EXPECT_EQ(mockFileSystem.lastOp, L"FindNextFile");
+    EXPECT_STREQ(fd.cFileName, "beta.txt");
 }

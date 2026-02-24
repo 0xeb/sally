@@ -130,6 +130,30 @@ TEST_F(RegistryTest, AnsiHelper_OpenKeyReadA)
     EXPECT_EQ(result, fakeKey);
 }
 
+TEST_F(RegistryTest, AnsiHelper_OpenKeyReadWriteA)
+{
+    HKEY fakeKey = reinterpret_cast<HKEY>(0x9ABC);
+    EXPECT_CALL(mockRegistry, OpenKeyReadWrite(HKEY_CURRENT_USER, testing::_, testing::_))
+        .WillOnce(testing::DoAll(
+            testing::SetArgReferee<2>(fakeKey),
+            testing::Return(RegistryResult::Ok())));
+
+    HKEY result;
+    auto res = OpenKeyReadWriteA(gRegistry, HKEY_CURRENT_USER, "Software\\TestRW", result);
+    EXPECT_TRUE(res.success);
+    EXPECT_EQ(result, fakeKey);
+}
+
+TEST_F(RegistryTest, AnsiHelper_DeleteValueA)
+{
+    HKEY fakeKey = reinterpret_cast<HKEY>(0x1111);
+    EXPECT_CALL(mockRegistry, DeleteValue(fakeKey, testing::StrEq(L"AutoImportConfig")))
+        .WillOnce(testing::Return(RegistryResult::Ok()));
+
+    auto res = DeleteValueA(gRegistry, fakeKey, "AutoImportConfig");
+    EXPECT_TRUE(res.success);
+}
+
 TEST(RegistryResultTest, NotFound_Works)
 {
     auto res = RegistryResult::Error(ERROR_FILE_NOT_FOUND);

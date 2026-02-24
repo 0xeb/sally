@@ -808,16 +808,19 @@ const char* SALAMANDER_PWDMNGR_REG = "Password Manager";
 
 BOOL GetUpgradeInfo(BOOL* autoImportConfig, char* autoImportConfigFromKey, int autoImportConfigFromKeySize)
 {
-    HKEY rootKey;
+    HKEY rootKey = NULL;
     DWORD saveInProgress; // dummy
     BOOL doNotExit = TRUE;
+    IRegistry* registry = gRegistry;
+    if (registry == NULL)
+        registry = GetWin32Registry();
     if (autoImportConfigFromKeySize > 0)
         *autoImportConfigFromKey = 0;
     LoadSaveToRegistryMutex.Enter();
     int rounds = 0; // prevent infinite loops
     *autoImportConfig = FALSE;
-    if (HANDLES_Q(RegOpenKeyEx(HKEY_CURRENT_USER, SalamanderConfigurationRoots[0], 0,
-                               KEY_READ, &rootKey)) == ERROR_SUCCESS)
+    if (registry != NULL &&
+        OpenKeyReadA(registry, HKEY_CURRENT_USER, SalamanderConfigurationRoots[0], rootKey).success)
     {
         HKEY oldCfgKey;
         char oldKeyName[200];
@@ -829,24 +832,23 @@ BOOL GetUpgradeInfo(BOOL* autoImportConfig, char* autoImportConfigFromKey, int a
             if (CutDirectory(autoImportConfigFromKey) &&
                 SalPathAppend(autoImportConfigFromKey, oldKeyName, autoImportConfigFromKeySize) &&
                 !IsTheSamePath(autoImportConfigFromKey, SalamanderConfigurationRoots[0]) &&     // the key stored in AutoImportConfig does not point to this version's key
-                HANDLES_Q(RegOpenKeyEx(HKEY_CURRENT_USER, autoImportConfigFromKey, 0, KEY_READ, // the key stored in AutoImportConfig can be opened (otherwise it doesn't exist?)
-                                       &oldCfgKey)) == ERROR_SUCCESS)
+                OpenKeyReadA(registry, HKEY_CURRENT_USER, autoImportConfigFromKey, oldCfgKey).success) // the key stored in AutoImportConfig can be opened (otherwise it doesn't exist?)
             {
                 // if the current "target" key also contains AutoImportConfig, follow it...
                 if (GetValue(oldCfgKey, SALAMANDER_AUTO_IMPORT_CONFIG, REG_SZ, oldKeyName, 200) && ++rounds <= 50)
                 {
-                    HANDLES(RegCloseKey(oldCfgKey));
+                    registry->CloseKey(oldCfgKey);
                     goto OPEN_AUTO_IMPORT_CONFIG_KEY;
                 }
                 HKEY cfgKey;
                 if (rounds <= 50 &&
                     !GetValue(oldCfgKey, SALAMANDER_SAVE_IN_PROGRESS, REG_DWORD, &saveInProgress, sizeof(DWORD)) &&
-                    HANDLES_Q(RegOpenKeyEx(oldCfgKey, SALAMANDER_CONFIG_REG, 0, KEY_READ, &cfgKey)) == ERROR_SUCCESS)
+                    registry->OpenKeyRead(oldCfgKey, AnsiToWideReg(SALAMANDER_CONFIG_REG).c_str(), cfgKey).success)
                 {
-                    HANDLES(RegCloseKey(cfgKey));
+                    registry->CloseKey(cfgKey);
                     *autoImportConfig = TRUE; // configuration is valid and not empty
                 }
-                HANDLES(RegCloseKey(oldCfgKey));
+                registry->CloseKey(oldCfgKey);
             }
         }
         if (*autoImportConfig) // check whether this version's key also contains configuration (besides "AutoImportConfig")
@@ -854,13 +856,13 @@ BOOL GetUpgradeInfo(BOOL* autoImportConfig, char* autoImportConfigFromKey, int a
             HKEY cfgKey;
             lstrcpyn(oldKeyName, SalamanderConfigurationRoots[0], 200);
             if (SalPathAppend(oldKeyName, SALAMANDER_CONFIG_REG, 200) &&
-                HANDLES_Q(RegOpenKeyEx(HKEY_CURRENT_USER, oldKeyName, 0, KEY_READ, &cfgKey)) == ERROR_SUCCESS)
+                OpenKeyReadA(registry, HKEY_CURRENT_USER, oldKeyName, cfgKey).success)
             {
-                HANDLES(RegCloseKey(cfgKey));
+                registry->CloseKey(cfgKey);
                 BOOL clearCfg = FALSE;
                 if (!GetValue(rootKey, SALAMANDER_SAVE_IN_PROGRESS, REG_DWORD, &saveInProgress, sizeof(DWORD)))
                 { // this key contains a valid configuration; ask the user what to do
-                    HANDLES(RegCloseKey(rootKey));
+                    registry->CloseKey(rootKey);
                     rootKey = NULL;
                     LoadSaveToRegistryMutex.Leave();
 
@@ -909,8 +911,7 @@ BOOL GetUpgradeInfo(BOOL* autoImportConfig, char* autoImportConfigFromKey, int a
                 else
                     clearCfg = TRUE; // configuration is corrupted, delete it
                 if (clearCfg &&
-                    HANDLES_Q(RegOpenKeyEx(HKEY_CURRENT_USER, SalamanderConfigurationRoots[0], 0,
-                                           KEY_READ | KEY_WRITE, &cfgKey)) == ERROR_SUCCESS)
+                    OpenKeyReadWriteA(registry, HKEY_CURRENT_USER, SalamanderConfigurationRoots[0], cfgKey).success)
                 { // delete the configuration and leave only "AutoImportConfig" (recreate it)
                     ClearKey(cfgKey);
                     lstrcpyn(oldKeyName, autoImportConfigFromKey, 200);
@@ -918,19 +919,19 @@ BOOL GetUpgradeInfo(BOOL* autoImportConfig, char* autoImportConfigFromKey, int a
                     if (!CutDirectory(oldKeyName, &keyName))
                         keyName = oldKeyName; // theoretically cannot happen
                     SetValue(cfgKey, SALAMANDER_AUTO_IMPORT_CONFIG, REG_SZ, keyName, -1);
-                    HANDLES(RegCloseKey(cfgKey));
+                    registry->CloseKey(cfgKey);
                 }
             }
         }
         if (rootKey != NULL)
-            HANDLES(RegCloseKey(rootKey));
+            registry->CloseKey(rootKey);
     }
     if (!*autoImportConfig && // this version's key lacks "AutoImportConfig" or does not point to a valid old configuration
-        HANDLES_Q(RegOpenKeyEx(HKEY_CURRENT_USER, SalamanderConfigurationRoots[0], 0,
-                               KEY_READ | KEY_WRITE, &rootKey)) == ERROR_SUCCESS)
+        registry != NULL &&
+        OpenKeyReadWriteA(registry, HKEY_CURRENT_USER, SalamanderConfigurationRoots[0], rootKey).success)
     { // remove "AutoImportConfig" from this version's key (if it exists it makes no sense here)
-        RegDeleteValue(rootKey, SALAMANDER_AUTO_IMPORT_CONFIG);
-        HANDLES(RegCloseKey(rootKey));
+        DeleteValueA(registry, rootKey, SALAMANDER_AUTO_IMPORT_CONFIG);
+        registry->CloseKey(rootKey);
     }
     LoadSaveToRegistryMutex.Leave();
     return doNotExit;
@@ -1312,12 +1313,15 @@ void CMainWindow::DeleteOldConfigurations(BOOL* deleteConfigurations, BOOL autoI
         {
             BOOL ok = FALSE;
             HKEY cfgKey;
-            if (HANDLES_Q(RegOpenKeyEx(HKEY_CURRENT_USER, SalamanderConfigurationRoots[0], 0,
-                                       KEY_READ | KEY_WRITE, &cfgKey)) == ERROR_SUCCESS)
+            IRegistry* registry = gRegistry;
+            if (registry == NULL)
+                registry = GetWin32Registry();
+            if (registry != NULL &&
+                OpenKeyReadWriteA(registry, HKEY_CURRENT_USER, SalamanderConfigurationRoots[0], cfgKey).success)
             { // remove "AutoImportConfig" value from the new key
-                if (RegDeleteValue(cfgKey, SALAMANDER_AUTO_IMPORT_CONFIG) == ERROR_SUCCESS)
+                if (DeleteValueA(registry, cfgKey, SALAMANDER_AUTO_IMPORT_CONFIG).success)
                     ok = TRUE;
-                HANDLES(RegCloseKey(cfgKey));
+                registry->CloseKey(cfgKey);
             }
             if (!ok) // if this happens it's probably fine because we likely didn't
                      // write Salamander's configuration either (it goes to the
@@ -1329,11 +1333,11 @@ void CMainWindow::DeleteOldConfigurations(BOOL* deleteConfigurations, BOOL autoI
             {
                 if (!doNotDeleteImportedCfg)
                 {
-                    if (HANDLES_Q(RegOpenKeyEx(HKEY_CURRENT_USER, autoImportConfigFromKey, 0,
-                                               KEY_READ | KEY_WRITE, &cfgKey)) == ERROR_SUCCESS)
+                    if (registry != NULL &&
+                        OpenKeyReadWriteA(registry, HKEY_CURRENT_USER, autoImportConfigFromKey, cfgKey).success)
                     {
                         ClearKeyAux(cfgKey);
-                        HANDLES(RegCloseKey(cfgKey));
+                        registry->CloseKey(cfgKey);
                         DeleteKeyAux(HKEY_CURRENT_USER, autoImportConfigFromKey);
                     }
                 }

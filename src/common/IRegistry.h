@@ -113,6 +113,12 @@ inline RegistryResult OpenKeyReadA(IRegistry* reg, HKEY root, const char* subKey
     return reg->OpenKeyRead(root, AnsiToWideReg(subKey).c_str(), outKey);
 }
 
+// ANSI helper: Open key for read/write
+inline RegistryResult OpenKeyReadWriteA(IRegistry* reg, HKEY root, const char* subKey, HKEY& outKey)
+{
+    return reg->OpenKeyReadWrite(root, AnsiToWideReg(subKey).c_str(), outKey);
+}
+
 // ANSI helper: Create key
 inline RegistryResult CreateKeyA(IRegistry* reg, HKEY root, const char* subKey, HKEY& outKey)
 {
@@ -152,4 +158,9 @@ inline RegistryResult SetStringA(IRegistry* reg, HKEY key, const char* valueName
 inline RegistryResult SetDWordA(IRegistry* reg, HKEY key, const char* valueName, DWORD value)
 {
     return reg->SetDWord(key, AnsiToWideReg(valueName).c_str(), value);
+}
+
+inline RegistryResult DeleteValueA(IRegistry* reg, HKEY key, const char* valueName)
+{
+    return reg->DeleteValue(key, AnsiToWideReg(valueName).c_str());
 }

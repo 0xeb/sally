@@ -320,6 +320,10 @@ BOOL SalLPCopyFile(const char* existingFileName, const char* newFileName, BOOL f
 
 HANDLE SalLPFindFirstFile(const char* fileName, WIN32_FIND_DATAW* findData)
 {
+    IFileSystem* fs = GetActiveFileSystem();
+    if (fs != NULL)
+        return FindFirstFilePathA(fs, fileName, findData);
+
     SalWidePath widePath(fileName);
     if (!widePath.IsValid())
     {
@@ -331,13 +335,17 @@ HANDLE SalLPFindFirstFile(const char* fileName, WIN32_FIND_DATAW* findData)
 
 BOOL SalLPFindNextFile(HANDLE hFindFile, WIN32_FIND_DATAW* findData)
 {
+    IFileSystem* fs = GetActiveFileSystem();
+    if (fs != NULL)
+        return fs->FindNextFile(hFindFile, findData);
+
     return FindNextFileW(hFindFile, findData);
 }
 
 BOOL SalLPFindNextFileA(HANDLE hFindFile, WIN32_FIND_DATAA* findData)
 {
     WIN32_FIND_DATAW findDataW;
-    BOOL result = FindNextFileW(hFindFile, &findDataW);
+    BOOL result = SalLPFindNextFile(hFindFile, &findDataW);
     if (result && findData != NULL)
     {
         findData->dwFileAttributes = findDataW.dwFileAttributes;
@@ -446,14 +454,8 @@ wchar_t* SalAnsiName::AllocWideName() const
 
 HANDLE SalLPFindFirstFileA(const char* fileName, WIN32_FIND_DATAA* findData)
 {
-    SalWidePath widePath(fileName);
-    if (!widePath.IsValid())
-    {
-        return INVALID_HANDLE_VALUE;
-    }
-
     WIN32_FIND_DATAW findDataW;
-    HANDLE h = FindFirstFileW(widePath.Get(), &findDataW);
+    HANDLE h = SalLPFindFirstFile(fileName, &findDataW);
     if (h != INVALID_HANDLE_VALUE && findData != NULL)
     {
         // Convert wide find data to ANSI

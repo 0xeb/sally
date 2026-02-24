@@ -62,6 +62,10 @@ public:
                               DWORD flagsAndAttributes,
                               HANDLE templateFile) = 0;
 
+    // File enumeration handle operations
+    virtual HANDLE FindFirstFile(const wchar_t* path, WIN32_FIND_DATAW* findData) = 0;
+    virtual BOOL FindNextFile(HANDLE findHandle, WIN32_FIND_DATAW* findData) = 0;
+
     // File handle operations (for copy loops, etc.)
     virtual HANDLE OpenFileForRead(const wchar_t* path, DWORD shareMode = FILE_SHARE_READ) = 0;
     virtual HANDLE CreateFileForWrite(const wchar_t* path, bool failIfExists) = 0;
@@ -186,4 +190,15 @@ inline HANDLE CreateFileA(IFileSystem* fs, const char* path,
     }
     return fs->CreateFile(widePath.c_str(), desiredAccess, shareMode, securityAttributes,
                           creationDisposition, flagsAndAttributes, templateFile);
+}
+
+inline HANDLE FindFirstFilePathA(IFileSystem* fs, const char* path, WIN32_FIND_DATAW* findData)
+{
+    std::wstring widePath = AnsiPathToWide(path);
+    if (widePath.empty() && path && *path)
+    {
+        SetLastError(ERROR_INVALID_PARAMETER);
+        return INVALID_HANDLE_VALUE;
+    }
+    return fs->FindFirstFile(widePath.c_str(), findData);
 }

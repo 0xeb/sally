@@ -26,6 +26,7 @@ public:
     FileResult opResult = FileResult::Ok();
     DWORD attributesResult = FILE_ATTRIBUTE_NORMAL;
     HANDLE handleResult = INVALID_HANDLE_VALUE;
+    HANDLE findHandleResult = INVALID_HANDLE_VALUE;
 
     bool FileExists(const wchar_t* path) override
     {
@@ -101,6 +102,21 @@ public:
     {
         calls.push_back({L"CreateFile", path ? path : L"", L""});
         return handleResult;
+    }
+
+    HANDLE FindFirstFile(const wchar_t* path, WIN32_FIND_DATAW* findData) override
+    {
+        (void)findData;
+        calls.push_back({L"FindFirstFile", path ? path : L"", L""});
+        return findHandleResult;
+    }
+
+    BOOL FindNextFile(HANDLE findHandle, WIN32_FIND_DATAW* findData) override
+    {
+        (void)findHandle;
+        (void)findData;
+        calls.push_back({L"FindNextFile", L"", L""});
+        return FALSE;
     }
 
     HANDLE OpenFileForRead(const wchar_t* path, DWORD shareMode) override
@@ -218,6 +234,23 @@ TEST(FileSystemMockTest, CreateFileDelegatesToImplementation)
     ASSERT_EQ(mock.calls.size(), 1u);
     EXPECT_EQ(mock.calls[0].op, L"CreateFile");
     EXPECT_EQ(mock.calls[0].path, L"C:\\test.bin");
+}
+
+TEST(FileSystemMockTest, FindOperationsDelegatesToImplementation)
+{
+    MockFileSystem mock;
+    mock.findHandleResult = reinterpret_cast<HANDLE>(0x5678);
+    WIN32_FIND_DATAW fd = {};
+
+    HANDLE h = mock.FindFirstFile(L"C:\\*.txt", &fd);
+    EXPECT_EQ(h, reinterpret_cast<HANDLE>(0x5678));
+
+    EXPECT_FALSE(mock.FindNextFile(h, &fd));
+
+    ASSERT_EQ(mock.calls.size(), 2u);
+    EXPECT_EQ(mock.calls[0].op, L"FindFirstFile");
+    EXPECT_EQ(mock.calls[0].path, L"C:\\*.txt");
+    EXPECT_EQ(mock.calls[1].op, L"FindNextFile");
 }
 
 int main(int argc, char** argv)

@@ -181,6 +181,22 @@ public:
                              creationDisposition, flagsAndAttributes, templateFile);
     }
 
+    HANDLE FindFirstFile(const wchar_t* path, WIN32_FIND_DATAW* findData) override
+    {
+        LongPath lp(path);
+        if (!lp.IsValid())
+        {
+            SetLastError(LastErrorOr(ERROR_INVALID_PARAMETER));
+            return INVALID_HANDLE_VALUE;
+        }
+        return ::FindFirstFileW(lp.Get(), findData);
+    }
+
+    BOOL FindNextFile(HANDLE findHandle, WIN32_FIND_DATAW* findData) override
+    {
+        return ::FindNextFileW(findHandle, findData);
+    }
+
     HANDLE OpenFileForRead(const wchar_t* path, DWORD shareMode) override
     {
         LongPath lp(path);
