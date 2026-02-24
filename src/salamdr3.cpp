@@ -1404,7 +1404,7 @@ void _RemoveTemporaryDir(const char* dir)
     if (*(end - 1) != '\\')
         *end++ = '\\';
     strcpy(end, "*");
-    HANDLE find = HANDLES_Q(FindFirstFileW(AnsiToWide(path).c_str(), &file));
+    HANDLE find = SalFindFirstFileHW(path, &file);
     if (find != INVALID_HANDLE_VALUE)
     {
         do
@@ -1421,7 +1421,7 @@ void _RemoveTemporaryDir(const char* dir)
                 else
                     gFileSystem->DeleteFile(AnsiToWide(path).c_str());
             }
-        } while (FindNextFileW(find, &file));
+        } while (SalLPFindNextFile(find, &file));
         HANDLES(FindClose(find));
     }
     *(end - 1) = 0;
@@ -1451,7 +1451,7 @@ void _RemoveEmptyDirs(const char* dir)
     if (*(end - 1) != '\\')
         *end++ = '\\';
     strcpy(end, "*");
-    HANDLE find = HANDLES_Q(FindFirstFileW(AnsiToWide(path).c_str(), &file));
+    HANDLE find = SalFindFirstFileHW(path, &file);
     if (find != INVALID_HANDLE_VALUE)
     {
         do
@@ -1468,7 +1468,7 @@ void _RemoveEmptyDirs(const char* dir)
                     _RemoveEmptyDirs(path);
                 }
             }
-        } while (FindNextFileW(find, &file));
+        } while (SalLPFindNextFile(find, &file));
         HANDLES(FindClose(find));
     }
     *(end - 1) = 0;
@@ -3596,7 +3596,7 @@ void CFileTimeStamps::CheckAndPackAndClear(HWND parent, BOOL* someFilesChanged, 
         CFileTimeStampsItem* item = List[i];
         sprintf(buf, "%s\\%s", item->SourcePath, item->FileName);
         BOOL kill = TRUE;
-        HANDLE find = HANDLES_Q(FindFirstFileW(AnsiToWide(buf).c_str(), &data));
+        HANDLE find = SalFindFirstFileHW(buf, &data);
         if (find != INVALID_HANDLE_VALUE)
         {
             HANDLES(FindClose(find));

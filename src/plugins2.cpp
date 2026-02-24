@@ -14,6 +14,7 @@
 #include "toolbar.h"
 #include "zip.h"
 #include "common/unicode/helpers.h"
+#include "common/widepath.h"
 #include "pack.h"
 #include "dialogs.h"
 #include "common/peutils.h"
@@ -2686,7 +2687,7 @@ int CPlugins::GetViewerCount(int index)
 void SearchForPlugins(char* buf, char* s, TIndirectArray<char>& foundFiles, WIN32_FIND_DATAW& data)
 {
     strcpy(s++, "\\*");
-    HANDLE find = HANDLES_Q(FindFirstFileW(AnsiToWide(buf).c_str(), &data));
+    HANDLE find = SalFindFirstFileHW(buf, &data);
     if (find != INVALID_HANDLE_VALUE)
     {
         do
@@ -2727,7 +2728,7 @@ void SearchForPlugins(char* buf, char* s, TIndirectArray<char>& foundFiles, WIN3
                     SearchForPlugins(buf, s + strlen(s), foundFiles, data);
                 }
             }
-        } while (FindNextFileW(find, &data));
+        } while (SalLPFindNextFile(find, &data));
         HANDLES(FindClose(find));
     }
 }
