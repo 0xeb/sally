@@ -599,7 +599,8 @@ HANDLE COperation::OpenSourceFile(DWORD flags) const
 {
     if (HasWideSource())
     {
-        HANDLE h = CreateFileW(
+        IFileSystem* fileSystem = GetWorkerFileSystem();
+        HANDLE h = fileSystem->CreateFile(
             SourceNameW.c_str(),
             GENERIC_READ,
             FILE_SHARE_READ | FILE_SHARE_WRITE,
@@ -630,7 +631,8 @@ HANDLE COperation::OpenTargetFile(DWORD access, DWORD shareMode, DWORD dispositi
 {
     if (HasWideTarget())
     {
-        HANDLE h = CreateFileW(
+        IFileSystem* fileSystem = GetWorkerFileSystem();
+        HANDLE h = fileSystem->CreateFile(
             TargetNameW.c_str(),
             access,
             shareMode,
@@ -663,20 +665,21 @@ HANDLE COperation::CreateTargetFileEx(DWORD desiredAccess, DWORD shareMode, DWOR
 {
     if (HasWideTarget())
     {
+        IFileSystem* fileSystem = GetWorkerFileSystem();
         // Use wide path directly - bypass ANSI conversion that loses Unicode chars
-        HANDLE out = CreateFileW(TargetNameW.c_str(), desiredAccess, shareMode, NULL,
-                                 CREATE_NEW, flagsAndAttributes, NULL);
+        HANDLE out = fileSystem->CreateFile(TargetNameW.c_str(), desiredAccess, shareMode, NULL,
+                                            CREATE_NEW, flagsAndAttributes, NULL);
         if (out == INVALID_HANDLE_VALUE && encryptionNotSupported != NULL &&
             (flagsAndAttributes & FILE_ATTRIBUTE_ENCRYPTED))
         {
             // Test if encryption is not supported
-            HANDLE testOut = CreateFileW(TargetNameW.c_str(), desiredAccess, shareMode, NULL,
-                                         CREATE_NEW, (flagsAndAttributes & ~(FILE_ATTRIBUTE_ENCRYPTED | FILE_ATTRIBUTE_READONLY)), NULL);
+            HANDLE testOut = fileSystem->CreateFile(TargetNameW.c_str(), desiredAccess, shareMode, NULL,
+                                                    CREATE_NEW, (flagsAndAttributes & ~(FILE_ATTRIBUTE_ENCRYPTED | FILE_ATTRIBUTE_READONLY)), NULL);
             if (testOut != INVALID_HANDLE_VALUE)
             {
                 *encryptionNotSupported = TRUE;
-                CloseHandle(testOut);
-                DeleteFileW(TargetNameW.c_str());
+                fileSystem->CloseHandle(testOut);
+                fileSystem->DeleteFile(TargetNameW.c_str());
             }
         }
         return out;
@@ -693,7 +696,7 @@ BOOL COperation::DeleteTargetFile() const
 {
     if (HasWideTarget())
     {
-        return DeleteFileW(TargetNameW.c_str());
+        return GetWorkerFileSystem()->DeleteFile(TargetNameW.c_str()).success;
     }
     else
     {
@@ -706,7 +709,7 @@ BOOL COperation::SetTargetAttributes(DWORD attrs) const
 {
     if (HasWideTarget())
     {
-        return SetFileAttributesW(TargetNameW.c_str(), attrs);
+        return GetWorkerFileSystem()->SetFileAttributes(TargetNameW.c_str(), attrs).success;
     }
     else
     {
@@ -719,7 +722,7 @@ DWORD COperation::GetTargetAttributes() const
 {
     if (HasWideTarget())
     {
-        return GetFileAttributesW(TargetNameW.c_str());
+        return GetWorkerFileSystem()->GetFileAttributes(TargetNameW.c_str());
     }
     else
     {
@@ -732,7 +735,7 @@ BOOL COperation::DeleteSourceFile() const
 {
     if (HasWideSource())
     {
-        return DeleteFileW(SourceNameW.c_str());
+        return GetWorkerFileSystem()->DeleteFile(SourceNameW.c_str()).success;
     }
     else
     {
@@ -745,7 +748,7 @@ BOOL COperation::SetSourceAttributes(DWORD attrs) const
 {
     if (HasWideSource())
     {
-        return SetFileAttributesW(SourceNameW.c_str(), attrs);
+        return GetWorkerFileSystem()->SetFileAttributes(SourceNameW.c_str(), attrs).success;
     }
     else
     {
@@ -758,7 +761,7 @@ DWORD COperation::GetSourceAttributes() const
 {
     if (HasWideSource())
     {
-        return GetFileAttributesW(SourceNameW.c_str());
+        return GetWorkerFileSystem()->GetFileAttributes(SourceNameW.c_str());
     }
     else
     {
