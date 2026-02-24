@@ -1,4 +1,4 @@
-# NuGet package restoration for Open Salamander CMake build
+# NuGet package restoration for Sally CMake build
 # Restores packages listed in packages.config and sets variables for consuming them.
 
 include_guard(GLOBAL)

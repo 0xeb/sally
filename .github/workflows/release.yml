@@ -41,15 +41,15 @@ jobs:
       - name: Create zip archive
         run: |
           $version = "${{ github.ref_name }}"
-          $zipName = "OpenSalamander-$version-${{ matrix.arch }}.zip"
-          Compress-Archive -Path "build/out/salamander/RelWithDebInfo_${{ matrix.arch }}/*" -DestinationPath $zipName
+          $zipName = "Sally-$version-${{ matrix.arch }}.zip"
+          Compress-Archive -Path "build/out/sally/RelWithDebInfo_${{ matrix.arch }}/*" -DestinationPath $zipName
           Write-Host "Created: $zipName"
 
       - name: Upload artifact
         uses: actions/upload-artifact@v4
         with:
-          name: OpenSalamander-${{ matrix.arch }}
-          path: OpenSalamander-*.zip
+          name: Sally-${{ matrix.arch }}
+          path: Sally-*.zip
 
   release:
     name: Create Release

@@ -1,4 +1,4 @@
-# Git version detection for Open Salamander
+# Git version detection for Sally
 # Generates git_version.h with version info from git tags
 # Format: x.y.z-shorthash (e.g., 5.0.1-9c98a4b)
 

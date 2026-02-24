@@ -1,4 +1,4 @@
-# Plugin building utilities for Open Salamander
+# Plugin building utilities for Sally
 # Provides sal_add_plugin() function to create plugin targets
 
 include_guard(GLOBAL)

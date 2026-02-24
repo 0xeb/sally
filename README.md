@@ -1,7 +1,7 @@
 # Sally
 
-[![Release](https://img.shields.io/github/v/release/0xeb/salamander)](https://github.com/0xeb/salamander/releases)
-[![Build](https://img.shields.io/github/actions/workflow/status/0xeb/salamander/pr-msbuild.yml?label=build)](https://github.com/0xeb/salamander/actions)
+[![Release](https://img.shields.io/github/v/release/0xeb/sally)](https://github.com/0xeb/sally/releases)
+[![Build](https://img.shields.io/github/actions/workflow/status/0xeb/sally/pr-msbuild.yml?label=build)](https://github.com/0xeb/sally/actions)
 [![License: GPL v2](https://img.shields.io/badge/License-GPLv2-blue.svg)](LICENSE)
 
 A fast, modern dual-panel file manager for Windows — fork of Open Salamander with Unicode, long paths, and ARM64 support.
@@ -45,7 +45,7 @@ Sally (short for Salamander) is a fork of [Open Salamander](https://github.com/O
 
 ## Downloads
 
-Pre-built binaries are available on the [Releases](https://github.com/0xeb/salamander/releases) page.
+Pre-built binaries are available on the [Releases](https://github.com/0xeb/sally/releases) page.
 
 ## Building
 
@@ -65,7 +65,7 @@ cmake --build build --config RelWithDebInfo
 cmake --build build --config RelWithDebInfo --target populate
 ```
 
-Output: `build/out/salamander/<Config>_<Arch>/`
+Output: `build/out/sally/<Config>_<Arch>/`
 
 ### Other Architectures
 

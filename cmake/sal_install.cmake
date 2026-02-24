@@ -1,4 +1,4 @@
-# Installation and deployment rules for Open Salamander
+# Installation and deployment rules for Sally
 # Handles copying runtime files, resources, and third-party dependencies
 
 include_guard(GLOBAL)

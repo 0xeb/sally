@@ -1,4 +1,4 @@
-# Common settings and utilities for Open Salamander CMake build
+# Common settings and utilities for Sally CMake build
 # This file is included by the parent project's CMakeLists.txt
 
 # Compute paths relative to the salamander submodule root
@@ -45,7 +45,7 @@ endif()
 string(REGEX REPLACE "([^/])$" "\\1/" SAL_OUTPUT_DIR "${SAL_OUTPUT_DIR}")
 
 # Full output path with config and platform
-set(SAL_OUTPUT_BASE "${SAL_OUTPUT_DIR}salamander")
+set(SAL_OUTPUT_BASE "${SAL_OUTPUT_DIR}sally")
 
 # Common preprocessor definitions (from sal_base.props)
 set(SAL_COMMON_DEFINES
@@ -109,5 +109,5 @@ if(MSVC)
   add_link_options($<$<CONFIG:Release>:/LTCG>)   # Link-time code generation
 endif()
 
-message(STATUS "Salamander root: ${SAL_ROOT}")
-message(STATUS "Salamander output: ${SAL_OUTPUT_BASE}")
+message(STATUS "Sally root: ${SAL_ROOT}")
+message(STATUS "Sally output: ${SAL_OUTPUT_BASE}")
