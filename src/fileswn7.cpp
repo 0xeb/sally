@@ -14,6 +14,7 @@
 #include "ui/IPrompter.h"
 #include "common/IFileSystem.h"
 #include "common/unicode/helpers.h"
+#include "common/widepath.h"
 #include "common/IEnvironment.h"
 
 //
@@ -831,7 +832,7 @@ BOOL _ReadDirectoryTree(HWND parent, CPathBuffer& path, char* name, CSalamanderD
     strcat(end, "\\*");
 
     WIN32_FIND_DATAW file;
-    HANDLE find = HANDLES_Q(FindFirstFileW(AnsiToWide(path).c_str(), &file));
+    HANDLE find = SalFindFirstFileHW(path, &file);
     *end = 0; // restore the path
     if (find == INVALID_HANDLE_VALUE)
     {
@@ -1029,7 +1030,7 @@ BOOL _ReadDirectoryTree(HWND parent, CPathBuffer& path, char* name, CSalamanderD
                     }
                 }
             }
-        } while (FindNextFileW(find, &file));
+        } while (SalLPFindNextFile(find, &file));
         DWORD err = GetLastError();
         HANDLES(FindClose(find));
         *end = 0; // restore the path

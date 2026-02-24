@@ -8,6 +8,7 @@
 #include "find.h"
 #include "md5.h"
 #include "common/unicode/helpers.h"
+#include "common/widepath.h"
 
 char* FindNamedHistory[FIND_NAMED_HISTORY_SIZE];
 char* FindLookInHistory[FIND_LOOKIN_HISTORY_SIZE];
@@ -1541,7 +1542,7 @@ void SearchDirectory(CPathBuffer& path, char* end, int startPathLen,
     }
 
     WIN32_FIND_DATAW file;
-    HANDLE find = HANDLES_Q(FindFirstFileW(AnsiToWide(path).c_str(), &file));
+    HANDLE find = SalFindFirstFileHW(path, &file);
     if (find != INVALID_HANDLE_VALUE)
     {
         if (end - path > 3)
@@ -1703,7 +1704,7 @@ void SearchDirectory(CPathBuffer& path, char* end, int startPathLen,
                 testFindNextErr = FALSE;
                 break;
             }
-        } while (FindNextFileW(find, &file));
+        } while (SalLPFindNextFile(find, &file));
         DWORD err = GetLastError();
         HANDLES(FindClose(find));
 
