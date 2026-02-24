@@ -8,6 +8,7 @@
 #include "common/IFileSystem.h"
 #include "common/unicode/helpers.h"
 #include "common/IEnvironment.h"
+#include "common/IRegistry.h"
 #include <shlwapi.h>
 #undef PathIsPrefix // otherwise conflicts with CSalamanderGeneral::PathIsPrefix
 
@@ -868,7 +869,11 @@ BOOL CMainWindow::OnAssociationsChangedNotification(BOOL showWaitWnd)
     // we try to avoid this by postponing the following mess using IDT_ASSOCIATIONSCHNG
 
     HKEY hKey;
-    if (HANDLES(RegOpenKeyEx(HKEY_CURRENT_USER, "Control Panel\\Desktop\\WindowMetrics", 0, KEY_READ | KEY_WRITE, &hKey)) == ERROR_SUCCESS)
+    IRegistry* registry = gRegistry;
+    if (registry == NULL)
+        registry = GetWin32Registry();
+    if (registry != NULL &&
+        OpenKeyReadWriteA(registry, HKEY_CURRENT_USER, "Control Panel\\Desktop\\WindowMetrics", hKey).success)
     {
         // older SHELL32.DLL versions may not export this, fileIconInit will be NULL
         FT_FileIconInit fileIconInit = NULL;
@@ -906,8 +911,8 @@ BOOL CMainWindow::OnAssociationsChangedNotification(BOOL showWaitWnd)
             if (fileIconInit != NULL)
                 fileIconInit(TRUE);
             if (deleteVal)
-                RegDeleteValue(hKey, "Shell Icon Size"); // clean up after ourselves
-            HANDLES(RegCloseKey(hKey));
+                DeleteValueA(registry, hKey, "Shell Icon Size"); // clean up after ourselves
+            registry->CloseKey(hKey);
 
             IgnoreWM_SETTINGCHANGE = FALSE;
         }
