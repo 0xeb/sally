@@ -1,4 +1,6 @@
 // SPDX-FileCopyrightText: 2023 Open Salamander Authors
+// SPDX-FileCopyrightText: 2026 Sally Authors
+// SPDX-FileCopyrightText: 2026 Sally Authors
 // SPDX-License-Identifier: GPL-2.0-or-later
 // CommentsTranslationProject: TRANSLATED
 
@@ -48,7 +50,7 @@ BOOL SalamanderIsNotBusy(DWORD* lastIdleTime);
 // - directory obtained from the current Salamander .slg file (see SLGHelpDir in shared\versinfo.rc)
 // - HELP\ENGLISH\*.chm
 // - the first subdirectory found under HELP
-// 'helpFileName' is the .chm file name to work with (file name without path). If NULL, "salamand.chm" is used.
+// 'helpFileName' is the .chm file name to work with (file name without path). If NULL, "sally.chm" is used.
 // 'parent' is the parent for any error message box; 'command' is the HTML Help command, see HHCDisplayXXX;
 // 'dwData' is the parameter for the HTML Help command, see HHCDisplayXXX. Can be called from any thread.
 // If 'quiet' is TRUE, no error message is shown. Returns TRUE on success, otherwise FALSE.
@@ -2128,7 +2130,7 @@ int GetWMCommandFromSalCmd(int salCmd);
 //******************************************************************************
 
 // number of items in SalamanderConfigurationRoots array
-#define SALCFG_ROOTS_COUNT 83
+#define SALCFG_ROOTS_COUNT 84
 
 // main thread id (valid only after entering WinMain())
 extern DWORD MainThreadID;

@@ -1,12 +1,12 @@
 cmake_minimum_required(VERSION 3.21)
 
-project(OpenSalamander LANGUAGES C CXX RC)
+project(Sally LANGUAGES C CXX RC)
 
 # Generate git version header
 include(${CMAKE_CURRENT_SOURCE_DIR}/cmake/git_version.cmake)
 
 if(NOT WIN32)
-  message(FATAL_ERROR "Open Salamander CMake build targets Windows only.")
+  message(FATAL_ERROR "Sally CMake build targets Windows only.")
 endif()
 
 # ==============================================================================
@@ -100,8 +100,8 @@ elseif(MINGW)
   )
 endif()
 
-# Match VS output name (salamand.exe instead of salamander.exe)
-set_target_properties(salamander PROPERTIES OUTPUT_NAME "salamand")
+# Output as sally.exe
+set_target_properties(salamander PROPERTIES OUTPUT_NAME "sally")
 
 # Resource file settings
 set_source_files_properties(${SALAMANDER_RC} PROPERTIES
@@ -626,6 +626,6 @@ enable_testing()
 add_subdirectory(src/tests)
 
 message(STATUS "")
-message(STATUS "=== Open Salamander CMake Build ===")
+message(STATUS "=== Sally CMake Build ===")
 message(STATUS "Output: ${SAL_OUTPUT_BASE}/<Config>_${SAL_PLATFORM}")
 message(STATUS "")

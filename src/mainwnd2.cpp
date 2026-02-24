@@ -1,4 +1,5 @@
 ﻿// SPDX-FileCopyrightText: 2023 Open Salamander Authors
+// SPDX-FileCopyrightText: 2026 Sally Authors
 // SPDX-License-Identifier: GPL-2.0-or-later
 // CommentsTranslationProject: TRANSLATED
 
@@ -158,6 +159,7 @@ const DWORD THIS_CONFIG_VERSION = 106; // 106 = plugins renamed from .spl to .dl
 // !!! Keep the corresponding lines in SalamanderConfigurationVersions up to date
 const char* SalamanderConfigurationRoots[SALCFG_ROOTS_COUNT + 1] =
     {
+        "Software\\Sally\\1.0",
         "Software\\Open Salamander\\5.0",
         "Software\\Altap\\Altap Salamander 4.0",
         "Software\\Altap\\Altap Salamander 4.0 beta 1 (DB177)",
@@ -244,6 +246,7 @@ const char* SalamanderConfigurationRoots[SALCFG_ROOTS_COUNT + 1] =
 };
 const char* SalamanderConfigurationVersions[SALCFG_ROOTS_COUNT] =
     {
+        "1.0",
         "5.0",
         "4.0",
         "4.0 beta 1 (DB177)",

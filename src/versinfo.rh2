@@ -31,7 +31,7 @@
 #endif
 
 // for SLG translators
-#define VERSINFO_SLG_WEB     "github.com/0xeb/salamander"
+#define VERSINFO_SLG_WEB     "github.com/0xeb/sally"
 #define VERSINFO_SLG_COMMENT "English version"
 
 #endif // __VERSINFO_RH2
