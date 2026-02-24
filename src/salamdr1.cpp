@@ -22,6 +22,7 @@
 #include "ui/IPrompter.h"
 #include "common/unicode/helpers.h"
 #include "common/IEnvironment.h"
+#include "common/IRegistry.h"
 #include "ui/IPrompter.h"
 #include "editwnd.h"
 #include "find.h"
@@ -37,6 +38,11 @@
 #include "logo.h"
 #include "color.h"
 #include "toolbar.h"
+
+static IRegistry* GetMainSalamanderRegistry()
+{
+    return gRegistry != nullptr ? gRegistry : GetWin32Registry();
+}
 
 #include "svg.h"
 
@@ -2110,14 +2116,14 @@ BOOL GetShortcutOverlay()
 */
 
     HKEY hKey;
-    if (NOHANDLES(RegOpenKeyEx(HKEY_LOCAL_MACHINE,
-                               "SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Explorer\\Shell Icons",
-                               0, KEY_QUERY_VALUE, &hKey)) == ERROR_SUCCESS)
+    IRegistry* registry = GetMainSalamanderRegistry();
+    if (OpenKeyReadA(registry, HKEY_LOCAL_MACHINE,
+                     "SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Explorer\\Shell Icons",
+                     hKey).success)
     {
         CPathBuffer buff;
-        DWORD buffLen = buff.Size();
         buff[0] = 0;
-        SalRegQueryValueEx(hKey, "29", NULL, NULL, (LPBYTE)buff.Get(), &buffLen);
+        GetStringA(registry, hKey, "29", buff, buff.Size());
         if (buff[0] != 0)
         {
             char* num = strrchr(buff, ','); // icon number is after the last comma
@@ -2147,7 +2153,7 @@ BOOL GetShortcutOverlay()
                         HANDLES_ADD(__htIcon, __hoLoadImage, HShortcutOverlays[i]);
             }
         }
-        NOHANDLES(RegCloseKey(hKey));
+        registry->CloseKey(hKey);
     }
 
     for (i = 0; i < ICONSIZE_COUNT; i++)
@@ -2312,11 +2318,12 @@ BOOL InitializeGraphics(BOOL colorsOnly)
     IconSizes[ICONSIZE_48] = GetIconSizeForSystemDPI(ICONSIZE_48);
 
     HKEY hKey;
-    if (OpenKeyAux(NULL, HKEY_CURRENT_USER, "Control Panel\\Desktop\\WindowMetrics", hKey))
+    IRegistry* registry = GetMainSalamanderRegistry();
+    if (OpenKeyReadA(registry, HKEY_CURRENT_USER, "Control Panel\\Desktop\\WindowMetrics", hKey).success)
     {
         // other interesting values: "Shell Icon Size", "Shell Small Icon Size"
         char buff[100];
-        if (GetValueAux(NULL, hKey, "Shell Icon Bpp", REG_SZ, buff, 100))
+        if (GetStringA(registry, hKey, "Shell Icon Bpp", buff, _countof(buff)).success)
         {
             iconColorsCount = atoi(buff);
         }
@@ -2335,7 +2342,7 @@ BOOL InitializeGraphics(BOOL colorsOnly)
         if (bpp <= 8)
             iconColorsCount = 0;
 
-        HANDLES(RegCloseKey(hKey));
+        registry->CloseKey(hKey);
     }
 
     TRACE_I("InitializeGraphics() bpp=" << bpp << " iconColorsCount=" << iconColorsCount);
