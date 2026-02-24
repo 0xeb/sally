@@ -8,6 +8,7 @@
 
 #include "ui/IPrompter.h"
 #include "common/unicode/helpers.h"
+#include "common/widepath.h"
 #include "mainwnd.h"
 #include "plugins.h"
 #include "fileswnd.h"
@@ -2444,7 +2445,7 @@ CDriveSelectErrDlg::DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
             {
                 WIN32_FIND_DATAW fileData;
                 HANDLE search;
-                search = HANDLES_Q(FindFirstFileW(AnsiToWide(fileName).c_str(), &fileData));
+                search = SalFindFirstFileHW(fileName, &fileData);
                 if (search == INVALID_HANDLE_VALUE)
                 {
                     DWORD err = GetLastError();

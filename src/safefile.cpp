@@ -15,6 +15,7 @@
 #include "common/IFileSystem.h"
 #include "ui/IPrompter.h"
 #include "common/unicode/helpers.h"
+#include "common/widepath.h"
 
 CSalamanderSafeFile SalSafeFile;
 
@@ -141,7 +142,7 @@ CSalamanderSafeFile::SafeFileCreate(const char* fileName,
         if (!isDir)
         {
             WIN32_FIND_DATAW data;
-            HANDLE find = HANDLES_Q(FindFirstFileW(AnsiToWide(fileName).c_str(), &data));
+            HANDLE find = SalFindFirstFileHW(fileName, &data);
             if (find != INVALID_HANDLE_VALUE)
             {
                 HANDLES(FindClose(find));

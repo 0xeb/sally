@@ -177,7 +177,7 @@ CPF_AGAIN:
         {
             SalPathAppend(threadPath, "*", threadPath.Size());
             WIN32_FIND_DATAW data;
-            HANDLE find = HANDLES_Q(FindFirstFileW(AnsiToWide(threadPath).c_str(), &data));
+            HANDLE find = SalFindFirstFileHW(threadPath, &data);
             if (find != INVALID_HANDLE_VALUE)
             {
                 // path is probably OK after all (cannot be used without test for fixed disk, unfortunately FindFirstFile

@@ -348,7 +348,7 @@ void CFilesWindow::Execute(int index)
                     SalPathAppend(fullName, "*", fullName.Size()))
                 {
                     WIN32_FIND_DATAW fileData;
-                    HANDLE search = HANDLES_Q(FindFirstFileW(AnsiToWide(fullName).c_str(), &fileData));
+                    HANDLE search = SalFindFirstFileHW(fullName, &fileData);
                     DWORD err = GetLastError();
                     CutDirectory(fullName);
                     if (search != INVALID_HANDLE_VALUE)
