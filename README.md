@@ -1,19 +1,19 @@
-# Open Salamander
+# Sally
 
 [![Release](https://img.shields.io/github/v/release/0xeb/salamander)](https://github.com/0xeb/salamander/releases)
 [![Build](https://img.shields.io/github/actions/workflow/status/0xeb/salamander/pr-msbuild.yml?label=build)](https://github.com/0xeb/salamander/actions)
 [![License: GPL v2](https://img.shields.io/badge/License-GPLv2-blue.svg)](LICENSE)
 
-A fast, modern dual-panel file manager for Windows — with Unicode, long paths, and ARM64 support.
+A fast, modern dual-panel file manager for Windows — fork of Open Salamander with Unicode, long paths, and ARM64 support.
 
 <!-- Screenshot: this is the classic annotated UI image from the help docs. Replace with a fresh Windows 11 screenshot when available. -->
 <p align="center">
-  <img src="help/src/hh/salamand/images/main.png" alt="Open Salamander screenshot" width="800">
+  <img src="help/src/hh/salamand/images/main.png" alt="Sally screenshot" width="800">
 </p>
 
-## About This Fork
+## About
 
-This fork is maintained by [Elias Bachaalany](https://github.com/0xeb) and is **571 commits ahead** of upstream [OpenSalamander](https://github.com/OpenSalamander/salamander). Development is AI-assisted using [Claude Code](https://docs.anthropic.com/en/docs/claude-code). See [Origin](doc/ORIGIN.md) for the full project history.
+Sally (short for Salamander) is a fork of [Open Salamander](https://github.com/OpenSalamander/salamander), maintained by [Elias Bachaalany](https://github.com/0xeb). Development is AI-assisted using [Claude Code](https://docs.anthropic.com/en/docs/claude-code). See [Origin](doc/ORIGIN.md) for the full project history.
 
 ## What's New
 
@@ -88,7 +88,7 @@ Contributions are welcome! See the [Developer Guide](doc/DEV.md) for repository 
 
 ## License
 
-Open Salamander is open source software licensed under [GPLv2](LICENSE). Individual components and libraries have separate but compatible licenses — see [third_party.txt](doc/third_party.txt) for details.
+Sally is based on Open Salamander, open source software licensed under [GPLv2](LICENSE). Individual components and libraries have separate but compatible licenses — see [third_party.txt](doc/third_party.txt) for details.
 
 ## Resources
 
