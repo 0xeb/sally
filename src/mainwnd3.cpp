@@ -192,7 +192,7 @@ BOOL OpenHtmlHelp(char* helpFileName, HWND parent, CHtmlHelpCommand command, DWO
                     if (SalPathAppend(helpPath, "*", helpPath.Size()))
                     { // try to find at least some other directory
                         WIN32_FIND_DATAW data;
-                        HANDLE find = HANDLES_Q(FindFirstFileW(AnsiToWide(helpPath).c_str(), &data));
+                        HANDLE find = SalFindFirstFileHW(helpPath, &data);
                         if (find != INVALID_HANDLE_VALUE)
                         {
                             do
@@ -209,7 +209,7 @@ BOOL OpenHtmlHelp(char* helpFileName, HWND parent, CHtmlHelpCommand command, DWO
                                         break;
                                     }
                                 }
-                            } while (FindNextFileW(find, &data));
+                            } while (SalLPFindNextFile(find, &data));
                             HANDLES(FindClose(find));
                         }
                     }

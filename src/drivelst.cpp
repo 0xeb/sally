@@ -867,7 +867,7 @@ BOOL CheckAndConnectUNCNetworkPath(HWND parent, const char* UNCPath, BOOL& pathI
 
     WIN32_FIND_DATAW data;
     HANDLE h;
-    if ((h = HANDLES_Q(FindFirstFileW(AnsiToWide(root).c_str(), &data))) != INVALID_HANDLE_VALUE)
+    if ((h = SalFindFirstFileHW(root, &data)) != INVALID_HANDLE_VALUE)
     { // UNC root path is accessible, we will not do anything
         HANDLES(FindClose(h));
     }
