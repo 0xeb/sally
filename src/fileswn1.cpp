@@ -474,16 +474,39 @@ unsigned IconThreadThreadFBody(void* parameter)
                 BOOL isGoogleDrivePath = FALSE;
                 if (window->Is(ptDisk))
                 {
-                    int l = (int)strlen(window->GetPath());
-                    memmove(path, window->GetPath(), l);
-                    if (path[l - 1] != '\\')
-                        path[l++] = '\\';
-                    name = path.Get() + l; // pointer to the location of the name in the full path
-                    *name = 0;
-                    MultiByteToWideChar(CP_ACP, MB_PRECOMPOSED, path.Get(), l, wPath.Get(), wPath.Size());
-                    wName = wPath.Get() + l;
-                    *wName = 0;
-                    pathIsInvalid = !PathContainsValidComponents(path, FALSE);
+                    const char* diskPath = window->GetPath();
+                    int l = (int)strlen(diskPath);
+                    const int needsTrailingSlash = (l > 0 && diskPath[l - 1] != '\\') ? 1 : 0;
+                    if (!path.EnsureCapacity(l + needsTrailingSlash + 1))
+                    {
+                        pathIsInvalid = TRUE;
+                        TRACE_E("IconThreadThreadFBody(): unable to allocate path buffer for icon reader path.");
+                    }
+                    else
+                    {
+                        memmove(path.Get(), diskPath, l);
+                        if (needsTrailingSlash)
+                            path[l++] = '\\';
+                        path[l] = 0;
+
+                        name = path.Get() + l; // pointer to the location of the name in the full path
+                        *name = 0;
+
+                        // Keep the wide prefix path in sync with ANSI path; avoid writing past inline MAX_PATH.
+                        int requiredWide = MultiByteToWideChar(CP_ACP, MB_PRECOMPOSED, path.Get(), -1, NULL, 0);
+                        if (requiredWide > 0 && wPath.EnsureCapacity(requiredWide) &&
+                            MultiByteToWideChar(CP_ACP, MB_PRECOMPOSED, path.Get(), -1, wPath.Get(), wPath.Size()) > 0)
+                        {
+                            wName = wPath.Get() + (requiredWide - 1);
+                        }
+                        else
+                        {
+                            wPath.Get()[0] = 0;
+                            wName = wPath.Get();
+                        }
+                    }
+                    if (!pathIsInvalid)
+                        pathIsInvalid = !PathContainsValidComponents(path, FALSE);
                     if (pathIsInvalid)
                         TRACE_I("Path contains invalid components, shell cannot read icons from such paths! Path: " << path);
                     isGoogleDrivePath = ShellIconOverlays.IsGoogleDrivePath(path);
