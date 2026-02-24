@@ -21,6 +21,14 @@ NTFSCONTROLFILE DynNtFsControlFile = NULL;
 
 COperationsQueue OperationsQueue; // queue of disk operations
 
+static IFileSystem* GetWorkerFileSystem()
+{
+    IFileSystem* fileSystem = gFileSystem;
+    if (fileSystem == NULL)
+        fileSystem = GetWin32FileSystem();
+    return fileSystem;
+}
+
 // if defined, various debug messages are written to TRACE
 //#define WORKER_COPY_DEBUG_MSG
 
@@ -840,7 +848,12 @@ BOOL COperation::AreSourceAndTargetSamePath() const
 HANDLE COperation::FindFirstTarget(WIN32_FIND_DATAW* findData) const
 {
     if (HasWideTarget())
+    {
+        IFileSystem* fileSystem = GetWorkerFileSystem();
+        if (fileSystem != NULL)
+            return fileSystem->FindFirstFile(TargetNameW.c_str(), findData);
         return FindFirstFileW(TargetNameW.c_str(), findData);
+    }
     else
         return SalFindFirstFileHW(TargetName, findData);
 }
@@ -849,7 +862,12 @@ HANDLE COperation::FindFirstTarget(WIN32_FIND_DATAW* findData) const
 HANDLE COperation::FindFirstSource(WIN32_FIND_DATAW* findData) const
 {
     if (HasWideSource())
+    {
+        IFileSystem* fileSystem = GetWorkerFileSystem();
+        if (fileSystem != NULL)
+            return fileSystem->FindFirstFile(SourceNameW.c_str(), findData);
         return FindFirstFileW(SourceNameW.c_str(), findData);
+    }
     else
         return SalFindFirstFileHW(SourceName, findData);
 }
@@ -1599,7 +1617,9 @@ void GetDirInfoW(char* buffer, const wchar_t* dir)
     else
     {
         WIN32_FIND_DATAW data;
-        HANDLE find = FindFirstFileW(dirPath.c_str(), &data);
+        IFileSystem* fileSystem = GetWorkerFileSystem();
+        HANDLE find = fileSystem != NULL ? fileSystem->FindFirstFile(dirPath.c_str(), &data)
+                                         : FindFirstFileW(dirPath.c_str(), &data);
         if (find != INVALID_HANDLE_VALUE)
         {
             HANDLES(FindClose(find));
@@ -1642,8 +1662,10 @@ BOOL IsDirectoryEmptyW(const wchar_t* name) // directories/subdirectories contai
         dir += L'\\';
     std::wstring pattern = dir + L"*";
 
+    IFileSystem* fileSystem = GetWorkerFileSystem();
     WIN32_FIND_DATAW fileData;
-    HANDLE search = FindFirstFileW(pattern.c_str(), &fileData);
+    HANDLE search = fileSystem != NULL ? fileSystem->FindFirstFile(pattern.c_str(), &fileData)
+                                       : FindFirstFileW(pattern.c_str(), &fileData);
     if (search != INVALID_HANDLE_VALUE)
     {
         do
@@ -1667,7 +1689,8 @@ BOOL IsDirectoryEmptyW(const wchar_t* name) // directories/subdirectories contai
                 HANDLES(FindClose(search)); // a file exists here
                 return FALSE;
             }
-        } while (FindNextFileW(search, &fileData));
+        } while (fileSystem != NULL ? fileSystem->FindNextFile(search, &fileData)
+                                    : FindNextFileW(search, &fileData));
         HANDLES(FindClose(search));
     }
     return TRUE;
@@ -6612,8 +6635,10 @@ BOOL SalCreateDirectoryEx(const char* name, DWORD* err)
             (errLoc == ERROR_FILE_EXISTS || // check whether this is only overwriting the file's DOS name
              errLoc == ERROR_ALREADY_EXISTS))
         {
+            IFileSystem* fileSystem = GetWorkerFileSystem();
             WIN32_FIND_DATAW data;
-            HANDLE find = HANDLES_Q(FindFirstFileW(nameW.c_str(), &data));
+            HANDLE find = fileSystem != NULL ? fileSystem->FindFirstFile(nameW.c_str(), &data)
+                                             : HANDLES_Q(FindFirstFileW(nameW.c_str(), &data));
             if (find != INVALID_HANDLE_VALUE)
             {
                 HANDLES(FindClose(find));
