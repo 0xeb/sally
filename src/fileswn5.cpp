@@ -2175,7 +2175,7 @@ void CFilesWindow::RenameFileInternal(CFileData* f, const char* formatedFileName
                      err == ERROR_ALREADY_EXISTS))
                 {
                     WIN32_FIND_DATAW data;
-                    HANDLE find = HANDLES_Q(FindFirstFileW(tgtPathW.c_str(), &data));
+                    HANDLE find = SalFindFirstFileHW(tgtPath, &data);
                     if (find != INVALID_HANDLE_VALUE)
                     {
                         HANDLES(FindClose(find));

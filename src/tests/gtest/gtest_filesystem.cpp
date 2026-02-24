@@ -253,6 +253,34 @@ TEST(FileSystemMockTest, FindOperationsDelegatesToImplementation)
     EXPECT_EQ(mock.calls[1].op, L"FindNextFile");
 }
 
+TEST(FileSystemAnsiHelperTest, FindFirstFilePathAConvertsAndDelegates)
+{
+    MockFileSystem mock;
+    mock.findHandleResult = reinterpret_cast<HANDLE>(0x9ABC);
+    WIN32_FIND_DATAW fd = {};
+
+    HANDLE h = FindFirstFilePathA(&mock, "C:\\Temp\\*.txt", &fd);
+
+    EXPECT_EQ(h, reinterpret_cast<HANDLE>(0x9ABC));
+    ASSERT_EQ(mock.calls.size(), 1u);
+    EXPECT_EQ(mock.calls[0].op, L"FindFirstFile");
+    EXPECT_EQ(mock.calls[0].path, L"C:\\Temp\\*.txt");
+}
+
+TEST(FileSystemAnsiHelperTest, FindFirstFilePathAPropagatesInvalidHandle)
+{
+    MockFileSystem mock;
+    mock.findHandleResult = INVALID_HANDLE_VALUE;
+    WIN32_FIND_DATAW fd = {};
+
+    HANDLE h = FindFirstFilePathA(&mock, "C:\\missing\\*.txt", &fd);
+
+    EXPECT_EQ(h, INVALID_HANDLE_VALUE);
+    ASSERT_EQ(mock.calls.size(), 1u);
+    EXPECT_EQ(mock.calls[0].op, L"FindFirstFile");
+    EXPECT_EQ(mock.calls[0].path, L"C:\\missing\\*.txt");
+}
+
 int main(int argc, char** argv)
 {
     ::testing::InitGoogleTest(&argc, argv);

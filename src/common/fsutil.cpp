@@ -4,6 +4,7 @@
 
 #include "precomp.h"
 #include "fsutil.h"
+#include "IFileSystem.h"
 #include "IPathService.h"
 #include "widepath.h"
 
@@ -35,8 +36,17 @@ SalFileInfo GetFileInfoW(const wchar_t* fullPath)
         return info;
     }
 
+    IFileSystem* fileSystem = gFileSystem;
+    if (fileSystem == NULL)
+        fileSystem = GetWin32FileSystem();
+    if (fileSystem == NULL)
+    {
+        info.LastError = ERROR_INVALID_FUNCTION;
+        return info;
+    }
+
     WIN32_FIND_DATAW findData;
-    HANDLE hFind = FindFirstFileW(pathToUse.c_str(), &findData);
+    HANDLE hFind = fileSystem->FindFirstFile(pathToUse.c_str(), &findData);
 
     if (hFind != INVALID_HANDLE_VALUE)
     {
