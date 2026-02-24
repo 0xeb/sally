@@ -13,6 +13,7 @@
 #include "mainwnd.h"
 #include "toolbar.h"
 #include "zip.h"
+#include "common/IRegistry.h"
 #include "common/unicode/helpers.h"
 #include "common/widepath.h"
 #include "pack.h"
@@ -33,6 +34,11 @@ struct CDIBHeader
     BYTE bmPlanes;
     BYTE bmBitsPixel;
 };
+
+static IRegistry* GetPluginsRegistryService()
+{
+    return gRegistry != nullptr ? gRegistry : GetWin32Registry();
+}
 
 //****************************************************************************
 //
@@ -144,7 +150,8 @@ BOOL SaveIconList(HKEY hKey, const char* valueName, CIconList* iconList)
     DWORD rawPNGSize;
     if (iconList->SaveToPNG(&rawPNG, &rawPNGSize))
     {
-        LONG res = RegSetValueEx(hKey, valueName, 0, REG_BINARY, rawPNG, rawPNGSize);
+        IRegistry* registry = GetPluginsRegistryService();
+        registry->SetBinary(hKey, AnsiToWideReg(valueName).c_str(), rawPNG, rawPNGSize);
         free(rawPNG);
         return TRUE;
     }
@@ -154,26 +161,16 @@ BOOL SaveIconList(HKEY hKey, const char* valueName, CIconList* iconList)
 
 BOOL LoadIconList(HKEY hKey, const char* valueName, CIconList** iconList)
 {
-    DWORD gettedType;
-    DWORD bufferSize;
-    LONG res = SalRegQueryValueEx(hKey, valueName, 0, &gettedType, NULL, &bufferSize);
-    if (res != ERROR_SUCCESS || gettedType != REG_BINARY)
+    IRegistry* registry = GetPluginsRegistryService();
+    RegValueType valueType = RegValueType::None;
+    std::vector<uint8_t> data;
+    auto result = registry->GetValue(hKey, AnsiToWideReg(valueName).c_str(), valueType, data);
+    if (!result.success || valueType != RegValueType::Binary)
         return FALSE;
-
-    BYTE* buff = (BYTE*)malloc(bufferSize);
-
-    DWORD bufferSize2 = bufferSize;
-    res = SalRegQueryValueEx(hKey, valueName, 0, &gettedType, buff, &bufferSize2);
-    if (res != ERROR_SUCCESS || bufferSize2 != bufferSize)
-    {
-        free(buff);
-        return FALSE;
-    }
 
     *iconList = new CIconList();
     //(*iconList)->Dump = TRUE;
-    BOOL ret = (*iconList)->CreateFromRawPNG(buff, bufferSize2, 16);
-    free(buff);
+    BOOL ret = (*iconList)->CreateFromRawPNG(data.empty() ? NULL : data.data(), (DWORD)data.size(), 16);
     return ret;
 }
 
