@@ -7,6 +7,7 @@
 #include "codetbl.h"
 #include "ui/IPrompter.h"
 #include "common/unicode/helpers.h"
+#include "common/widepath.h"
 #include "cfgdlg.h"
 
 CCodeTables CodeTables;
@@ -468,7 +469,7 @@ void CCodeTables::PreloadAllConversions()
     lstrcpy(strrchr(path, '\\') + 1, "convert\\*.*");
 
     WIN32_FIND_DATAW find;
-    HANDLE hFind = HANDLES_Q(FindFirstFileW(AnsiToWide(path).c_str(), &find));
+    HANDLE hFind = SalFindFirstFileHW(path, &find);
     if (hFind != INVALID_HANDLE_VALUE)
     {
         do
@@ -500,7 +501,7 @@ void CCodeTables::PreloadAllConversions()
                         delete table; //  we are not interested in the default table -- discard it
                 }
             }
-        } while (FindNextFileW(hFind, &find));
+        } while (SalLPFindNextFile(hFind, &find));
         HANDLES(FindClose(hFind));
     }
 }

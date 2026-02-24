@@ -6,6 +6,7 @@
 
 #include "ui/IPrompter.h"
 #include "common/unicode/helpers.h"
+#include "common/widepath.h"
 #include "cfgdlg.h"
 #include "dialogs.h"
 #include "usermenu.h"
@@ -866,7 +867,7 @@ BOOL CLanguageSelectorDialog::Initialize(const char* slgSearchPath, HINSTANCE pl
         lstrcpyn(path, slgSearchPath, path.Size());
 
     WIN32_FIND_DATAW file;
-    HANDLE hFind = HANDLES_Q(FindFirstFileW(AnsiToWide(path).c_str(), &file));
+    HANDLE hFind = SalFindFirstFileHW(path, &file);
     if (hFind != INVALID_HANDLE_VALUE)
     {
         do
@@ -888,7 +889,7 @@ BOOL CLanguageSelectorDialog::Initialize(const char* slgSearchPath, HINSTANCE pl
                     }
                 }
             }
-        } while (FindNextFileW(hFind, &file));
+        } while (SalLPFindNextFile(hFind, &file));
         HANDLES(FindClose(hFind));
     }
     return TRUE;

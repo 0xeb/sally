@@ -568,7 +568,7 @@ BOOL ReadDirsAndFilesAux(HWND hWindow, DWORD flags, CCmpDirProgressDialog* progr
         DWORD counter = 0;
         WIN32_FIND_DATAW data;
         HANDLE hFind;
-        hFind = HANDLES_Q(FindFirstFileW(AnsiToWide(path).c_str(), &data));
+        hFind = SalFindFirstFileHW(path, &data);
         if (hFind == INVALID_HANDLE_VALUE)
         {
             DWORD err = GetLastError();
@@ -694,7 +694,7 @@ BOOL ReadDirsAndFilesAux(HWND hWindow, DWORD flags, CCmpDirProgressDialog* progr
                         free(file.Name);
                 }
             }
-        } while (FindNextFileW(hFind, &data));
+        } while (SalLPFindNextFile(hFind, &data));
         DWORD err = GetLastError();
         if (err != ERROR_NO_MORE_FILES)
         {
