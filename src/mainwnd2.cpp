@@ -948,39 +948,47 @@ BOOL GetUpgradeInfo(BOOL* autoImportConfig, char* autoImportConfigFromKey, int a
 
 BOOL FindLanguageFromPrevVerOfSal(char* slgName)
 {
-    HKEY hCfgKey;
-    HKEY hRootKey;
+    HKEY hCfgKey = NULL;
+    HKEY hRootKey = NULL;
     int rootIndex = 0;
     const char* root;
     DWORD saveInProgress; // dummy
+    IRegistry* registry = gRegistry;
+    if (registry == NULL)
+        registry = GetWin32Registry();
 
     slgName[0] = 0;
     LoadSaveToRegistryMutex.Enter();
+    if (registry == NULL)
+    {
+        LoadSaveToRegistryMutex.Leave();
+        return FALSE;
+    }
     do
     {
         // check if the key exists and if a configuration is stored under it
         root = SalamanderConfigurationRoots[rootIndex];
-        BOOL rootFound = HANDLES_Q(RegOpenKeyEx(HKEY_CURRENT_USER, root, 0, KEY_READ, &hRootKey)) == ERROR_SUCCESS;
-        BOOL cfgFound = rootFound && HANDLES_Q(RegOpenKeyEx(hRootKey, SALAMANDER_CONFIG_REG, 0,
-                                                            KEY_READ, &hCfgKey)) == ERROR_SUCCESS;
+        BOOL rootFound = OpenKeyReadA(registry, HKEY_CURRENT_USER, root, hRootKey).success;
+        BOOL cfgFound = rootFound &&
+                        registry->OpenKeyRead(hRootKey, AnsiToWideReg(SALAMANDER_CONFIG_REG).c_str(), hCfgKey).success;
         if (cfgFound && GetValue(hRootKey, SALAMANDER_SAVE_IN_PROGRESS, REG_DWORD, &saveInProgress, sizeof(DWORD)))
         { // the configuration is corrupted
             cfgFound = FALSE;
-            HANDLES(RegCloseKey(hCfgKey));
+            registry->CloseKey(hCfgKey);
         }
         DWORD configVersion = 1; // this is configuration from 1.52 or older
         if (cfgFound)
         {
             HKEY actKey;
-            if (HANDLES_Q(RegOpenKeyEx(hRootKey, SALAMANDER_VERSION_REG, 0, KEY_READ, &actKey) == ERROR_SUCCESS))
+            if (registry->OpenKeyRead(hRootKey, AnsiToWideReg(SALAMANDER_VERSION_REG).c_str(), actKey).success)
             {
                 configVersion = 2; // configuration from 1.6b1
                 GetValue(actKey, SALAMANDER_VERSIONREG_REG, REG_DWORD, &configVersion, sizeof(DWORD));
-                HANDLES(RegCloseKey(actKey));
+                registry->CloseKey(actKey);
             }
         }
         if (rootFound)
-            HANDLES(RegCloseKey(hRootKey));
+            registry->CloseKey(hRootKey);
         if (cfgFound)
         {
             BOOL found = FALSE;
@@ -990,7 +998,7 @@ BOOL FindLanguageFromPrevVerOfSal(char* slgName)
                 GetValue(hCfgKey, CONFIG_LANGUAGE_REG, REG_SZ, slgName, MAX_PATH);
                 found = slgName[0] != 0;
             }
-            HANDLES(RegCloseKey(hCfgKey));
+            registry->CloseKey(hCfgKey);
             LoadSaveToRegistryMutex.Leave();
             return found;
         }
@@ -1100,6 +1108,9 @@ BOOL FindLatestConfiguration(BOOL* deleteConfigurations, const char*& loadConfig
     const char* root;
     DWORD saveInProgress; // dummy
     HKEY hCfgKey;
+    IRegistry* registry = gRegistry;
+    if (registry == NULL)
+        registry = GetWin32Registry();
 
     CImportConfigDialog dlg;
     ZeroMemory(dlg.ConfigurationExist, sizeof(dlg.ConfigurationExist)); // none of the configurations found yet
@@ -1121,7 +1132,7 @@ BOOL FindLatestConfiguration(BOOL* deleteConfigurations, const char*& loadConfig
             copyIsOK = 1; // backup is valid
         else
             copyIsOK = 0; // backup is corrupted
-        HANDLES(RegCloseKey(backupKey));
+        CloseKeyAux(backupKey);
         if (!copyIsOK) // delete the corrupted backup and pretend it never existed (it probably wasn't fully created)
         {
             TRACE_I("Configuration backup is incomplete, removing... " << backup);
@@ -1199,7 +1210,8 @@ MENU_TEMPLATE_ITEM MsgBoxButtons[] =
 
                 CheckShutdownParams();
                 LoadSaveToRegistryMutex.Enter();
-                if (HANDLES_Q(RegOpenKeyEx(HKEY_CURRENT_USER, root, 0, KEY_READ | KEY_WRITE, &hRootKey)) == ERROR_SUCCESS)
+                if (registry != NULL &&
+                    OpenKeyReadWriteA(registry, HKEY_CURRENT_USER, root, hRootKey).success)
                 { // delete the corrupted configuration (if it's still there - user might have renamed it for backup)
                     TRACE_I("Deleting corrupted configuration on user demand: " << root);
                     ClearKeyAux(hRootKey);
@@ -2818,10 +2830,13 @@ BOOL CMainWindow::LoadConfig(BOOL importingOldConfig, const CCommandLineParams* 
 
         if (OpenKey(salamander, SALAMANDER_DEFDIRS_REG, actKey))
         {
-            DWORD values;
-            DWORD res = RegQueryInfoKey(actKey, NULL, 0, 0, NULL, NULL, NULL, &values, NULL,
-                                        NULL, NULL, NULL);
-            if (res == ERROR_SUCCESS)
+            IRegistry* registry = gRegistry;
+            if (registry == NULL)
+                registry = GetWin32Registry();
+            std::vector<std::wstring> valueNames;
+            RegistryResult enumResult = registry != NULL ? registry->EnumValues(actKey, valueNames)
+                                                         : RegistryResult::Error(ERROR_INVALID_FUNCTION);
+            if (enumResult.success)
             {
                 char dir[4] = " :\\"; // reset DefaultDir
                 char d;
@@ -2831,39 +2846,42 @@ BOOL CMainWindow::LoadConfig(BOOL importingOldConfig, const CCommandLineParams* 
                     strcpy(DefaultDir[d - 'A'], dir);
                 }
 
-                char name[2];
-                BYTE path[SAL_MAX_LONG_PATH];
-                DWORD nameLen, dataLen, type;
-
-                int i;
-                for (i = 0; i < (int)values; i++)
+                for (size_t i = 0; i < valueNames.size(); i++)
                 {
-                    nameLen = 2;
-                    dataLen = SAL_MAX_LONG_PATH;
-                    res = RegEnumValue(actKey, i, name, &nameLen, 0, &type, path, &dataLen);
-                    if (res == ERROR_SUCCESS)
-                        if (type == REG_SZ)
+                    char nameA[8] = {0};
+                    int nameLen = WideCharToMultiByte(CP_ACP, 0, valueNames[i].c_str(), -1,
+                                                      nameA, _countof(nameA), NULL, NULL);
+                    if (nameLen <= 1 || nameA[1] != 0)
+                    {
+                        gPrompter->ShowError(LoadStrW(IDS_ERRORLOADCONFIG), LoadStrW(IDS_UNEXPECTEDVALUE));
+                        continue;
+                    }
+
+                    char path[SAL_MAX_LONG_PATH] = {0};
+                    RegistryResult valueResult = GetStringA(registry, actKey, nameA, path, _countof(path));
+                    if (valueResult.success)
+                    {
+                        char d2 = LowerCase[(unsigned char)nameA[0]];
+                        if (d2 >= 'a' && d2 <= 'z')
                         {
-                            char d2 = LowerCase[name[0]];
-                            if (d2 >= 'a' && d2 <= 'z')
-                            {
-                                if (dataLen > 2 && LowerCase[path[0]] == d2 &&
-                                    path[1] == ':' && path[2] == '\\')
-                                    memmove(DefaultDir[d2 - 'a'], path, dataLen);
-                                else
-                                    gPrompter->ShowError(LoadStrW(IDS_ERRORLOADCONFIG), LoadStrW(IDS_UNEXPECTEDVALUE));
-                            }
+                            size_t dataLen = strlen(path) + 1;
+                            if (dataLen > 2 && LowerCase[(unsigned char)path[0]] == d2 &&
+                                path[1] == ':' && path[2] == '\\')
+                                lstrcpyn(DefaultDir[d2 - 'a'], path, MAX_PATH);
                             else
                                 gPrompter->ShowError(LoadStrW(IDS_ERRORLOADCONFIG), LoadStrW(IDS_UNEXPECTEDVALUE));
                         }
                         else
-                            gPrompter->ShowError(LoadStrW(IDS_ERRORLOADCONFIG), LoadStrW(IDS_UNEXPECTEDVALUETYPE));
+                            gPrompter->ShowError(LoadStrW(IDS_ERRORLOADCONFIG), LoadStrW(IDS_UNEXPECTEDVALUE));
+                    }
+                    else if (valueResult.errorCode == ERROR_INVALID_DATATYPE)
+                        gPrompter->ShowError(LoadStrW(IDS_ERRORLOADCONFIG), LoadStrW(IDS_UNEXPECTEDVALUETYPE));
                     else
-                        gPrompter->ShowError(LoadStrW(IDS_ERRORLOADCONFIG), GetErrorTextW(res));
+                        gPrompter->ShowError(LoadStrW(IDS_ERRORLOADCONFIG), GetErrorTextW(valueResult.errorCode));
                 }
             }
-            else if (res != ERROR_FILE_NOT_FOUND)
-                gPrompter->ShowError(LoadStrW(IDS_ERRORLOADCONFIG), GetErrorTextW(res));
+            else if (enumResult.errorCode != ERROR_FILE_NOT_FOUND)
+                gPrompter->ShowError(LoadStrW(IDS_ERRORLOADCONFIG), GetErrorTextW(enumResult.errorCode));
             CloseKey(actKey);
         }
 
