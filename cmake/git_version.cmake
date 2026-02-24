@@ -1,6 +1,6 @@
 # Git version detection for Sally
 # Generates git_version.h with version info from git tags
-# Format: x.y.z-shorthash (e.g., 5.0.1-9c98a4b)
+# Format: x.y.z-shorthash (e.g., 1.0.0-9c98a4b)
 
 find_package(Git QUIET)
 
@@ -26,7 +26,7 @@ if(GIT_FOUND AND EXISTS "${CMAKE_SOURCE_DIR}/.git")
     )
 
     if(GIT_TAG_RESULT EQUAL 0 AND GIT_HASH_RESULT EQUAL 0)
-        # Strip leading 'v' if present (v5.0.1 -> 5.0.1)
+        # Strip leading 'v' if present (v1.0.0 -> 1.0.0)
         string(REGEX REPLACE "^v" "" GIT_TAG_VERSION "${GIT_TAG}")
 
         # Check if we're exactly on the tag
@@ -40,10 +40,10 @@ if(GIT_FOUND AND EXISTS "${CMAKE_SOURCE_DIR}/.git")
         )
 
         if(GIT_EXACT_RESULT EQUAL 0)
-            # Exactly on tag: just use version (e.g., 5.0.1)
+            # Exactly on tag: just use version (e.g., 1.0.0)
             set(GIT_VERSION "${GIT_TAG_VERSION}")
         else()
-            # Ahead of tag: use version-hash (e.g., 5.0.1-9c98a4b)
+            # Ahead of tag: use version-hash (e.g., 1.0.0-9c98a4b)
             set(GIT_VERSION "${GIT_TAG_VERSION}-${GIT_COMMIT_SHORT}")
         endif()
 
