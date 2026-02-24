@@ -889,7 +889,7 @@ BOOL CMainWindow::OnAssociationsChangedNotification(BOOL showWaitWnd)
 
         char size[50];
         BOOL deleteVal = FALSE;
-        if (!GetValueAux(NULL, hKey, "Shell Icon Size", REG_SZ, size, 50))
+        if (!GetStringA(registry, hKey, "Shell Icon Size", size, _countof(size)).success)
         {
             // The values for the icon size are Shell Icon Size and
             // Shell Small Icon Size (both are stored as strings - not
@@ -909,12 +909,12 @@ BOOL CMainWindow::OnAssociationsChangedNotification(BOOL showWaitWnd)
             IgnoreWM_SETTINGCHANGE = TRUE;
 
             sprintf(size, "%d", val - 1);
-            SetValueAux(NULL, hKey, "Shell Icon Size", REG_SZ, size, -1);
+            SetStringA(registry, hKey, "Shell Icon Size", size);
             SendMessage(MainWindow->HWindow, WM_SETTINGCHANGE, SPI_SETICONMETRICS, (LPARAM) "WindowMetrics");
             if (fileIconInit != NULL)
                 fileIconInit(FALSE);
             sprintf(size, "%d", val);
-            SetValueAux(NULL, hKey, "Shell Icon Size", REG_SZ, size, -1);
+            SetStringA(registry, hKey, "Shell Icon Size", size);
             SendMessage(MainWindow->HWindow, WM_SETTINGCHANGE, SPI_SETICONMETRICS, (LPARAM) "WindowMetrics");
             if (fileIconInit != NULL)
                 fileIconInit(TRUE);
