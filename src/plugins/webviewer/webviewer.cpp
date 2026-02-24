@@ -27,8 +27,8 @@ CThreadQueue CViewerMainWindow::ThreadQueue("WebViewer Viewers");  // list of al
 HINSTANCE DLLInstance = NULL; // handle to the SPL module - language-independent resources
 HINSTANCE HLanguage = NULL;   // handle to the SLG module - language-dependent resources
 
-int ConfigVersion = 0;           // 0 - default, 1 - SS 1.6 beta 3, 2 - SS 1.6 beta 4, 3 - SS 2.5 beta 1, 4 - AS 3.1 beta 1
-#define CURRENT_CONFIG_VERSION 4 // AS 3.1 beta 1
+int ConfigVersion = 0;           // 0 - default, 1 - SS 1.6 beta 3, 2 - SS 1.6 beta 4, 3 - SS 2.5 beta 1, 4 - AS 3.1 beta 1, 5 - Sally (PNG/SVG)
+#define CURRENT_CONFIG_VERSION 5 // Sally: PNG/SVG viewer support
 const char* CONFIG_VERSION = "Version";
 
 // Salamander general interface - valid from startup until the plugin shuts down
@@ -176,13 +176,14 @@ void CPluginInterface::SaveConfiguration(HWND parent, HKEY regKey, CSalamanderRe
 }
 
 const char* MARKDOWN_EXTENSIONS = "*.md;*.mdown;*.markdown";
+const char* IMAGE_EXTENSIONS = "*.png;*.svg";
 
 void CPluginInterface::Connect(HWND parent, CSalamanderConnectAbstract* salamander)
 {
     CALL_STACK_MESSAGE1("CPluginInterface::Connect(,)");
 
     char buff[1000];
-    sprintf_s(buff, "*.htm;*.html;*.xml;*.mht;%s", MARKDOWN_EXTENSIONS);
+    sprintf_s(buff, "*.htm;*.html;*.xml;*.mht;%s;%s", MARKDOWN_EXTENSIONS, IMAGE_EXTENSIONS);
 
     salamander->AddViewer(buff, FALSE);
 
@@ -201,6 +202,11 @@ void CPluginInterface::Connect(HWND parent, CSalamanderConnectAbstract* salamand
     if (ConfigVersion < 4) // before AD 3.1 beta 1
     {
         salamander->AddViewer(MARKDOWN_EXTENSIONS, TRUE);
+    }
+
+    if (ConfigVersion < 5) // Sally: add PNG/SVG viewer support
+    {
+        salamander->AddViewer(IMAGE_EXTENSIONS, TRUE);
     }
 }
 
