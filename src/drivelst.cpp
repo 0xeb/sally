@@ -7,6 +7,7 @@
 #include "menu.h"
 #include "ui/IPrompter.h"
 #include "common/unicode/helpers.h"
+#include "common/IRegistry.h"
 #include "drivelst.h"
 #include "cfgdlg.h"
 #include "dialogs.h"
@@ -91,47 +92,42 @@ BOOL GetUserName(const char* drive, const char* remoteName, char* userName, DWOR
                  char* providerBuf, DWORD providerBufSize)
 {
     CALL_STACK_MESSAGE5("GetUserName(%s, %s, , %u, , %u)", drive, remoteName, userBufSize, providerBufSize);
+    IRegistry* registry = gRegistry;
+    if (registry == NULL)
+        registry = GetWin32Registry();
+    if (registry == NULL)
+        return FALSE; // well, nothing ...
+
     HKEY network;
-    LONG res = HANDLES_Q(RegOpenKeyEx(HKEY_CURRENT_USER, "Network", 0, KEY_READ, &network));
-    if (res != ERROR_SUCCESS)
+    if (!OpenKeyReadA(registry, HKEY_CURRENT_USER, "Network", network).success)
         return FALSE; // well, nothing ...
 
     BOOL ret = FALSE;
     CPathBuffer keyName; // Heap-allocated for long path support
-    DWORD keyNameSize, type;
     HKEY driveKey;
 
     keyName[0] = drive[0];
     keyName[1] = 0;
-    if (HANDLES_Q(RegOpenKeyEx(network, keyName, 0, KEY_READ, &driveKey)) == ERROR_SUCCESS)
+    if (OpenKeyReadA(registry, network, keyName, driveKey).success)
     {
-        keyNameSize = keyName.Size();
-        type = REG_SZ;
-        res = SalRegQueryValueEx(driveKey, "RemotePath", 0, &type,
-                                 (unsigned char*)keyName.Get(), &keyNameSize);
-        if (res == ERROR_SUCCESS && type == REG_SZ && IsTheSamePath(keyName, remoteName))
+        RegistryResult res = GetStringA(registry, driveKey, "RemotePath", keyName.Get(), keyName.Size());
+        if (res.success && IsTheSamePath(keyName, remoteName))
         {
             ret = TRUE; // we will announce success, even if the user name is not defined (the current user should be used)
 
-            keyNameSize = userBufSize;
-            type = REG_SZ;
-            res = SalRegQueryValueEx(driveKey, "UserName", 0, &type,
-                                     (unsigned char*)userName, &keyNameSize);
-            if (res == ERROR_SUCCESS && type == REG_SZ && userName[0] != 0) // do we have a user?
+            res = GetStringA(registry, driveKey, "UserName", userName, userBufSize);
+            if (res.success && userName[0] != 0) // do we have a user?
                 TRACE_I("Found user name: " << keyName << ", " << userName);
             else
                 userName[0] = 0;
 
-            keyNameSize = providerBufSize;
-            type = REG_SZ;
-            res = SalRegQueryValueEx(driveKey, "ProviderName", 0, &type,
-                                     (unsigned char*)providerBuf, &keyNameSize);
-            if (res != ERROR_SUCCESS || type != REG_SZ) // if we do not have a provider, we will reset the buffer
+            res = GetStringA(registry, driveKey, "ProviderName", providerBuf, providerBufSize);
+            if (!res.success) // if we do not have a provider, we will reset the buffer
                 providerBuf[0] = 0;
         }
-        HANDLES(RegCloseKey(driveKey));
+        registry->CloseKey(driveKey);
     }
-    HANDLES(RegCloseKey(network));
+    registry->CloseKey(network);
 
     return ret;
 }
@@ -1489,67 +1485,67 @@ void InitOneDrivePath()
         }
     }
 
+    IRegistry* registry = gRegistry;
+    if (registry == NULL)
+        registry = GetWin32Registry();
+
     HKEY hKey;
     CPathBuffer path; // Heap-allocated for long path support
-    for (int i = 0; !done && i < 2; i++) // theoretically only needed for Windows 8 and lower (from 8.1 we have FOLDERID_SkyDrive)
+    if (registry != NULL)
     {
-        if (HANDLES_Q(RegOpenKeyEx(HKEY_CURRENT_USER,
-                                   Windows8_1AndLater && !Windows10AndLater ? (i == 0 ? "Software\\Microsoft\\Windows\\CurrentVersion\\OneDrive" : // jen Win 8.1
-                                                                                   "Software\\Microsoft\\Windows\\CurrentVersion\\SkyDrive")
-                                                                            : (i == 0 ? "Software\\Microsoft\\OneDrive" : "Software\\Microsoft\\SkyDrive"), // krom Win 8.1
-                                   0, KEY_READ, &hKey)) == ERROR_SUCCESS)
+        for (int i = 0; !done && i < 2; i++) // theoretically only needed for Windows 8 and lower (from 8.1 we have FOLDERID_SkyDrive)
         {
-            DWORD size = path.Size(); // size in bytes
-            DWORD type;
-            if (SalRegQueryValueEx(hKey, "UserFolder", 0, &type, (BYTE*)path.Get(), &size) == ERROR_SUCCESS &&
-                type == REG_SZ && size > 1)
+            const char* oneDriveKey = Windows8_1AndLater && !Windows10AndLater
+                                          ? (i == 0 ? "Software\\Microsoft\\Windows\\CurrentVersion\\OneDrive" : // jen Win 8.1
+                                                 "Software\\Microsoft\\Windows\\CurrentVersion\\SkyDrive")
+                                          : (i == 0 ? "Software\\Microsoft\\OneDrive" : "Software\\Microsoft\\SkyDrive"); // krom Win 8.1
+            if (OpenKeyReadA(registry, HKEY_CURRENT_USER, oneDriveKey, hKey).success)
             {
-                //TRACE_I("OneDrive path (UserFolder): " << path);
-                strcpy_s(OneDrivePath.Get(), OneDrivePath.Size(), path); // we have needed path
-                done = TRUE;
+                RegistryResult result = GetStringA(registry, hKey, "UserFolder", path.Get(), path.Size());
+                if (result.success && path[0] != 0)
+                {
+                    //TRACE_I("OneDrive path (UserFolder): " << path);
+                    strcpy_s(OneDrivePath.Get(), OneDrivePath.Size(), path); // we have needed path
+                    done = TRUE;
+                }
+                registry->CloseKey(hKey);
             }
-            HANDLES(RegCloseKey(hKey));
         }
     }
 
     // we will load OneDrive Business storages from the registry
     OneDriveBusinessStorages.DestroyMembers();
-    if (HANDLES_Q(RegOpenKeyEx(HKEY_CURRENT_USER, "Software\\Microsoft\\OneDrive\\Accounts",
-                               0, KEY_READ, &hKey)) == ERROR_SUCCESS)
+    if (registry != NULL &&
+        OpenKeyReadA(registry, HKEY_CURRENT_USER, "Software\\Microsoft\\OneDrive\\Accounts", hKey).success)
     {
-        DWORD i = 0;
-        while (1)
-        { // enumarate all extensions one by one
-            char keyName[300];
-            DWORD keyNameLen = _countof(keyName);
-            if (RegEnumKeyEx(hKey, i, keyName, &keyNameLen, NULL, NULL, NULL, NULL) == ERROR_SUCCESS)
-            { // opening the account key
-                HKEY hAccount;
-                if (StrICmp(keyName, "Personal") != 0 && // we don't want to read personal account here (see OneDrivePath)
-                    HANDLES_Q(RegOpenKeyEx(hKey, keyName, 0, KEY_READ, &hAccount)) == ERROR_SUCCESS)
-                { // we read all accounts except Personal (for now only "Business???", where ??? is a number)
-                    char disp[ONEDRIVE_MAXBUSINESSDISPLAYNAME];
-                    DWORD size = sizeof(disp); // size in bytes
-                    DWORD type;
-                    if (SalRegQueryValueEx(hAccount, "DisplayName", 0, &type, (BYTE*)disp, &size) == ERROR_SUCCESS &&
-                        type == REG_SZ && size > 1)
+        std::vector<std::wstring> accountKeys;
+        if (registry->EnumSubKeys(hKey, accountKeys).success)
+        {
+            for (size_t i = 0; i < accountKeys.size(); i++)
+            {
+                const std::wstring& keyName = accountKeys[i];
+                if (_wcsicmp(keyName.c_str(), L"Personal") != 0) // we don't want to read personal account here (see OneDrivePath)
+                {                                                 // we read all accounts except Personal (for now only "Business???", where ??? is a number)
+                    HKEY hAccount;
+                    if (registry->OpenKeyRead(hKey, keyName.c_str(), hAccount).success)
                     {
-                        size = path.Size(); // size in bytes
-                        if (SalRegQueryValueEx(hAccount, "UserFolder", 0, &type, (BYTE*)path.Get(), &size) == ERROR_SUCCESS &&
-                            type == REG_SZ && size > 1)
-                        { // we will collect everything that has DisplayName and UserFolder, no matter what it is, we will offer it to the user under "OneDrive"
-                            //TRACE_I("OneDrive Business: DisplayName: " << disp << ", UserFolder: " << path);
-                            OneDriveBusinessStorages.SortIn(new COneDriveBusinessStorage(disp, path));
+                        char disp[ONEDRIVE_MAXBUSINESSDISPLAYNAME];
+                        RegistryResult result = GetStringA(registry, hAccount, "DisplayName", disp, sizeof(disp));
+                        if (result.success && disp[0] != 0)
+                        {
+                            result = GetStringA(registry, hAccount, "UserFolder", path.Get(), path.Size());
+                            if (result.success && path[0] != 0)
+                            { // we will collect everything that has DisplayName and UserFolder, no matter what it is, we will offer it to the user under "OneDrive"
+                                //TRACE_I("OneDrive Business: DisplayName: " << disp << ", UserFolder: " << path);
+                                OneDriveBusinessStorages.SortIn(new COneDriveBusinessStorage(disp, path));
+                            }
                         }
+                        registry->CloseKey(hAccount);
                     }
-                    HANDLES(RegCloseKey(hAccount));
                 }
             }
-            else
-                break; // end of enumeration (can also be a small buffer, but I don't consider it reasonable to handle)
-            i++;
         }
-        HANDLES(RegCloseKey(hKey));
+        registry->CloseKey(hKey);
     }
 }
 
