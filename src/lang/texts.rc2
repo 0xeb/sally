@@ -162,7 +162,7 @@ STRINGTABLE
  IDS_MENU_HELP_TASKLIST,     "Task &List..."
  IDS_MENU_HELP_FORUM,        "Official Support &Forum"
  IDS_MENU_HELP_ABOUTPLUGINS, "About &Plugin"
- IDS_MENU_HELP_ABOUT,        "&About Open Salamander"
+ IDS_MENU_HELP_ABOUT,        "&About Sally"
 
 //
 // find file menu
@@ -312,7 +312,7 @@ STRINGTABLE
  IDS_DONTSHOWAGAINSS, "&Stop searching without asking next time\thow to revert\tYou can change this option later on the Confirmations page in the Configuration."
  IDS_DONTSHOWAGAINCF, "&Close Find without asking next time\thow to revert\tYou can change this option later on the Confirmations page in the Configuration."
  IDS_DONTSHOWAGAINAT, "&Turn on Always on Top without asking next time\thow to revert\tYou can change this option later on the Confirmations page in the Configuration."
- IDS_DONTSHOWAGAINCS, "&Close Open Salamander without asking next time\thow to revert\tYou can change this option later on the Confirmations page in the Configuration."
+ IDS_DONTSHOWAGAINCS, "&Close Sally without asking next time\thow to revert\tYou can change this option later on the Confirmations page in the Configuration."
  IDS_DONTSHOWAGAINCD, "&Create directory without asking next time\thow to revert\tYou can change this option later on the Confirmations page in the Configuration."
 
  IDS_CANTSHOWRESULTS, "Cannot show results, out of memory."
@@ -547,7 +547,7 @@ STRINGTABLE
  IDS_PASTE_CHANGE_DIRECTORY, "Change Directory"
 
  IDS_ALWAYSONTOP, "Always on &Top"
- IDS_WANTALWAYSONTOP, "Always on Top prevents other application windows from open above Open Salamander windows. You will not be able to open these windows on top until you turn off Always on Top."
+ IDS_WANTALWAYSONTOP, "Always on Top prevents other application windows from open above Sally windows. You will not be able to open these windows on top until you turn off Always on Top."
 
  IDS_EMPTYHOTPATHS, "Empty (Use Ctrl+Shift+number key to assign Hot Path)"
  IDS_NEWHOTPATH, "(New Hot Path)\tCtrl+Shift+="
@@ -809,7 +809,7 @@ STRINGTABLE
 
  IDS_TBTT_MENU                 "Enter or Leave Menu"
  IDS_TBTT_ALTVIEW              "Alternate View"
- IDS_TBTT_EXIT                 "Exit Open Salamander"
+ IDS_TBTT_EXIT                 "Exit Sally"
  IDS_TBTT_OCCUPIEDSPACE        "Calculate Occupied Space\tAlt+F10"
  IDS_TBTT_EDITNEW              "Edit New File\tShift+F4"
  IDS_TBTT_CHANGEDIR            "Change Directory\tShift+F7"
@@ -873,7 +873,7 @@ STRINGTABLE
  IDS_TEXTCOPIED, "Text was successfully copied to clipboard."
  IDS_COPYTOCLIPBOARD, "&Copy To Clipboard"
 
- IDS_CONFIGHOWTOIMPORT, "Importing the configuration is quite simple. Just find the file with configuration and open it (use Enter key or double-click on it). It should be opened in Registry Editor. When it shows question if you want to add information from the file to registry, you should close all running instances of Open Salamander. It will prevent overwriting of newly imported configuration by automatic save of configuration on exit of Open Salamander. When there is no running Open Salamander, press Yes in Registry Editor question message box. Then it will import the configuration from the file to registry."
+ IDS_CONFIGHOWTOIMPORT, "Importing the configuration is quite simple. Just find the file with configuration and open it (use Enter key or double-click on it). It should be opened in Registry Editor. When it shows question if you want to add information from the file to registry, you should close all running instances of Sally. It will prevent overwriting of newly imported configuration by automatic save of configuration on exit of Sally. When there is no running Sally, press Yes in Registry Editor question message box. Then it will import the configuration from the file to registry."
 
  IDS_ERRORUNPACK, "Error Unpacking Archive"
 
@@ -1166,7 +1166,7 @@ STRINGTABLE
 
 // color Scheme
  IDS_COLORSCHEME_CUSTOM, "Custom"
- IDS_COLORSCHEME_SALAMANDER, "Open Salamander"
+ IDS_COLORSCHEME_SALAMANDER, "Sally"
  IDS_COLORSCHEME_EXPLORER, "Windows Explorer"
  IDS_COLORSCHEME_NORTON, "Norton Commander"
  IDS_COLORSCHEME_NAVIGATOR, "DOS Navigator"
@@ -1208,7 +1208,7 @@ STRINGTABLE
 
  IDS_CUSTOMIZE_HOTPATHS, "Customize..."
 
- IDS_CONTEXTMENU_EXIT, "Exit Open Salamander"
+ IDS_CONTEXTMENU_EXIT, "Exit Sally"
 
 // Directory and Status line Tooltips
  IDS_PANELFILTER, "Filter is on"
@@ -1241,14 +1241,14 @@ STRINGTABLE
  IDS_DROPCANCEL, "Cancel"
 
  IDS_UNABLETOLOADPLUGIN, "Unable to load %s plugin (%s) or some of its components.\nError: %s\nSee plugin details in menu Plugins / Plugins Manager."
- IDS_UNABLETOFINDPLUGINENTRY, "The SPL file %s is not an Open Salamander plugin."
+ IDS_UNABLETOFINDPLUGINENTRY, "The SPL file %s is not an Sally plugin."
  IDS_REINSTALLPLUGIN, "%s plugin (%s) has been changed. Please reinstall (remove and add) this plugin (in menu Plugins / Plugins Manager)."
- IDS_PLUGININVALID, "%s plugin (%s) has not been loaded. Plugin is not valid Open Salamander Plugin or some plugin internal error has occurred."
- IDS_PLUGININVALID2, "This plugin (%s) has not been loaded. Plugin is not valid Open Salamander Plugin or some plugin internal error has occurred."
- IDS_OLDPLUGINVERSION, "%s plugin (%s) is not supported by this version of Open Salamander. Please get updated version of this plugin."
- IDS_OLDPLUGINVERSION2, "The plugin (%s) is not supported by this version of Open Salamander. Please get updated version of this plugin."
- IDS_OLDPLUGINVERSION_CONFIRM, "%s plugin (%s) targets legacy commercial SDK version 4.0 (required version 102).\nIt may be ABI-incompatible with this Open Salamander build and can be unstable.\n\nDo you want to load this plugin anyway?\nChoosing YES permanently trusts this plugin path."
- IDS_OLDPLUGINVERSION_CONFIRM2, "The plugin (%s) targets legacy commercial SDK version 4.0 (required version 102).\nIt may be ABI-incompatible with this Open Salamander build and can be unstable.\n\nDo you want to load this plugin anyway?\nChoosing YES permanently trusts this plugin path."
+ IDS_PLUGININVALID, "%s plugin (%s) has not been loaded. Plugin is not valid Sally Plugin or some plugin internal error has occurred."
+ IDS_PLUGININVALID2, "This plugin (%s) has not been loaded. Plugin is not valid Sally Plugin or some plugin internal error has occurred."
+ IDS_OLDPLUGINVERSION, "%s plugin (%s) is not supported by this version of Sally. Please get updated version of this plugin."
+ IDS_OLDPLUGINVERSION2, "The plugin (%s) is not supported by this version of Sally. Please get updated version of this plugin."
+ IDS_OLDPLUGINVERSION_CONFIRM, "%s plugin (%s) targets legacy commercial SDK version 4.0 (required version 102).\nIt may be ABI-incompatible with this Sally build and can be unstable.\n\nDo you want to load this plugin anyway?\nChoosing YES permanently trusts this plugin path."
+ IDS_OLDPLUGINVERSION_CONFIRM2, "The plugin (%s) targets legacy commercial SDK version 4.0 (required version 102).\nIt may be ABI-incompatible with this Sally build and can be unstable.\n\nDo you want to load this plugin anyway?\nChoosing YES permanently trusts this plugin path."
 
  IDS_UPDATEFAILED, "Packing of updated file(s) into archive has failed. Do you want to try it again? If you choose NO, you'll get back to the Archive Update dialog, so you'll be able to copy updated file(s) to chosen disk folder (for later packing into the archive)."
 
@@ -1279,8 +1279,8 @@ STRINGTABLE
  IDS_EMPTYNAMENOTALLOWED, "Empty name has no sense here."
  IDS_INCOMLETEFILENAME, "The path specified is incomplete, please specify full path."
 
- IDS_SALAMANDBUSY, "Running instance of Open Salamander is busy.\nDo you want to run new instance?"
- IDS_SALAMANDBUSY2, "Open Salamander is busy. The requested command cannot be accomplished, please try it again later."
+ IDS_SALAMANDBUSY, "Running instance of Sally is busy.\nDo you want to run new instance?"
+ IDS_SALAMANDBUSY2, "Sally is busy. The requested command cannot be accomplished, please try it again later."
 
  IDS_VIEWERCOPYTOFILE, "Copy To File"
 
@@ -1317,14 +1317,14 @@ STRINGTABLE
  IDS_PLUGINRESETKEYS, "%s plugin must be unloaded and loaded to restore hot keys.\n\nDo you want restore hot keys?"
 
 
- IDS_INVALIDCMDLINE, "Invalid command line parameters.\n\nUsage:\n  SALAMAND.EXE [-L path-to-left-panel] [-R path-to-right-panel] [-A path-to-active-panel] [-C use-configuration-file] [-I icon-index] [-T title-prefix] [-O only-one-instance] [-P panel-index]\n\n  [X] means that parameter X is optional"
+ IDS_INVALIDCMDLINE, "Invalid command line parameters.\n\nUsage:\n  SALLY.EXE [-L path-to-left-panel] [-R path-to-right-panel] [-A path-to-active-panel] [-C use-configuration-file] [-I icon-index] [-T title-prefix] [-O only-one-instance] [-P panel-index]\n\n  [X] means that parameter X is optional"
  IDS_FILEREADERROR, "Unable to read file ""%s""."
  IDS_FILEWRITEERROR, "Unable to write file ""%s""."
 
  IDS_ERRORCREATINGROOTDIR, "The directory is the root directory."
  IDS_ERR_FILEOPEN, "Error querying file properties."
 
- IDS_NOTARCHIVEPATH, "The path specified contains path to a file. The file is not registered archive file (see Configuration/Panel Archivers/Extensions), so Open Salamander doesn't know how to open it."
+ IDS_NOTARCHIVEPATH, "The path specified contains path to a file. The file is not registered archive file (see Configuration/Panel Archivers/Extensions), so Sally doesn't know how to open it."
  IDS_PATHNOTFOUND, "The path specified was not found."
  IDS_NOTPLUGINFS, "The path specified contains unknown plugin file system (its name is before ':',\nsee menu Plugins / Plugins Manager for known plugin file systems)."
 
@@ -1344,7 +1344,7 @@ STRINGTABLE
  IDS_SAVINGCONFIGURATION, "Saving configuration to registry, please wait..."
  IDS_DELETINGCONFIGURATION, "Deleting old configuration from registry, please wait..."
 
- IDS_SAVECFG_EXPFILEEXISTS, "The file ""%s"" was found. This file contains exported configuration which is loaded on every start of Open Salamander. If you don't want to load configuration from this file, rename or delete it. Press OK to save configuration or Cancel to focus the file."
+ IDS_SAVECFG_EXPFILEEXISTS, "The file ""%s"" was found. This file contains exported configuration which is loaded on every start of Sally. If you don't want to load configuration from this file, rename or delete it. Press OK to save configuration or Cancel to focus the file."
 
  IDS_FSFORCECLOSE, "The path ""%s"" has rejected to close.\nDo you want to force it to close?"
 
@@ -1365,7 +1365,7 @@ STRINGTABLE
 
  IDS_NEWISNOTAVAILABLE, "Menu New is not available."
 
- IDS_TMPDIRERROR, "The directory specified by the TMP or TEMP environment variables doesn't exist or isn't accessible. Open Salamander will use the system directory for temporary files."
+ IDS_TMPDIRERROR, "The directory specified by the TMP or TEMP environment variables doesn't exist or isn't accessible. Sally will use the system directory for temporary files."
 
  IDS_UPDIRTYPENAME, "Upper Directory"
 
@@ -1384,7 +1384,7 @@ STRINGTABLE
 
  IDS_PLUGINSUFFIX, " (Plugin)"
 
- IDS_CURRENTPROCESSBREAK, "You cannot break this task (it makes no sense). Use another Open Salamander task to break this one."
+ IDS_CURRENTPROCESSBREAK, "You cannot break this task (it makes no sense). Use another Sally task to break this one."
  IDS_CURRENTPROCESSTERMINATE, "Are you sure you wish to terminate current process?\n\nWARNING: All unsaved data in current process will be lost!"
  IDS_CONFIRM_TERMINATE, "Are you sure you wish to terminate specified process?\n\nWARNING: All unsaved data in specified process will be lost!"
  IDS_CONFIRM_BREAK, "Are you sure you wish to break specified process and send us bug report?\n\nWARNING: All unsaved data in specified process will be lost!"
@@ -1400,14 +1400,14 @@ STRINGTABLE
 
  IDS_INVALIDNUMBER, "Invalid number."
 
- IDS_CLEARHISTORY_CNFRM, "Are you sure you want Open Salamander to delete all your history related data?\n\nHistory of Command line, copy, move, select, working directories, opened files, find, plugins, etc. will be deleted."
- IDS_HISTORY_WAS_CLEARED, "All history related data was cleared from memory.\n\nPlease consider saving of Open Salamander's configuration.\nIt removes history related data even from Registry."
+ IDS_CLEARHISTORY_CNFRM, "Are you sure you want Sally to delete all your history related data?\n\nHistory of Command line, copy, move, select, working directories, opened files, find, plugins, etc. will be deleted."
+ IDS_HISTORY_WAS_CLEARED, "All history related data was cleared from memory.\n\nPlease consider saving of Sally's configuration.\nIt removes history related data even from Registry."
 
  IDS_UNPACK_ONLYDISK, "Unpacking to archives or plugin file-systems is not supported yet."
  IDS_UNPACK_OPMASKSNOTSUP, "Operation masks are not supported when unpacking from archives (target path must exist or end on backslash)."
 
- IDS_LANGUAGE_CHANGE, "Language changes do not take effect until the Open Salamander is restarted."
- IDS_CONVERSION_CHANGE, "Conversion Table changes do not take effect until the Open Salamander is restarted."
+ IDS_LANGUAGE_CHANGE, "Language changes do not take effect until the Sally is restarted."
+ IDS_CONVERSION_CHANGE, "Conversion Table changes do not take effect until the Sally is restarted."
 
  IDS_FSCOPYMOVE_ONLYDISK_A, "This plugin file-system doesn't support copying nor moving to archives."
  IDS_FSCOPYMOVE_ONLYDISK_FS, "This plugin file-system doesn't support copying nor moving to specified plugin file-system."
@@ -1431,7 +1431,7 @@ STRINGTABLE
  IDS_CONFIRM_DELETE, "Are you sure you want to delete %s?"
  IDS_CONFIRM_DELETE2, "Are you sure you want to delete %s?\n\nAll files matching recycle masks will be sent to the Recycle Bin."
 
- IDS_DELETETMPSALDIRS, "{!}Do you want to delete %d temporary director{y|1|ies} used by previous instances of Open Salamander?"
+ IDS_DELETETMPSALDIRS, "{!}Do you want to delete %d temporary director{y|1|ies} used by previous instances of Sally?"
  IDS_DELETETMPSALDIRS_YES, "&Yes";
  IDS_DELETETMPSALDIRS_NO, "&No";
  IDS_DELETETMPSALDIRS_FOCUS, "&Focus";
@@ -1503,7 +1503,7 @@ STRINGTABLE
  IDS_UNABLETOEDITDUPFILES, "Unable to edit or open file from archive. Name of this file is used for more than one file in archive (such files can be opened only in viewers)."
  IDS_UNABLETOEDITINVFILES, "Unable to edit or open file from archive. Name of this file is invalid on Windows file systems (such files can be opened only in viewers)."
 
- IDS_EDITPACKNOTSUPPORTED, "Packing to this type of archive is not supported. Open Salamander will not be able to update file in archive.\n\nDo you still want to edit this file?"
+ IDS_EDITPACKNOTSUPPORTED, "Packing to this type of archive is not supported. Sally will not be able to update file in archive.\n\nDo you still want to edit this file?"
 
  IDS_UNPACKINGFILEFROMARC, "Unpacking file from archive, please wait..."
  IDS_LISTINGARCHIVE, "Reading list of files and directories from archive, please wait..."
@@ -1580,8 +1580,8 @@ STRINGTABLE
 
  IDS_ARCFILESNOTFOUND, "Unable to unpack files and directories specified in clipboard. They are not in archive any more."
  IDS_ARCFILESNOTFOUND2, "Some files or directories specified in clipboard were not found in archive.\n\nDo you want to continue?"
- IDS_ARCUNABLETOPASTE1, "Unable to paste files and directories from clipboard here. Open Salamander's\nmain window must be accessible to process Paste command."
- IDS_ARCUNABLETOPASTE2, "Unable to paste files and directories from clipboard now. Open Salamander's\nmain window must be accessible to process Paste command."
+ IDS_ARCUNABLETOPASTE1, "Unable to paste files and directories from clipboard here. Sally's\nmain window must be accessible to process Paste command."
+ IDS_ARCUNABLETOPASTE2, "Unable to paste files and directories from clipboard now. Sally's\nmain window must be accessible to process Paste command."
 
  IDS_INFODLGFLAG7, "supports named streams"
  IDS_INFODLGFLAG8, "volume is read-only"
@@ -1598,7 +1598,7 @@ STRINGTABLE
 
  IDS_EDITNEWALREADYEX, "The file already exists. Do you want to edit this existing file?"
 
- IDS_SRCPATHUNICODEONLY, "Source path cannot be translated from Unicode to multibyte, so Open Salamander is not able to work on it."
+ IDS_SRCPATHUNICODEONLY, "Source path cannot be translated from Unicode to multibyte, so Sally is not able to work on it."
  IDS_SRCFILESNOTFOUND, "Some files or directories specified in drag&drop or clipboard operation were not found.\n\nDo you want to continue?"
 
  IDS_PLUGINPACKERNOTFOUND, "Unable to found packer for %s plugin (see Packers in Pack Dialog Box page in Configuration)."
@@ -1670,21 +1670,21 @@ STRINGTABLE
  IDS_CNFRM_STOPFIND, "Do you want to stop searching? (in Find Files and Directories)"
  IDS_CNFRM_CREATEPATH, "Do you want to create target path? (in Copy/Move operations)"
  IDS_CNFRM_ALWAYSONTOP, "Do you want to turn on Always on Top?"
- IDS_CNFRM_ONSALCLOSE, "Do you want to close Open Salamander?"
+ IDS_CNFRM_ONSALCLOSE, "Do you want to close Sally?"
  IDS_CNFRM_ONSENDEMAIL, "Do you want to Email selected files?"
  IDS_CNFRM_ONADDTOARCHIVE, "Do you want to add files into existing archive?"
  IDS_CNFRM_ONCREATEDIR, "The directory doesn't exist. Do you want to create it?"
  IDS_CNFRM_COPYMOVEOPTNS, "Copy/Move to archives and plugin FS: options will be ignored."
 
- IDS_CANCLOSESALAMANDER, "Do you want to close Open Salamander?"
+ IDS_CANCLOSESALAMANDER, "Do you want to close Sally?"
 
  IDS_PLUGINURLNONE, "(none)"
 
- IDS_SHELLEXTBREAK, "The main window of Open Salamander was destroyed by some faulty shell extension. Please send us the following bug report to help us resolve this problem.\n\nPress OK to open the Bug Report dialog box."
+ IDS_SHELLEXTBREAK, "The main window of Sally was destroyed by some faulty shell extension. Please send us the following bug report to help us resolve this problem.\n\nPress OK to open the Bug Report dialog box."
  IDS_SHELLEXTBREAK2, "Some faulty shell extension has destroyed our window. Please send us the following bug report to help us resolve this problem.\n\nPress OK to open the Bug Report dialog box."
- IDS_SHELLEXTCRASH, "Open Salamander becomes unstable because of some faulty shell extension. Please send us the following bug report to help us resolve this problem.\n\nPress OK to open the Bug Report dialog box."
- IDS_SHELLEXTBREAK3, "This window cannot be closed at this time because there is some task pending that is using it. Press the Continue and wait until this task is finished.\n\nIf there is not any such task, press the Abort and send us a bug report to help us resolve this problem. Open Salamander will be terminated."
- IDS_SHELLEXTBREAK4, "Unable to execute new task because executing of previous task was not finished yet. Press the Continue and wait until previous task is executed.\n\nIf there is not any such task, press the Abort and send us a bug report to help us resolve this problem. Open Salamander will be terminated."
+ IDS_SHELLEXTCRASH, "Sally becomes unstable because of some faulty shell extension. Please send us the following bug report to help us resolve this problem.\n\nPress OK to open the Bug Report dialog box."
+ IDS_SHELLEXTBREAK3, "This window cannot be closed at this time because there is some task pending that is using it. Press the Continue and wait until this task is finished.\n\nIf there is not any such task, press the Abort and send us a bug report to help us resolve this problem. Sally will be terminated."
+ IDS_SHELLEXTBREAK4, "Unable to execute new task because executing of previous task was not finished yet. Press the Continue and wait until previous task is executed.\n\nIf there is not any such task, press the Abort and send us a bug report to help us resolve this problem. Sally will be terminated."
 
  IDS_NEWLYCREATEDFILE, "The file already exists. Do you want to replace it?"
 
@@ -1709,7 +1709,7 @@ STRINGTABLE
  IDS_NAMEMANGLE_LOWERCASE, "In lower case"
  IDS_NAMEMANGLE_UPPERCASE, "In upper case"
 
- IDS_SIZEMODE_BYTES, "In Bytes (Open Salamander default)"
+ IDS_SIZEMODE_BYTES, "In Bytes (Sally default)"
  IDS_SIZEMODE_KB, "In Kilo Bytes (Windows Explorer default)"
  IDS_SIZEMODE_MIXED, "In short format (for example 15 B, 3.41 KB, or 12.5 MB)"
 
@@ -1728,7 +1728,7 @@ STRINGTABLE
  IDS_DONTSHOWAGAIN2, "&Don't show this message again"
 
  IDS_HOTKEY_PLUGIN_CONFLICT, "Currently assigned to: %s"
- IDS_HOTKEY_SAL_CONFLICT, "This shortcuts belongs to Open Salamander. Please, choose another one."
+ IDS_HOTKEY_SAL_CONFLICT, "This shortcuts belongs to Sally. Please, choose another one."
 
  IDS_FINDIGNORE_RESET, "Are you sure you want to set paths to default values?"
 
@@ -1753,14 +1753,14 @@ STRINGTABLE
  IDS_MSGBOXBTN_SKIPALL, "S&kip All"
  IDS_MSGBOXBTN_FOCUS, "&Focus"
 
- IDS_CANTLOADPLUGINSLG1, "Unable to load this plugin in currently used language. Plugin language file %s was not found or is not valid. Open Salamander will try to search for some other plugin language file (.SLG)."
- IDS_CANTLOADPLUGINSLG2, "Unable to load plugin language module which was formerly used by this plugin. Plugin language file %s was not found or is not valid. Open Salamander will try to search for some other plugin language file (.SLG)."
+ IDS_CANTLOADPLUGINSLG1, "Unable to load this plugin in currently used language. Plugin language file %s was not found or is not valid. Sally will try to search for some other plugin language file (.SLG)."
+ IDS_CANTLOADPLUGINSLG2, "Unable to load plugin language module which was formerly used by this plugin. Plugin language file %s was not found or is not valid. Sally will try to search for some other plugin language file (.SLG)."
  IDS_PLUGINSLGNOTFOUND, "It seems that you have no language modules (.SLG) for this plugin (see plugin's subdirectory LANG)."
  IDS_DONOTSHOWCANTLOADPLUGINSLG, "&Do not show this message for other plugins"
 
- IDS_CORRUPTEDCONFIGFOUND, "Configuration stored in registry is corrupted, so it cannot be loaded. Open Salamander was probably terminated during saving configuration. This happens mainly when Open Salamander is still running when you shutdown system (or log off). To prevent this problem, close Open Salamander before shutdown (or log off).\n\nYou can backup corrupted configuration now (run RegEdit.exe, rename key HKEY_CURRENT_USER\\%s). Later you can try to get some settings from this backup (User Menu, Hotpaths, FTP bookmarks, etc.), visit forum.altap.cz for details.\n\nCorrupted configuration must be removed from registry before starting Open Salamander."
+ IDS_CORRUPTEDCONFIGFOUND, "Configuration stored in registry is corrupted, so it cannot be loaded. Sally was probably terminated during saving configuration. This happens mainly when Sally is still running when you shutdown system (or log off). To prevent this problem, close Sally before shutdown (or log off).\n\nYou can backup corrupted configuration now (run RegEdit.exe, rename key HKEY_CURRENT_USER\\%s). Later you can try to get some settings from this backup (User Menu, Hotpaths, FTP bookmarks, etc.), visit github.com/0xeb/sally/discussions for details.\n\nCorrupted configuration must be removed from registry before starting Sally."
  IDS_CORRUPTEDCONFIGREMOVEBTN, "&Remove Configuration"
- IDS_CHANGEDSHUTDOWNPARS, "You are using nonstandard values of the following parameters used during Log off and Shutdown. It probably causes corruption of Open Salamander's configuration (it's terminated during save of configuration).\n\nHKEY_CURRENT_USER\\Control Panel\\Desktop\\WaitToKillAppTimeout should be 20000.\nHKEY_CURRENT_USER\\Control Panel\\Desktop\\AutoEndTasks should be 0."
+ IDS_CHANGEDSHUTDOWNPARS, "You are using nonstandard values of the following parameters used during Log off and Shutdown. It probably causes corruption of Sally's configuration (it's terminated during save of configuration).\n\nHKEY_CURRENT_USER\\Control Panel\\Desktop\\WaitToKillAppTimeout should be 20000.\nHKEY_CURRENT_USER\\Control Panel\\Desktop\\AutoEndTasks should be 0."
 
  IDS_COMPAREFILESORDIRS, "Please specify if you want to compare files or directories."
  IDS_MSGBOXBTN_FILES, "&Files"
@@ -1770,7 +1770,7 @@ STRINGTABLE
 
  IDS_INVALIDESCAPEPATH, "The path where to go if path in panel is inaccessible is invalid, please correct this path in configuration on Drives page."
  
- IDS_SHEXT_NOTLOADEDYET, "Drag&drop operation from archive or plugin file system has failed. Please remove unwantedly created DROPFAKE directory (if any) from target directory.\n\nThis should happen only immediately after installation or if drop target is not Windows Explorer nor Open Salamander. If drop target is Windows Explorer, please restart Windows to correct this problem (advanced users can just kill explorer.exe process and start it again)."
+ IDS_SHEXT_NOTLOADEDYET, "Drag&drop operation from archive or plugin file system has failed. Please remove unwantedly created DROPFAKE directory (if any) from target directory.\n\nThis should happen only immediately after installation or if drop target is not Windows Explorer nor Sally. If drop target is Windows Explorer, please restart Windows to correct this problem (advanced users can just kill explorer.exe process and start it again)."
  
  IDS_SALAMANDERICON_DEFAULT, "Default"
  IDS_SALAMANDERICON_RED, "Red"
@@ -1794,17 +1794,17 @@ STRINGTABLE
  
  IDS_SELLANGEXITBUTTON, "&Exit"
  
- IDS_PLUGINSAVEFAILED, "Unable to save configuration of %s plugin (error opening configuration key of Open Salamander).\n\nDo you still want to unload it?"
+ IDS_PLUGINSAVEFAILED, "Unable to save configuration of %s plugin (error opening configuration key of Sally).\n\nDo you still want to unload it?"
  
  IDS_ICONOVRLS_NAME, "Name"
  IDS_ICONOVRLS_DESCR, "Description"
- IDS_ICONOVRLS_CHANGE, "Icon Overlays changes do not take effect until the Open Salamander is restarted."
- IDS_ICONOVRLS_CRASH, "Open Salamander has become unstable. An unhandled exception has occurred in %s icon overlay handler. You can prevent similar crashes if Open Salamander will not use this handler (click This button) or will stop displaying custom icon overlays at all (click All button). You may also try to upgrade software providing this handler (search forum.altap.cz for details).\n\nWhat icon overlay handlers do you want to disable?\n\nNote: you can set up icon overlays in configuration dialog (see Icon Overlays page)."
+ IDS_ICONOVRLS_CHANGE, "Icon Overlays changes do not take effect until the Sally is restarted."
+ IDS_ICONOVRLS_CRASH, "Sally has become unstable. An unhandled exception has occurred in %s icon overlay handler. You can prevent similar crashes if Sally will not use this handler (click This button) or will stop displaying custom icon overlays at all (click All button). You may also try to upgrade software providing this handler (search github.com/0xeb/sally/discussions for details).\n\nWhat icon overlay handlers do you want to disable?\n\nNote: you can set up icon overlays in configuration dialog (see Icon Overlays page)."
  IDS_ICONOVRLS_DISTHIS, "&This"
  IDS_ICONOVRLS_DISALL, "&All"
  
- IDS_IMPORTCFGFROMFILESKIPPED, "The config.reg file (or other file specified with -c parameter) was not imported to registry due to import of the configuration from the older version of Open Salamander. Please exit Open Salamander now and start it again to solve this problem."
- IDS_NOTALLPLUGINSCFGIMPORTED, "You have upgraded to the new version of Open Salamander. It is importing the configuration of the old version now. The old version contained some plugins (listed below) which are missing (or which are not working) in the new version, so their configuration cannot be imported now. You can start Open Salamander without these plugins now (the configuration of the old version remains in registry, so you can import it later). Or exit Open Salamander now, install missing plugins, and start Open Salamander again.\n\nMissing (or not working) plugins: %s%s."
+ IDS_IMPORTCFGFROMFILESKIPPED, "The config.reg file (or other file specified with -c parameter) was not imported to registry due to import of the configuration from the older version of Sally. Please exit Sally now and start it again to solve this problem."
+ IDS_NOTALLPLUGINSCFGIMPORTED, "You have upgraded to the new version of Sally. It is importing the configuration of the old version now. The old version contained some plugins (listed below) which are missing (or which are not working) in the new version, so their configuration cannot be imported now. You can start Sally without these plugins now (the configuration of the old version remains in registry, so you can import it later). Or exit Sally now, install missing plugins, and start Sally again.\n\nMissing (or not working) plugins: %s%s."
  IDS_NUMOFSKIPPEDPLUGINNAMES, ", %d more plugins skipped"
  IDS_STARTWITHOUTMISSINGPLUGINS, "&Start Without Missing Plugins"
  
@@ -1849,8 +1849,8 @@ STRINGTABLE
  IDS_COPYMOVE_SAVEASDEF "Save options as defaults"
  IDS_COPYMOVE_RESETDEFS "Reset options and defaults"
  
- IDS_CONFIGEXPUPTOXP, "If you want to import configuration on every start of Open Salamander, export it to installation directory to file named config.reg. To import other configuration file use command line parameter -C (e.g. ""salamand.exe -C myconfig.reg"").\n\nWe recommend to add clearing of registry key with configuration directly to exported file. Otherwise imported configuration will be merged with the current one in registry and it may result in inconsistent configuration."
- IDS_CONFIGEXPVISTA, "If you want to import configuration on every start of Open Salamander, export it to application data directory (or installation directory) to file named config.reg. To import other configuration file use command line parameter -C (e.g. ""salamand.exe -C myconfig.reg"").\n\nWe recommend to add clearing of registry key with configuration directly to exported file. Otherwise imported configuration will be merged with the current one in registry and it may result in inconsistent configuration."
+ IDS_CONFIGEXPUPTOXP, "If you want to import configuration on every start of Sally, export it to installation directory to file named config.reg. To import other configuration file use command line parameter -C (e.g. ""sally.exe -C myconfig.reg"").\n\nWe recommend to add clearing of registry key with configuration directly to exported file. Otherwise imported configuration will be merged with the current one in registry and it may result in inconsistent configuration."
+ IDS_CONFIGEXPVISTA, "If you want to import configuration on every start of Sally, export it to application data directory (or installation directory) to file named config.reg. To import other configuration file use command line parameter -C (e.g. ""sally.exe -C myconfig.reg"").\n\nWe recommend to add clearing of registry key with configuration directly to exported file. Otherwise imported configuration will be merged with the current one in registry and it may result in inconsistent configuration."
  IDS_CONFIGEXPCLEARKEY, "&Add clearing of registry key with configuration directly to exported file"
  
  IDS_IMPORTCFG_OPENERR, "Unable to open or read the configuration file.\n\nFile: %s\nError: %s"
@@ -1859,7 +1859,7 @@ STRINGTABLE
  IDS_IMPORTCFG_INVALIDFORMAT, "Unable to import the configuration file. It has invalid format.\n\nFile: %s"
  IDS_IMPORTCFG_REGERR, "Unable to import the configuration file to registry. Error writing to registry.\n\nFile: %s"
  
- IDS_IMPORTCFG_NOTOURVER, "The configuration file (%s) does not contain configuration for this version of Open Salamander.\n\nDo you want to import it anyway?"
+ IDS_IMPORTCFG_NOTOURVER, "The configuration file (%s) does not contain configuration for this version of Sally.\n\nDo you want to import it anyway?"
  
  IDS_EXPORTCFG_REGERR, "Unable to export configuration to the file. Error reading configuration from registry."
  IDS_EXPORTCFG_FILEERR, "Unable to export configuration to the file. Error writing configuration to the file.\n\nFile: %s"
@@ -1913,30 +1913,30 @@ STRINGTABLE
  IDS_SALMON_OUT_OF_MEMORY "Out of memory" 
  IDS_SALMON_FILE_SIZE "Getting size of file failed for %s"
  IDS_SALMON_FILE_OPEN "Failed to open %s"
- IDS_SALMON_MORE_REPORTS "Some older bug reports were found. Would you like to report also these bugs and help us improve Open Salamander?\n\nPress Yes to process old bug reports. Press No to delete old bug reports."
- IDS_SALMON_TITLE "Open Salamander Bug Reporter"
+ IDS_SALMON_MORE_REPORTS "Some older bug reports were found. Would you like to report also these bugs and help us improve Sally?\n\nPress Yes to process old bug reports. Press No to delete old bug reports."
+ IDS_SALMON_TITLE "Sally Bug Reporter"
  IDS_SALMON_COMPRESSING "Compressing, wait please..."
  IDS_SALMON_UPLOADING "Uploading, wait please..."
- IDS_SALMON_UPLOADSUCCESS "Report has been uploaded successfully.\n\nThank you for helping us improve Open Salamander!" 
- IDS_SALMON_UPLOADFAILED "Report upload has failed, reason: %s\n\nPlease send us report using email to support@altap.cz and delete them from your disk. Click OK to show the report."
- IDS_SALMON_COMPRESSFAILED "Report compression has failed, reason: %s\n\nPlease pack your bug report using 7-Zip, email it to support@altap.cz, and delete report files from your disk. Click OK to show the report."
+ IDS_SALMON_UPLOADSUCCESS "Report has been uploaded successfully.\n\nThank you for helping us improve Sally!" 
+ IDS_SALMON_UPLOADFAILED "Report upload has failed, reason: %s\n\nPlease send us report using email to github.com/0xeb/sally/issues and delete them from your disk. Click OK to show the report."
+ IDS_SALMON_COMPRESSFAILED "Report compression has failed, reason: %s\n\nPlease pack your bug report using 7-Zip, email it to github.com/0xeb/sally/issues, and delete report files from your disk. Click OK to show the report."
  IDS_SALMON_LOAD_FAILED "Loading of %s failed."
- IDS_SALMON_WRONG_CMDLINE "This is an internal Open Salamander utility, please don't start it directly."
- IDS_SALMON_WRONG_VERSION "Incorrect version of Open Salamander Bug Reporter. Please contact us at support@altap.cz."
- IDS_SALMON_MINIDUMP "A problem has occured, forcing Open Salamander to close.\nCreating a bug report, wait please..."
+ IDS_SALMON_WRONG_CMDLINE "This is an internal Sally utility, please don't start it directly."
+ IDS_SALMON_WRONG_VERSION "Incorrect version of Sally Bug Reporter. Please contact us at github.com/0xeb/sally/issues."
+ IDS_SALMON_MINIDUMP "A problem has occured, forcing Sally to close.\nCreating a bug report, wait please..."
  IDS_SALMON_BUGREPORT_PROBLEM "Some problem has occured during the bug report creation:\n%s"
  IDS_SALMON_MINIDUMP_CREATE "Cannot create minidump file %s. Code: %d."
  IDS_SALMON_MINIDUMP_CALL "Error during minidump creation. Code: %d."
 
-// IDS_SALMON_FAILED, "Starting of Bug Reporter failed. Please pack following bug report using 7-Zip packer and send it to our email address support@altap.cz.\n\nThank you for helping us improve Open Salamander."
- IDS_SALMON_NOT_RUNNING, "Open Salamander Bug Reporter (salmon.exe) is not running. Open Salamander will not be able to handle potential crashes. Please restart Open Salamander."
+// IDS_SALMON_FAILED, "Starting of Bug Reporter failed. Please pack following bug report using 7-Zip packer and send it to our email address github.com/0xeb/sally/issues.\n\nThank you for helping us improve Sally."
+ IDS_SALMON_NOT_RUNNING, "Sally Bug Reporter (salmon.exe) is not running. Sally will not be able to handle potential crashes. Please restart Sally."
 
- IDS_SLGINCOMPLETE_TITLE, "Unfinished Translation of Open Salamander"
- IDS_SLGINCOMPLETE_TEXT, "Translation of Open Salamander into your language is not finished. Please consider visiting our discussion forum and joining the translation effort:"
+ IDS_SLGINCOMPLETE_TITLE, "Unfinished Translation of Sally"
+ IDS_SLGINCOMPLETE_TEXT, "Translation of Sally into your language is not finished. Please consider visiting our discussion forum and joining the translation effort:"
  
  IDS_RECYCLEBINERROR, "Unable to send file or directory to the Recycle Bin because it has invalid name.\n\nInvalid part of name: ""%s""\n\nHint: Try to rename it before sending to the Recycle Bin or delete it permanently (try Shift+Delete key)."
  
- IDS_PLUGINISX86ONLY, "Unable to load %s plugin. This plugin is available only in x86 (32-bit) version of Open Salamander. Please start x86 version of Open Salamander to use this plugin. Sorry for the inconvenience."
+ IDS_PLUGINISX86ONLY, "Unable to load %s plugin. This plugin is available only in x86 (32-bit) version of Sally. Please start x86 version of Sally to use this plugin. Sorry for the inconvenience."
  
  IDS_UNABLETORESOLVELINK, "unable to resolve link"
  IDS_VOLMOUNTPOINT, "volume mount point"
@@ -1946,7 +1946,7 @@ STRINGTABLE
  IDS_BLOCKSHUTDOWNDISKOPER, "Disk operation is in progress."
  IDS_BLOCKSHUTDOWNFINDFILES, "Searching is in progress."
  IDS_BLOCKSHUTDOWNSAVECFG, "Saving configuration, please wait few seconds."
- IDS_FORCEDSHUTDOWN, "Windows is rejecting to abort shutdown. This message will block it temporarily. Please wait to abort shutdown manually before you close this message, otherwise Open Salamander will be terminated without saving configuration."
- IDS_FORCEDSHUTDOWNDISKOPER, "Windows is rejecting to abort shutdown. This message will block it temporarily.\n\nYou have some disk operations in progress. Do you want to cancel them now? Click No only if you have aborted shutdown manually, otherwise you risk having unfinished files on your disk.\n\nPlease wait to abort shutdown manually before you answer this question, otherwise Open Salamander will be terminated without saving configuration."
+ IDS_FORCEDSHUTDOWN, "Windows is rejecting to abort shutdown. This message will block it temporarily. Please wait to abort shutdown manually before you close this message, otherwise Sally will be terminated without saving configuration."
+ IDS_FORCEDSHUTDOWNDISKOPER, "Windows is rejecting to abort shutdown. This message will block it temporarily.\n\nYou have some disk operations in progress. Do you want to cancel them now? Click No only if you have aborted shutdown manually, otherwise you risk having unfinished files on your disk.\n\nPlease wait to abort shutdown manually before you answer this question, otherwise Sally will be terminated without saving configuration."
  IDS_CLOSINGFINDWINDOWS, "Closing Find windows, please wait..."
 }

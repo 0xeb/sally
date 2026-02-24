@@ -1,4 +1,5 @@
 ﻿// SPDX-FileCopyrightText: 2023 Open Salamander Authors
+// SPDX-FileCopyrightText: 2026 Sally Authors
 // SPDX-License-Identifier: GPL-2.0-or-later
 // CommentsTranslationProject: TRANSLATED
 
@@ -41,8 +42,8 @@ CTwain::CTwain()
     AppIdentity.ProtocolMajor = TWON_PROTOCOLMAJOR;
     AppIdentity.ProtocolMinor = TWON_PROTOCOLMINOR;
     AppIdentity.SupportedGroups = DG_IMAGE | DG_CONTROL;
-    strcpy(AppIdentity.Manufacturer, "Open Salamander");
-    strcpy(AppIdentity.ProductFamily, "Open Salamander plugin");
+    strcpy(AppIdentity.Manufacturer, "Sally");
+    strcpy(AppIdentity.ProductFamily, "Sally plugin");
     strcpy(AppIdentity.ProductName, PLUGIN_NAME_EN);
 
     memset(&SrcIdentity, 0, sizeof(SrcIdentity));

@@ -13,7 +13,7 @@ Language=0x409 English (United States)
 Title=UnFAT Help
 
 [WINDOWS]
-$global_ssdefault=,"salamand.chm::\salamand.hhc","unfat.hhk","hh\unfat\introduction_intro.htm","hh\unfat\introduction_intro.htm",,,,"Web Help",0x3520,,0x180e,,,,,,,,0
+$global_ssdefault=,"sally.chm::\salamand.hhc","unfat.hhk","hh\unfat\introduction_intro.htm","hh\unfat\introduction_intro.htm",,,,"Web Help",0x3520,,0x180e,,,,,,,,0
 
 [FILES]
 hh\salamander_help.css
@@ -27,7 +27,7 @@ hh\salamander_help_shared.css
 #include "..\lang\lang.rh"
 
 [MERGE FILES]
-salamand.chm
+sally.chm
 zip.chm
 demoplug.chm
 demoview.chm

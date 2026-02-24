@@ -9,7 +9,7 @@ FILETYPE 0x2
         BLOCK "040904E4"
         {
             VALUE "CompanyName", "Martin Prikryl\0"
-            VALUE "FileDescription", "WinSCP: SFTP/SCP client for Open Salamander\0"
+            VALUE "FileDescription", "WinSCP: SFTP/SCP client for Sally\0"
             VALUE "FileVersion", "1.7.0.92\0"
             VALUE "InternalName", "WINSCP\0"
             VALUE "LegalCopyright", "(c) 2000-2023 Martin Prikryl\0"

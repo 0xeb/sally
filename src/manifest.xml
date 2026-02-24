@@ -1,12 +1,12 @@
 ﻿<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
 <assembly xmlns="urn:schemas-microsoft-com:asm.v1" manifestVersion="1.0">
 <assemblyIdentity
-    name="Open.Salamander.OpenSalamander"
+    name="Sally.FileManager"
     processorArchitecture="*"
     type="win32"
-    version="5.0.0.0">
+    version="1.0.0.0">
 </assemblyIdentity>
-<description>Open Salamander File Manager</description>
+<description>Sally File Manager</description>
 <dependency>
     <dependentAssembly>
         <assemblyIdentity

@@ -27,7 +27,7 @@ STRINGTABLE DISCARDABLE
     IDS_PLUGIN_DESCRIPTION      "Browse and extract CD/DVD ISO image files."
     IDS_CANT_CREATE_TEMP        "Cannot create temporary directory."
     IDS_CANT_DELETE_TEMP_FILE   "Cannot delete temporary file."
-    IDS_UNKNOWN_FILE_FORMAT     "Unknown file format or not a valid ISO image.\n\nIf you are sure this is a valid ISO image, please contact support@altap.cz and help us to support this format."
+    IDS_UNKNOWN_FILE_FORMAT     "Unknown file format or not a valid ISO image.\n\nIf you are sure this is a valid ISO image, please contact github.com/0xeb/sally/issues and help us to support this format."
     IDS_CANT_OPEN_FILE          "Cannot open file '%s'."
     IDS_ERR_TMP                 "Creation of temporary file has failed."
     IDS_CANT_SET_ATTRS          "Cannot set file attributes."
@@ -45,7 +45,7 @@ STRINGTABLE DISCARDABLE
     IDS_ERROR_READING_SECTOR    "Cannot read sector #%08X."
     IDS_ERROR_LISTING_IMAGE     "Error reading directory structure at sector #%08X.\n\nIncomplete content of ISO image."
     IDS_INTERNAL_PLUGIN_ERROR   "Internal plugin error."
-    IDS_UDF_UNKNOWN_ALLOCATION_STRATEGY  "Unknown allocation strategy (%d).\n\nPlease contact support@altap.cz and help us fix this problem."
+    IDS_UDF_UNKNOWN_ALLOCATION_STRATEGY  "Unknown allocation strategy (%d).\n\nPlease contact github.com/0xeb/sally/issues and help us fix this problem."
     IDS_UDF_INVALID_TAG_ID      "Invalid UDF Tag ID."
     IDS_UDF_ERROR_READING_VAT   "Error reading virtual allocation table at sector #%08X."
     IDS_UDF_MISSING_VAT         "Missing virtual allocation table."
@@ -65,7 +65,7 @@ STRINGTABLE DISCARDABLE
     IDS_ERR_HFS_BTREE_FRAGMENTED "The Catalog file is fragmented into more than 8 fragments which is not supported."
     IDS_ERR_HFS_FILE_FRAGMENTED "The file '%s' is fragmented into more than 8 fragments which is not supported.\nThe file will not be extracted."
 
-    IDS_ERR_TOO_LONG_PATH       "This disk image contains a too long path that Open Salamander cannot handle."
+    IDS_ERR_TOO_LONG_PATH       "This disk image contains a too long path that Sally cannot handle."
 
     IDS_ERR_DMG_READ_HDR        "Cannot read package header. File too small."
     IDS_ERR_DMG_ENCRYPTED       "This package is encrypted.\nEncrypted packages are not supported."

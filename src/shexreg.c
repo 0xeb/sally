@@ -1,4 +1,5 @@
 ﻿// SPDX-FileCopyrightText: 2023 Open Salamander Authors
+// SPDX-FileCopyrightText: 2026 Sally Authors
 // SPDX-License-Identifier: GPL-2.0-or-later
 
 #include <windows.h>
@@ -26,19 +27,19 @@
 //const char *SALSHEXT_SHAREDMEMMUTEXNAME = "SalExten_SharedMemMutex3";// salamext.dll (od verze 2.52 beta 1)
 //const char *SALSHEXT_SHAREDMEMNAME = "SalExten_SharedMem3";          // salamext.dll (od verze 2.52 beta 1)
 //const char *SALSHEXT_DOPASTEEVENTNAME = "SalExten_DoPasteEvent3";    // salamext.dll (od verze 2.52 beta 1, pouziva se jen pod Vista+)
-const char* SALSHEXT_SHAREDMEMMUTEXNAME = "SalExten_SharedMemMutex4"; // salextx86.dll a salextx64.dll (od verze 3.0 beta 1)
-const char* SALSHEXT_SHAREDMEMNAME = "SalExten_SharedMem4";           // salextx86.dll a salextx64.dll (od verze 3.0 beta 1)
-const char* SALSHEXT_DOPASTEEVENTNAME = "SalExten_DoPasteEvent4";     // salextx86.dll a salextx64.dll (od verze 3.0 beta 1, pouziva se jen pod Vista+)
+const char* SALSHEXT_SHAREDMEMMUTEXNAME = "SalExten_SharedMemMutex5"; // salextx64.dll (Sally 1.0)
+const char* SALSHEXT_SHAREDMEMNAME = "SalExten_SharedMem5";           // salextx64.dll (Sally 1.0)
+const char* SALSHEXT_DOPASTEEVENTNAME = "SalExten_DoPasteEvent5";     // salextx64.dll (Sally 1.0)
 
 //const char *SHEXREG_OPENSALAMANDER = "ServantSalamander";                                // salshext.dll (Sal 2.5 beta 1)
 //const char *SHEXREG_OPENSALAMANDER_DESCR = "Shell Extension for Servant Salamander";     // salshext.dll (Sal 2.5 beta 1)
 //const char *SHEXREG_OPENSALAMANDER = "ServantSalamander25";                              // salexten.dll - 2.5 beta 2 az RC1
 //const char *SHEXREG_OPENSALAMANDER_DESCR = "Shell Extension for Servant Salamander 2.5"; // salexten.dll - 2.5 beta 2 az RC1
 //const char* SHEXREG_OPENSALAMANDER = "AltapSalamanderVer" SALSHEXT_SHAREDNAMESAPPENDIX;  // salexten.dll - do 4.0
-const char* SHEXREG_OPENSALAMANDER = "OpenSalamanderVer" SALSHEXT_SHAREDNAMESAPPENDIX;
+const char* SHEXREG_OPENSALAMANDER = "SallyVer" SALSHEXT_SHAREDNAMESAPPENDIX;
 #ifdef INSIDE_SALAMANDER
 #include "versinfo.rh2"
-const char* SHEXREG_OPENSALAMANDER_DESCR = "Shell Extension (%s) for Open Salamander " VERSINFO_VERSION;
+const char* SHEXREG_OPENSALAMANDER_DESCR = "Shell Extension (%s) for Sally " VERSINFO_VERSION;
 #endif // INSIDE_SALAMANDER
 
 #ifdef ENABLE_SH_MENU_EXT

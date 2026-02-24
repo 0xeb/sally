@@ -473,7 +473,7 @@ STRINGTABLE
  IDS_STPAR_UNABLECOMPAUTODCOND, "Autodetect condition contains error.\n\nError: %s"
 
  IDS_LOGMSGUNKNOWNSRVTYPE, "Unknown server type, unable to parse text listing...\r\n"
- IDS_UNKNOWNSRVTYPEINFO, "Unable to parse listing of files and directories from server. Only plain text of listing will be displayed in panel.\n\nPlease check our web pages for newer version of Open Salamander. If you are using the latest version, please send us raw listing (if not confidential; right click in panel > Show Raw Listing > Save As) to email support@altap.cz. Please help us to support as many types of servers as possible."
+ IDS_UNKNOWNSRVTYPEINFO, "Unable to parse listing of files and directories from server. Only plain text of listing will be displayed in panel.\n\nPlease check our web pages for newer version of Sally. If you are using the latest version, please send us raw listing (if not confidential; right click in panel > Show Raw Listing > Save As) to email github.com/0xeb/sally/issues. Please help us to support as many types of servers as possible."
  IDS_LOGMSGUNKNOWNSRVTYPE2, "Unable to parse text listing using selected server type...\r\n"
  IDS_UNKNOWNSRVTYPEINFO2, "Unable to parse listing of files and directories from server. Only plain text of listing will be displayed in panel.\n\nTry to select different server type or let FTP client to autodetect it (use Advanced button in Connect to FTP Server dialog)."
  IDS_LOGMSGPARSEDBYSRVTYPE, "Text listing was parsed by ""%s"" server type...\r\n"
@@ -884,7 +884,7 @@ STRINGTABLE
  IDS_LOGMSGUPLRESUMEERR, "Unable to resume (append) the file (unexpected error).\r\n"
  IDS_LOGMSGUPLNOTCONFIRMED, "Entire file was sent but server did not confirm its receiving.\r\nGoing to get file size (in bytes) to test if file was successfully copied/moved.\r\n"
 
- IDS_SSL_ERR_OPENSSLNOTFOUND "Unable to find or load OpenSSL libraries needed for encryption.\r\nThe files needed are ssleay32.dll and libeay32.dll.\r\nThey are part of Open Salamander installation."
+ IDS_SSL_ERR_OPENSSLNOTFOUND "Unable to find or load OpenSSL libraries needed for encryption.\r\nThe files needed are ssleay32.dll and libeay32.dll.\r\nThey are part of Sally installation."
  IDS_SSL_ERR_NEW "Unable to allocate OpenSSL control structure. Out of memory."
  IDS_SSL_ERR_NEW_LOG "SSL ERROR: Unable to allocate OpenSSL control structure. Out of memory.\r\n"
  IDS_SSL_ERR_CONNECT "Unable to establish encrypted connection (SSL).\n\nError: %s"

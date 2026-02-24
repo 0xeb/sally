@@ -119,7 +119,7 @@ STRINGTABLE
   IDS_SEARCHING, "Searching: %s\\"
   IDS_SUBSTRINGHELP, "Enter string, decimal number or hexadecimal number prefiixed by 0x. Empty string matches all entries."
   IDS_HEXHELP, "Enter hexadecimal pattern in format: 1a 2b ""foo"" 3c. Use "" for unicode and ' for ASCII strings patterns."
-  IDS_REGEXPHELP, "Enter regular expression. For details on regular expressions see Open Salamander documentation."
+  IDS_REGEXPHELP, "Enter regular expression. For details on regular expressions see Sally documentation."
   IDS_LONGDATA, "Unable to finish operation because of too long data."
   IDS_BADTIMEFORMAT, "Invalid date/time format. Please enter date in format dd.mm.yyyy or date and time in format hh:mm:ss dd.mm.yyyy."
   IDS_CREATETEMP, "Unable to create a temporary file. "
@@ -167,5 +167,5 @@ STRINGTABLE
   IDS_COPYNAME, "Copy Name as Text"
   IDS_COPYFULLNAME, "Copy Full Name as Text"
   IDS_COPYPATH, "Copy Full Path as Text"
-  IDS_BUSY, "Open Salamander is busy. The requested command cannot be accomplished, please try it again later."
+  IDS_BUSY, "Sally is busy. The requested command cannot be accomplished, please try it again later."
 }

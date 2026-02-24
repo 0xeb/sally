@@ -1,4 +1,5 @@
 ﻿// SPDX-FileCopyrightText: 2023 Open Salamander Authors
+// SPDX-FileCopyrightText: 2026 Sally Authors
 // SPDX-License-Identifier: GPL-2.0-or-later
 // CommentsTranslationProject: TRANSLATED
 
@@ -2855,7 +2856,7 @@ HWND CWaitWindow::Create(HWND hForegroundWnd)
 
     CreateEx(WS_EX_DLGMODALFRAME | WS_EX_TOOLWINDOW,
              SAVEBITS_CLASSNAME,
-             Caption.empty() ? "Open Salamander" : Caption.c_str(),
+             Caption.empty() ? "Sally" : Caption.c_str(),
              WS_BORDER | WS_OVERLAPPED | (ShowCloseButton ? WS_SYSMENU : 0),
              0, 0, width, height,
              HParent,

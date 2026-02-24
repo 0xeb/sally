@@ -1,4 +1,5 @@
 ﻿// SPDX-FileCopyrightText: 2023 Open Salamander Authors
+// SPDX-FileCopyrightText: 2026 Sally Authors
 // SPDX-License-Identifier: GPL-2.0-or-later
 // CommentsTranslationProject: TRANSLATED
 
@@ -11,7 +12,7 @@
 
 using namespace std;
 
-const char* SERVER_NAME = "reports.altap.cz";
+const char* SERVER_NAME = ""; // Dead server — bug report upload disabled
 
 BOOL CreateHTTPOutput(CUploadParams* uploadParams, char** buffer, int* bufferSize)
 {

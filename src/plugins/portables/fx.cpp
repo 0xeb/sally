@@ -1,4 +1,5 @@
 ﻿// SPDX-FileCopyrightText: 2023 Open Salamander Authors
+// SPDX-FileCopyrightText: 2026 Sally Authors
 // SPDX-License-Identifier: GPL-2.0-or-later
 // CommentsTranslationProject: TRANSLATED
 
@@ -397,7 +398,7 @@ namespace Fx
 
     void WINAPI CFxPluginInterface::GetPluginHomePageUrl(CFxString& url) const
     {
-        url = TEXT("www.altap.cz");
+        url = TEXT("github.com/0xeb/sally");
     }
 
     bool WINAPI CFxPluginInterface::NeedsWinLib() const

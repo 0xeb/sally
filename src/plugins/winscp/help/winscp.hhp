@@ -13,7 +13,7 @@ Language=0x409 English (United States)
 Title=WinSCP Help
 
 [WINDOWS]
-$global_ssdefault=,"salamand.chm::\salamand.hhc","winscp.hhk","hh\winscp\introduction_intro.htm","hh\winscp\introduction_intro.htm",,,,"Web Help",0x3520,,0x180e,,,,,,,,0
+$global_ssdefault=,"sally.chm::\salamand.hhc","winscp.hhk","hh\winscp\introduction_intro.htm","hh\winscp\introduction_intro.htm",,,,"Web Help",0x3520,,0x180e,,,,,,,,0
 
 [FILES]
 hh\salamander_help.css
@@ -59,7 +59,7 @@ IDH_UI_SAL_PREF_CONFIRMATIONS=hh\winscp\ui_sal_pref_confirmations.htm
 IDH_UI_SAL_PREF_TRANSFER=hh\winscp\ui_sal_pref_transfer.htm
 IDH_UI_SAL_PREF_QUEUE=hh\winscp\ui_sal_pref_queue.htm
 IDH_UI_SAL_PREF_PANEL=hh\winscp\ui_sal_pref_panel.htm
-IDH_DISCONNECT_F12=ms-its:salamand.chm::/hh\salamand\disk_net.htm
+IDH_DISCONNECT_F12=ms-its:sally.chm::/hh\salamand\disk_net.htm
 IDH_DIR_SYNCHRONIZE=hh\winscp\task_synchronize_full.htm
 IDH_UI_SAL_PREFERENCES=hh\winscp\ui_sal_preferences.htm
 IDH_SHELL_SESSION=hh\winscp\shell_session.htm
@@ -72,7 +72,7 @@ IDH_UI_SYNCHRONIZE_CHECKLIST=hh\winscp\ui_synchronize_checklist.htm
 #include "..\salamander\Salamander.rh"
 
 [MERGE FILES]
-salamand.chm
+sally.chm
 zip.chm
 filecomp.chm
 7zip.chm

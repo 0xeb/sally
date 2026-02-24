@@ -1,4 +1,5 @@
 ﻿// SPDX-FileCopyrightText: 2023 Open Salamander Authors
+// SPDX-FileCopyrightText: 2026 Sally Authors
 // SPDX-License-Identifier: GPL-2.0-or-later
 // CommentsTranslationProject: TRANSLATED
 
@@ -572,8 +573,8 @@ public:
     void Clean()
     {
         LanguageID = 0x0409;
-        lstrcpyW(Author, L"Open Salamander");
-        lstrcpyW(Web, L"www.altap.cz");
+        lstrcpyW(Author, L"Sally");
+        lstrcpyW(Web, L"github.com/0xeb/sally");
         lstrcpyW(Comment, L"");
         lstrcpyW(HelpDir, L"");
         lstrcpyW(SLGIncomplete, L"");

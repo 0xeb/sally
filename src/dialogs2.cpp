@@ -1,4 +1,6 @@
 // SPDX-FileCopyrightText: 2023 Open Salamander Authors
+// SPDX-FileCopyrightText: 2026 Sally Authors
+// SPDX-FileCopyrightText: 2026 Sally Authors
 // SPDX-License-Identifier: GPL-2.0-or-later
 // CommentsTranslationProject: TRANSLATED
 
@@ -578,12 +580,14 @@ void CImportConfigDialog::Transfer(CTransferInfo& ti)
         {
             if (ConfigurationExist[i])
             {
-                // detect whether this is "Open Salamander", "Altap Salamander", or the old "Servant Salamander"
+                // detect whether this is "Sally", "Open Salamander", "Altap Salamander", or the old "Servant Salamander"
+                BOOL sally = StrIStr(SalamanderConfigurationRoots[i], "Sally") != NULL;
                 BOOL openSalamander = StrIStr(SalamanderConfigurationRoots[i], "Open Salamander") != NULL;
                 BOOL altapSalamander = StrIStr(SalamanderConfigurationRoots[i], "Altap Salamander") != NULL;
-                const char* name = openSalamander    ? "Open Salamander %s"
-                                   : altapSalamander ? "Altap Salamander %s"
-                                                     : "Servant Salamander %s";
+                const char* name = sally              ? "Sally %s"
+                                   : openSalamander   ? "Open Salamander %s"
+                                   : altapSalamander  ? "Altap Salamander %s"
+                                                      : "Servant Salamander %s";
                 sprintf(buff, name, SalamanderConfigurationVersions[i]);
                 SendDlgItemMessage(HWindow, IDC_IMPORTCONFIG, CB_ADDSTRING, 0, (LPARAM)buff);
                 if (selIndex == 0)
@@ -610,12 +614,14 @@ void CImportConfigDialog::Transfer(CTransferInfo& ti)
                 lvi.iSubItem = 0;
                 lvi.state = 0;
 
-                // detect whether this is "Open Salamander", "Altap Salamander", or the old "Servant Salamander"
+                // detect whether this is "Sally", "Open Salamander", "Altap Salamander", or the old "Servant Salamander"
+                BOOL sally = StrIStr(SalamanderConfigurationRoots[i], "Sally") != NULL;
                 BOOL openSalamander = StrIStr(SalamanderConfigurationRoots[i], "Open Salamander") != NULL;
                 BOOL altapSalamander = StrIStr(SalamanderConfigurationRoots[i], "Altap Salamander") != NULL;
-                const char* name = openSalamander    ? "Open Salamander %s"
-                                   : altapSalamander ? "Altap Salamander %s"
-                                                     : "Servant Salamander %s";
+                const char* name = sally              ? "Sally %s"
+                                   : openSalamander   ? "Open Salamander %s"
+                                   : altapSalamander  ? "Altap Salamander %s"
+                                                      : "Servant Salamander %s";
                 sprintf(buff, name, SalamanderConfigurationVersions[i]);
                 lvi.pszText = buff;
                 ListView_InsertItem(hListView, &lvi);
@@ -1015,7 +1021,7 @@ CLanguageSelectorDialog::DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
         if (PluginName != NULL && LOWORD(wParam) == IDCANCEL)
             return 0;
         if (LOWORD(wParam) == IDB_GETMORELANGS)
-            ShellExecute(HWindow, "open", "https://forum.altap.cz/viewforum.php?f=23", NULL, NULL, SW_SHOWNORMAL);
+            ShellExecute(HWindow, "open", "https://github.com/0xeb/sally/discussions", NULL, NULL, SW_SHOWNORMAL);
         if (LOWORD(wParam) == IDB_REFRESHLANGS)
         {
             ListView_DeleteAllItems(HListView);

@@ -1,4 +1,4 @@
-# 7-Zip plugin and dependencies for Open Salamander
+# 7-Zip plugin and dependencies for Sally
 # Builds: 7za.dll (library), 7zwrapper.dll (wrapper), sal7zip.dll (plugin)
 
 include_guard(GLOBAL)

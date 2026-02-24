@@ -26,7 +26,7 @@ STRINGTABLE DISCARDABLE
     IDS_PLUGIN_DESCRIPTION      "Browse and extract CHM files."
     IDS_CANT_CREATE_TEMP        "Can not create temporary directory."
     IDS_CANT_DELETE_TEMP_FILE   "Can not delete temporary file."
-    IDS_UNKNOWN_FILE_FORMAT     "Unknown file format or not valid CHM image.\n\nIf you are sure this is valid CHM image, please contact support@altap.cz and help us to support this format."
+    IDS_UNKNOWN_FILE_FORMAT     "Unknown file format or not valid CHM image.\n\nIf you are sure this is valid CHM image, please contact github.com/0xeb/sally/issues and help us to support this format."
     IDS_CANT_OPEN_FILE          "Can not open this file."
     IDS_ERR_TMP                 "Creation of temporary file has failed."
     IDS_CANT_SET_ATTRS          "Can not set file attributes."

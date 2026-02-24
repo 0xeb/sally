@@ -1,4 +1,5 @@
 ﻿// SPDX-FileCopyrightText: 2023 Open Salamander Authors
+// SPDX-FileCopyrightText: 2026 Sally Authors
 // SPDX-License-Identifier: GPL-2.0-or-later
 // CommentsTranslationProject: TRANSLATED
 
@@ -27,7 +28,7 @@ HANDLE GetBugReporterRegistryMutex()
     SetSecurityDescriptorDacl(secAttr.lpSecurityDescriptor, TRUE, 0, FALSE);
     // it would be convenient to add SID to the mutex name, because processes with different SID run with a different HKCU tree
     // but for simplicity we skip that and the mutex will be truly global
-    const char* MUTEX_NAME = "Global\\AltapSalamanderBugReporterRegistryMutex";
+    const char* MUTEX_NAME = "Global\\SallyBugReporterRegistryMutex";
     HANDLE hMutex = NOHANDLES(CreateMutex(&secAttr, FALSE, MUTEX_NAME));
     if (hMutex == NULL) // create can already open an existing mutex, but it can fail, so we try open afterwards
         hMutex = NOHANDLES(OpenMutex(SYNCHRONIZE, FALSE, MUTEX_NAME));
@@ -36,7 +37,7 @@ HANDLE GetBugReporterRegistryMutex()
 
 BOOL SalmonGetBugReportUID(DWORD64* uid)
 {
-    const char* BUG_REPORTER_KEY = "Software\\Open Salamander\\Bug Reporter";
+    const char* BUG_REPORTER_KEY = "Software\\Sally\\Bug Reporter";
     const char* BUG_REPORTER_UID = "ID";
 
     // this section runs at Salamander startup and theoretically concurrent registry read/write can occur

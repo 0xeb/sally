@@ -268,7 +268,7 @@ BEGIN
     EDITTEXT        IDE_FONT,65,134,165,14,ES_AUTOHSCROLL | ES_READONLY | NOT WS_TABSTOP
     LTEXT           "Other",IDC_STATIC_10,6,156,21,8
     CONTROL         "",IDC_STATIC_11,"Static",SS_ETCHEDHORZ | WS_GROUP,29,160,219,1
-    CONTROL         "&Load plugin on Open Salamander start",IDC_LOADONSTART,
+    CONTROL         "&Load plugin on Sally start",IDC_LOADONSTART,
                     "Button",BS_AUTOCHECKBOX | WS_TABSTOP,12,166,162,12
 END
 

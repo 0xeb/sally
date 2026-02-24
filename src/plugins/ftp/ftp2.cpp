@@ -1,4 +1,5 @@
 ﻿// SPDX-FileCopyrightText: 2023 Open Salamander Authors
+// SPDX-FileCopyrightText: 2026 Sally Authors
 // SPDX-License-Identifier: GPL-2.0-or-later
 // CommentsTranslationProject: TRANSLATED
 
@@ -884,7 +885,7 @@ void WriteStrToFile(HANDLE file, const char* str, DWORD* err)
 }
 
 // texts in the file with an exported "server type" (extension .STR)
-const char* STR_FILE_HEADER = "Open Salamander - FTP Client - Exported Server Type";
+const char* STR_FILE_HEADER = "Sally - FTP Client - Exported Server Type";
 const char* STR_FILE_TYPENAME = "Type Name:";
 const char* STR_FILE_ADCOND = "Autodetect Condition:";
 const char* STR_FILE_COLUMNS = "Columns:";

@@ -1,4 +1,5 @@
 ﻿// SPDX-FileCopyrightText: 2023 Open Salamander Authors
+// SPDX-FileCopyrightText: 2026 Sally Authors
 // SPDX-License-Identifier: GPL-2.0-or-later
 // CommentsTranslationProject: TRANSLATED
 
@@ -290,10 +291,10 @@ BOOL OpenHtmlHelp(char* helpFileName, HWND parent, CHtmlHelpCommand command, DWO
     }
 
     if (helpFileName != NULL) // plugin help: to open the window in the right position
-    {                         // with remembered Favorites, we must open "salamand.chm" first (then
+    {                         // with remembered Favorites, we must open "sally.chm" first (then
                               // the plugin help opens in this same window)
         lstrcpyn(helpPath, CurrentHelpDir, helpPath.Size());
-        if (SalPathAppend(helpPath, "salamand.chm", helpPath.Size()) &&
+        if (SalPathAppend(helpPath, "sally.chm", helpPath.Size()) &&
             FileExists(helpPath))
         {
             HtmlHelp(NULL, helpPath, HH_DISPLAY_TOC, 0); // ignore potential error
@@ -303,7 +304,7 @@ BOOL OpenHtmlHelp(char* helpFileName, HWND parent, CHtmlHelpCommand command, DWO
     BOOL ret = FALSE;
 
     lstrcpyn(helpPath, CurrentHelpDir, helpPath.Size());
-    if (SalPathAppend(helpPath, helpFileName == NULL ? "salamand.chm" : helpFileName, helpPath.Size()) &&
+    if (SalPathAppend(helpPath, helpFileName == NULL ? "sally.chm" : helpFileName, helpPath.Size()) &&
         FileExists(helpPath))
     {
         if (HtmlHelp(NULL, helpPath, uCommand, dwData) == NULL)
@@ -2557,7 +2558,7 @@ MENU_TEMPLATE_ITEM AddToSystemMenu[] =
 */
         case CM_FORUM:
         {
-            ShellExecute(HWindow, "open", "https://forum.altap.cz/", NULL, NULL, SW_SHOWNORMAL);
+            ShellExecute(HWindow, "open", "https://github.com/0xeb/sally/discussions", NULL, NULL, SW_SHOWNORMAL);
             return 0;
         }
 

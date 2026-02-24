@@ -1,12 +1,12 @@
 cmake_minimum_required(VERSION 3.21)
 
-project(OpenSalamander LANGUAGES C CXX RC)
+project(Sally LANGUAGES C CXX RC)
 
 # Generate git version header
 include(${CMAKE_CURRENT_SOURCE_DIR}/cmake/git_version.cmake)
 
 if(NOT WIN32)
-  message(FATAL_ERROR "Open Salamander CMake build targets Windows only.")
+  message(FATAL_ERROR "Sally CMake build targets Windows only.")
 endif()
 
 # ==============================================================================
@@ -58,19 +58,19 @@ include(${CMAKE_CURRENT_SOURCE_DIR}/cmake/sal_common.cmake)
 include(${CMAKE_CURRENT_SOURCE_DIR}/cmake/sal_nuget.cmake)
 
 # ==============================================================================
-# Main Executable: salamander
+# Main Executable: sally
 # ==============================================================================
 
 # Source list (extracted from vcxproj)
 include(${CMAKE_CURRENT_SOURCE_DIR}/cmake/targets/salamand_sources.cmake)
 
-add_executable(salamander WIN32)
+add_executable(sally WIN32)
 
-target_include_directories(salamander PRIVATE
+target_include_directories(sally PRIVATE
   ${SAL_COMMON_INCLUDES}
 )
 
-target_compile_definitions(salamander PRIVATE
+target_compile_definitions(sally PRIVATE
   SAFE_ALLOC
   INSIDE_SALAMANDER
   ${SAL_COMMON_DEFINES}
@@ -78,30 +78,27 @@ target_compile_definitions(salamander PRIVATE
   $<${SAL_IS_RELEASE}:${SAL_RELEASE_DEFINES}>
 )
 
-target_link_libraries(salamander PRIVATE
+target_link_libraries(sally PRIVATE
   htmlhelp comctl32 mpr ws2_32 netapi32 msimg32 shlwapi
   ${SAL_COMMON_LIBS}
 )
 
-target_link_directories(salamander PRIVATE
+target_link_directories(sally PRIVATE
   "${SAL_SHARED}/libs/${SAL_PLATFORM}"
 )
 
 if(MSVC)
-  target_link_options(salamander PRIVATE
+  target_link_options(sally PRIVATE
     /SUBSYSTEM:WINDOWS
     /STACK:3145728
     /MANIFEST:NO
   )
 elseif(MINGW)
-  target_link_options(salamander PRIVATE
+  target_link_options(sally PRIVATE
     -Wl,--subsystem,windows
     -Wl,--stack,3145728
   )
 endif()
-
-# Match VS output name (salamand.exe instead of salamander.exe)
-set_target_properties(salamander PROPERTIES OUTPUT_NAME "salamand")
 
 # Resource file settings
 set_source_files_properties(${SALAMANDER_RC} PROPERTIES
@@ -132,14 +129,14 @@ foreach(src IN LISTS SALAMANDER_SOURCES)
   endif()
 endforeach()
 
-target_sources(salamander PRIVATE ${SAL_SOURCES_NO_REGLIB} ${SALAMANDER_RC})
-target_link_libraries(salamander PRIVATE reglib)
+target_sources(sally PRIVATE ${SAL_SOURCES_NO_REGLIB} ${SALAMANDER_RC})
+target_link_libraries(sally PRIVATE reglib)
 
 # Shell extension registration (C file with extern "C" linkage)
-target_sources(salamander PRIVATE "${SAL_SRC}/shexreg.c")
+target_sources(sally PRIVATE "${SAL_SRC}/shexreg.c")
 
 # Output directories
-set_target_properties(salamander PROPERTIES
+set_target_properties(sally PROPERTIES
   RUNTIME_OUTPUT_DIRECTORY "${SAL_OUTPUT_BASE}/$<CONFIG>_${SAL_PLATFORM}"
   ARCHIVE_OUTPUT_DIRECTORY "${SAL_OUTPUT_BASE}/$<CONFIG>_${SAL_PLATFORM}/lib"
   LIBRARY_OUTPUT_DIRECTORY "${SAL_OUTPUT_BASE}/$<CONFIG>_${SAL_PLATFORM}/bin"
@@ -580,7 +577,7 @@ include(${CMAKE_CURRENT_SOURCE_DIR}/cmake/sal_install.cmake)
 include(GNUInstallDirs)
 
 # Main executable
-sal_install_main(salamander)
+sal_install_main(sally)
 
 # Utils go in utils/
 install(TARGETS salmon salspawn salopen tserver translator RUNTIME DESTINATION utils)
@@ -616,7 +613,7 @@ sal_generate_plugins_ver()
 sal_create_populate_target()
 
 # Ensure populate depends on main targets
-add_dependencies(populate salamander salmon salspawn salopen tserver translator salext sal_lang_english)
+add_dependencies(populate sally salmon salspawn salopen tserver translator salext sal_lang_english)
 
 # ==============================================================================
 # Tests
@@ -626,6 +623,6 @@ enable_testing()
 add_subdirectory(src/tests)
 
 message(STATUS "")
-message(STATUS "=== Open Salamander CMake Build ===")
+message(STATUS "=== Sally CMake Build ===")
 message(STATUS "Output: ${SAL_OUTPUT_BASE}/<Config>_${SAL_PLATFORM}")
 message(STATUS "")

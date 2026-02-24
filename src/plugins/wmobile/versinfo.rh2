@@ -18,7 +18,7 @@
 #define VERSINFO_COPYRIGHT   "Copyright © 2003-2023 Juraj Rojko"
 #define VERSINFO_COMPANY     "Juraj Rojko"
 
-#define VERSINFO_DESCRIPTION "Windows Mobile plugin for Open Salamander"
+#define VERSINFO_DESCRIPTION "Windows Mobile plugin for Sally"
 
 #ifdef _LANG
 #define VERSINFO_INTERNAL    "ENGLISH"
@@ -29,7 +29,7 @@
 #endif
 
 // for SLG translators
-#define VERSINFO_SLG_WEB     "www.altap.cz"
+#define VERSINFO_SLG_WEB     "github.com/0xeb/sally"
 #define VERSINFO_SLG_COMMENT "English version"
 
 #endif // __WMOBILE_VERSINFO_RH2

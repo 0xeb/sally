@@ -56,7 +56,7 @@ BEGIN
             VALUE "OriginalFilename", VERSINFO_ORIGINAL "\0"
             VALUE "LegalCopyright", VERSINFO_COPYRIGHT "\0"
             VALUE "ProductVersion", VERSINFO_SALAMANDER_VERSION "\0"
-            VALUE "ProductName", "Open Salamander\0"
+            VALUE "ProductName", "Sally\0"
 #ifdef _LANG
             VALUE "Comments", "Language resources\0"
             VALUE "SLGAuthor", VERSINFO_COMPANY "\0"

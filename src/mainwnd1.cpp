@@ -1,4 +1,6 @@
 // SPDX-FileCopyrightText: 2023 Open Salamander Authors
+// SPDX-FileCopyrightText: 2026 Sally Authors
+// SPDX-FileCopyrightText: 2026 Sally Authors
 // SPDX-License-Identifier: GPL-2.0-or-later
 // CommentsTranslationProject: TRANSLATED
 
@@ -30,9 +32,9 @@
 #endif
 
 #if defined(GIT_VERSION_AVAILABLE) && defined(GIT_VERSION)
-const char* SALAMANDER_TEXT_VERSION = "Open Salamander " GIT_VERSION " (" SAL_VER_PLATFORM ")";
+const char* SALAMANDER_TEXT_VERSION = "Sally " GIT_VERSION " (" SAL_VER_PLATFORM ")";
 #else
-const char* SALAMANDER_TEXT_VERSION = "Open Salamander " VERSINFO_VERSION;
+const char* SALAMANDER_TEXT_VERSION = "Sally " VERSINFO_VERSION;
 #endif
 
 //****************************************************************************

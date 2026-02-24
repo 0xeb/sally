@@ -1,4 +1,5 @@
 ﻿// SPDX-FileCopyrightText: 2023 Open Salamander Authors
+// SPDX-FileCopyrightText: 2026 Sally Authors
 // SPDX-License-Identifier: GPL-2.0-or-later
 // CommentsTranslationProject: TRANSLATED
 
@@ -340,7 +341,7 @@ BOOL CZipPack::LoadDefaults()
             lstrcpy(Options.About, "Version 1.40");
             lstrcpy(Options.SfxSettings.ExtractBtnText, LoadStr(IDS_DEFEXTRBUTTON));
             lstrcpy(Options.SfxSettings.Vendor, "Self-Extractor © 2000-2023 Open Salamander Authors");
-            lstrcpy(Options.SfxSettings.WWW, "https://www.altap.cz");
+            lstrcpy(Options.SfxSettings.WWW, "https://github.com/0xeb/sally");
         }
         else
         {

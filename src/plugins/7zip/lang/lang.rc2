@@ -65,7 +65,7 @@ STRINGTABLE
   IDS_UPDATE_NOT_SUPPORTED,   "Update operations are not supported for this archive."
   IDS_CANT_MOVE_TMPARCHIVE,   "Cannot move temporary archive '%s'."
   IDS_CANT_DELETE_TMPARCHIVE, "Cannot delete temporary archive '%s'."
-  IDS_7Z_UPDATE_ERROR,        "An error occured when updating archive.\n\nThis is not a fault of Open Salamander 7zip plugin. The problem is in 7za.dll,\nso please do NOT send us bugreports, we know about this problem."
+  IDS_7Z_UPDATE_ERROR,        "An error occured when updating archive.\n\nThis is not a fault of Sally 7zip plugin. The problem is in 7za.dll,\nso please do NOT send us bugreports, we know about this problem."
   IDS_7Z_SOLID_DELETE_UNSUP,  "Deleting files from solid archives is not supported."
   IDS_CANT_UPDATE_ARCHIVE,    "Cannot update archive '%s'."
   IDS_CANT_CREATE_TMPFILE,    "Cannot create temporary file."

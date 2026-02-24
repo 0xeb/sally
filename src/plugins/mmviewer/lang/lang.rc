@@ -65,7 +65,7 @@ FONT 8, "MS Shell Dlg", 400, 0, 0x1
 BEGIN
     DEFPUSHBUTTON   "Close",IDCANCEL,306,113,50,14
     ICON            "",IDC_MAIN_ICON,11,9,20,20
-    LTEXT           "MMViewer %s - Multimedia Viewer for Open Salamander",IDC_ABOUT_TITLE,46,9,313,8
+    LTEXT           "MMViewer %s - Multimedia Viewer for Sally",IDC_ABOUT_TITLE,46,9,313,8
     LTEXT           "dummy",IDC_ABOUT_COPYRIGHT,46,19,177,8,SS_NOPREFIX
     ICON            "",IDC_DISKEXPLORER_ICON,11,42,20,20
     LTEXT           "MPEG, ID3 Tag version 1 and 2, OGG, WMA, VQF and Tracker parsers",IDC_STATIC_1,46,41,238,8

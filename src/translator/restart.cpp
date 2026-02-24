@@ -1,4 +1,5 @@
 ﻿// SPDX-FileCopyrightText: 2023 Open Salamander Authors
+// SPDX-FileCopyrightText: 2026 Sally Authors
 // SPDX-License-Identifier: GPL-2.0-or-later
 // CommentsTranslationProject: TRANSLATED
 
@@ -49,7 +50,7 @@ BOOL KillSalamandersAux(const char* path)
     {
         while (Process32Next(snapshot, &entry) == TRUE)
         {
-            if (_stricmp(entry.szExeFile, "salamand.exe") == 0)
+            if (_stricmp(entry.szExeFile, "sally.exe") == 0)
             {
                 HANDLE hProcess = OpenProcess(PROCESS_QUERY_INFORMATION + PROCESS_VM_READ + PROCESS_TERMINATE, FALSE, entry.th32ProcessID);
 

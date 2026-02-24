@@ -2,7 +2,7 @@
 Auto Index=Yes
 Binary Index=Yes
 Compatibility=1.1 or later
-Compiled file=salamand.chm
+Compiled file=sally.chm
 Contents file=salamand.hhc
 Default Window=$global_ssdefault
 Default topic=hh\salamand\introduction_intro.htm
@@ -11,7 +11,7 @@ Full text search stop list file=..\..\plugins\shared\help\en\stop.stp
 Full-text search=Yes
 Index file=salamand.hhk
 Language=0x409 English (United States)
-Title=Open Salamander Help
+Title=Sally Help
 
 [WINDOWS]
 $global_ssdefault=,"salamand.hhc","salamand.hhk","hh\salamand\introduction_intro.htm","hh\salamand\introduction_intro.htm",,,,"Web Help",0x23520,,0x180e,,,,,,,,0

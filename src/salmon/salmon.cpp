@@ -1,4 +1,5 @@
 ﻿// SPDX-FileCopyrightText: 2023 Open Salamander Authors
+// SPDX-FileCopyrightText: 2026 Sally Authors
 // SPDX-License-Identifier: GPL-2.0-or-later
 // CommentsTranslationProject: TRANSLATED
 
@@ -16,7 +17,7 @@ extern TDirectArray<CBugReport> BugReports(1, 10);
 char LatestBugReport[MAX_PATH] = {0}; // name of the most recent bug report (name only, without extension)
 BOOL ReportOldBugs = TRUE;            // the user allowed uploading old reports as well
 
-const char* APP_NAME = "Open Salamander Bug Reporter";
+const char* APP_NAME = "Sally Bug Reporter";
 
 // ****************************************************************************
 
@@ -309,7 +310,7 @@ HINSTANCE LoadSLG(const char* slgName)
         }
     }
     if (hSLG == NULL)
-        MessageBox(NULL, "Internal error: cannot load any language file. Please contact us at support@altap.cz.", APP_NAME, MB_OK | MB_ICONEXCLAMATION | MB_SETFOREGROUND);
+        MessageBox(NULL, "Internal error: cannot load any language file. Please report at github.com/0xeb/sally/issues.", APP_NAME, MB_OK | MB_ICONEXCLAMATION | MB_SETFOREGROUND);
     return hSLG;
 }
 
@@ -322,14 +323,14 @@ BOOL RestartSalamander(HWND hParent)
 {
     char path[MAX_PATH];
     GetModuleFileName(NULL, path, MAX_PATH);
-    *(strrchr(path, '\\')) = '\0'; // strip \salamand.exe
+    *(strrchr(path, '\\')) = '\0'; // strip \sally.exe
     char* p = strrchr(path, '\\'); // strip \plugins
     if (p != NULL)
     {
         *p = 0;
         char initDir[MAX_PATH];
         strcpy(initDir, path);
-        strcat(path, "\\salamand.exe");
+        strcat(path, "\\sally.exe");
         SHELLEXECUTEINFO se;
         memset(&se, 0, sizeof(SHELLEXECUTEINFO));
         se.cbSize = sizeof(SHELLEXECUTEINFO);
@@ -757,7 +758,7 @@ BOOL GetStringSid(LPTSTR* stringSid)
     return TRUE;
 }
 
-#define SALMON_MAINDLG_MUTEX_NAME "AltapSalamanderSalmonMainDialog"
+#define SALMON_MAINDLG_MUTEX_NAME "SallySalmonMainDialog"
 
 class CMainDialogMutex
 {

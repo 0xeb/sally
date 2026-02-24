@@ -176,7 +176,7 @@ STRINGTABLE
 BEGIN
     IDS_ABORTCAPTION        "Abort Script"
     IDS_ABORTTIP            "Abort Running Script\tCtrl+Break"
-    IDS_MAINWINDOWLOCKED    "Open Salamander window is locked by Automation plugin. Please finish running script."
+    IDS_MAINWINDOWLOCKED    "Sally window is locked by Automation plugin. Please finish running script."
     IDS_ENGINECREATEFAIL    "Failed to initialize the scripting engine."
 END
 

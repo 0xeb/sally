@@ -1,4 +1,5 @@
 ﻿// SPDX-FileCopyrightText: 2023 Open Salamander Authors
+// SPDX-FileCopyrightText: 2026 Sally Authors
 // SPDX-License-Identifier: GPL-2.0-or-later
 // CommentsTranslationProject: TRANSLATED
 
@@ -749,7 +750,7 @@ BOOL CCallStack::CreateBugReportFile(EXCEPTION_POINTERS* Exception, DWORD thread
             {
                 __try
                 {
-                    PrintBugReportLine((void*)file, "Open Salamander Bug Report File", FALSE);
+                    PrintBugReportLine((void*)file, "Sally Bug Report File", FALSE);
                     PrintBugReportLine((void*)file, "", FALSE);
 
 #ifndef CALLSTK_DISABLE

@@ -1,4 +1,5 @@
 ﻿// SPDX-FileCopyrightText: 2023 Open Salamander Authors
+// SPDX-FileCopyrightText: 2026 Sally Authors
 // SPDX-License-Identifier: GPL-2.0-or-later
 // CommentsTranslationProject: TRANSLATED
 
@@ -2183,7 +2184,7 @@ void SetThreadNameInVCAndTrace(const char* name)
 BOOL GetOurPathInRoamingAPPDATA(char* buf)
 {
     return SHGetFolderPath(NULL, CSIDL_APPDATA, NULL, 0 /* SHGFP_TYPE_CURRENT */, buf) == S_OK &&
-           SalPathAppend(buf, "Open Salamander", MAX_PATH);
+           SalPathAppend(buf, "Sally", MAX_PATH);
 }
 
 BOOL CreateOurPathInRoamingAPPDATA(char* buf)
@@ -2193,7 +2194,7 @@ BOOL CreateOurPathInRoamingAPPDATA(char* buf)
         buf[0] = 0;
     if (SHGetFolderPath(NULL, CSIDL_APPDATA, NULL, 0 /* SHGFP_TYPE_CURRENT */, path) == S_OK)
     {
-        if (SalPathAppend(path, "Open Salamander", SAL_MAX_LONG_PATH))
+        if (SalPathAppend(path, "Sally", SAL_MAX_LONG_PATH))
         {
             SalLPCreateDirectory(path, NULL); // if it fails (e.g. already exists), we don't care...
             if (buf != NULL)

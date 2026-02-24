@@ -19,6 +19,6 @@ STRINGTABLE
  IDS_ABOUT, "About Plugin"
  IDS_ERR_OPEN_FILE, "Unable to open file %s."
  IDS_ERR_TMP, "Creation of temporary file has failed."
- IDS_EXCEPTION, "Exception has occured.\n\nViewed file: %s\n\nIf you think that viewed file is not corrupted, please send this file to support@altap.cz.\nWe will reproduce and fix the viewer bug. Thanks for cooperation!"
- IDS_HIDDEN_SECTIONS, "No Portable Executable section selected in plugin configuration was found.\nUse menu Options > Plugin Configuration > Portable Executable Viewer\nin Open Salamander main window to setup visible sections."
+ IDS_EXCEPTION, "Exception has occured.\n\nViewed file: %s\n\nIf you think that viewed file is not corrupted, please send this file to github.com/0xeb/sally/issues.\nWe will reproduce and fix the viewer bug. Thanks for cooperation!"
+ IDS_HIDDEN_SECTIONS, "No Portable Executable section selected in plugin configuration was found.\nUse menu Options > Plugin Configuration > Portable Executable Viewer\nin Sally main window to setup visible sections."
 }

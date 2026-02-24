@@ -6,14 +6,14 @@
 
 #include "..\plugins\shared\spl_vers.h"
 
-#define FILE_SALVER "5.0"   // without the build number and platform, e.g. "3.1 beta 1"
-#define FILE_VER "1.49\0"
-#define FILE_COPYRIGHT "Copyright © 2003-2023 Open Salamander Authors\0"
+#define FILE_SALVER "1.0"   // without the build number and platform, e.g. "3.1 beta 1"
+#define FILE_VER "1.50\0"
+#define FILE_COPYRIGHT "Copyright \xA9 2003-2026 Sally Authors\0"
 
 #ifdef _WIN64
-#define FILE_DESCR "Shell Extension (x64) for Open Salamander " FILE_SALVER "\0"
+#define FILE_DESCR "Shell Extension (x64) for Sally " FILE_SALVER "\0"
 #else // _WIN64
-#define FILE_DESCR "Shell Extension (x86) for Open Salamander " FILE_SALVER "\0"
+#define FILE_DESCR "Shell Extension (x86) for Sally " FILE_SALVER "\0"
 #endif // _WIN64
 
 1 VERSIONINFO
@@ -29,14 +29,14 @@ BEGIN
     BEGIN
         BLOCK "040904b0"
         BEGIN
-            VALUE "Comments", "This DLL is registered as a shell extension in the Windows registry. It provides support for Drag & Drop and Cut / Copy & Paste from archives and plugin file-systems to Windows Explorer. It can be locked by Windows, so it may not be possible to delete it directly. If you have uninstalled Open Salamander, you should restart Windows to remove this DLL (this DLL will be removed on next start of Windows). If you want to uninstall this DLL manually, open Command Prompt (run cmd.exe or command.com), run ""regsvr32 /u "
+            VALUE "Comments", "This DLL is registered as a shell extension in the Windows registry. It provides support for Drag & Drop and Cut / Copy & Paste from archives and plugin file-systems to Windows Explorer. It can be locked by Windows, so it may not be possible to delete it directly. If you have uninstalled Sally, you should restart Windows to remove this DLL (this DLL will be removed on next start of Windows). If you want to uninstall this DLL manually, open Command Prompt (run cmd.exe or command.com), run ""regsvr32 /u "
 #ifdef _WIN64
             "salextx64"
 #else // _WIN64
             "salextx86"
 #endif // _WIN64
             ".dll"", restart Windows, and try to delete this DLL again (it should not be registered as the shell extension, so it should be possible to delete it).\0"
-            VALUE "CompanyName", "Open Salamander\0"
+            VALUE "CompanyName", "Sally\0"
             VALUE "FileDescription", FILE_DESCR
             VALUE "FileVersion", FILE_VER
 #ifdef _WIN64
@@ -48,7 +48,7 @@ BEGIN
 #endif // _WIN64
             VALUE "LegalCopyright", FILE_COPYRIGHT
             VALUE "ProductVersion", VERSINFO_SALAMANDER_VERSION "\0"
-            VALUE "ProductName", "Open Salamander\0"
+            VALUE "ProductName", "Sally\0"
         END
     END
     BLOCK "VarFileInfo"

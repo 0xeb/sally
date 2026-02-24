@@ -10,7 +10,7 @@
 // internal viewer (viewer2.cpp) and file panel view/edit (fileswn5.cpp)
 // to open files with paths exceeding MAX_PATH (260 chars).
 //
-// Issue: https://github.com/0xeb/salamander/issues/24
+// Issue: https://github.com/0xeb/sally/issues/24
 //
 //****************************************************************************
 

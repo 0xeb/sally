@@ -1,4 +1,5 @@
 ﻿// SPDX-FileCopyrightText: 2023 Open Salamander Authors
+// SPDX-FileCopyrightText: 2026 Sally Authors
 // SPDX-License-Identifier: GPL-2.0-or-later
 // CommentsTranslationProject: TRANSLATED
 
@@ -22,7 +23,7 @@
 #define VERSINFO_xstr(s) VERSINFO_str(s)
 #define VERSINFO_str(s) #s
 
-#define VERSINFO_SALAMANDER_MAJOR 5
+#define VERSINFO_SALAMANDER_MAJOR 1
 #define VERSINFO_SALAMANDER_MINORA 0
 #define VERSINFO_SALAMANDER_MINORB 0
 
@@ -199,6 +200,6 @@
 //   103 - 5.0
 
 #define LAST_VERSION_OF_SALAMANDER 103
-#define REQUIRE_LAST_VERSION_OF_SALAMANDER "This plugin requires Open Salamander 5.0 (" SAL_VER_PLATFORM ") or later."
+#define REQUIRE_LAST_VERSION_OF_SALAMANDER "This plugin requires Sally 1.0 (" SAL_VER_PLATFORM ") or later."
 
 #endif // __SPL_VERS_H

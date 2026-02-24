@@ -134,7 +134,7 @@ END
 
 IDD_CTRLEXAMPLE DIALOGEX 32, 40, 463, 236
 STYLE DS_SETFONT | DS_MODALFRAME | DS_FIXEDSYS | WS_POPUP | WS_VISIBLE | WS_CAPTION | WS_SYSMENU
-CAPTION "Controls provided by Open Salamander"
+CAPTION "Controls provided by Sally"
 FONT 8, "MS Shell Dlg", 400, 0, 0x1
 BEGIN
     GROUPBOX        "CGUIStaticTextAbstract",IDC_STATIC_1,6,4,254,108
@@ -153,7 +153,7 @@ BEGIN
     LTEXT           "STF_PATH_ELLIPSIS",IDC_STATIC_8,14,76,75,8
     LTEXT           "C:\\Program Files\\Some Application With Long Path\\example.exe",IDC_CE_STPATH,102,76,152,8
     LTEXT           "STF_PATH_ELLIPSIS",IDC_STATIC_9,14,87,75,8
-    LTEXT           "ftp://ftp.altap.cz/pub/salamander/example.exe",IDC_CE_STPATH2,102,87,152,8
+    LTEXT           "https://github.com/0xeb/sally",IDC_CE_STPATH2,102,87,152,8
     RTEXT           "Drag texts to change their size.",IDC_STATIC_10,151,97,103,8
     GROUPBOX        "CGUIProgressBarAbstract",IDC_STATIC_11,6,118,254,66
     LTEXT           "Progress label",IDC_STATIC_12,15,129,60,8
@@ -169,7 +169,7 @@ BEGIN
     PUSHBUTTON      "Text",IDC_CE_PBCOLOR2,215,204,33,14
     GROUPBOX        "CGUIHyperLinkAbstract",IDC_STATIC_15,269,4,185,48
     LTEXT           "SetActionOpen",IDC_STATIC_16,277,17,75,8
-    LTEXT           "www.altap.cz",IDC_CE_HLOPEN,365,17,47,8,WS_TABSTOP
+    LTEXT           "github.com/0xeb/sally",IDC_CE_HLOPEN,365,17,47,8,WS_TABSTOP
     LTEXT           "SetActionPostCommand",IDC_STATIC_17,277,27,81,8
     LTEXT           "Say something!",IDC_CE_HLCOMMAND,365,27,55,8,WS_TABSTOP
     LTEXT           "SetActionPostCommand",IDC_STATIC_18,277,37,81,8

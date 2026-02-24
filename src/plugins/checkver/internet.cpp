@@ -1,4 +1,5 @@
 ﻿// SPDX-FileCopyrightText: 2023 Open Salamander Authors
+// SPDX-FileCopyrightText: 2026 Sally Authors
 // SPDX-License-Identifier: GPL-2.0-or-later
 // CommentsTranslationProject: TRANSLATED
 
@@ -10,12 +11,13 @@
 #include "checkver.rh2"
 #include "lang\lang.rh"
 
-const char* SCRIPT_URL_FTP_EN = "ftp://ftp.altap.cz/pub/altap/salamand/checkver/salupdate40_en.txt";
-const char* SCRIPT_URL_FTP_CZ = "ftp://ftp.altap.cz/pub/altap/salamand/checkver/salupdate40_cz.txt";
-const char* SCRIPT_URL_HTTP = "https://www.altap.cz/salupdate40/";
-const char* SCRIPT_URL_HTTP_AFTERINSTALL = "https://www.altap.cz/salupdatenew40/";
+// Dead URLs — checkver server no longer exists; kept as placeholders
+const char* SCRIPT_URL_FTP_EN = "";
+const char* SCRIPT_URL_FTP_CZ = "";
+const char* SCRIPT_URL_HTTP = "";
+const char* SCRIPT_URL_HTTP_AFTERINSTALL = "";
 
-const char* AGENT_NAME = "Open Salamander CheckVer Plugin";
+const char* AGENT_NAME = "Sally CheckVer Plugin";
 
 // limitation - may be called from only one thread; otherwise buffer overwrites are not handled
 const char* GetInetErrorText(DWORD dError)

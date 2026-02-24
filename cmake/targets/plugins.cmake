@@ -1,4 +1,4 @@
-# Plugin target definitions for Open Salamander
+# Plugin target definitions for Sally
 # Each plugin is defined using sal_add_plugin()
 #
 # With PCH support enabled, most plugins should now build correctly.

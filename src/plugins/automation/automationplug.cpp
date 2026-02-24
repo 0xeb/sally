@@ -1,4 +1,5 @@
 ﻿// SPDX-FileCopyrightText: 2023 Open Salamander Authors
+// SPDX-FileCopyrightText: 2026 Sally Authors
 // SPDX-License-Identifier: GPL-2.0-or-later
 // CommentsTranslationProject: TRANSLATED
 
@@ -586,10 +587,10 @@ void WINAPI CAutomationPluginInterface::LoadConfiguration(
 
     if (bLoadDefaultDirs)
     {
-        dir.Set(_T("$[AppData]\\Open Salamander\\Automation\\scripts"));
+        dir.Set(_T("$[AppData]\\Sally\\Automation\\scripts"));
         m_aDirectories.Add(dir);
 
-        dir.Set(_T("$[AllUsersProfile]\\Open Salamander\\Automation\\scripts"));
+        dir.Set(_T("$[AllUsersProfile]\\Sally\\Automation\\scripts"));
         m_aDirectories.Add(dir);
 
         dir.Set(_T("$(SalDir)\\plugins\\automation\\scripts"));

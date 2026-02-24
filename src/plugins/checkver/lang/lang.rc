@@ -78,7 +78,7 @@ BEGIN
     LTEXT           "Internet Connection Settings:",IDC_STATIC_1,5,7,101,8
     LTEXT           "",IDC_CFG_INTERNET,107,7,190,8
     PUSHBUTTON      "&Change",IDC_CFG_CHANGE,301,4,50,14,WS_GROUP
-    GROUPBOX        "&Open Check for New Versions window on Open Salamander start",IDC_STATIC_2,5,21,347,81,WS_GROUP
+    GROUPBOX        "&Open Check for New Versions window on Sally start",IDC_STATIC_2,5,21,347,81,WS_GROUP
     CONTROL         "Never",IDC_CFG_NEVER,"Button",BS_AUTORADIOBUTTON | WS_GROUP | WS_TABSTOP,13,32,60,12
     CONTROL         "Every day",IDC_CFG_DAY,"Button",BS_AUTORADIOBUTTON,107,32,60,12
     CONTROL         "Every week",IDC_CFG_WEEK,"Button",BS_AUTORADIOBUTTON,232,32,60,12
@@ -89,16 +89,16 @@ BEGIN
                     "Button",BS_AUTOCHECKBOX | WS_GROUP | WS_TABSTOP,13,62,325,12
     CONTROL         "C&lose window if no new version is found, otherwise show window",IDC_CFG_AUTOCLOSE,
                     "Button",BS_AUTOCHECKBOX | WS_TABSTOP,13,74,270,12
-    LTEXT           "Note: this window can be invoked from Open Salamander menu Plugins / Check Version.",IDC_STATIC_3,13,88,330,8
+    LTEXT           "Note: this window can be invoked from Sally menu Plugins / Check Version.",IDC_STATIC_3,13,88,330,8
     GROUPBOX        "&Filters",IDC_STATIC_4,5,109,347,110,WS_GROUP
     LISTBOX         IDC_CFG_FILTER,13,122,191,54,WS_VSCROLL | WS_TABSTOP
     PUSHBUTTON      "&Remove Selected Item From Filters",IDC_CFG_REMOVE,210,122,135,14
     LTEXT           "Note: one or all versions of module can be added to Filters from the Check for New Versions window. Use right-click context menu on module name.",IDC_STATIC_5,210,138,135,40
-    CONTROL         "Check for r&elease versions of Open Salamander and plugins",IDC_CFG_RELEASE,
+    CONTROL         "Check for r&elease versions of Sally and plugins",IDC_CFG_RELEASE,
                     "Button",BS_AUTOCHECKBOX | WS_GROUP | WS_TABSTOP,13,178,270,12
-    CONTROL         "Check for &beta versions of Open Salamander and plugins",IDC_CFG_BETA,
+    CONTROL         "Check for &beta versions of Sally and plugins",IDC_CFG_BETA,
                     "Button",BS_AUTOCHECKBOX | WS_TABSTOP,13,190,270,12
-    CONTROL         "Check for &preview build versions of Open Salamander and plugins",IDC_CFG_PB,
+    CONTROL         "Check for &preview build versions of Sally and plugins",IDC_CFG_PB,
                     "Button",BS_AUTOCHECKBOX | WS_TABSTOP,13,202,270,12
     PUSHBUTTON      "Set &Defaults",IDC_CFG_DEFAULTS,6,227,60,14,WS_GROUP
     DEFPUSHBUTTON   "OK",IDOK,183,227,50,14,WS_GROUP
@@ -112,7 +112,7 @@ CAPTION "CheckVer Internet Connection Settings"
 FONT 8, "MS Shell Dlg", 400, 0, 0x1
 BEGIN
     ICON            "",IDC_INTERNET_ICON,8,8,20,20,WS_GROUP
-    LTEXT           "CheckVer plugin lets you know about the latest versions of Open Salamander and plugins. Internet connection is needed for reading new versions information.",IDC_STATIC_1,39,7,202,24
+    LTEXT           "CheckVer plugin lets you know about the latest versions of Sally and plugins. Internet connection is needed for reading new versions information.",IDC_STATIC_1,39,7,202,24
     GROUPBOX        "How do you connect to the Internet",IDC_STATIC_2,40,38,211,67,WS_GROUP
     CONTROL         "I connect through a &phone line and a modem",IDC_INET_PHONE,
                     "Button",BS_AUTORADIOBUTTON | WS_GROUP | WS_TABSTOP,47,51,166,12
