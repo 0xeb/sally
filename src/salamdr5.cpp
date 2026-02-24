@@ -13,11 +13,33 @@
 #include "dialogs.h"
 #include "common/widepath.h"
 #include "ui/IPrompter.h"
+#include "common/IRegistry.h"
 #include "common/unicode/helpers.h"
 #include "common/IFileSystem.h"
 #include "common/fsutil.h"
 
 CSystemPolicies SystemPolicies;
+
+static IRegistry* GetSystemPoliciesRegistry()
+{
+    return gRegistry != nullptr ? gRegistry : GetWin32Registry();
+}
+
+static BOOL GetValueDontCheckTypeViaRegistry(IRegistry* registry, HKEY hKey, const char* name, void* buffer, DWORD bufferSize)
+{
+    if (registry == nullptr || buffer == nullptr || bufferSize == 0)
+        return FALSE;
+
+    RegValueType type = RegValueType::None;
+    std::vector<uint8_t> data;
+    auto result = registry->GetValue(hKey, AnsiToWideReg(name).c_str(), type, data);
+    if (!result.success || data.size() > bufferSize)
+        return FALSE;
+
+    if (!data.empty())
+        memcpy(buffer, data.data(), data.size());
+    return TRUE;
+}
 
 const int ctsNotRunning = 0x00;   // can be started
 const int ctsActive = 0x01;       // this thread is active/just finishing
@@ -1579,29 +1601,22 @@ void CSystemPolicies::EnableAll()
 BOOL CSystemPolicies::LoadList(TDirectArray<char*>* list, HKEY hRootKey, const char* keyName)
 {
     HKEY hKey;
-    if (OpenKeyAux(NULL, hRootKey, keyName, hKey))
+    IRegistry* registry = GetSystemPoliciesRegistry();
+    if (OpenKeyReadA(registry, hRootKey, keyName, hKey).success)
     {
-        DWORD values;
-        DWORD res = RegQueryInfoKey(hKey, NULL, 0, 0, NULL, NULL, NULL, &values, NULL,
-                                    NULL, NULL, NULL);
-        if (res == ERROR_SUCCESS)
+        std::vector<std::wstring> valueNames;
+        if (registry->EnumValues(hKey, valueNames).success)
         {
-            int i;
-            for (i = 0; i < (int)values; i++)
+            for (const auto& valueName : valueNames)
             {
-                char valueName[2];
-                DWORD valueNameLen = 2;
-                DWORD type;
-                CPathBuffer data;
-                DWORD dataLen = data.Size();
-                res = RegEnumValue(hKey, i, valueName, &valueNameLen, 0, &type, (BYTE*)data.Get(), &dataLen);
-                if (res == ERROR_SUCCESS && type == REG_SZ)
+                std::wstring appNameWide;
+                if (registry->GetString(hKey, valueName.c_str(), appNameWide).success)
                 {
-                    int len = lstrlen(data);
-                    char* appName = (char*)malloc(len + 1);
+                    std::string appNameAnsi = WideToAnsi(appNameWide);
+                    char* appName = (char*)malloc(appNameAnsi.size() + 1);
                     if (appName == NULL)
                     {
-                        CloseKeyAux(hKey);
+                        registry->CloseKey(hKey);
                         return FALSE;
                     }
                     list->Add(appName);
@@ -1609,14 +1624,14 @@ BOOL CSystemPolicies::LoadList(TDirectArray<char*>* list, HKEY hRootKey, const c
                     {
                         list->ResetState();
                         free(appName);
-                        CloseKeyAux(hKey);
+                        registry->CloseKey(hKey);
                         return FALSE;
                     }
-                    memcpy(appName, data, len + 1);
+                    memcpy(appName, appNameAnsi.c_str(), appNameAnsi.size() + 1);
                 }
             }
         }
-        CloseKeyAux(hKey);
+        registry->CloseKey(hKey);
     }
     return TRUE;
 }
@@ -1670,43 +1685,44 @@ void CSystemPolicies::LoadFromRegistry()
     EnableAll();
 
     // pull restrictions
+    IRegistry* registry = GetSystemPoliciesRegistry();
     HKEY hKey;
-    if (OpenKeyAux(NULL, HKEY_CURRENT_USER, "Software\\Microsoft\\Windows\\CurrentVersion\\Policies\\Explorer", hKey))
+    if (OpenKeyReadA(registry, HKEY_CURRENT_USER, "Software\\Microsoft\\Windows\\CurrentVersion\\Policies\\Explorer", hKey).success)
     {
         // according to MSDN values can be DWORD and BINARY:
         // It is a REG_DWORD or 4-byte REG_BINARY data value, found under the same key.
-        GetValueDontCheckTypeAux(hKey, "NoRun", /*REG_DWORD,*/ &NoRun, sizeof(DWORD));
-        GetValueDontCheckTypeAux(hKey, "NoDrives", /*REG_DWORD,*/ &NoDrives, sizeof(DWORD));
-        //GetValueDontCheckTypeAux(hKey, "NoViewOnDrive", /*REG_DWORD,*/ &NoViewOnDrive, sizeof(DWORD));
-        GetValueDontCheckTypeAux(hKey, "NoFind", /*REG_DWORD,*/ &NoFind, sizeof(DWORD));
-        GetValueDontCheckTypeAux(hKey, "NoShellSearchButton", /*REG_DWORD,*/ &NoShellSearchButton, sizeof(DWORD));
-        GetValueDontCheckTypeAux(hKey, "NoNetHood", /*REG_DWORD,*/ &NoNetHood, sizeof(DWORD));
-        //GetValueDontCheckTypeAux(hKey, "NoComputersNearMe", /*REG_DWORD,*/ &NoComputersNearMe, sizeof(DWORD));
-        GetValueDontCheckTypeAux(hKey, "NoNetConnectDisconnect", /*REG_DWORD,*/ &NoNetConnectDisconnect, sizeof(DWORD));
-        GetValueDontCheckTypeAux(hKey, "RestrictRun", /*REG_DWORD,*/ &RestrictRun, sizeof(DWORD));
+        GetValueDontCheckTypeViaRegistry(registry, hKey, "NoRun", /*REG_DWORD,*/ &NoRun, sizeof(DWORD));
+        GetValueDontCheckTypeViaRegistry(registry, hKey, "NoDrives", /*REG_DWORD,*/ &NoDrives, sizeof(DWORD));
+        //GetValueDontCheckTypeViaRegistry(registry, hKey, "NoViewOnDrive", /*REG_DWORD,*/ &NoViewOnDrive, sizeof(DWORD));
+        GetValueDontCheckTypeViaRegistry(registry, hKey, "NoFind", /*REG_DWORD,*/ &NoFind, sizeof(DWORD));
+        GetValueDontCheckTypeViaRegistry(registry, hKey, "NoShellSearchButton", /*REG_DWORD,*/ &NoShellSearchButton, sizeof(DWORD));
+        GetValueDontCheckTypeViaRegistry(registry, hKey, "NoNetHood", /*REG_DWORD,*/ &NoNetHood, sizeof(DWORD));
+        //GetValueDontCheckTypeViaRegistry(registry, hKey, "NoComputersNearMe", /*REG_DWORD,*/ &NoComputersNearMe, sizeof(DWORD));
+        GetValueDontCheckTypeViaRegistry(registry, hKey, "NoNetConnectDisconnect", /*REG_DWORD,*/ &NoNetConnectDisconnect, sizeof(DWORD));
+        GetValueDontCheckTypeViaRegistry(registry, hKey, "RestrictRun", /*REG_DWORD,*/ &RestrictRun, sizeof(DWORD));
         if (RestrictRun && !LoadList(&RestrictRunList, HKEY_CURRENT_USER, "Software\\Microsoft\\Windows\\CurrentVersion\\Policies\\Explorer\\RestrictRun"))
             RestrictRun = 0; // low memory; disable this option
-        GetValueDontCheckTypeAux(hKey, "DisallowRun", /*REG_DWORD,*/ &DisallowRun, sizeof(DWORD));
+        GetValueDontCheckTypeViaRegistry(registry, hKey, "DisallowRun", /*REG_DWORD,*/ &DisallowRun, sizeof(DWORD));
         if (DisallowRun && !LoadList(&DisallowRunList, HKEY_CURRENT_USER, "Software\\Microsoft\\Windows\\CurrentVersion\\Policies\\Explorer\\DisallowRun"))
             DisallowRun = 0; // low memory; disable this option
-        CloseKeyAux(hKey);
+        registry->CloseKey(hKey);
     }
 
-    //  if (OpenKeyAux(NULL, HKEY_CURRENT_USER, "Software\\Microsoft\\Windows\\CurrentVersion\\Policies\\Network", hKey))
+    //  if (OpenKeyReadA(registry, HKEY_CURRENT_USER, "Software\\Microsoft\\Windows\\CurrentVersion\\Policies\\Network", hKey).success)
     //  {
-    //GetValueDontCheckTypeAux(hKey, "NoEntireNetwork", /*REG_DWORD,*/ &NoEntireNetwork, sizeof(DWORD));
-    //    CloseKeyAux(hKey);
+    //GetValueDontCheckTypeViaRegistry(registry, hKey, "NoEntireNetwork", /*REG_DWORD,*/ &NoEntireNetwork, sizeof(DWORD));
+    //    registry->CloseKey(hKey);
     //  }
 
-    if (OpenKeyAux(NULL, HKEY_CURRENT_USER, "SOFTWARE\\Policies\\Microsoft\\Windows\\Explorer", hKey))
+    if (OpenKeyReadA(registry, HKEY_CURRENT_USER, "SOFTWARE\\Policies\\Microsoft\\Windows\\Explorer", hKey).success)
     {
-        GetValueDontCheckTypeAux(hKey, "NoDotBreakInLogicalCompare", /*REG_DWORD,*/ &NoDotBreakInLogicalCompare, sizeof(DWORD));
-        CloseKeyAux(hKey);
+        GetValueDontCheckTypeViaRegistry(registry, hKey, "NoDotBreakInLogicalCompare", /*REG_DWORD,*/ &NoDotBreakInLogicalCompare, sizeof(DWORD));
+        registry->CloseKey(hKey);
     }
-    if (OpenKeyAux(NULL, HKEY_LOCAL_MACHINE, "SOFTWARE\\Policies\\Microsoft\\Windows\\Explorer", hKey))
+    if (OpenKeyReadA(registry, HKEY_LOCAL_MACHINE, "SOFTWARE\\Policies\\Microsoft\\Windows\\Explorer", hKey).success)
     {
-        GetValueDontCheckTypeAux(hKey, "NoDotBreakInLogicalCompare", /*REG_DWORD,*/ &NoDotBreakInLogicalCompare, sizeof(DWORD));
-        CloseKeyAux(hKey);
+        GetValueDontCheckTypeViaRegistry(registry, hKey, "NoDotBreakInLogicalCompare", /*REG_DWORD,*/ &NoDotBreakInLogicalCompare, sizeof(DWORD));
+        registry->CloseKey(hKey);
     }
 }
 
