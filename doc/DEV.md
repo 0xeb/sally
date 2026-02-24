@@ -8,7 +8,7 @@
 \convert         Conversion tables for the Convert command
 \doc             Documentation
 \help            User manual source files
-\src             Open Salamander core source code
+\src             Sally core source code
 \src\common      Shared libraries
 \src\common\dep  Shared third-party libraries
 \src\lang        English resources
@@ -18,13 +18,11 @@
 \src\salmon      Crash detecting and reporting
 \src\salopen     Open files helper
 \src\salspawn    Process spawning helper
-\src\setup       Installer and uninstaller
 \src\sfx7zip     Self-extractor based on 7-Zip
 \src\shellext    Shell extension DLL
 \src\tests       Unit tests
-\src\translator  Translate Salamander UI to other languages
+\src\translator  Translate Sally UI to other languages
 \src\tserver     Trace Server to display info and error messages
-\src\vcxproj     Visual Studio project files
 \tools           Minor utilities
 \translations    Translations into other languages
 ```

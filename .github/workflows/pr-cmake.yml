@@ -1,0 +1,48 @@
+name: PR Build
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, ready_for_review]
+    branches: ["**"]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: pr-cmake-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    name: Build ${{ matrix.arch }} Debug
+    runs-on: windows-2022
+
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - arch: x64
+            cmake_arch: x64
+          - arch: x86
+            cmake_arch: Win32
+
+    defaults:
+      run:
+        shell: pwsh
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Register MSVC problem matcher
+        uses: ammaraskar/msvc-problem-matcher@master
+
+      - name: Configure CMake (${{ matrix.arch }})
+        run: cmake -B build -A ${{ matrix.cmake_arch }}
+
+      - name: Build Debug
+        run: cmake --build build --config Debug -j
+
+      - name: Run tests
+        run: ctest --test-dir build -C Debug --output-on-failure
