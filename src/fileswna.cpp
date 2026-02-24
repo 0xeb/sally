@@ -17,6 +17,7 @@
 #include "ui/IPrompter.h"
 #include "common/unicode/helpers.h"
 #include "common/IFileSystem.h"
+#include "common/widepath.h"
 #include "common/IEnvironment.h"
 
 void CFilesWindow::PluginFSFilesAction(CPluginFSActionType type)
@@ -373,7 +374,7 @@ void CFilesWindow::DragDropToArcOrFS(CTmpDragDropOperData* data)
     SalPathAppend(path, "*", path.Size());
     CPathBuffer text;
     WIN32_FIND_DATAW file;
-    HANDLE find = HANDLES_Q(FindFirstFileW(AnsiToWide(path).c_str(), &file));
+    HANDLE find = SalFindFirstFileHW(path, &file);
     *end = 0; // fix the path
     if (find == INVALID_HANDLE_VALUE)
     {
@@ -489,7 +490,7 @@ void CFilesWindow::DragDropToArcOrFS(CTmpDragDropOperData* data)
                 testFindNextErr = FALSE;
                 break;
             }
-        } while (FindNextFileW(find, &file));
+        } while (SalLPFindNextFile(find, &file));
         DWORD err = GetLastError();
         HANDLES(FindClose(find));
 

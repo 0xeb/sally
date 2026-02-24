@@ -16,6 +16,7 @@
 #include "ui/IPrompter.h"
 #include "common/IFileSystem.h"
 #include "common/unicode/helpers.h"
+#include "common/widepath.h"
 #include "common/IEnvironment.h"
 
 //
@@ -1183,7 +1184,7 @@ BOOL EmailFilesAddDirectory(CSimpleMAPI* mapi, const char* path, BOOL* errGetFil
         myPath[l++] = '\\';
     char* name = myPath + l;
     strcpy(name, "*");
-    HANDLE find = HANDLES_Q(FindFirstFileW(AnsiToWide(myPath).c_str(), &file));
+    HANDLE find = SalFindFirstFileHW(myPath, &file);
     if (find == INVALID_HANDLE_VALUE)
     {
         DWORD err = GetLastError();
@@ -1234,7 +1235,7 @@ BOOL EmailFilesAddDirectory(CSimpleMAPI* mapi, const char* path, BOOL* errGetFil
                 }
             }
         }
-    } while (FindNextFileW(find, &file));
+    } while (SalLPFindNextFile(find, &file));
     HANDLES(FindClose(find));
     return ok;
 }
