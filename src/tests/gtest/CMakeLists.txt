@@ -594,6 +594,30 @@ set_target_properties(gtest_plugins PROPERTIES
 
 add_dependencies(gtest_plugins test_dummy_plugin)
 
+# Long path copy/move integration tests (issue #34)
+add_executable(gtest_longpath_copymove
+    gtest_longpath_copymove.cpp
+)
+
+target_include_directories(gtest_longpath_copymove PRIVATE
+    ${CMAKE_CURRENT_SOURCE_DIR}/../..
+    ${CMAKE_CURRENT_SOURCE_DIR}/../../common
+)
+
+target_compile_definitions(gtest_longpath_copymove PRIVATE
+    WIN32 _WINDOWS _CRT_SECURE_NO_WARNINGS UNICODE _UNICODE
+)
+
+target_link_libraries(gtest_longpath_copymove
+    GTest::gtest GTest::gtest_main
+)
+
+add_test(NAME gtest_longpath_copymove COMMAND gtest_longpath_copymove)
+
+set_target_properties(gtest_longpath_copymove PROPERTIES
+    RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/tests"
+)
+
 # Long path viewer integration tests (issue #24)
 add_executable(gtest_longpath_viewer
     gtest_longpath_viewer.cpp

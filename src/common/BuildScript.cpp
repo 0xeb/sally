@@ -29,18 +29,6 @@ static char* AllocFullPath(const char* dir, const char* name)
     return buf;
 }
 
-// Helper: allocate a wide full path string "dir\name".
-static std::wstring BuildWidePath(const std::wstring& dir, const std::wstring& name)
-{
-    if (dir.empty())
-        return name;
-    std::wstring result = dir;
-    if (result.back() != L'\\')
-        result += L'\\';
-    result += name;
-    return result;
-}
-
 BOOL BuildScriptFromSnapshot(
     const CSelectionSnapshot& snapshot,
     const CBuildConfig& config,
@@ -100,11 +88,11 @@ BOOL BuildScriptFromSnapshot(
                 if (op.SourceName == NULL)
                     return FALSE;
                 op.TargetName = NULL;
-                // Set wide path if available
+                // Set wide path if available (with \\?\ prefix for long paths)
                 if (!item.NameW.empty())
                     op.SetSourceNameW(snapshot.SourcePath.c_str(), item.NameW);
-                else if (!snapshot.SourcePathW.empty())
-                    op.SourceNameW = BuildWidePath(snapshot.SourcePathW, std::wstring(item.Name.begin(), item.Name.end()));
+                else if (!snapshot.SourcePath.empty())
+                    op.SetSourceNameW(snapshot.SourcePath.c_str(), std::wstring(item.Name.begin(), item.Name.end()));
 
                 script->DirsCount++;
                 script->Add(op);
@@ -123,8 +111,8 @@ BOOL BuildScriptFromSnapshot(
                 op.TargetName = NULL;
                 if (!item.NameW.empty())
                     op.SetSourceNameW(snapshot.SourcePath.c_str(), item.NameW);
-                else if (!snapshot.SourcePathW.empty())
-                    op.SourceNameW = BuildWidePath(snapshot.SourcePathW, std::wstring(item.Name.begin(), item.Name.end()));
+                else if (!snapshot.SourcePath.empty())
+                    op.SetSourceNameW(snapshot.SourcePath.c_str(), std::wstring(item.Name.begin(), item.Name.end()));
 
                 script->FilesCount++;
                 script->Add(op);
@@ -154,11 +142,17 @@ BOOL BuildScriptFromSnapshot(
                 dirOp.TargetName = AllocFullPath(snapshot.TargetPath.c_str(), item.Name.c_str());
                 if (dirOp.TargetName == NULL)
                     return FALSE;
-                // Set wide paths
+                // Set wide paths (with \\?\ prefix for long paths)
                 if (!item.NameW.empty())
                 {
                     dirOp.SetSourceNameW(snapshot.SourcePath.c_str(), item.NameW);
                     dirOp.SetTargetNameW(snapshot.TargetPath.c_str(), item.NameW);
+                }
+                else if (!snapshot.SourcePath.empty())
+                {
+                    std::wstring nameW(item.Name.begin(), item.Name.end());
+                    dirOp.SetSourceNameW(snapshot.SourcePath.c_str(), nameW);
+                    dirOp.SetTargetNameW(snapshot.TargetPath.c_str(), nameW);
                 }
 
                 script->DirsCount++;
@@ -188,6 +182,8 @@ BOOL BuildScriptFromSnapshot(
                     delOp.TargetName = NULL;
                     if (!item.NameW.empty())
                         delOp.SetSourceNameW(snapshot.SourcePath.c_str(), item.NameW);
+                    else if (!snapshot.SourcePath.empty())
+                        delOp.SetSourceNameW(snapshot.SourcePath.c_str(), std::wstring(item.Name.begin(), item.Name.end()));
 
                     script->Add(delOp);
                     if (!script->IsGood())
@@ -215,11 +211,17 @@ BOOL BuildScriptFromSnapshot(
                 op.TargetName = AllocFullPath(snapshot.TargetPath.c_str(), item.Name.c_str());
                 if (op.TargetName == NULL)
                     return FALSE;
-                // Set wide paths
+                // Set wide paths (with \\?\ prefix for long paths)
                 if (!item.NameW.empty())
                 {
                     op.SetSourceNameW(snapshot.SourcePath.c_str(), item.NameW);
                     op.SetTargetNameW(snapshot.TargetPath.c_str(), item.NameW);
+                }
+                else if (!snapshot.SourcePath.empty())
+                {
+                    std::wstring nameW(item.Name.begin(), item.Name.end());
+                    op.SetSourceNameW(snapshot.SourcePath.c_str(), nameW);
+                    op.SetTargetNameW(snapshot.TargetPath.c_str(), nameW);
                 }
 
                 script->FilesCount++;
