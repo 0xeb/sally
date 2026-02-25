@@ -1414,27 +1414,45 @@ void CFilesWindow::EditNewFile()
         lstrcpyn(path, Configuration.EditNewFileDefault, path.Size());
     else
     {
-        // Try to derive name from the focused file (issue #12)
+        // Try to derive name from the focused item (issue #12)
         BOOL usedFocused = FALSE;
         int totalCount = Dirs->Count + Files->Count;
-        if (FocusedIndex >= 0 && FocusedIndex < totalCount && FocusedIndex >= Dirs->Count)
+        if (FocusedIndex >= 0 && FocusedIndex < totalCount)
         {
-            // Focused on a file (not a directory, not "..")
-            CFileData* f = &Files->At(FocusedIndex - Dirs->Count);
-            const char* name = f->Name;
-            const char* dot = strrchr(name, '.');
-            if (dot != NULL && dot > name)
+            if (FocusedIndex >= Dirs->Count)
             {
-                // "report.docx" -> "report-new.docx"
-                int baseLen = (int)(dot - name);
-                sprintf(path, "%.*s-new%s", baseLen, name, dot);
+                // Focused on a file
+                CFileData* f = &Files->At(FocusedIndex - Dirs->Count);
+                std::wstring nameW = f->NameW ? f->NameW : AnsiToWide(f->Name);
+                const wchar_t* dot = wcsrchr(nameW.c_str(), L'.');
+                std::wstring suggestion;
+                if (dot != NULL && dot > nameW.c_str())
+                {
+                    // "report.docx" -> "report-new.docx"
+                    suggestion.assign(nameW.c_str(), dot);
+                    suggestion += L"-new";
+                    suggestion += dot;
+                }
+                else
+                {
+                    // "Makefile" -> "Makefile-new"
+                    suggestion = nameW + L"-new";
+                }
+                WideToAnsi(suggestion, path.Get(), path.Size());
                 usedFocused = TRUE;
             }
             else
             {
-                // "Makefile" -> "Makefile-new"
-                sprintf(path, "%s-new", name);
-                usedFocused = TRUE;
+                // Focused on a directory — skip ".."
+                CFileData* d = &Dirs->At(FocusedIndex);
+                if (strcmp(d->Name, "..") != 0)
+                {
+                    // "MyFolder" -> "MyFolder-new.txt"
+                    std::wstring nameW = d->NameW ? d->NameW : AnsiToWide(d->Name);
+                    std::wstring suggestion = nameW + L"-new.txt";
+                    WideToAnsi(suggestion, path.Get(), path.Size());
+                    usedFocused = TRUE;
+                }
             }
         }
         if (!usedFocused)
