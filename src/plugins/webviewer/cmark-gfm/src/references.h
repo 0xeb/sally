@@ -1,5 +1,4 @@
-﻿// CommentsTranslationProject: TRANSLATED
-#ifndef CMARK_REFERENCES_H
+﻿#ifndef CMARK_REFERENCES_H
 #define CMARK_REFERENCES_H
 
 #include "map.h"

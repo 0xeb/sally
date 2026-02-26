@@ -1,5 +1,4 @@
-﻿// CommentsTranslationProject: TRANSLATED
-/*
+﻿/*
  * Header for int64.c.
  */
 

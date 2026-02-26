@@ -1,5 +1,4 @@
-﻿// CommentsTranslationProject: TRANSLATED
-#ifndef TextsWinH
+﻿#ifndef TextsWinH
 #define TextsWinH
 
 #define DND_DOWNLOAD_MOVE_WARNING 1050

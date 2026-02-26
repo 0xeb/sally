@@ -1,5 +1,4 @@
-﻿// CommentsTranslationProject: TRANSLATED
-#ifndef CMARK_GFM_TAGFILTER_H
+﻿#ifndef CMARK_GFM_TAGFILTER_H
 #define CMARK_GFM_TAGFILTER_H
 
 #include "cmark-gfm-core-extensions.h"

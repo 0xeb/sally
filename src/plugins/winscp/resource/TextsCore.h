@@ -1,5 +1,4 @@
-﻿// CommentsTranslationProject: TRANSLATED
-#ifndef TextsCoreH
+﻿#ifndef TextsCoreH
 #define TextsCoreH
 
 #define UNKNOWN_KEY2    1

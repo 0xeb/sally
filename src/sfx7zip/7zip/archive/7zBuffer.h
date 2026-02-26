@@ -1,5 +1,4 @@
-﻿// CommentsTranslationProject: TRANSLATED
-/* 7zBuffer.h */
+﻿/* 7zBuffer.h */
 
 #ifndef __7Z_BUFFER_H
 #define __7Z_BUFFER_H

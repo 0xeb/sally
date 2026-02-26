@@ -1,5 +1,4 @@
-﻿// CommentsTranslationProject: TRANSLATED
-#ifndef HEADER_OPENSSLV_H
+﻿#ifndef HEADER_OPENSSLV_H
 #define HEADER_OPENSSLV_H
 
 /* Numeric release version identifier:

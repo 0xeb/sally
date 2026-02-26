@@ -1,5 +1,4 @@
-﻿// CommentsTranslationProject: TRANSLATED
-#ifndef CMARK_SYNTAX_EXTENSION_H
+﻿#ifndef CMARK_SYNTAX_EXTENSION_H
 #define CMARK_SYNTAX_EXTENSION_H
 
 #include "cmark-gfm.h"

@@ -1,5 +1,4 @@
-﻿// CommentsTranslationProject: TRANSLATED
-//---------------------------------------------------------------------------
+﻿//---------------------------------------------------------------------------
 #ifndef SftpFileSystemH
 #define SftpFileSystemH
 

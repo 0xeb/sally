@@ -1,5 +1,4 @@
-﻿// CommentsTranslationProject: TRANSLATED
-#ifndef CMARK_SCANNERS_H
+﻿#ifndef CMARK_SCANNERS_H
 #define CMARK_SCANNERS_H
 
 #include "cmark-gfm.h"

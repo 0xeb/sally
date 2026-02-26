@@ -1,5 +1,4 @@
-﻿// CommentsTranslationProject: TRANSLATED
-/* 7zHeader.h */
+﻿/* 7zHeader.h */
 
 #ifndef __7Z_HEADER_H
 #define __7Z_HEADER_H

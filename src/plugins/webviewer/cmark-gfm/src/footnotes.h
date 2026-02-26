@@ -1,5 +1,4 @@
-﻿// CommentsTranslationProject: TRANSLATED
-#ifndef CMARK_FOOTNOTES_H
+﻿#ifndef CMARK_FOOTNOTES_H
 #define CMARK_FOOTNOTES_H
 
 #include "map.h"

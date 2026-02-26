@@ -1,5 +1,4 @@
-﻿// CommentsTranslationProject: TRANSLATED
-#include <gtest/gtest.h>
+﻿#include <gtest/gtest.h>
 #include "../../ui/IPrompter.h"
 #include "../../common/unicode/helpers.h"
 #include <string>

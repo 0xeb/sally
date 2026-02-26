@@ -1,5 +1,4 @@
-﻿// CommentsTranslationProject: TRANSLATED
-#ifndef CMARK_REGISTRY_H
+﻿#ifndef CMARK_REGISTRY_H
 #define CMARK_REGISTRY_H
 
 #ifdef __cplusplus

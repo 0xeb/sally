@@ -1,5 +1,4 @@
-﻿// CommentsTranslationProject: TRANSLATED
-#ifndef CMARK_NODE_H
+﻿#ifndef CMARK_NODE_H
 #define CMARK_NODE_H
 
 #ifdef __cplusplus

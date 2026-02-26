@@ -1,5 +1,4 @@
-﻿// CommentsTranslationProject: TRANSLATED
-#ifndef CMARK_RENDER_H
+﻿#ifndef CMARK_RENDER_H
 #define CMARK_RENDER_H
 
 #ifdef __cplusplus

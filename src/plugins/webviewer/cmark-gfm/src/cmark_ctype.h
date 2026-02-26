@@ -1,5 +1,4 @@
-﻿// CommentsTranslationProject: TRANSLATED
-#ifndef CMARK_CMARK_CTYPE_H
+﻿#ifndef CMARK_CMARK_CTYPE_H
 #define CMARK_CMARK_CTYPE_H
 
 #ifdef __cplusplus

@@ -1,5 +1,4 @@
-﻿// CommentsTranslationProject: TRANSLATED
-/* fix for MSVC ...evil! */
+﻿/* fix for MSVC ...evil! */
 #ifdef _MSC_VER
    #define CONST64(n) n ## ui64
    typedef unsigned __int64 ulong64;

@@ -1,5 +1,4 @@
-﻿// CommentsTranslationProject: TRANSLATED
-/* $Id$ */
+﻿/* $Id$ */
 /***************************************************************************
  *                        lzx.h - LZX decompression routines               *
  *                           -------------------                           *

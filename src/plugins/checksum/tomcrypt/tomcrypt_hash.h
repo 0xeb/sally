@@ -1,5 +1,4 @@
-﻿// CommentsTranslationProject: TRANSLATED
-/* ---- HASH FUNCTIONS ---- */
+﻿/* ---- HASH FUNCTIONS ---- */
 #ifdef LTC_SHA512
 struct sha512_state {
     ulong64  length, state[8];

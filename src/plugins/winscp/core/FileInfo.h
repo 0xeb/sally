@@ -1,5 +1,4 @@
-﻿// CommentsTranslationProject: TRANSLATED
-#ifndef FileInfoH
+﻿#ifndef FileInfoH
 #define FileInfoH
 
 struct TTranslation {

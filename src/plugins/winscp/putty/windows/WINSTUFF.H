@@ -1,5 +1,4 @@
-﻿// CommentsTranslationProject: TRANSLATED
-/*
+﻿/*
  * winstuff.h: Windows-specific inter-module stuff.
  */
 

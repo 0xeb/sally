@@ -1,5 +1,4 @@
-﻿// CommentsTranslationProject: TRANSLATED
-/*
+﻿/*
  * PuTTY memory-handling header.
  */
 

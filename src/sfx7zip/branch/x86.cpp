@@ -1,5 +1,4 @@
-﻿// CommentsTranslationProject: TRANSLATED
-// x86.cpp
+﻿// x86.cpp
 
 //#include "StdAfx.h"
 #include "x86.h"

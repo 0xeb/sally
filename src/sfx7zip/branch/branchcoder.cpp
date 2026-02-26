@@ -1,5 +1,4 @@
-﻿// CommentsTranslationProject: TRANSLATED
-// BranchCoder.cpp
+﻿// BranchCoder.cpp
 
 //#include "StdAfx.h"
 #include "BranchCoder.h"

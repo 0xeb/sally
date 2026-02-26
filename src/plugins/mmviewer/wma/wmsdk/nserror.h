@@ -1,5 +1,4 @@
-﻿// CommentsTranslationProject: TRANSLATED
-/*++
+﻿/*++
 
   Microsoft Windows Media Technology
   Copyright (C) Microsoft Corporation, 1999 - 2001.  All Rights Reserved.

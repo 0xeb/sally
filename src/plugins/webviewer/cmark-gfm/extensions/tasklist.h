@@ -1,5 +1,4 @@
-﻿// CommentsTranslationProject: TRANSLATED
-#ifndef TASKLIST_H
+﻿#ifndef TASKLIST_H
 #define TASKLIST_H
 
 #include "cmark-gfm-core-extensions.h"

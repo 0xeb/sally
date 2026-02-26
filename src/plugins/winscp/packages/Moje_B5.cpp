@@ -1,5 +1,4 @@
-﻿// CommentsTranslationProject: TRANSLATED
-//---------------------------------------------------------------------------
+﻿//---------------------------------------------------------------------------
 #include <vcl.h>
 #pragma hdrstop
 #pragma package(smart_init)

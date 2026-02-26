@@ -1,5 +1,4 @@
-﻿// CommentsTranslationProject: TRANSLATED
-#include "precomp.h"
+﻿#include "precomp.h"
 
 #include "../dlldefs.h"
 #include "../fileio.h"

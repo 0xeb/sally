@@ -1,5 +1,4 @@
-﻿// CommentsTranslationProject: TRANSLATED
-#ifndef CMARK_GFM_H
+﻿#ifndef CMARK_GFM_H
 #define CMARK_GFM_H
 
 #include <stdio.h>

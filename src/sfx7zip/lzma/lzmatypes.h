@@ -1,5 +1,4 @@
-﻿// CommentsTranslationProject: TRANSLATED
-/* 
+﻿/* 
 LzmaTypes.h 
 
 Types for LZMA Decoder

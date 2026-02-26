@@ -1,5 +1,4 @@
-﻿// CommentsTranslationProject: TRANSLATED
-/*
+﻿/*
  * Header for misc.c.
  */
 

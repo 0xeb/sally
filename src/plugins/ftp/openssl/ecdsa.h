@@ -1,5 +1,4 @@
-﻿// CommentsTranslationProject: TRANSLATED
-/* crypto/ecdsa/ecdsa.h */
+﻿/* crypto/ecdsa/ecdsa.h */
 /**
  * \file   crypto/ecdsa/ecdsa.h Include file for the OpenSSL ECDSA functions
  * \author Written by Nils Larsch for the OpenSSL project

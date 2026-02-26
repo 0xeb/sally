@@ -1,5 +1,4 @@
-﻿// CommentsTranslationProject: TRANSLATED
-/* LibTomCrypt, modular cryptographic library -- Tom St Denis */
+﻿/* LibTomCrypt, modular cryptographic library -- Tom St Denis */
 /* SPDX-License-Identifier: Unlicense */
 
 /* ---- SYMMETRIC KEY STUFF -----

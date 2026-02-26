@@ -1,5 +1,4 @@
-﻿// CommentsTranslationProject: TRANSLATED
-//---------------------------------------------------------------------------
+﻿//---------------------------------------------------------------------------
 #ifndef HierarchicalStorageH
 #define HierarchicalStorageH
 

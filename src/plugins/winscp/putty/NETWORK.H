@@ -1,5 +1,4 @@
-﻿// CommentsTranslationProject: TRANSLATED
-/*
+﻿/*
  * Networking abstraction in PuTTY.
  *
  * The way this works is: a back end can choose to open any number

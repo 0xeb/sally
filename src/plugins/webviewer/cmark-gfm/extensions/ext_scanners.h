@@ -1,5 +1,4 @@
-﻿// CommentsTranslationProject: TRANSLATED
-#include "chunk.h"
+﻿#include "chunk.h"
 #include "cmark-gfm.h"
 
 #ifdef __cplusplus

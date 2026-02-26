@@ -1,5 +1,4 @@
-﻿// CommentsTranslationProject: TRANSLATED
-#ifndef CMARK_HTML_H
+﻿#ifndef CMARK_HTML_H
 #define CMARK_HTML_H
 
 #include "buffer.h"

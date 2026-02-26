@@ -1,5 +1,4 @@
-﻿// CommentsTranslationProject: TRANSLATED
-
+﻿
 /*-------------------------------------------------------------*/
 /*--- Private header file for the library.                  ---*/
 /*---                                       bzlib_private.h ---*/

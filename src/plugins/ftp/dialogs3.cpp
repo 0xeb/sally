@@ -2,7 +2,6 @@
 // SPDX-FileCopyrightText: 2026 Sally Authors
 // SPDX-FileCopyrightText: 2026 Sally Authors
 // SPDX-License-Identifier: GPL-2.0-or-later
-// CommentsTranslationProject: TRANSLATED
 
 #include "precomp.h"
 
@@ -1231,7 +1230,7 @@ CEditRulesControlWindow::WindowProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
                         "add_string_to_column(<column-id>, string-expression)",
                         "month_3(<column-id>, \"jan feb mar apr may jun jul aug sep oct nov dec\")",
                         "month_txt(<column-id>)",
-                        "month_txt(<column-id>, \"Jan. Feb. März Apr. Mai Juni Juli Aug. Sept. Okt. Nov. Dez.\")",
+                        "month_txt(<column-id>, \"Jan. Feb. Mï¿½rz Apr. Mai Juni Juli Aug. Sept. Okt. Nov. Dez.\")",
                         "positive_number(<column-id>)",
                         "cut_end_of_string(<column-id>, number)",
                         "skip_to_number()",

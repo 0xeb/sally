@@ -1,5 +1,4 @@
-﻿// CommentsTranslationProject: TRANSLATED
-#ifndef CMARK_PARSER_H
+﻿#ifndef CMARK_PARSER_H
 #define CMARK_PARSER_H
 
 #include <stdio.h>

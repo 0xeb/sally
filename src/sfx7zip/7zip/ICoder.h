@@ -1,5 +1,4 @@
-﻿// CommentsTranslationProject: TRANSLATED
-// ICoder.h
+﻿// ICoder.h
 
 #ifndef __ICODER_H
 #define __ICODER_H

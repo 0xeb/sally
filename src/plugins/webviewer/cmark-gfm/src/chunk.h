@@ -1,5 +1,4 @@
-﻿// CommentsTranslationProject: TRANSLATED
-#ifndef CMARK_CHUNK_H
+﻿#ifndef CMARK_CHUNK_H
 #define CMARK_CHUNK_H
 
 #include <string.h>

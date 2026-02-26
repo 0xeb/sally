@@ -1,5 +1,4 @@
-﻿// CommentsTranslationProject: TRANSLATED
-// Windows Template Library - WTL version 10.0
+﻿// Windows Template Library - WTL version 10.0
 // Copyright (C) Microsoft Corporation, WTL Team. All rights reserved.
 //
 // This file is a part of the Windows Template Library.

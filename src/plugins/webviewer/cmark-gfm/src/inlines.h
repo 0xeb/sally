@@ -1,5 +1,4 @@
-﻿// CommentsTranslationProject: TRANSLATED
-#ifndef CMARK_INLINES_H
+﻿#ifndef CMARK_INLINES_H
 #define CMARK_INLINES_H
 
 #ifdef __cplusplus

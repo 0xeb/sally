@@ -1,5 +1,4 @@
-﻿// CommentsTranslationProject: TRANSLATED
-//---------------------------------------------------------------------------
+﻿//---------------------------------------------------------------------------
 #ifndef FtpFileSystemH
 #define FtpFileSystemH
 
