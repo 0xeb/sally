@@ -33,7 +33,7 @@ jobs:
         uses: actions/checkout@v4
 
       - name: Configure CMake (${{ matrix.arch }})
-        run: cmake -B build -A ${{ matrix.cmake_arch }}
+        run: cmake -B build -A ${{ matrix.cmake_arch }} -DSAL_BUILD_DEMOPLUG=OFF
 
       - name: Build RelWithDebInfo
         run: cmake --build build --config RelWithDebInfo --target populate -j

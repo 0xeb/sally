@@ -185,17 +185,21 @@ void ApplyListTreeThemeToControl(HWND hwnd, BOOL useDark)
 
     if (_tcsicmp(className, WC_LISTVIEW) == 0)
     {
-        ListView_SetBkColor(hwnd, useDark ? DIALOG_DARK_INPUT_BG : CLR_DEFAULT);
-        ListView_SetTextBkColor(hwnd, useDark ? DIALOG_DARK_INPUT_BG : CLR_DEFAULT);
-        ListView_SetTextColor(hwnd, useDark ? DIALOG_DARK_INPUT_TEXT : CLR_DEFAULT);
+        COLORREF bgColor = useDark ? DIALOG_DARK_INPUT_BG : GetSysColor(COLOR_WINDOW);
+        COLORREF textColor = useDark ? DIALOG_DARK_INPUT_TEXT : GetSysColor(COLOR_WINDOWTEXT);
+        ListView_SetBkColor(hwnd, bgColor);
+        ListView_SetTextBkColor(hwnd, bgColor);
+        ListView_SetTextColor(hwnd, textColor);
         InvalidateRect(hwnd, NULL, FALSE);
         return;
     }
 
     if (_tcsicmp(className, WC_TREEVIEW) == 0)
     {
-        TreeView_SetBkColor(hwnd, useDark ? DIALOG_DARK_INPUT_BG : CLR_DEFAULT);
-        TreeView_SetTextColor(hwnd, useDark ? DIALOG_DARK_TEXT : CLR_DEFAULT);
+        COLORREF bgColor = useDark ? DIALOG_DARK_INPUT_BG : GetSysColor(COLOR_WINDOW);
+        COLORREF textColor = useDark ? DIALOG_DARK_TEXT : GetSysColor(COLOR_WINDOWTEXT);
+        TreeView_SetBkColor(hwnd, bgColor);
+        TreeView_SetTextColor(hwnd, textColor);
         InvalidateRect(hwnd, NULL, FALSE);
         return;
     }

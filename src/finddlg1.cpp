@@ -18,6 +18,7 @@
 #include "usermenu.h"
 #include "execute.h"
 #include "tasklist.h"
+#include "darkmode.h"
 
 #include <shlwapi.h>
 
@@ -26,6 +27,25 @@ const char* NORMAL_FINDING_CAPTION = "%s [%s %s]";
 
 BOOL FindManageInUse = FALSE;
 BOOL FindIgnoreInUse = FALSE;
+
+static void ApplyFindResultsListColors(HWND hDialog)
+{
+    HWND hListView = GetDlgItem(hDialog, IDC_FIND_RESULTS);
+    if (hListView == NULL)
+        return;
+
+    if (DarkMode_ShouldUseDark())
+    {
+        DarkMode_ApplyListTreeThemeRecursive(hListView);
+        return;
+    }
+
+    COLORREF bgColor = GetSysColor(COLOR_WINDOW);
+    ListView_SetBkColor(hListView, bgColor);
+    ListView_SetTextBkColor(hListView, bgColor);
+    ListView_SetTextColor(hListView, GetSysColor(COLOR_WINDOWTEXT));
+    InvalidateRect(hListView, NULL, TRUE);
+}
 
 //****************************************************************************
 //
@@ -2956,6 +2976,7 @@ CFindDialog::DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
         LayoutControls();
         FoundFilesListView->InitColumns();
         SetContentVisible(Configuration.SearchFileContent);
+        ApplyFindResultsListColors(HWindow);
 
         // remove WS_TABSTOP from IDC_FIND_ADVANCED_TEXT
         DWORD style = (DWORD)GetWindowLongPtr(GetDlgItem(HWindow, IDC_FIND_ADVANCED_TEXT), GWL_STYLE);
@@ -4361,9 +4382,11 @@ MENU_TEMPLATE_ITEM FindLookInBrowseMenu[] =
         break;
     }
 
+    case WM_SETTINGCHANGE:
+    case WM_THEMECHANGED:
     case WM_SYSCOLORCHANGE:
     {
-        ListView_SetBkColor(GetDlgItem(HWindow, IDC_FIND_RESULTS), GetSysColor(COLOR_WINDOW));
+        ApplyFindResultsListColors(HWindow);
         break;
     }
     }
