@@ -7,6 +7,7 @@
 
 #include <commctrl.h>
 #include <tchar.h>
+#include <uxtheme.h>
 
 namespace
 {
@@ -35,6 +36,8 @@ const COLORREF DIALOG_DARK_INPUT_BG = RGB(30, 30, 30);
 const COLORREF DIALOG_DARK_INPUT_TEXT = RGB(245, 245, 245);
 const TCHAR* IMMERSIVE_COLOR_SET_PARAM = TEXT("ImmersiveColorSet");
 const TCHAR* WINDOWS_THEME_ELEMENT_PARAM = TEXT("WindowsThemeElement");
+const TCHAR* SCROLLBAR_CLASS_NAME = TEXT("ScrollBar");
+const WCHAR* UXTHEME_DARKMODE_EXPLORER = L"DarkMode_Explorer";
 
 HBRUSH DialogDarkBrush = NULL;
 HBRUSH DialogDarkInputBrush = NULL;
@@ -170,6 +173,14 @@ void ApplyListTreeThemeToControl(HWND hwnd, BOOL useDark)
     TCHAR className[64] = {0};
     if (GetClassName(hwnd, className, _countof(className)) == 0)
         return;
+
+    if (_tcsicmp(className, SCROLLBAR_CLASS_NAME) == 0)
+    {
+        // Custom panel scrollbars are separate controls and need explicit theming.
+        SetWindowTheme(hwnd, useDark ? UXTHEME_DARKMODE_EXPLORER : NULL, NULL);
+        InvalidateRect(hwnd, NULL, TRUE);
+        return;
+    }
 
     if (_tcsicmp(className, WC_LISTVIEW) == 0)
     {

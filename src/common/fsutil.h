@@ -186,6 +186,26 @@ BOOL IsUNCRootPathW(const wchar_t* path);
 //
 BOOL IsUNCPathW(const wchar_t* path);
 
+// Checks whether path/filename basename is reserved DOS device name "nul"
+// (case-insensitive). Accepts either full path or name-only input.
+BOOL IsReservedNulBasenameW(const wchar_t* pathOrName);
+BOOL IsReservedNulBasenameA(const char* pathOrName);
+
+// Central delete policy: returns TRUE when delete must not go through
+// recycle-bin shell path and should use direct filesystem delete instead.
+BOOL ShouldBypassRecycleBinForDeleteW(const wchar_t* pathOrName);
+BOOL ShouldBypassRecycleBinForDeleteA(const char* pathOrName);
+
+// Computes panel delete recycle mode (0/1/2) from configuration and context.
+// - `driveIsFixed`: TRUE when source path is fixed local drive.
+// - `configuredUseRecycleBin`: Configuration.UseRecycleBin (0/1/2).
+// - `invertRecycleBin`: TRUE when Shift inverts recycle usage.
+// - `bypassRecycleForEntry`: TRUE for special entries that must use direct delete.
+int ComputeDeleteRecycleMode(BOOL driveIsFixed,
+                             int configuredUseRecycleBin,
+                             BOOL invertRecycleBin,
+                             BOOL bypassRecycleForEntry);
+
 // Checks if a path has a trailing backslash.
 //
 // Parameters:

@@ -14,6 +14,7 @@
 #include "pack.h"
 #include "mapi.h"
 #include "ui/IPrompter.h"
+#include "common/fsutil.h"
 #include "common/IFileSystem.h"
 #include "common/unicode/helpers.h"
 #include "common/widepath.h"
@@ -338,25 +339,42 @@ void CFilesWindow::FilesAction(CActionType type, CFilesWindow* target, int count
         //---
         int recycle = 0;
         BOOL canUseRecycleBin = TRUE;
+        BOOL containsReservedNul = FALSE;
         if (type == atDelete)
         {
-            if (MyGetDriveType(GetPath()) != DRIVE_FIXED)
+            if (count > 0)
             {
-                recycle = 0;              // none
-                canUseRecycleBin = FALSE; // it will not work because Windows does not support it
+                int i;
+                for (i = 0; i < count; i++)
+                {
+                    int index = indexes[i];
+                    if (index < 0 || index >= Dirs->Count + Files->Count)
+                        continue;
+                    if (index == 0 && subDir)
+                        continue; // ".."
+                    CFileData* item = (index < Dirs->Count) ? &Dirs->At(index) : &Files->At(index - Dirs->Count);
+                    if (ShouldBypassRecycleBinForDeleteA(item->Name))
+                    {
+                        containsReservedNul = TRUE;
+                        break;
+                    }
+                }
             }
             else
             {
-                if (invertRecycleBin)
+                int index = GetCaretIndex();
+                if (index >= 0 && index < Dirs->Count + Files->Count &&
+                    !(index == 0 && subDir))
                 {
-                    if (Configuration.UseRecycleBin == 0)
-                        recycle = 1; // all
-                    else
-                        recycle = 0; // none
+                    CFileData* item = (index < Dirs->Count) ? &Dirs->At(index) : &Files->At(index - Dirs->Count);
+                    containsReservedNul = ShouldBypassRecycleBinForDeleteA(item->Name);
                 }
-                else
-                    recycle = Configuration.UseRecycleBin;
             }
+
+            BOOL driveIsFixed = MyGetDriveType(GetPath()) == DRIVE_FIXED;
+            canUseRecycleBin = driveIsFixed;
+            recycle = ComputeDeleteRecycleMode(driveIsFixed, Configuration.UseRecycleBin,
+                                               invertRecycleBin, containsReservedNul);
         }
 
         CFileData* f = NULL;

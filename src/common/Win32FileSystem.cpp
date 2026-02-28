@@ -4,7 +4,142 @@
 #include "precomp.h"
 #include "IFileSystem.h"
 #include "IPathService.h"
+#include "fsutil.h"
 #include <string>
+
+namespace
+{
+bool HasLongPrefix(const wchar_t* path)
+{
+    return path != NULL && wcsncmp(path, L"\\\\?\\", 4) == 0;
+}
+
+bool IsUNCPath(const wchar_t* path)
+{
+    return path != NULL && path[0] == L'\\' && path[1] == L'\\' && !HasLongPrefix(path);
+}
+
+bool IsDriveAbsolutePath(const wchar_t* path)
+{
+    return path != NULL &&
+           ((path[0] >= L'A' && path[0] <= L'Z') || (path[0] >= L'a' && path[0] <= L'z')) &&
+           path[1] == L':' &&
+           (path[2] == L'\\' || path[2] == L'/');
+}
+
+void NormalizePathSeparators(std::wstring& path)
+{
+    for (size_t i = 0; i < path.size(); ++i)
+    {
+        if (path[i] == L'/')
+            path[i] = L'\\';
+    }
+}
+
+const wchar_t* GetBaseName(const wchar_t* path)
+{
+    if (path == NULL)
+        return NULL;
+
+    const wchar_t* lastSlash = wcsrchr(path, L'\\');
+    const wchar_t* lastAltSlash = wcsrchr(path, L'/');
+    const wchar_t* name = path;
+    if (lastSlash != NULL && lastSlash >= name)
+        name = lastSlash + 1;
+    if (lastAltSlash != NULL && lastAltSlash + 1 > name)
+        name = lastAltSlash + 1;
+    return name;
+}
+
+bool BuildExtendedAbsolutePath(const wchar_t* inputPath, std::wstring& outPath)
+{
+    if (inputPath == NULL || inputPath[0] == L'\0')
+    {
+        SetLastError(ERROR_INVALID_PARAMETER);
+        return false;
+    }
+
+    if (HasLongPrefix(inputPath))
+    {
+        outPath.assign(inputPath);
+        return true;
+    }
+
+    if (gPathService == NULL)
+        gPathService = GetWin32PathService();
+    if (gPathService == NULL)
+    {
+        SetLastError(ERROR_INVALID_FUNCTION);
+        return false;
+    }
+
+    std::wstring fullPath;
+    if (IsReservedNulBasenameW(inputPath))
+    {
+        if (IsDriveAbsolutePath(inputPath) || IsUNCPath(inputPath))
+        {
+            fullPath.assign(inputPath);
+            NormalizePathSeparators(fullPath);
+        }
+        else
+        {
+            // GetFullPathNameW("...\\nul") resolves to device path (\\.\nul), so
+            // resolve only the parent and then append the reserved file name.
+            const wchar_t* baseName = GetBaseName(inputPath);
+            size_t parentLen = (baseName != NULL) ? static_cast<size_t>(baseName - inputPath) : 0;
+            std::wstring parentPath = parentLen > 0 ? std::wstring(inputPath, parentLen) : std::wstring(L".");
+
+            PathResult parentRes = gPathService->GetFullPathName(parentPath.c_str(), fullPath);
+            if (!parentRes.success)
+            {
+                SetLastError(parentRes.errorCode);
+                return false;
+            }
+            if (fullPath.empty())
+            {
+                SetLastError(ERROR_INVALID_PARAMETER);
+                return false;
+            }
+            if (fullPath.back() != L'\\' && fullPath.back() != L'/')
+                fullPath.push_back(L'\\');
+            fullPath.append(baseName != NULL ? baseName : L"nul");
+        }
+    }
+    else
+    {
+        PathResult fullRes = gPathService->GetFullPathName(inputPath, fullPath);
+        if (!fullRes.success)
+        {
+            SetLastError(fullRes.errorCode);
+            return false;
+        }
+
+        if (fullPath.empty())
+        {
+            SetLastError(ERROR_INVALID_PARAMETER);
+            return false;
+        }
+    }
+
+    if (HasLongPrefix(fullPath.c_str()))
+    {
+        outPath.swap(fullPath);
+        return true;
+    }
+
+    if (IsUNCPath(fullPath.c_str()))
+        outPath = L"\\\\?\\UNC\\" + fullPath.substr(2);
+    else
+        outPath = L"\\\\?\\" + fullPath;
+
+    if (outPath.size() > SAL_MAX_LONG_PATH - 1)
+    {
+        SetLastError(ERROR_FILENAME_EXCED_RANGE);
+        return false;
+    }
+    return true;
+}
+} // namespace
 
 // RAII wrapper for ToLongPath result
 class LongPath
@@ -109,6 +244,16 @@ public:
 
     FileResult DeleteFile(const wchar_t* path) override
     {
+        if (IsReservedNulBasenameW(path))
+        {
+            std::wstring specialPath;
+            if (!BuildExtendedAbsolutePath(path, specialPath))
+                return FileResult::Error(LastErrorOr(ERROR_INVALID_PARAMETER));
+            if (::DeleteFileW(specialPath.c_str()))
+                return FileResult::Ok();
+            return FileResult::Error(GetLastError());
+        }
+
         LongPath lp(path);
         if (!lp.IsValid())
             return FileResult::Error(LastErrorOr(ERROR_INVALID_PARAMETER));

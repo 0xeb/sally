@@ -98,6 +98,56 @@ TEST(BuildPathW_ANSI, NullDirectory)
 }
 
 // ============================================================================
+// Reserved name delete policy tests
+// ============================================================================
+
+TEST(ReservedNulBasenameW, DetectsNameAndPath)
+{
+    EXPECT_TRUE(IsReservedNulBasenameW(L"nul"));
+    EXPECT_TRUE(IsReservedNulBasenameW(L"NUL"));
+    EXPECT_TRUE(IsReservedNulBasenameW(L"C:\\temp\\nul"));
+    EXPECT_TRUE(IsReservedNulBasenameW(L"C:/temp/NuL"));
+    EXPECT_FALSE(IsReservedNulBasenameW(L"nul.txt"));
+    EXPECT_FALSE(IsReservedNulBasenameW(L"null"));
+}
+
+TEST(ReservedNulBasenameA, DetectsNameAndPath)
+{
+    EXPECT_TRUE(IsReservedNulBasenameA("nul"));
+    EXPECT_TRUE(IsReservedNulBasenameA("NUL"));
+    EXPECT_TRUE(IsReservedNulBasenameA("C:\\temp\\nul"));
+    EXPECT_TRUE(IsReservedNulBasenameA("C:/temp/NuL"));
+    EXPECT_FALSE(IsReservedNulBasenameA("nul.txt"));
+    EXPECT_FALSE(IsReservedNulBasenameA("null"));
+}
+
+TEST(DeletePolicyBypassRecycleBin, UsesReservedNulRule)
+{
+    EXPECT_TRUE(ShouldBypassRecycleBinForDeleteW(L"C:\\temp\\nul"));
+    EXPECT_TRUE(ShouldBypassRecycleBinForDeleteA("C:\\temp\\nul"));
+    EXPECT_FALSE(ShouldBypassRecycleBinForDeleteW(L"C:\\temp\\file.txt"));
+    EXPECT_FALSE(ShouldBypassRecycleBinForDeleteA("C:\\temp\\file.txt"));
+}
+
+TEST(DeletePolicyRecycleMode, HandlesDriveConfigAndInvert)
+{
+    EXPECT_EQ(ComputeDeleteRecycleMode(TRUE, 1, FALSE, FALSE), 1);
+    EXPECT_EQ(ComputeDeleteRecycleMode(TRUE, 0, FALSE, FALSE), 0);
+    EXPECT_EQ(ComputeDeleteRecycleMode(TRUE, 2, FALSE, FALSE), 2);
+    EXPECT_EQ(ComputeDeleteRecycleMode(TRUE, 0, TRUE, FALSE), 1);
+    EXPECT_EQ(ComputeDeleteRecycleMode(TRUE, 1, TRUE, FALSE), 0);
+    EXPECT_EQ(ComputeDeleteRecycleMode(FALSE, 1, FALSE, FALSE), 0);
+}
+
+TEST(DeletePolicyRecycleMode, BypassForcesDirectDelete)
+{
+    EXPECT_EQ(ComputeDeleteRecycleMode(TRUE, 1, FALSE, TRUE), 0);
+    EXPECT_EQ(ComputeDeleteRecycleMode(TRUE, 2, FALSE, TRUE), 0);
+    EXPECT_EQ(ComputeDeleteRecycleMode(TRUE, 0, TRUE, TRUE), 0);
+    EXPECT_EQ(ComputeDeleteRecycleMode(FALSE, 1, FALSE, TRUE), 0);
+}
+
+// ============================================================================
 // GetFileNameW tests
 // ============================================================================
 

@@ -6,6 +6,7 @@
 
 #include "cfgdlg.h"
 #include "worker.h"
+#include "common/fsutil.h"
 #include "common/widepath.h"
 #include "common/IFileSystem.h"
 #include "common/IWorkerObserver.h"
@@ -6450,7 +6451,8 @@ BOOL DoDeleteFile(IWorkerObserver& observer, char* name, const CQuadWord& size, 
     // if the path ends with a space/dot it is invalid and we must not delete it,
     // DeleteFile would trim the spaces/dots and remove a different file
     std::wstring effectiveDeleteNameW = !nameW.empty() ? nameW : AnsiToWide(name);
-    BOOL invalidName = FileNameIsInvalidW(effectiveDeleteNameW.c_str(), TRUE);
+    BOOL deleteNameIsNul = ShouldBypassRecycleBinForDeleteW(effectiveDeleteNameW.c_str());
+    BOOL invalidName = FileNameIsInvalidW(effectiveDeleteNameW.c_str(), TRUE) && !deleteNameIsNul;
 
     DWORD err;
     while (1)
@@ -6533,6 +6535,9 @@ BOOL DoDeleteFile(IWorkerObserver& observer, char* name, const CQuadWord& size, 
                 break;
             }
             }
+            if (deleteNameIsNul)
+                useRecycleBin = FALSE;
+
             if (useRecycleBin)
             {
                 std::wstring effectiveNameW = !nameW.empty() ? nameW : AnsiToWide(name);
@@ -6561,8 +6566,23 @@ BOOL DoDeleteFile(IWorkerObserver& observer, char* name, const CQuadWord& size, 
             else
             {
                 std::wstring effectiveNameW = !nameW.empty() ? nameW : AnsiToWide(name);
-                if (!DeleteFileW(effectiveNameW.c_str()))
-                    err = GetLastError();
+                if (deleteNameIsNul)
+                {
+                    IFileSystem* fileSystem = GetWorkerFileSystem();
+                    if (fileSystem == NULL)
+                        err = ERROR_INVALID_FUNCTION;
+                    else
+                    {
+                        FileResult deleteRes = fileSystem->DeleteFile(effectiveNameW.c_str());
+                        if (!deleteRes.success)
+                            err = deleteRes.errorCode;
+                    }
+                }
+                else
+                {
+                    if (!DeleteFileW(effectiveNameW.c_str()))
+                        err = GetLastError();
+                }
             }
         }
         else

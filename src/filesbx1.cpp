@@ -13,6 +13,7 @@
 #include "stswnd.h"
 #include "shellib.h"
 #include "snooper.h"
+#include "darkmode.h"
 
 const char* CFILESBOX_CLASSNAME = "SalamanderItemsBox";
 
@@ -2215,6 +2216,9 @@ BOOL CFilesBox::ShowHideChilds()
                           &HeaderLine);
         change = TRUE;
     }
+
+    if (change)
+        DarkMode_ApplyListTreeThemeRecursive(HWindow);
 
     return change;
 }

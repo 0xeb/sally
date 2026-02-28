@@ -12,6 +12,7 @@
 #include <windows.h>
 #include <stdlib.h>
 #include <string.h>
+#include <string>
 
 #include "../common/IFileSystem.h"
 #include "../common/widepath.h"
@@ -39,6 +40,163 @@ static BOOL PathHasLongPrefix(const char* path)
     return path != NULL &&
            path[0] == '\\' && path[1] == '\\' &&
            path[2] == '?' && path[3] == '\\';
+}
+
+static BOOL PathHasLongPrefixW(const wchar_t* path)
+{
+    return path != NULL && wcsncmp(path, L"\\\\?\\", 4) == 0;
+}
+
+static BOOL IsUNCPathW(const wchar_t* path)
+{
+    return path != NULL && path[0] == L'\\' && path[1] == L'\\' && !PathHasLongPrefixW(path);
+}
+
+static BOOL IsDriveAbsolutePathW(const wchar_t* path)
+{
+    return path != NULL &&
+           ((path[0] >= L'A' && path[0] <= L'Z') || (path[0] >= L'a' && path[0] <= L'z')) &&
+           path[1] == L':' &&
+           (path[2] == L'\\' || path[2] == L'/');
+}
+
+static const wchar_t* GetBaseNameW(const wchar_t* path)
+{
+    if (path == NULL)
+        return NULL;
+
+    const wchar_t* lastSlash = wcsrchr(path, L'\\');
+    const wchar_t* lastAltSlash = wcsrchr(path, L'/');
+    const wchar_t* name = path;
+    if (lastSlash != NULL && lastSlash >= name)
+        name = lastSlash + 1;
+    if (lastAltSlash != NULL && lastAltSlash + 1 > name)
+        name = lastAltSlash + 1;
+    return name;
+}
+
+static BOOL IsBasenameNulA(const char* path)
+{
+    if (path == NULL || path[0] == '\0')
+        return FALSE;
+
+    const char* lastSlash = strrchr(path, '\\');
+    const char* lastAltSlash = strrchr(path, '/');
+    const char* name = path;
+    if (lastSlash != NULL && lastSlash >= name)
+        name = lastSlash + 1;
+    if (lastAltSlash != NULL && lastAltSlash + 1 > name)
+        name = lastAltSlash + 1;
+    return _stricmp(name, "nul") == 0;
+}
+
+static BOOL GetFullPathNameDynamicW(const wchar_t* inputPath, std::wstring& outPath)
+{
+    if (inputPath == NULL || inputPath[0] == L'\0')
+    {
+        SetLastError(ERROR_INVALID_PARAMETER);
+        return FALSE;
+    }
+
+    DWORD capacity = MAX_PATH;
+    while (1)
+    {
+        std::wstring buffer;
+        buffer.resize(capacity);
+
+        DWORD len = GetFullPathNameW(inputPath, capacity, &buffer[0], NULL);
+        if (len == 0)
+            return FALSE;
+
+        if (len < capacity)
+        {
+            buffer.resize(len);
+            outPath.swap(buffer);
+            return TRUE;
+        }
+
+        if (len >= SAL_MAX_LONG_PATH)
+        {
+            SetLastError(ERROR_FILENAME_EXCED_RANGE);
+            return FALSE;
+        }
+        capacity = len + 1;
+    }
+}
+
+static void NormalizeSeparatorsW(std::wstring& path)
+{
+    for (size_t i = 0; i < path.size(); ++i)
+    {
+        if (path[i] == L'/')
+            path[i] = L'\\';
+    }
+}
+
+static BOOL BuildExtendedAbsolutePathForReservedNulA(const char* inputPath, std::wstring& outPath)
+{
+    if (inputPath == NULL || inputPath[0] == '\0')
+    {
+        SetLastError(ERROR_INVALID_PARAMETER);
+        return FALSE;
+    }
+
+    int wlen = MultiByteToWideChar(CP_ACP, 0, inputPath, -1, NULL, 0);
+    if (wlen <= 0)
+        return FALSE;
+
+    std::wstring wideInput;
+    wideInput.resize(wlen);
+    if (MultiByteToWideChar(CP_ACP, 0, inputPath, -1, &wideInput[0], wlen) == 0)
+        return FALSE;
+    wideInput.resize(wlen - 1);
+
+    if (PathHasLongPrefixW(wideInput.c_str()))
+    {
+        outPath = wideInput;
+        return TRUE;
+    }
+
+    std::wstring fullPath;
+    if (IsDriveAbsolutePathW(wideInput.c_str()) || IsUNCPathW(wideInput.c_str()))
+    {
+        fullPath = wideInput;
+        NormalizeSeparatorsW(fullPath);
+    }
+    else
+    {
+        const wchar_t* baseName = GetBaseNameW(wideInput.c_str());
+        size_t parentLen = (baseName != NULL) ? static_cast<size_t>(baseName - wideInput.c_str()) : 0;
+        std::wstring parentPath = parentLen > 0 ? std::wstring(wideInput.c_str(), parentLen) : std::wstring(L".");
+        if (!GetFullPathNameDynamicW(parentPath.c_str(), fullPath))
+            return FALSE;
+        if (fullPath.empty())
+        {
+            SetLastError(ERROR_INVALID_PARAMETER);
+            return FALSE;
+        }
+        if (fullPath.back() != L'\\' && fullPath.back() != L'/')
+            fullPath.push_back(L'\\');
+        fullPath.append(baseName != NULL ? baseName : L"nul");
+    }
+
+    if (PathHasLongPrefixW(fullPath.c_str()))
+    {
+        outPath.swap(fullPath);
+        return TRUE;
+    }
+
+    if (IsUNCPathW(fullPath.c_str()))
+        outPath = L"\\\\?\\UNC\\" + fullPath.substr(2);
+    else
+        outPath = L"\\\\?\\" + fullPath;
+
+    if (outPath.size() > SAL_MAX_LONG_PATH - 1)
+    {
+        SetLastError(ERROR_FILENAME_EXCED_RANGE);
+        return FALSE;
+    }
+    return TRUE;
 }
 
 //
@@ -244,6 +402,14 @@ BOOL SalLPDeleteFile(const char* fileName)
     IFileSystem* fs = GetActiveFileSystem();
     if (fs != NULL)
         return ResultToBool(DeleteFileA(fs, fileName));
+
+    if (IsBasenameNulA(fileName))
+    {
+        std::wstring extendedPath;
+        if (!BuildExtendedAbsolutePathForReservedNulA(fileName, extendedPath))
+            return FALSE;
+        return DeleteFileW(extendedPath.c_str());
+    }
 
     SalWidePath widePath(fileName);
     if (!widePath.IsValid())
