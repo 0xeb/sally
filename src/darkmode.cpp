@@ -138,8 +138,9 @@ BOOL ShouldUseDarkColorsInternal()
 
 BOOL IsThemeSettingHint(LPARAM lParam)
 {
+    // WM_SETTINGCHANGE with NULL lParam is used for many unrelated updates.
     if (lParam == 0)
-        return TRUE;
+        return FALSE;
 
     LPCTSTR valueName = (LPCTSTR)lParam;
     if (valueName == NULL || *valueName == 0)

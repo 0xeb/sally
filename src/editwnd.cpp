@@ -1859,6 +1859,39 @@ CEditWindow::WindowProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
                 SelectObject(hDC, oldPen);
                 HANDLES(ReleaseDC(HWindow, hDC));
             }
+
+            // Keep default combo painting from clearing the custom dark frame.
+            RECT r;
+            r.left = 0;
+            r.top = 0;
+            r.right = cr.right;
+            r.bottom = 2;
+            ValidateRect(HWindow, &r);
+            r.left = 0;
+            r.top = cr.bottom - 2;
+            r.right = cr.right;
+            r.bottom = cr.bottom;
+            ValidateRect(HWindow, &r);
+            r.left = 0;
+            r.top = 2;
+            r.right = 2;
+            r.bottom = cr.bottom - 2;
+            ValidateRect(HWindow, &r);
+            r.left = cr.right - 2;
+            r.top = 2;
+            r.right = cr.right;
+            r.bottom = cr.bottom - 2;
+            ValidateRect(HWindow, &r);
+
+            int sbWidth = GetSystemMetrics(SM_CXVSCROLL);
+            int dividerX = cr.right - 2 - sbWidth;
+            r.left = dividerX - 1;
+            r.top = cr.top + 2;
+            r.right = dividerX + 1;
+            r.bottom = cr.bottom - 2;
+            if (r.right > r.left && r.bottom > r.top)
+                ValidateRect(HWindow, &r);
+
             break;
         }
 
