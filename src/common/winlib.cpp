@@ -463,7 +463,10 @@ CWindow::CWindowProcInt(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam, BOOL
     }
     // calling WindowProc(...) method of the corresponding window object
     if (uMsg == WM_SETTINGCHANGE && DarkMode_OnSettingChange(lParam))
+    {
         DarkMode_ApplyTitleBar(hwnd);
+        DarkMode_ApplyListTreeThemeRecursive(hwnd);
+    }
 
     LRESULT lResult;
     if (wnd != NULL)
@@ -719,6 +722,7 @@ CDialog::DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
         if (DarkMode_OnSettingChange(lParam))
         {
             DarkMode_ApplyTitleBar(HWindow);
+            DarkMode_ApplyListTreeThemeRecursive(HWindow);
             InvalidateRect(HWindow, NULL, TRUE);
         }
         break;
@@ -795,6 +799,9 @@ CDialog::CDialogProc(HWND hwndDlg, UINT uMsg, WPARAM wParam, LPARAM lParam)
         dlgRes = dlg->DialogProc(uMsg, wParam, lParam);
     else
         dlgRes = FALSE; // error or message didn't come between WM_INITDIALOG and WM_DESTROY
+
+    if (dlg != NULL && uMsg == WM_INITDIALOG)
+        DarkMode_ApplyListTreeThemeRecursive(hwndDlg);
 
     return dlgRes;
 }

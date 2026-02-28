@@ -5,6 +5,7 @@
 #include "precomp.h"
 #include "darkmode.h"
 
+#include <commctrl.h>
 #include <tchar.h>
 
 namespace
@@ -149,6 +150,7 @@ BOOL CALLBACK ApplyThreadWindowProc(HWND hwnd, LPARAM lParam)
 {
     UNREFERENCED_PARAMETER(lParam);
     DarkMode_ApplyTitleBar(hwnd);
+    DarkMode_ApplyListTreeThemeRecursive(hwnd);
     return TRUE;
 }
 
@@ -158,6 +160,39 @@ void EnsureDialogBrushes()
         DialogDarkBrush = CreateSolidBrush(DIALOG_DARK_BG);
     if (DialogDarkInputBrush == NULL)
         DialogDarkInputBrush = CreateSolidBrush(DIALOG_DARK_INPUT_BG);
+}
+
+void ApplyListTreeThemeToControl(HWND hwnd, BOOL useDark)
+{
+    if (hwnd == NULL || !IsWindow(hwnd))
+        return;
+
+    TCHAR className[64] = {0};
+    if (GetClassName(hwnd, className, _countof(className)) == 0)
+        return;
+
+    if (_tcsicmp(className, WC_LISTVIEW) == 0)
+    {
+        ListView_SetBkColor(hwnd, useDark ? DIALOG_DARK_INPUT_BG : CLR_DEFAULT);
+        ListView_SetTextBkColor(hwnd, useDark ? DIALOG_DARK_INPUT_BG : CLR_DEFAULT);
+        ListView_SetTextColor(hwnd, useDark ? DIALOG_DARK_INPUT_TEXT : CLR_DEFAULT);
+        InvalidateRect(hwnd, NULL, FALSE);
+        return;
+    }
+
+    if (_tcsicmp(className, WC_TREEVIEW) == 0)
+    {
+        TreeView_SetBkColor(hwnd, useDark ? DIALOG_DARK_INPUT_BG : CLR_DEFAULT);
+        TreeView_SetTextColor(hwnd, useDark ? DIALOG_DARK_TEXT : CLR_DEFAULT);
+        InvalidateRect(hwnd, NULL, FALSE);
+        return;
+    }
+}
+
+BOOL CALLBACK ApplyListTreeThemeEnumProc(HWND hwnd, LPARAM lParam)
+{
+    ApplyListTreeThemeToControl(hwnd, (BOOL)lParam);
+    return TRUE;
 }
 
 } // namespace
@@ -346,4 +381,14 @@ void DarkMode_ApplyToThreadTopLevelWindows(DWORD threadId)
         threadId = GetCurrentThreadId();
 
     EnumThreadWindows(threadId, ApplyThreadWindowProc, 0);
+}
+
+void DarkMode_ApplyListTreeThemeRecursive(HWND root)
+{
+    if (root == NULL || !IsWindow(root))
+        return;
+
+    BOOL useDark = DarkMode_ShouldUseDark();
+    ApplyListTreeThemeToControl(root, useDark);
+    EnumChildWindows(root, ApplyListTreeThemeEnumProc, (LPARAM)useDark);
 }
