@@ -453,6 +453,7 @@ struct CConfiguration
     // Directory name convert\\XXX\\convert.cfg from which convert.cfg is loaded
     CPathBuffer ConversionTable;
 
+    int ThemeMode;                              // dark mode behavior (THEME_MODE_* from darkmode.h)
     int TitleBarShowPath;                        // will we display the path in the title bar?
     int TitleBarMode;                            // title bar display mode (TITLE_BAR_MODE_xxx)
     int UseTitleBarPrefix;                       // should prefix be shown in the title bar?

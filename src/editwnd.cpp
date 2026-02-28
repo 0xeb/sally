@@ -11,9 +11,31 @@
 #include "fileswnd.h"
 #include "editwnd.h"
 #include "stswnd.h"
+#include "darkmode.h"
 #include <uxtheme.h>
 
 #include <shlwapi.h>
+
+namespace
+{
+const COLORREF EDITWND_DARK_BG = RGB(45, 45, 48);
+const COLORREF EDITWND_DARK_INPUT_BG = RGB(30, 30, 30);
+const COLORREF EDITWND_DARK_TEXT = RGB(232, 232, 232);
+const COLORREF EDITWND_DARK_DISABLED_TEXT = RGB(140, 140, 140);
+const COLORREF EDITWND_DARK_BORDER_OUTER = RGB(75, 75, 75);
+const COLORREF EDITWND_DARK_BORDER_INNER = RGB(95, 95, 95);
+const COLORREF EDITWND_DARK_BUTTON_BG = RGB(52, 52, 56);
+
+static void FillRectSolid(HDC hDC, const RECT* rect, COLORREF color)
+{
+    HGDIOBJ oldBrush = SelectObject(hDC, GetStockObject(DC_BRUSH));
+    COLORREF oldColor = SetDCBrushColor(hDC, color);
+    FillRect(hDC, rect, (HBRUSH)GetStockObject(DC_BRUSH));
+    SetDCBrushColor(hDC, oldColor);
+    SelectObject(hDC, oldBrush);
+}
+
+} // namespace
 
 //*****************************************************************************
 //
@@ -1516,16 +1538,19 @@ CInnerText::WindowProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
         HANDLES(BeginPaint(HWindow, &ps));
 
         HDC dc = ItemBitmap.HMemDC;
+        BOOL useDark = DarkMode_ShouldUseDark();
+        COLORREF bkColor = useDark ? EDITWND_DARK_INPUT_BG
+                                   : GetSysColor(EditWindow->Enabled ? COLOR_WINDOW : COLOR_BTNFACE);
+        COLORREF txColor = useDark ? (EditWindow->Enabled ? EDITWND_DARK_TEXT : EDITWND_DARK_DISABLED_TEXT)
+                                   : GetSysColor(EditWindow->Enabled ? COLOR_WINDOWTEXT : COLOR_BTNSHADOW);
+        RECT r;
+        GetClientRect(HWindow, &r);
+        FillRectSolid(dc, &r, bkColor);
 
         if (!Message.empty())
         {
-            COLORREF sysBkColor = EditWindow->Enabled ? COLOR_WINDOW : COLOR_BTNFACE;
-            COLORREF sysTxColor = EditWindow->Enabled ? COLOR_WINDOWTEXT : COLOR_BTNSHADOW;
-            int oldColor = SetTextColor(dc, GetSysColor(sysTxColor));
+            int oldColor = SetTextColor(dc, txColor);
             HFONT oldFont = (HFONT)SelectObject(dc, EnvFont);
-            RECT r;
-            GetClientRect(HWindow, &r);
-            FillRect(dc, &r, (HBRUSH)(UINT_PTR)(sysBkColor + 1));
             int oldBkMode = SetBkMode(dc, TRANSPARENT);
             r.right -= TXEL_SPACE - 1; // bold fonts make the text overflow - hence this correction
 
@@ -1539,8 +1564,9 @@ CInnerText::WindowProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
             SetBkMode(dc, oldBkMode);
             SetTextColor(dc, oldColor);
             SelectObject(dc, oldFont);
-            BitBlt(ps.hdc, 0, 0, Width, Height, dc, 0, 0, SRCCOPY);
         }
+
+        BitBlt(ps.hdc, 0, 0, Width, Height, dc, 0, 0, SRCCOPY);
 
         HANDLES(EndPaint(HWindow, &ps));
         return 0;
@@ -1735,6 +1761,16 @@ CEditWindow::WindowProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
     SLOW_CALL_STACK_MESSAGE4("CEditWindow::WindowProc(0x%X, 0x%IX, 0x%IX)", uMsg, wParam, lParam);
     switch (uMsg)
     {
+    case WM_CTLCOLOREDIT:
+    case WM_CTLCOLORLISTBOX:
+    case WM_CTLCOLORSTATIC:
+    {
+        HBRUSH hBrush = DarkMode_GetDialogCtlColorBrush(uMsg, (HDC)wParam, (HWND)lParam);
+        if (hBrush != NULL)
+            return (LRESULT)hBrush;
+        break;
+    }
+
     case WM_SIZE:
     {
         LRESULT result = CWindow::WindowProc(uMsg, wParam, lParam);
@@ -1781,6 +1817,51 @@ CEditWindow::WindowProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
     {
         RECT cr;
         GetClientRect(HWindow, &cr);
+        BOOL useDark = DarkMode_ShouldUseDark();
+
+        if (useDark)
+        {
+            HDC hDC = HANDLES(GetDC(HWindow));
+            if (hDC != NULL)
+            {
+                FillRectSolid(hDC, &cr, EDITWND_DARK_BG);
+
+                int sbWidth = GetSystemMetrics(SM_CXVSCROLL);
+                RECT editArea = cr;
+                editArea.left = EL_XBORDER - 1;
+                editArea.top = 3;
+                editArea.right = cr.right - sbWidth - 1;
+                editArea.bottom = cr.bottom - 3;
+                FillRectSolid(hDC, &editArea, EDITWND_DARK_INPUT_BG);
+
+                RECT btnArea;
+                btnArea.left = cr.right - 2 - sbWidth + 1;
+                btnArea.top = 3;
+                btnArea.right = cr.right - 3;
+                btnArea.bottom = cr.bottom - 3;
+                if (btnArea.right > btnArea.left && btnArea.bottom > btnArea.top)
+                    FillRectSolid(hDC, &btnArea, EDITWND_DARK_BUTTON_BG);
+
+                HGDIOBJ oldPen = SelectObject(hDC, GetStockObject(DC_PEN));
+                HGDIOBJ oldBrush = SelectObject(hDC, GetStockObject(NULL_BRUSH));
+                COLORREF oldPenColor = SetDCPenColor(hDC, EDITWND_DARK_BORDER_OUTER);
+                Rectangle(hDC, cr.left, cr.top, cr.right, cr.bottom);
+
+                SetDCPenColor(hDC, EDITWND_DARK_BORDER_INNER);
+                Rectangle(hDC, editArea.left, editArea.top, editArea.right, editArea.bottom);
+
+                SetDCPenColor(hDC, EDITWND_DARK_BORDER_OUTER);
+                MoveToEx(hDC, cr.right - 2 - sbWidth, cr.top + 2, NULL);
+                LineTo(hDC, cr.right - 2 - sbWidth, cr.bottom - 2);
+
+                SetDCPenColor(hDC, oldPenColor);
+                SelectObject(hDC, oldBrush);
+                SelectObject(hDC, oldPen);
+                HANDLES(ReleaseDC(HWindow, hDC));
+            }
+            break;
+        }
+
         // ensure the 2-pixel frame around the combo is not cleared during painting
         RECT r;
         r.left = 0;

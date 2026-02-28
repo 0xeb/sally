@@ -28,6 +28,7 @@
 #include "common/widepath.h"
 #include "tasklist.h"
 #include "pwdmngr.h"
+#include "darkmode.h"
 
 //
 // ConfigVersion - version number of the loaded configuration
@@ -479,6 +480,7 @@ const char* CONFIG_SHOWSPLASHSCREEN_REG = "Show Splash Screen";
 const char* CONFIG_CONVERSIONTABLE_REG = "Conversion Table";
 const char* CONFIG_TITLEBARSHOWPATH_REG = "Title bar show path";
 const char* CONFIG_TITLEBARMODE_REG = "Title bar mode";
+const char* CONFIG_THEME_MODE_REG = "Theme mode";
 const char* CONFIG_TITLEBARPREFIX_REG = "Title bar prefix";
 const char* CONFIG_TITLEBARPREFIXTEXT_REG = "Title bar prefix text";
 const char* CONFIG_MAINWINDOWICONINDEX_REG = "Main window icon index";
@@ -1940,6 +1942,8 @@ void CMainWindow::SaveConfig(HWND parent)
                          &Configuration.TitleBarShowPath, sizeof(DWORD));
                 SetValue(actKey, CONFIG_TITLEBARMODE_REG, REG_DWORD,
                          &Configuration.TitleBarMode, sizeof(DWORD));
+                SetValue(actKey, CONFIG_THEME_MODE_REG, REG_DWORD,
+                         &Configuration.ThemeMode, sizeof(DWORD));
                 SetValue(actKey, CONFIG_TITLEBARPREFIX_REG, REG_DWORD,
                          &Configuration.UseTitleBarPrefix, sizeof(DWORD));
                 SetValue(actKey, CONFIG_TITLEBARPREFIXTEXT_REG, REG_SZ,
@@ -3273,6 +3277,7 @@ BOOL CMainWindow::LoadConfig(BOOL importingOldConfig, const CCommandLineParams* 
 
         DWORD cmdLine = 0, cmdLineFocus = 0;
         DWORD rightPanelFocused = FALSE;
+        Configuration.ThemeMode = THEME_MODE_LIGHT;
         if (OpenKey(salamander, SALAMANDER_CONFIG_REG, actKey))
         {
             if (importingOldConfig)
@@ -3486,6 +3491,10 @@ BOOL CMainWindow::LoadConfig(BOOL importingOldConfig, const CCommandLineParams* 
                      &Configuration.TitleBarShowPath, sizeof(DWORD));
             GetValue(actKey, CONFIG_TITLEBARMODE_REG, REG_DWORD,
                      &Configuration.TitleBarMode, sizeof(DWORD));
+            GetValue(actKey, CONFIG_THEME_MODE_REG, REG_DWORD,
+                     &Configuration.ThemeMode, sizeof(DWORD));
+            if (Configuration.ThemeMode < THEME_MODE_LIGHT || Configuration.ThemeMode > THEME_MODE_SYSTEM)
+                Configuration.ThemeMode = THEME_MODE_LIGHT;
             GetValue(actKey, CONFIG_TITLEBARPREFIX_REG, REG_DWORD,
                      &Configuration.UseTitleBarPrefix, sizeof(DWORD));
             GetValue(actKey, CONFIG_TITLEBARPREFIXTEXT_REG, REG_SZ,
@@ -4157,6 +4166,14 @@ BOOL CMainWindow::LoadConfig(BOOL importingOldConfig, const CCommandLineParams* 
         lstrcpyn(DefaultDir[LowerCase[sysDefDir[0]] - 'a'], sysDefDir, MAX_PATH);
         // restore DefaultDir
         MainWindow->UpdateDefaultDir(TRUE);
+
+        // Main window is created before LoadConfig() runs; re-apply titlebar theme
+        // now that Configuration.ThemeMode is finalized from persisted settings.
+        DarkMode_SetThemeMode(Configuration.ThemeMode);
+        ColorsChanged(TRUE, FALSE, TRUE); // rebuild color-dependent resources for initial theme
+        DarkMode_ApplyTitleBar(HWindow);
+        DarkMode_ApplyToThreadTopLevelWindows(GetCurrentThreadId());
+        InvalidateRect(HWindow, NULL, TRUE);
 
         return ret;
     }

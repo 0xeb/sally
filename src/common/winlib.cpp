@@ -25,6 +25,7 @@
 #include "array.h"
 
 #include "winlib.h"
+#include "darkmode.h"
 
 // Precaution against runtime check failure in debug version: original macro version casts rgb to WORD,
 // so reports data loss (RED component)
@@ -389,6 +390,7 @@ CWindow::CWindowProcInt(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam, BOOL
                 TRACE_ET(_T("Unable to create window."));
                 return FALSE;
             }
+            DarkMode_ApplyTitleBar(hwnd);
         }
         break;
     }
@@ -460,6 +462,9 @@ CWindow::CWindowProcInt(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam, BOOL
     }
     }
     // calling WindowProc(...) method of the corresponding window object
+    if (uMsg == WM_SETTINGCHANGE && DarkMode_OnSettingChange(lParam))
+        DarkMode_ApplyTitleBar(hwnd);
+
     LRESULT lResult;
     if (wnd != NULL)
         lResult = wnd->WindowProc(uMsg, wParam, lParam);
@@ -661,6 +666,17 @@ CDialog::DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
         return TRUE;
     }
 
+    case WM_CTLCOLORDLG:
+    case WM_CTLCOLORSTATIC:
+    case WM_CTLCOLOREDIT:
+    case WM_CTLCOLORLISTBOX:
+    {
+        HBRUSH hBrush = DarkMode_GetDialogCtlColorBrush(uMsg, (HDC)wParam, (HWND)lParam);
+        if (hBrush != NULL)
+            return (INT_PTR)hBrush;
+        break;
+    }
+
     case WM_COMMAND:
     {
         switch (LOWORD(wParam))
@@ -697,6 +713,16 @@ CDialog::DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
         }
         break;
     }
+
+    case WM_SETTINGCHANGE:
+    {
+        if (DarkMode_OnSettingChange(lParam))
+        {
+            DarkMode_ApplyTitleBar(HWindow);
+            InvalidateRect(HWindow, NULL, TRUE);
+        }
+        break;
+    }
     }
     return FALSE;
 }
@@ -724,6 +750,7 @@ CDialog::CDialogProc(HWND hwndDlg, UINT uMsg, WPARAM wParam, LPARAM lParam)
                 TRACE_ET(_T("Unable to create dialog."));
                 return TRUE;
             }
+            DarkMode_ApplyTitleBar(hwndDlg);
             dlg->NotifDlgJustCreated(); // introduced as place for dialog layout adjustment
         }
         break;

@@ -5,9 +5,44 @@
 #include "precomp.h"
 
 #include "menu.h"
+#include "darkmode.h"
 
 #define UPDOWN_TIMER_ID 1  // timer id
 #define UPDOWN_TIMER_TO 50 // time out [ms]
+
+static void FillRectWithColor(HDC hDC, const RECT* rect, COLORREF color)
+{
+    HGDIOBJ oldBrush = SelectObject(hDC, GetStockObject(DC_BRUSH));
+    COLORREF oldColor = SetDCBrushColor(hDC, color);
+    FillRect(hDC, rect, (HBRUSH)GetStockObject(DC_BRUSH));
+    SetDCBrushColor(hDC, oldColor);
+    SelectObject(hDC, oldBrush);
+}
+
+static void PatBltWithColor(HDC hDC, int left, int top, int width, int height, COLORREF color)
+{
+    HGDIOBJ oldBrush = SelectObject(hDC, GetStockObject(DC_BRUSH));
+    COLORREF oldColor = SetDCBrushColor(hDC, color);
+    PatBlt(hDC, left, top, width, height, PATCOPY);
+    SetDCBrushColor(hDC, oldColor);
+    SelectObject(hDC, oldBrush);
+}
+
+static COLORREF GetMenuPopupBkColor(const CMenuSharedResources* sharedRes)
+{
+    if (sharedRes != NULL)
+        return sharedRes->NormalBkColor;
+    if (DarkMode_ShouldUseDark())
+        return RGB(45, 45, 48);
+    return GetSysColor(COLOR_BTNFACE);
+}
+
+static COLORREF GetMenuPopupBorderColor()
+{
+    if (DarkMode_ShouldUseDark())
+        return RGB(80, 80, 80);
+    return GetSysColor(COLOR_3DSHADOW);
+}
 
 //*****************************************************************************
 //
@@ -2869,9 +2904,7 @@ CMenuPopup::WindowProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
     case WM_ERASEBKGND:
     {
         HDC hDC = (HDC)wParam;
-        HBRUSH hOldBrush = (HBRUSH)SelectObject(hDC, HDialogBrush);
-        PatBlt(hDC, 0, 0, Width, TotalHeight, PATCOPY);
-        SelectObject(hDC, hOldBrush);
+        PatBltWithColor(hDC, 0, 0, Width, TotalHeight, GetMenuPopupBkColor(SharedRes));
         return 1;
     }
 
@@ -2902,16 +2935,15 @@ CMenuPopup::WindowProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
         r.top = 0;
 
         // darker frame around the menu
-        HBRUSH hOldBrush = (HBRUSH)SelectObject(hdc, HMenuGrayTextBrush);
-        PatBlt(hdc, 0, 0, r.right, 1, PATCOPY);
-        PatBlt(hdc, r.right - 1, 0, r.right, r.bottom, PATCOPY);
-        PatBlt(hdc, 0, r.bottom - 1, r.right, r.bottom, PATCOPY);
-        PatBlt(hdc, 0, 0, 1, r.bottom, PATCOPY);
-        SelectObject(hdc, hOldBrush);
+        COLORREF borderColor = GetMenuPopupBorderColor();
+        PatBltWithColor(hdc, 0, 0, r.right, 1, borderColor);
+        PatBltWithColor(hdc, r.right - 1, 0, 1, r.bottom, borderColor);
+        PatBltWithColor(hdc, 0, r.bottom - 1, r.right, 1, borderColor);
+        PatBltWithColor(hdc, 0, 0, 1, r.bottom, borderColor);
 
         // the interior of the regular background
         InflateRect(&r, -1, -1);
-        FillRect(hdc, &r, HDialogBrush);
+        FillRectWithColor(hdc, &r, GetMenuPopupBkColor(SharedRes));
 
         HANDLES(ReleaseDC(HWindow, hdc));
         return 0;

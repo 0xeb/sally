@@ -7,6 +7,7 @@
 #include "bitmap.h"
 #include "toolbar.h"
 #include "svg.h"
+#include "darkmode.h"
 
 //*****************************************************************************
 //
@@ -17,6 +18,34 @@
 
 #define TB_ICON_TB 3 // number of pixels above/below the icon, including the frame
 #define TB_TEXT_TB 3
+
+static void FillRectWithColor(HDC hDC, const RECT* r, COLORREF color)
+{
+    HGDIOBJ oldBrush = SelectObject(hDC, GetStockObject(DC_BRUSH));
+    SetDCBrushColor(hDC, color);
+    FillRect(hDC, r, (HBRUSH)GetStockObject(DC_BRUSH));
+    SelectObject(hDC, oldBrush);
+}
+
+static COLORREF GetToolBarBkColor()
+{
+    return DarkMode_ShouldUseDark() ? RGB(45, 45, 48) : GetSysColor(COLOR_BTNFACE);
+}
+
+static COLORREF GetToolBarTextColor()
+{
+    return DarkMode_ShouldUseDark() ? RGB(232, 232, 232) : GetSysColor(COLOR_BTNTEXT);
+}
+
+static COLORREF GetToolBarTextShadowColor()
+{
+    return DarkMode_ShouldUseDark() ? RGB(90, 90, 90) : GetSysColor(COLOR_BTNSHADOW);
+}
+
+static COLORREF GetToolBarTextHilightColor()
+{
+    return DarkMode_ShouldUseDark() ? RGB(120, 120, 120) : GetSysColor(COLOR_BTNHILIGHT);
+}
 
 void CToolBar::SetFont()
 {
@@ -427,6 +456,7 @@ void CToolBar::DrawItem(HDC hDC, int index)
         return;
     }
     BOOL vertical = (Style & TLB_STYLE_VERTICAL) != 0;
+    BOOL useDarkToolbar = DarkMode_ShouldUseDark();
 
     CToolBarItem* item = Items[index];
     int width = item->Width;
@@ -453,17 +483,23 @@ void CToolBar::DrawItem(HDC hDC, int index)
         r1.right = width;
         r1.bottom = Height;
     }
-    FillRect(CacheBitmap->HMemDC, &r1, HDialogBrush);
+    if (useDarkToolbar)
+        FillRectWithColor(CacheBitmap->HMemDC, &r1, GetToolBarBkColor());
+    else
+        FillRect(CacheBitmap->HMemDC, &r1, HDialogBrush);
 
     if (item->Style & TLBI_STYLE_SEPARATOR)
     {
+        COLORREF separatorDark = useDarkToolbar ? RGB(70, 70, 70) : GetSysColor(COLOR_BTNSHADOW);
+        COLORREF separatorLight = useDarkToolbar ? RGB(95, 95, 95) : GetSysColor(COLOR_BTNHIGHLIGHT);
         if (vertical)
         {
             int y = height / 2 - 1;
-            HPEN hOldPen = (HPEN)SelectObject(CacheBitmap->HMemDC, BtnShadowPen);
+            HGDIOBJ hOldPen = SelectObject(CacheBitmap->HMemDC, GetStockObject(DC_PEN));
+            SetDCPenColor(CacheBitmap->HMemDC, separatorDark);
             MoveToEx(CacheBitmap->HMemDC, 1, y, NULL);
             LineTo(CacheBitmap->HMemDC, Width - 1, y);
-            SelectObject(CacheBitmap->HMemDC, BtnHilightPen);
+            SetDCPenColor(CacheBitmap->HMemDC, separatorLight);
             MoveToEx(CacheBitmap->HMemDC, 1, y + 1, NULL);
             LineTo(CacheBitmap->HMemDC, Width - 1, y + 1);
             SelectObject(CacheBitmap->HMemDC, hOldPen);
@@ -471,10 +507,11 @@ void CToolBar::DrawItem(HDC hDC, int index)
         else
         {
             int x = width / 2 - 1;
-            HPEN hOldPen = (HPEN)SelectObject(CacheBitmap->HMemDC, BtnShadowPen);
+            HGDIOBJ hOldPen = SelectObject(CacheBitmap->HMemDC, GetStockObject(DC_PEN));
+            SetDCPenColor(CacheBitmap->HMemDC, separatorDark);
             MoveToEx(CacheBitmap->HMemDC, x, 1, NULL);
             LineTo(CacheBitmap->HMemDC, x, Height - 1);
-            SelectObject(CacheBitmap->HMemDC, BtnHilightPen);
+            SetDCPenColor(CacheBitmap->HMemDC, separatorLight);
             MoveToEx(CacheBitmap->HMemDC, x + 1, 1, NULL);
             LineTo(CacheBitmap->HMemDC, x + 1, Height - 1);
             SelectObject(CacheBitmap->HMemDC, hOldPen);
@@ -542,8 +579,8 @@ void CToolBar::DrawItem(HDC hDC, int index)
                     // dithered pressed background
                     SetBrushOrgEx(CacheBitmap->HMemDC, 0, r.top, NULL);
                     HBRUSH hOldBrush = (HBRUSH)SelectObject(CacheBitmap->HMemDC, HDitherBrush);
-                    int oldTextColor = SetTextColor(CacheBitmap->HMemDC, GetSysColor(COLOR_BTNFACE));
-                    int oldBkColor = SetBkColor(CacheBitmap->HMemDC, GetSysColor(COLOR_3DHILIGHT));
+                    int oldTextColor = SetTextColor(CacheBitmap->HMemDC, useDarkToolbar ? RGB(50, 50, 50) : GetSysColor(COLOR_BTNFACE));
+                    int oldBkColor = SetBkColor(CacheBitmap->HMemDC, useDarkToolbar ? RGB(75, 75, 78) : GetSysColor(COLOR_3DHILIGHT));
                     PatBlt(CacheBitmap->HMemDC, r.left + 1, r.top + 1,
                            r.right - r.left - 2, r.bottom - r.top - 2, PATCOPY);
                     SetTextColor(CacheBitmap->HMemDC, oldTextColor);
@@ -630,13 +667,13 @@ void CToolBar::DrawItem(HDC hDC, int index)
                 textR2.top++;
                 textR2.right++;
                 textR2.bottom++;
-                SetTextColor(CacheBitmap->HMemDC, GetSysColor(COLOR_BTNHILIGHT));
+                SetTextColor(CacheBitmap->HMemDC, GetToolBarTextHilightColor());
                 DrawText(CacheBitmap->HMemDC, item->Text, item->TextLen,
                          &textR2, noPrefix | DT_NOCLIP | DT_LEFT | DT_SINGLELINE | DT_VCENTER);
-                SetTextColor(CacheBitmap->HMemDC, GetSysColor(COLOR_BTNSHADOW));
+                SetTextColor(CacheBitmap->HMemDC, GetToolBarTextShadowColor());
             }
             else
-                SetTextColor(CacheBitmap->HMemDC, GetSysColor(COLOR_BTNTEXT));
+                SetTextColor(CacheBitmap->HMemDC, GetToolBarTextColor());
             DrawText(CacheBitmap->HMemDC, item->Text, item->TextLen, &r,
                      noPrefix | DT_NOCLIP | DT_LEFT | DT_VCENTER | DT_SINGLELINE);
             if (hOldFont != NULL)
@@ -737,7 +774,10 @@ void CToolBar::DrawAllItems(HDC hDC)
                 r.top = offset;
                 r.right = Width;
                 r.bottom = offset + length;
-                FillRect(hDC, &r, HDialogBrush);
+                if (DarkMode_ShouldUseDark())
+                    FillRectWithColor(hDC, &r, GetToolBarBkColor());
+                else
+                    FillRect(hDC, &r, HDialogBrush);
             }
         }
     }
@@ -753,7 +793,10 @@ void CToolBar::DrawAllItems(HDC hDC)
                 r.top = 0;
                 r.right = offset + length;
                 r.bottom = Height;
-                FillRect(hDC, &r, HDialogBrush);
+                if (DarkMode_ShouldUseDark())
+                    FillRectWithColor(hDC, &r, GetToolBarBkColor());
+                else
+                    FillRect(hDC, &r, HDialogBrush);
             }
         }
     }

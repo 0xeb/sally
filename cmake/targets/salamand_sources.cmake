@@ -53,6 +53,7 @@ set(SALAMANDER_SOURCES
   "${SAL_SRC}/dialogs6.cpp"
   "${SAL_SRC}/dialogse.cpp"
   "${SAL_SRC}/dialogsp.cpp"
+  "${SAL_SRC}/darkmode.cpp"
   "${SAL_SRC}/drivelst.cpp"
   "${SAL_SRC}/editwnd.cpp"
   "${SAL_SRC}/edtlbwnd.cpp"

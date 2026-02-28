@@ -39,6 +39,7 @@
 #include "logo.h"
 #include "color.h"
 #include "toolbar.h"
+#include "darkmode.h"
 
 static IRegistry* GetMainSalamanderRegistry()
 {
@@ -1718,45 +1719,55 @@ COLORREF GetFullRowHighlight(COLORREF bkHighlightColor) // returns "heuristic" h
 
 void UpdateDefaultColors(SALCOLOR* colors, CHighlightMasks* highlightMasks, BOOL processColors, BOOL processMasks)
 {
+    BOOL darkDefaults = DarkMode_ShouldUseDark();
+
     if (processColors)
     {
         int bitsPerPixel = GetCurrentBPP();
+        COLORREF sysWindow = darkDefaults ? RGB(30, 30, 30) : GetSysColor(COLOR_WINDOW);
+        COLORREF sysWindowText = darkDefaults ? RGB(232, 232, 232) : GetSysColor(COLOR_WINDOWTEXT);
+        COLORREF sysHighlight = darkDefaults ? RGB(62, 125, 231) : GetSysColor(COLOR_HIGHLIGHT);
+        COLORREF sysHighlightText = darkDefaults ? RGB(255, 255, 255) : GetSysColor(COLOR_HIGHLIGHTTEXT);
+        COLORREF sysActiveCaption = darkDefaults ? RGB(45, 45, 48) : GetSysColor(COLOR_ACTIVECAPTION);
+        COLORREF sysCaptionText = darkDefaults ? RGB(235, 235, 235) : GetSysColor(COLOR_CAPTIONTEXT);
+        COLORREF sysInactiveCaption = darkDefaults ? RGB(37, 37, 38) : GetSysColor(COLOR_INACTIVECAPTION);
+        COLORREF sysInactiveCaptionText = darkDefaults ? RGB(180, 180, 180) : GetSysColor(COLOR_INACTIVECAPTIONTEXT);
 
         // pen colors for frame around item - we take from system window text color
         if (GetFValue(colors[FOCUS_ACTIVE_NORMAL]) & SCF_DEFAULT)
-            SetRGBPart(&colors[FOCUS_ACTIVE_NORMAL], GetSysColor(COLOR_WINDOWTEXT));
+            SetRGBPart(&colors[FOCUS_ACTIVE_NORMAL], sysWindowText);
         if (GetFValue(colors[FOCUS_ACTIVE_SELECTED]) & SCF_DEFAULT)
-            SetRGBPart(&colors[FOCUS_ACTIVE_SELECTED], GetSysColor(COLOR_WINDOWTEXT));
+            SetRGBPart(&colors[FOCUS_ACTIVE_SELECTED], sysWindowText);
         if (GetFValue(colors[FOCUS_BK_INACTIVE_NORMAL]) & SCF_DEFAULT)
-            SetRGBPart(&colors[FOCUS_BK_INACTIVE_NORMAL], GetSysColor(COLOR_WINDOW));
+            SetRGBPart(&colors[FOCUS_BK_INACTIVE_NORMAL], sysWindow);
         if (GetFValue(colors[FOCUS_BK_INACTIVE_SELECTED]) & SCF_DEFAULT)
-            SetRGBPart(&colors[FOCUS_BK_INACTIVE_SELECTED], GetSysColor(COLOR_WINDOW));
+            SetRGBPart(&colors[FOCUS_BK_INACTIVE_SELECTED], sysWindow);
 
         // panel item text colors - we take from system window text color
         if (GetFValue(colors[ITEM_FG_NORMAL]) & SCF_DEFAULT)
-            SetRGBPart(&colors[ITEM_FG_NORMAL], GetSysColor(COLOR_WINDOWTEXT));
+            SetRGBPart(&colors[ITEM_FG_NORMAL], sysWindowText);
         if (GetFValue(colors[ITEM_FG_FOCUSED]) & SCF_DEFAULT)
-            SetRGBPart(&colors[ITEM_FG_FOCUSED], GetSysColor(COLOR_WINDOWTEXT));
+            SetRGBPart(&colors[ITEM_FG_FOCUSED], sysWindowText);
         if (GetFValue(colors[ITEM_FG_HIGHLIGHT]) & SCF_DEFAULT) // FULL ROW HIGHLIGHT based on _NORMAL
             SetRGBPart(&colors[ITEM_FG_HIGHLIGHT], GetCOLORREF(colors[ITEM_FG_NORMAL]));
 
         // panel item background colors - we take from system window background color
         if (GetFValue(colors[ITEM_BK_NORMAL]) & SCF_DEFAULT)
-            SetRGBPart(&colors[ITEM_BK_NORMAL], GetSysColor(COLOR_WINDOW));
+            SetRGBPart(&colors[ITEM_BK_NORMAL], sysWindow);
         if (GetFValue(colors[ITEM_BK_SELECTED]) & SCF_DEFAULT)
-            SetRGBPart(&colors[ITEM_BK_SELECTED], GetSysColor(COLOR_WINDOW));
+            SetRGBPart(&colors[ITEM_BK_SELECTED], sysWindow);
         if (GetFValue(colors[ITEM_BK_HIGHLIGHT]) & SCF_DEFAULT) // HIGHLIGHT copied from NORMAL (to work with custom/norton modes too)
             SetRGBPart(&colors[ITEM_BK_HIGHLIGHT], GetFullRowHighlight(GetCOLORREF(colors[ITEM_BK_NORMAL])));
 
         // progress bar colors
         if (GetFValue(colors[PROGRESS_FG_NORMAL]) & SCF_DEFAULT)
-            SetRGBPart(&colors[PROGRESS_FG_NORMAL], GetSysColor(COLOR_WINDOWTEXT));
+            SetRGBPart(&colors[PROGRESS_FG_NORMAL], sysWindowText);
         if (GetFValue(colors[PROGRESS_FG_SELECTED]) & SCF_DEFAULT)
-            SetRGBPart(&colors[PROGRESS_FG_SELECTED], GetSysColor(COLOR_HIGHLIGHTTEXT));
+            SetRGBPart(&colors[PROGRESS_FG_SELECTED], sysHighlightText);
         if (GetFValue(colors[PROGRESS_BK_NORMAL]) & SCF_DEFAULT)
-            SetRGBPart(&colors[PROGRESS_BK_NORMAL], GetSysColor(COLOR_WINDOW));
+            SetRGBPart(&colors[PROGRESS_BK_NORMAL], sysWindow);
         if (GetFValue(colors[PROGRESS_BK_SELECTED]) & SCF_DEFAULT)
-            SetRGBPart(&colors[PROGRESS_BK_SELECTED], GetSysColor(COLOR_HIGHLIGHT));
+            SetRGBPart(&colors[PROGRESS_BK_SELECTED], sysHighlight);
 
         // selected icon blend color
         if (GetFValue(colors[ICON_BLEND_SELECTED]) & SCF_DEFAULT)
@@ -1775,21 +1786,21 @@ void UpdateDefaultColors(SALCOLOR* colors, CHighlightMasks* highlightMasks, BOOL
 
         // active panel title: BACKGROUND
         if (GetFValue(colors[ACTIVE_CAPTION_BK]) & SCF_DEFAULT)
-            SetRGBPart(&colors[ACTIVE_CAPTION_BK], GetSysColor(COLOR_ACTIVECAPTION));
+            SetRGBPart(&colors[ACTIVE_CAPTION_BK], sysActiveCaption);
         // active panel title: TEXT
         if (GetFValue(colors[ACTIVE_CAPTION_FG]) & SCF_DEFAULT)
-            SetRGBPart(&colors[ACTIVE_CAPTION_FG], GetSysColor(COLOR_CAPTIONTEXT));
+            SetRGBPart(&colors[ACTIVE_CAPTION_FG], sysCaptionText);
         // inactive panel title: BACKGROUND
         if (GetFValue(colors[INACTIVE_CAPTION_BK]) & SCF_DEFAULT)
-            SetRGBPart(&colors[INACTIVE_CAPTION_BK], GetSysColor(COLOR_INACTIVECAPTION));
+            SetRGBPart(&colors[INACTIVE_CAPTION_BK], sysInactiveCaption);
         // inactive panel title: TEXT
         if (GetFValue(colors[INACTIVE_CAPTION_FG]) & SCF_DEFAULT)
         {
             // we prefer the same text color as for active title, but sometimes this color is too
             // close to background color, then we try the inactive title text color
             COLORREF clrBk = GetCOLORREF(colors[INACTIVE_CAPTION_BK]);
-            COLORREF clrFgAc = GetSysColor(COLOR_CAPTIONTEXT);
-            COLORREF clrFgIn = GetSysColor(COLOR_INACTIVECAPTIONTEXT);
+            COLORREF clrFgAc = sysCaptionText;
+            COLORREF clrFgIn = sysInactiveCaptionText;
             BYTE grayBk = GetGrayscaleFromRGB(GetRValue(clrBk), GetGValue(clrBk), GetBValue(clrBk));
             BYTE grayFgAc = GetGrayscaleFromRGB(GetRValue(clrFgAc), GetGValue(clrFgAc), GetBValue(clrFgAc));
             BYTE grayFgIn = GetGrayscaleFromRGB(GetRValue(clrFgIn), GetGValue(clrFgIn), GetBValue(clrFgIn));
@@ -1797,7 +1808,7 @@ void UpdateDefaultColors(SALCOLOR* colors, CHighlightMasks* highlightMasks, BOOL
         }
 
         // hot item colors
-        COLORREF hotColor = GetSysColor(COLOR_HOTLIGHT);
+        COLORREF hotColor = darkDefaults ? RGB(120, 170, 255) : GetSysColor(COLOR_HOTLIGHT);
         if (GetFValue(colors[HOT_PANEL]) & SCF_DEFAULT)
             SetRGBPart(&colors[HOT_PANEL], hotColor);
 
@@ -1817,12 +1828,64 @@ void UpdateDefaultColors(SALCOLOR* colors, CHighlightMasks* highlightMasks, BOOL
                 clr = GetHilightColor(clr, GetCOLORREF(colors[INACTIVE_CAPTION_BK]));
             SetRGBPart(&colors[HOT_INACTIVE], clr);
         }
+
+        if (darkDefaults)
+        {
+            // Force a coherent dark palette for panel/client rendering in V2.
+            // Keeping these synchronized avoids icon background artifacts when
+            // image-list background follows ITEM_BK_NORMAL.
+            SetRGBPart(&colors[FOCUS_ACTIVE_NORMAL], RGB(145, 145, 145));
+            SetRGBPart(&colors[FOCUS_ACTIVE_SELECTED], RGB(220, 220, 220));
+            SetRGBPart(&colors[FOCUS_FG_INACTIVE_NORMAL], RGB(120, 120, 120));
+            SetRGBPart(&colors[FOCUS_FG_INACTIVE_SELECTED], RGB(150, 150, 150));
+            SetRGBPart(&colors[FOCUS_BK_INACTIVE_NORMAL], RGB(30, 30, 30));
+            SetRGBPart(&colors[FOCUS_BK_INACTIVE_SELECTED], RGB(30, 30, 30));
+
+            SetRGBPart(&colors[ITEM_FG_NORMAL], RGB(232, 232, 232));
+            SetRGBPart(&colors[ITEM_FG_SELECTED], RGB(255, 255, 255));
+            SetRGBPart(&colors[ITEM_FG_FOCUSED], RGB(255, 255, 255));
+            SetRGBPart(&colors[ITEM_FG_FOCSEL], RGB(255, 255, 255));
+            SetRGBPart(&colors[ITEM_FG_HIGHLIGHT], RGB(255, 255, 255));
+
+            SetRGBPart(&colors[ITEM_BK_NORMAL], RGB(30, 30, 30));
+            SetRGBPart(&colors[ITEM_BK_SELECTED], RGB(30, 30, 30));
+            SetRGBPart(&colors[ITEM_BK_FOCUSED], RGB(62, 125, 231));
+            SetRGBPart(&colors[ITEM_BK_FOCSEL], RGB(62, 125, 231));
+            SetRGBPart(&colors[ITEM_BK_HIGHLIGHT], RGB(45, 45, 48));
+
+            SetRGBPart(&colors[ICON_BLEND_SELECTED], RGB(120, 170, 255));
+            SetRGBPart(&colors[ICON_BLEND_FOCUSED], RGB(150, 150, 150));
+            SetRGBPart(&colors[ICON_BLEND_FOCSEL], RGB(120, 170, 255));
+
+            SetRGBPart(&colors[PROGRESS_FG_NORMAL], RGB(232, 232, 232));
+            SetRGBPart(&colors[PROGRESS_FG_SELECTED], RGB(255, 255, 255));
+            SetRGBPart(&colors[PROGRESS_BK_NORMAL], RGB(30, 30, 30));
+            SetRGBPart(&colors[PROGRESS_BK_SELECTED], RGB(62, 125, 231));
+
+            SetRGBPart(&colors[HOT_PANEL], RGB(120, 170, 255));
+            SetRGBPart(&colors[HOT_ACTIVE], RGB(170, 200, 255));
+            SetRGBPart(&colors[HOT_INACTIVE], RGB(140, 170, 220));
+
+            SetRGBPart(&colors[ACTIVE_CAPTION_FG], RGB(235, 235, 235));
+            SetRGBPart(&colors[ACTIVE_CAPTION_BK], RGB(45, 45, 48));
+            SetRGBPart(&colors[INACTIVE_CAPTION_FG], RGB(180, 180, 180));
+            SetRGBPart(&colors[INACTIVE_CAPTION_BK], RGB(37, 37, 38));
+        }
     }
 
     if (processMasks)
     {
         // colors dependent on file name+attributes
         int i;
+#define ENSURE_DARK_MASK_TEXT(maskColor, fallbackColor)                                                                     \
+    do                                                                                                                       \
+    {                                                                                                                        \
+        COLORREF __clr = GetCOLORREF(maskColor);                                                                            \
+        BYTE __gray = GetGrayscaleFromRGB(GetRValue(__clr), GetGValue(__clr), GetBValue(__clr));                          \
+        if (__gray < 96)                                                                                                    \
+            SetRGBPart(&(maskColor), fallbackColor);                                                                        \
+    } while (0)
+
         for (i = 0; i < highlightMasks->Count; i++)
         {
             CHighlightMasksItem* item = highlightMasks->At(i);
@@ -1846,7 +1909,25 @@ void UpdateDefaultColors(SALCOLOR* colors, CHighlightMasks* highlightMasks, BOOL
                 SetRGBPart(&item->HighlightFg, GetCOLORREF(item->NormalFg));
             if (GetFValue(item->HighlightBk) & SCF_DEFAULT) // FULL ROW HIGHLIGHT based on _NORMAL
                 SetRGBPart(&item->HighlightBk, GetFullRowHighlight(GetCOLORREF(item->NormalBk)));
+
+            if (darkDefaults)
+            {
+                // Existing configs can contain explicit light backgrounds in masks.
+                // Normalize mask backgrounds to dark palette so panel rows stay coherent.
+                SetRGBPart(&item->NormalBk, GetCOLORREF(colors[ITEM_BK_NORMAL]));
+                SetRGBPart(&item->FocusedBk, GetCOLORREF(colors[ITEM_BK_FOCUSED]));
+                SetRGBPart(&item->SelectedBk, GetCOLORREF(colors[ITEM_BK_SELECTED]));
+                SetRGBPart(&item->FocSelBk, GetCOLORREF(colors[ITEM_BK_FOCSEL]));
+                SetRGBPart(&item->HighlightBk, GetCOLORREF(colors[ITEM_BK_HIGHLIGHT]));
+
+                ENSURE_DARK_MASK_TEXT(item->NormalFg, GetCOLORREF(colors[ITEM_FG_NORMAL]));
+                ENSURE_DARK_MASK_TEXT(item->FocusedFg, GetCOLORREF(colors[ITEM_FG_FOCUSED]));
+                ENSURE_DARK_MASK_TEXT(item->SelectedFg, GetCOLORREF(colors[ITEM_FG_SELECTED]));
+                ENSURE_DARK_MASK_TEXT(item->FocSelFg, GetCOLORREF(colors[ITEM_FG_FOCSEL]));
+                ENSURE_DARK_MASK_TEXT(item->HighlightFg, GetCOLORREF(colors[ITEM_FG_HIGHLIGHT]));
+            }
         }
+#undef ENSURE_DARK_MASK_TEXT
     }
 }
 
@@ -2470,6 +2551,7 @@ BOOL InitializeGraphics(BOOL colorsOnly)
         }
         ImageList_SetImageCount(HFindSymbolsImageList, 2); // initialization
                                                            //    ImageList_SetBkColor(HFindSymbolsImageList, GetSysColor(COLOR_WINDOW)); // for transparent icons to work under XP
+        COLORREF toolBarBkColor = DarkMode_ShouldUseDark() ? RGB(45, 45, 48) : GetSysColor(COLOR_BTNFACE);
 
         int iconSize = IconSizes[ICONSIZE_16];
         HBITMAP hTmpMaskBitmap;
@@ -2477,7 +2559,7 @@ BOOL InitializeGraphics(BOOL colorsOnly)
         HBITMAP hTmpColorBitmap;
         if (!CreateToolbarBitmaps(HInstance,
                                   IDB_MENU,
-                                  RGB(255, 0, 255), GetSysColor(COLOR_BTNFACE),
+                                  RGB(255, 0, 255), toolBarBkColor,
                                   hTmpMaskBitmap, hTmpGrayBitmap, hTmpColorBitmap,
                                   FALSE, NULL, 0))
             return FALSE;
@@ -2492,7 +2574,7 @@ BOOL InitializeGraphics(BOOL colorsOnly)
         GetSVGIconsMainToolbar(&svgIcons, &svgIconsCount);
         if (!CreateToolbarBitmaps(HInstance,
                                   Use256ColorsBitmap() ? IDB_TOOLBAR_256 : IDB_TOOLBAR_16,
-                                  RGB(255, 0, 255), GetSysColor(COLOR_BTNFACE),
+                                  RGB(255, 0, 255), toolBarBkColor,
                                   hTmpMaskBitmap, hTmpGrayBitmap, hTmpColorBitmap,
                                   TRUE, svgIcons, svgIconsCount))
             return FALSE;
@@ -2598,8 +2680,9 @@ BOOL InitializeGraphics(BOOL colorsOnly)
         SVGArrowDropDown.Load(IDV_ARROW_DOWN, -1, -1, SVGSTATE_ENABLED | SVGSTATE_DISABLED);
     }
 
-    ImageList_SetBkColor(HHotToolBarImageList, GetSysColor(COLOR_BTNFACE));
-    ImageList_SetBkColor(HGrayToolBarImageList, GetSysColor(COLOR_BTNFACE));
+    COLORREF toolBarBkColor = DarkMode_ShouldUseDark() ? RGB(45, 45, 48) : GetSysColor(COLOR_BTNFACE);
+    ImageList_SetBkColor(HHotToolBarImageList, toolBarBkColor);
+    ImageList_SetBkColor(HGrayToolBarImageList, toolBarBkColor);
 
     if (SystemParametersInfo(SPI_GETMOUSEHOVERTIME, 0, &MouseHoverTime, FALSE) == 0)
     {
@@ -2661,7 +2744,7 @@ BOOL InitializeGraphics(BOOL colorsOnly)
 
     COLORMAP clrMap[3];
     clrMap[0].from = RGB(255, 0, 255);
-    clrMap[0].to = GetSysColor(COLOR_BTNFACE);
+    clrMap[0].to = toolBarBkColor;
     clrMap[1].from = RGB(255, 255, 255);
     clrMap[1].to = GetSysColor(COLOR_BTNHILIGHT);
     clrMap[2].from = RGB(128, 128, 128);
@@ -2694,8 +2777,8 @@ BOOL InitializeGraphics(BOOL colorsOnly)
     ImageList_AddMasked(HHotBottomTBImageList, hHotBottomTB, RGB(255, 0, 255));
     HANDLES(DeleteObject(hBottomTB));
     HANDLES(DeleteObject(hHotBottomTB));
-    ImageList_SetBkColor(HBottomTBImageList, GetSysColor(COLOR_BTNFACE));
-    ImageList_SetBkColor(HHotBottomTBImageList, GetSysColor(COLOR_BTNFACE));
+    ImageList_SetBkColor(HBottomTBImageList, toolBarBkColor);
+    ImageList_SetBkColor(HHotBottomTBImageList, toolBarBkColor);
     return TRUE;
 }
 
@@ -3179,7 +3262,13 @@ void ColorsChanged(BOOL refresh, BOOL colorsOnly, BOOL reloadUMIcons)
     Plugins.Event(PLUGINEVENT_COLORSCHANGED, 0);
 
     if (MainWindow != NULL && MainWindow->HTopRebar != NULL)
-        SendMessage(MainWindow->HTopRebar, RB_SETBKCOLOR, 0, (LPARAM)GetSysColor(COLOR_BTNFACE));
+    {
+        DarkModeMainFramePalette palette;
+        if (DarkMode_GetMainFramePalette(&palette))
+            SendMessage(MainWindow->HTopRebar, RB_SETBKCOLOR, 0, (LPARAM)palette.Fill);
+        else
+            SendMessage(MainWindow->HTopRebar, RB_SETBKCOLOR, 0, (LPARAM)GetSysColor(COLOR_BTNFACE));
+    }
 
     if (refresh && MainWindow != NULL)
     {
