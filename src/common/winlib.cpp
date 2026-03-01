@@ -25,6 +25,40 @@
 #include "array.h"
 
 #include "winlib.h"
+#ifdef INSIDE_SALAMANDER
+#include "darkmode.h"
+#endif
+
+#ifdef INSIDE_SALAMANDER
+#define WinLib_DarkMode_GetDialogCtlColorBrush DarkMode_GetDialogCtlColorBrush
+#define WinLib_DarkMode_OnSettingChange DarkMode_OnSettingChange
+#define WinLib_DarkMode_ApplyTitleBar DarkMode_ApplyTitleBar
+#define WinLib_DarkMode_ApplyListTreeThemeRecursive DarkMode_ApplyListTreeThemeRecursive
+#else
+static HBRUSH WinLib_DarkMode_GetDialogCtlColorBrush(UINT msg, HDC hdc, HWND hCtrl)
+{
+    UNREFERENCED_PARAMETER(msg);
+    UNREFERENCED_PARAMETER(hdc);
+    UNREFERENCED_PARAMETER(hCtrl);
+    return NULL;
+}
+
+static BOOL WinLib_DarkMode_OnSettingChange(LPARAM lParam)
+{
+    UNREFERENCED_PARAMETER(lParam);
+    return FALSE;
+}
+
+static void WinLib_DarkMode_ApplyTitleBar(HWND hwnd)
+{
+    UNREFERENCED_PARAMETER(hwnd);
+}
+
+static void WinLib_DarkMode_ApplyListTreeThemeRecursive(HWND root)
+{
+    UNREFERENCED_PARAMETER(root);
+}
+#endif
 
 // Precaution against runtime check failure in debug version: original macro version casts rgb to WORD,
 // so reports data loss (RED component)
@@ -389,6 +423,7 @@ CWindow::CWindowProcInt(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam, BOOL
                 TRACE_ET(_T("Unable to create window."));
                 return FALSE;
             }
+            WinLib_DarkMode_ApplyTitleBar(hwnd);
         }
         break;
     }
@@ -460,6 +495,13 @@ CWindow::CWindowProcInt(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam, BOOL
     }
     }
     // calling WindowProc(...) method of the corresponding window object
+    if ((uMsg == WM_SETTINGCHANGE && WinLib_DarkMode_OnSettingChange(lParam)) ||
+        uMsg == WM_THEMECHANGED)
+    {
+        WinLib_DarkMode_ApplyTitleBar(hwnd);
+        WinLib_DarkMode_ApplyListTreeThemeRecursive(hwnd);
+    }
+
     LRESULT lResult;
     if (wnd != NULL)
         lResult = wnd->WindowProc(uMsg, wParam, lParam);
@@ -661,6 +703,17 @@ CDialog::DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
         return TRUE;
     }
 
+    case WM_CTLCOLORDLG:
+    case WM_CTLCOLORSTATIC:
+    case WM_CTLCOLOREDIT:
+    case WM_CTLCOLORLISTBOX:
+    {
+        HBRUSH hBrush = WinLib_DarkMode_GetDialogCtlColorBrush(uMsg, (HDC)wParam, (HWND)lParam);
+        if (hBrush != NULL)
+            return (INT_PTR)hBrush;
+        break;
+    }
+
     case WM_COMMAND:
     {
         switch (LOWORD(wParam))
@@ -697,6 +750,25 @@ CDialog::DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
         }
         break;
     }
+
+    case WM_SETTINGCHANGE:
+    {
+        if (WinLib_DarkMode_OnSettingChange(lParam))
+        {
+            WinLib_DarkMode_ApplyTitleBar(HWindow);
+            WinLib_DarkMode_ApplyListTreeThemeRecursive(HWindow);
+            InvalidateRect(HWindow, NULL, TRUE);
+        }
+        break;
+    }
+
+    case WM_THEMECHANGED:
+    {
+        WinLib_DarkMode_ApplyTitleBar(HWindow);
+        WinLib_DarkMode_ApplyListTreeThemeRecursive(HWindow);
+        InvalidateRect(HWindow, NULL, TRUE);
+        break;
+    }
     }
     return FALSE;
 }
@@ -724,6 +796,7 @@ CDialog::CDialogProc(HWND hwndDlg, UINT uMsg, WPARAM wParam, LPARAM lParam)
                 TRACE_ET(_T("Unable to create dialog."));
                 return TRUE;
             }
+            WinLib_DarkMode_ApplyTitleBar(hwndDlg);
             dlg->NotifDlgJustCreated(); // introduced as place for dialog layout adjustment
         }
         break;
@@ -768,6 +841,9 @@ CDialog::CDialogProc(HWND hwndDlg, UINT uMsg, WPARAM wParam, LPARAM lParam)
         dlgRes = dlg->DialogProc(uMsg, wParam, lParam);
     else
         dlgRes = FALSE; // error or message didn't come between WM_INITDIALOG and WM_DESTROY
+
+    if (dlg != NULL && uMsg == WM_INITDIALOG)
+        WinLib_DarkMode_ApplyListTreeThemeRecursive(hwndDlg);
 
     return dlgRes;
 }

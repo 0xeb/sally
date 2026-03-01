@@ -3322,6 +3322,21 @@ void CFilesWindow::OnColorsChanged()
         if (UseSystemIcons || UseThumbnails)
             WakeupIconCacheThread();
     }
+
+    if (ListBox != NULL && ListBox->HWindow != NULL)
+    {
+        // A color/theme switch can happen after the panel was already painted.
+        // Force a full panel repaint so stale light pixels are not left behind
+        // until the user moves selection or scrolls.
+        InvalidateRect(ListBox->HWindow, &ListBox->FilesRect, FALSE);
+        if (ListBox->HeaderLine.HWindow != NULL)
+            InvalidateRect(ListBox->HeaderLine.HWindow, NULL, TRUE);
+        if (ListBox->HVScrollBar != NULL)
+            InvalidateRect(ListBox->HVScrollBar, NULL, TRUE);
+        if (ListBox->HHScrollBar != NULL && ListBox->BottomBar.HWindow != NULL)
+            InvalidateRect(ListBox->BottomBar.HWindow, NULL, TRUE);
+        UpdateWindow(ListBox->HWindow);
+    }
 }
 
 CViewModeEnum

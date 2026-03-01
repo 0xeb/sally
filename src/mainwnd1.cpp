@@ -3185,6 +3185,11 @@ void CMainWindow::OnColorsChanged(BOOL reloadUMIcons)
     // main menu
     MainMenu.SetImageList(HGrayToolBarImageList, TRUE);
     MainMenu.SetHotImageList(HHotToolBarImageList, TRUE);
+    if (MenuBar != NULL && MenuBar->HWindow != NULL)
+    {
+        InvalidateRect(MenuBar->HWindow, NULL, TRUE);
+        UpdateWindow(MenuBar->HWindow);
+    }
 
     // archive menu
     ArchiveMenu.SetImageList(HGrayToolBarImageList, TRUE);
@@ -3201,6 +3206,19 @@ void CMainWindow::OnColorsChanged(BOOL reloadUMIcons)
     if (RightPanel != NULL)
     {
         RightPanel->OnColorsChanged();
+    }
+
+    if (EditWindow != NULL && EditWindow->HWindow != NULL)
+    {
+        InvalidateRect(EditWindow->HWindow, NULL, TRUE);
+        UpdateWindow(EditWindow->HWindow);
+
+        CEditLine* editLine = EditWindow->GetEditLine();
+        if (editLine != NULL && editLine->HWindow != NULL)
+        {
+            InvalidateRect(editLine->HWindow, NULL, TRUE);
+            UpdateWindow(editLine->HWindow);
+        }
     }
 }
 

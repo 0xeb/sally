@@ -95,6 +95,15 @@ protected:
             wPath = L"\\\\?\\" + wPath;
         CreateTestFileW(wPath);
     }
+
+    std::wstring ToExtendedPath(const std::wstring& path)
+    {
+        if (path.size() >= 4 && path.compare(0, 4, L"\\\\?\\") == 0)
+            return path;
+        if (path.size() >= 2 && path[0] == L'\\' && path[1] == L'\\')
+            return L"\\\\?\\UNC\\" + path.substr(2);
+        return L"\\\\?\\" + path;
+    }
 };
 
 // ============================================================================
@@ -345,6 +354,34 @@ TEST_F(FilesystemOpsTest, DeleteFile_NonExistent)
 {
     std::string bogus = m_tempDir + "\\no_such_file.txt";
     EXPECT_FALSE(SalLPDeleteFile(bogus.c_str()));
+}
+
+TEST_F(FilesystemOpsTest, DeleteFile_ReservedNulBasename)
+{
+    std::wstring createPath = ToExtendedPath(m_tempDirW) + L"\\nul";
+    HANDLE h = CreateFileW(createPath.c_str(), GENERIC_WRITE, 0, NULL,
+                           CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL, NULL);
+    ASSERT_NE(h, INVALID_HANDLE_VALUE) << "CreateFileW failed with " << GetLastError();
+    CloseHandle(h);
+
+    std::string deletePath = m_tempDir + "\\nul";
+    EXPECT_TRUE(SalLPDeleteFile(deletePath.c_str())) << "Delete failed with " << GetLastError();
+
+    EXPECT_EQ(GetFileAttributesW(createPath.c_str()), INVALID_FILE_ATTRIBUTES);
+}
+
+TEST_F(FilesystemOpsTest, DeleteFile_ReservedNulBasename_CaseInsensitive)
+{
+    std::wstring createPath = ToExtendedPath(m_tempDirW) + L"\\NUL";
+    HANDLE h = CreateFileW(createPath.c_str(), GENERIC_WRITE, 0, NULL,
+                           CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL, NULL);
+    ASSERT_NE(h, INVALID_HANDLE_VALUE) << "CreateFileW failed with " << GetLastError();
+    CloseHandle(h);
+
+    std::string deletePath = m_tempDir + "\\NUL";
+    EXPECT_TRUE(SalLPDeleteFile(deletePath.c_str())) << "Delete failed with " << GetLastError();
+
+    EXPECT_EQ(GetFileAttributesW(createPath.c_str()), INVALID_FILE_ATTRIBUTES);
 }
 
 // ============================================================================

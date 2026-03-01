@@ -36,6 +36,7 @@
 #include "zip.h"
 #include "tasklist.h"
 #include "jumplist.h"
+#include "darkmode.h"
 extern "C"
 {
 #include "shexreg.h"
@@ -1015,6 +1016,10 @@ CMainWindow::WindowProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
 
         SetTimer(HWindow, IDT_ADDNEWMODULES, 15000, NULL); // timer after 15 seconds for AddNewlyLoadedModulesToGlobalModulesStore()
 
+        DarkMode_Initialize();
+        DarkMode_SetThemeMode(Configuration.ThemeMode);
+        DarkMode_ApplyTitleBar(HWindow);
+
         CMWDropTarget* dropTarget = new CMWDropTarget();
         if (dropTarget != NULL)
         {
@@ -1260,6 +1265,14 @@ MENU_TEMPLATE_ITEM AddToSystemMenu[] =
 
     case WM_SETTINGCHANGE:
     {
+        if (DarkMode_OnSettingChange(lParam))
+        {
+            DarkMode_SetThemeMode(Configuration.ThemeMode);
+            DarkMode_ApplyToThreadTopLevelWindows(GetCurrentThreadId());
+            ColorsChanged(TRUE, FALSE, TRUE);
+            return 0;
+        }
+
         if (IgnoreWM_SETTINGCHANGE || LeftPanel == NULL || RightPanel == NULL) // a bug report showed that WM_SETTINGCHANGE was delivered immediately from WM_CREATE of the main window (panels didn't exist yet, causing a NULL access)
             return 0;
 
@@ -4949,6 +4962,17 @@ MENU_TEMPLATE_ITEM AddToSystemMenu[] =
         return plResult;
     }
 
+    case WM_CTLCOLORDLG:
+    case WM_CTLCOLORSTATIC:
+    case WM_CTLCOLOREDIT:
+    case WM_CTLCOLORLISTBOX:
+    {
+        HBRUSH hBrush = DarkMode_GetDialogCtlColorBrush(uMsg, (HDC)wParam, (HWND)lParam);
+        if (hBrush != NULL)
+            return (LRESULT)hBrush;
+        break;
+    }
+
     case WM_SETCURSOR:
     {
         if (HasLockedUI())
@@ -6715,14 +6739,31 @@ MENU_TEMPLATE_ITEM AddToSystemMenu[] =
         PAINTSTRUCT ps;
 
         HDC dc = HANDLES(BeginPaint(HWindow, &ps));
-        HPEN oldPen = (HPEN)SelectObject(dc, BtnShadowPen);
+        DarkModeMainFramePalette palette;
+        BOOL useDarkPalette = DarkMode_GetMainFramePalette(&palette);
+
+        HPEN oldLegacyPen = NULL;
+        HGDIOBJ oldStockPen = NULL;
+        HGDIOBJ oldStockBrush = NULL;
+        if (useDarkPalette)
+        {
+            oldStockPen = SelectObject(dc, GetStockObject(DC_PEN));
+            oldStockBrush = SelectObject(dc, GetStockObject(DC_BRUSH));
+            SetDCPenColor(dc, palette.LineDark);
+            SetDCBrushColor(dc, palette.Fill);
+        }
+        else
+            oldLegacyPen = (HPEN)SelectObject(dc, BtnShadowPen);
 
         RECT r;
         if (TopToolBar->HWindow != NULL)
         {
             MoveToEx(dc, 0, 0, NULL);
             LineTo(dc, WindowWidth + 1, 0);
-            SelectObject(dc, BtnHilightPen);
+            if (useDarkPalette)
+                SetDCPenColor(dc, palette.LineLight);
+            else
+                SelectObject(dc, BtnHilightPen);
             MoveToEx(dc, 0, 1, NULL);
             LineTo(dc, WindowWidth + 1, 1);
         }
@@ -6739,9 +6780,17 @@ MENU_TEMPLATE_ITEM AddToSystemMenu[] =
             //        MoveToEx(dc, r.left, r.top + 1, NULL);
             //        LineTo(dc, r.right, r.top + 1);
             r.bottom = r.top + PanelsHeight;
-            FillRect(dc, &r, HDialogBrush);
-
-            SelectObject(dc, BtnFacePen);
+            if (useDarkPalette)
+            {
+                SetDCBrushColor(dc, palette.Fill);
+                FillRect(dc, &r, (HBRUSH)GetStockObject(DC_BRUSH));
+                SetDCPenColor(dc, palette.Border);
+            }
+            else
+            {
+                FillRect(dc, &r, HDialogBrush);
+                SelectObject(dc, BtnFacePen);
+            }
             MoveToEx(dc, 0, 0, NULL);
             LineTo(dc, 0, WindowHeight - 1);
             LineTo(dc, WindowWidth - 1, WindowHeight - 1);
@@ -6754,7 +6803,13 @@ MENU_TEMPLATE_ITEM AddToSystemMenu[] =
             r.top = TopRebarHeight + PanelsHeight;
             r.right = WindowWidth;
             r.bottom = r.top + 2;
-            FillRect(dc, &r, HDialogBrush);
+            if (useDarkPalette)
+            {
+                SetDCBrushColor(dc, palette.Fill);
+                FillRect(dc, &r, (HBRUSH)GetStockObject(DC_BRUSH));
+            }
+            else
+                FillRect(dc, &r, HDialogBrush);
         }
 
         if (BottomToolBar->HWindow != NULL)
@@ -6763,10 +6818,22 @@ MENU_TEMPLATE_ITEM AddToSystemMenu[] =
             r.top = TopRebarHeight + PanelsHeight + EditHeight;
             r.right = WindowWidth;
             r.bottom = r.top + 2;
-            FillRect(dc, &r, HDialogBrush);
+            if (useDarkPalette)
+            {
+                SetDCBrushColor(dc, palette.Fill);
+                FillRect(dc, &r, (HBRUSH)GetStockObject(DC_BRUSH));
+            }
+            else
+                FillRect(dc, &r, HDialogBrush);
         }
 
-        SelectObject(dc, oldPen);
+        if (useDarkPalette)
+        {
+            SelectObject(dc, oldStockBrush);
+            SelectObject(dc, oldStockPen);
+        }
+        else
+            SelectObject(dc, oldLegacyPen);
         HANDLES(EndPaint(HWindow, &ps));
         return 0;
     }

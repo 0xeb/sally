@@ -317,6 +317,67 @@ BOOL IsUNCPathW(const wchar_t* path)
     return (path[0] == L'\\' && path[1] == L'\\');
 }
 
+BOOL IsReservedNulBasenameW(const wchar_t* pathOrName)
+{
+    if (pathOrName == NULL || pathOrName[0] == L'\0')
+        return FALSE;
+
+    const wchar_t* baseName = pathOrName;
+    const wchar_t* lastSlash = wcsrchr(pathOrName, L'\\');
+    const wchar_t* lastAltSlash = wcsrchr(pathOrName, L'/');
+    if (lastSlash != NULL && lastSlash + 1 > baseName)
+        baseName = lastSlash + 1;
+    if (lastAltSlash != NULL && lastAltSlash + 1 > baseName)
+        baseName = lastAltSlash + 1;
+
+    return _wcsicmp(baseName, L"nul") == 0;
+}
+
+BOOL IsReservedNulBasenameA(const char* pathOrName)
+{
+    if (pathOrName == NULL || pathOrName[0] == '\0')
+        return FALSE;
+
+    const char* baseName = pathOrName;
+    const char* lastSlash = strrchr(pathOrName, '\\');
+    const char* lastAltSlash = strrchr(pathOrName, '/');
+    if (lastSlash != NULL && lastSlash + 1 > baseName)
+        baseName = lastSlash + 1;
+    if (lastAltSlash != NULL && lastAltSlash + 1 > baseName)
+        baseName = lastAltSlash + 1;
+
+    return _stricmp(baseName, "nul") == 0;
+}
+
+BOOL ShouldBypassRecycleBinForDeleteW(const wchar_t* pathOrName)
+{
+    return IsReservedNulBasenameW(pathOrName);
+}
+
+BOOL ShouldBypassRecycleBinForDeleteA(const char* pathOrName)
+{
+    return IsReservedNulBasenameA(pathOrName);
+}
+
+int ComputeDeleteRecycleMode(BOOL driveIsFixed,
+                             int configuredUseRecycleBin,
+                             BOOL invertRecycleBin,
+                             BOOL bypassRecycleForEntry)
+{
+    int recycle = 0;
+    if (driveIsFixed)
+    {
+        if (invertRecycleBin)
+            recycle = (configuredUseRecycleBin == 0) ? 1 : 0;
+        else
+            recycle = configuredUseRecycleBin;
+    }
+
+    if (bypassRecycleForEntry)
+        recycle = 0;
+    return recycle;
+}
+
 BOOL HasTrailingBackslashW(const wchar_t* path)
 {
     if (path == NULL || path[0] == L'\0')

@@ -5,6 +5,10 @@ project(Sally LANGUAGES C CXX RC)
 # Generate git version header
 include(${CMAKE_CURRENT_SOURCE_DIR}/cmake/git_version.cmake)
 
+# Demo/sample plugin toggle.
+# Keep enabled for local debug/dev by default; release CI disables it explicitly.
+option(SAL_BUILD_DEMOPLUG "Build DemoPlug sample plugin (includes DemoPlug FS)" ON)
+
 if(NOT WIN32)
   message(FATAL_ERROR "Sally CMake build targets Windows only.")
 endif()
