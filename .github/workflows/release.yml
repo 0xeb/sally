@@ -38,19 +38,19 @@ jobs:
       - name: Build RelWithDebInfo
         run: cmake --build build --config RelWithDebInfo --target populate -j
 
-      - name: Create zip archives
+      - name: Create runtime zip and collect symbols
         run: |
           $version = "${{ github.ref_name }}"
           $outputRoot = "build/out/sally/RelWithDebInfo_${{ matrix.arch }}"
 
           $runtimeDir = Join-Path $env:RUNNER_TEMP "sally-runtime-${{ matrix.arch }}"
-          $pdbDir = Join-Path $env:RUNNER_TEMP "sally-pdb-${{ matrix.arch }}"
+          $pdbDir = Join-Path $PWD "pdb-${{ matrix.arch }}"
           Remove-Item -Recurse -Force $runtimeDir,$pdbDir -ErrorAction SilentlyContinue
           New-Item -ItemType Directory -Path $runtimeDir,$pdbDir | Out-Null
 
           Copy-Item -Path "$outputRoot/*" -Destination $runtimeDir -Recurse -Force
 
-          # Collect symbols into a dedicated package and remove them from runtime zip.
+          # Collect symbols into a dedicated folder and remove them from runtime package.
           Get-ChildItem -Path $runtimeDir -Recurse -File -Filter *.pdb | ForEach-Object {
             $relative = $_.FullName.Substring($runtimeDir.Length).TrimStart('\')
             $dest = Join-Path $pdbDir $relative
@@ -62,20 +62,15 @@ jobs:
           $runtimeZip = "Sally-$version-${{ matrix.arch }}.zip"
           Compress-Archive -Path "$runtimeDir/*" -DestinationPath $runtimeZip
           Write-Host "Created runtime package: $runtimeZip"
-
-          $symbolZip = "Sally-$version-${{ matrix.arch }}-pdb.zip"
-          if (Get-ChildItem -Path $pdbDir -Recurse -File | Select-Object -First 1) {
-            Compress-Archive -Path "$pdbDir/*" -DestinationPath $symbolZip
-            Write-Host "Created symbols package: $symbolZip"
-          } else {
-            Write-Host "No PDB files found; skipping symbols package."
-          }
+          Write-Host "Collected symbols in: $pdbDir"
 
       - name: Upload artifact
         uses: actions/upload-artifact@v4
         with:
           name: Sally-${{ matrix.arch }}
-          path: Sally-*.zip
+          path: |
+            Sally-${{ github.ref_name }}-${{ matrix.arch }}.zip
+            pdb-${{ matrix.arch }}/
 
   release:
     name: Create Release
@@ -90,6 +85,33 @@ jobs:
           path: artifacts
 
       - name: List artifacts
+        run: find artifacts -type f -name "*.zip"
+
+      - name: Create consolidated symbols zip
+        run: |
+          version="${{ github.ref_name }}"
+          symbols_root="artifacts/symbols"
+          rm -rf "$symbols_root"
+          mkdir -p "$symbols_root"
+
+          for arch in x64 x86 ARM64; do
+            src="$(find artifacts -type d -name "pdb-$arch" | head -n 1)"
+            if [ -n "$src" ]; then
+              mkdir -p "$symbols_root/$arch"
+              cp -a "$src"/. "$symbols_root/$arch"/
+            else
+              echo "No symbol directory found for $arch"
+            fi
+          done
+
+          if find "$symbols_root" -type f -name "*.pdb" | grep -q .; then
+            (cd "$symbols_root" && zip -r "../Sally-${version}-pdb.zip" .)
+            echo "Created artifacts/Sally-${version}-pdb.zip"
+          else
+            echo "No PDB files found across artifacts; skipping consolidated symbols zip."
+          fi
+
+      - name: List packaged zips
         run: find artifacts -type f -name "*.zip"
 
       - name: Create GitHub Release
