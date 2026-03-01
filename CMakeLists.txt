@@ -5,9 +5,20 @@ project(Sally LANGUAGES C CXX RC)
 # Generate git version header
 include(${CMAKE_CURRENT_SOURCE_DIR}/cmake/git_version.cmake)
 
+# Detect CI by environment (can be overridden explicitly via -DSAL_UNDER_CI=...).
+set(_SAL_UNDER_CI_DEFAULT OFF)
+if(DEFINED ENV{CI} AND NOT "$ENV{CI}" STREQUAL "")
+  set(_SAL_UNDER_CI_DEFAULT ON)
+endif()
+option(SAL_UNDER_CI "Enable CI-friendly defaults for reproducible automation builds" ${_SAL_UNDER_CI_DEFAULT})
+
 # Demo/sample plugin toggle.
-# Keep enabled for local debug/dev by default; release CI disables it explicitly.
-option(SAL_BUILD_DEMOPLUG "Build DemoPlug sample plugin (includes DemoPlug FS)" ON)
+# Default is ON locally, OFF under CI unless explicitly overridden.
+set(_SAL_BUILD_DEMOPLUG_DEFAULT ON)
+if(SAL_UNDER_CI)
+  set(_SAL_BUILD_DEMOPLUG_DEFAULT OFF)
+endif()
+option(SAL_BUILD_DEMOPLUG "Build DemoPlug sample plugin (includes DemoPlug FS)" ${_SAL_BUILD_DEMOPLUG_DEFAULT})
 
 if(NOT WIN32)
   message(FATAL_ERROR "Sally CMake build targets Windows only.")
@@ -568,10 +579,7 @@ set_target_properties(salext PROPERTIES
 # Plugins
 # ==============================================================================
 
-include(${CMAKE_CURRENT_SOURCE_DIR}/cmake/targets/plugins.cmake)
-
-# 7-Zip plugin with dependencies (7za.dll, 7zwrapper.dll)
-include(${CMAKE_CURRENT_SOURCE_DIR}/cmake/targets/7zip.cmake)
+add_subdirectory(src/plugins)
 
 # ==============================================================================
 # Installation Rules
@@ -629,4 +637,6 @@ add_subdirectory(src/tests)
 message(STATUS "")
 message(STATUS "=== Sally CMake Build ===")
 message(STATUS "Output: ${SAL_OUTPUT_BASE}/<Config>_${SAL_PLATFORM}")
+message(STATUS "SAL_UNDER_CI: ${SAL_UNDER_CI}")
+message(STATUS "SAL_BUILD_DEMOPLUG: ${SAL_BUILD_DEMOPLUG}")
 message(STATUS "")

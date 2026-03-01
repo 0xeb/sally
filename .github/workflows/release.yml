@@ -33,17 +33,43 @@ jobs:
         uses: actions/checkout@v4
 
       - name: Configure CMake (${{ matrix.arch }})
-        run: cmake -B build -A ${{ matrix.cmake_arch }} -DSAL_BUILD_DEMOPLUG=OFF
+        run: cmake -B build -A ${{ matrix.cmake_arch }} -DSAL_UNDER_CI=ON -DSAL_BUILD_DEMOPLUG=OFF
 
       - name: Build RelWithDebInfo
         run: cmake --build build --config RelWithDebInfo --target populate -j
 
-      - name: Create zip archive
+      - name: Create zip archives
         run: |
           $version = "${{ github.ref_name }}"
-          $zipName = "Sally-$version-${{ matrix.arch }}.zip"
-          Compress-Archive -Path "build/out/sally/RelWithDebInfo_${{ matrix.arch }}/*" -DestinationPath $zipName
-          Write-Host "Created: $zipName"
+          $outputRoot = "build/out/sally/RelWithDebInfo_${{ matrix.arch }}"
+
+          $runtimeDir = Join-Path $env:RUNNER_TEMP "sally-runtime-${{ matrix.arch }}"
+          $pdbDir = Join-Path $env:RUNNER_TEMP "sally-pdb-${{ matrix.arch }}"
+          Remove-Item -Recurse -Force $runtimeDir,$pdbDir -ErrorAction SilentlyContinue
+          New-Item -ItemType Directory -Path $runtimeDir,$pdbDir | Out-Null
+
+          Copy-Item -Path "$outputRoot/*" -Destination $runtimeDir -Recurse -Force
+
+          # Collect symbols into a dedicated package and remove them from runtime zip.
+          Get-ChildItem -Path $runtimeDir -Recurse -File -Filter *.pdb | ForEach-Object {
+            $relative = $_.FullName.Substring($runtimeDir.Length).TrimStart('\')
+            $dest = Join-Path $pdbDir $relative
+            New-Item -ItemType Directory -Path (Split-Path -Parent $dest) -Force | Out-Null
+            Copy-Item -Path $_.FullName -Destination $dest -Force
+            Remove-Item -Path $_.FullName -Force
+          }
+
+          $runtimeZip = "Sally-$version-${{ matrix.arch }}.zip"
+          Compress-Archive -Path "$runtimeDir/*" -DestinationPath $runtimeZip
+          Write-Host "Created runtime package: $runtimeZip"
+
+          $symbolZip = "Sally-$version-${{ matrix.arch }}-pdb.zip"
+          if (Get-ChildItem -Path $pdbDir -Recurse -File | Select-Object -First 1) {
+            Compress-Archive -Path "$pdbDir/*" -DestinationPath $symbolZip
+            Write-Host "Created symbols package: $symbolZip"
+          } else {
+            Write-Host "No PDB files found; skipping symbols package."
+          }
 
       - name: Upload artifact
         uses: actions/upload-artifact@v4
