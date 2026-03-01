@@ -332,7 +332,7 @@ const char* SalamanderConfigurationVersions[SALCFG_ROOTS_COUNT] =
         "1.6 beta 1-5",
         "1.52"};
 
-const char* SALAMANDER_ROOT_REG = NULL; // will be set in salamdr1.cpp
+const char* SALAMANDER_ROOT_REG = NULL; // will be set in salamander_entry_lifecycle.cpp
 
 const char* SALAMANDER_SAVE_IN_PROGRESS = "Save In Progress"; // value exists only during configuration save (detects interrupted saves -> corrupted configuration)
 BOOL IsSetSALAMANDER_SAVE_IN_PROGRESS = FALSE;                // TRUE = the registry contains SALAMANDER_SAVE_IN_PROGRESS (detect interrupted configuration saving)

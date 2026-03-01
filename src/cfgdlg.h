@@ -175,7 +175,7 @@ extern CMainWindowIconItem MainWindowIcons[MAINWINDOWICONS_COUNT];
 
 struct CConfiguration
 {
-    // ConfigVersion - version number of the loaded configuration (see comment in mainwnd2.cpp)
+    // ConfigVersion - version number of the loaded configuration (see comment in main_window_config_persistence.cpp)
     DWORD ConfigVersion;
 
     int IncludeDirs,            // select/deselect (*, +, -) directories as well

@@ -15,7 +15,7 @@
 #include "nethood.h"
 #include "cache.h"
 #include "nethoodfs.h"
-#include "nethoodfs2.h"
+#include "nethood_fs_operations.h"
 #include "nethooddata.h"
 #include "nethoodmenu.h"
 #include "globals.h"

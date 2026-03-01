@@ -5,7 +5,7 @@
 
 // CBuildScriptState — transient state used during BuildScriptMain/Dir/File.
 //
-// Previously these were file-level globals in fileswn6.cpp. Extracting them
+// Previously these were file-level globals in files_window_copy_move.cpp. Extracting them
 // into a struct enables passing through BuildScript functions without global
 // state, which is required for headless/parallel script building.
 

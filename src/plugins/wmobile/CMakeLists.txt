@@ -4,8 +4,8 @@
 sal_add_plugin(NAME wmobile
   SOURCES
     "${SAL_PLUGINS}/wmobile/dialogs.cpp"
-    "${SAL_PLUGINS}/wmobile/fs1.cpp"
-    "${SAL_PLUGINS}/wmobile/fs2.cpp"
+    "${SAL_PLUGINS}/wmobile/fs_init.cpp"
+    "${SAL_PLUGINS}/wmobile/fs_operations.cpp"
     "${SAL_PLUGINS}/wmobile/precomp.cpp"
     "${SAL_PLUGINS}/wmobile/rapi.cpp"
     "${SAL_PLUGINS}/wmobile/wmobile.cpp"

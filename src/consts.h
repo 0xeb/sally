@@ -5,7 +5,7 @@
 
 #pragma once
 
-// current configuration version (see mainwnd2.cpp for description)
+// current configuration version (see main_window_config_persistence.cpp for description)
 extern const DWORD THIS_CONFIG_VERSION;
 
 // Version expiration: uncomment for beta and PB builds; comment out for release builds:

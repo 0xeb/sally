@@ -1105,10 +1105,10 @@ extern CShares Shares; // the loaded shared directories are stored here
 
 extern CSalamanderSafeFile SalSafeFile; // interface for comfortable work with files
 
-extern const char* SalamanderConfigurationRoots[];                                                           // description in mainwnd2.cpp
-BOOL GetUpgradeInfo(BOOL* autoImportConfig, char* autoImportConfigFromKey, int autoImportConfigFromKeySize); // description in mainwnd2.cpp
-BOOL FindLatestConfiguration(BOOL* deleteConfigurations, const char*& loadConfiguration);                    // description in mainwnd2.cpp
-BOOL FindLanguageFromPrevVerOfSal(char* slgName);                                                            // description in mainwnd2.cpp
+extern const char* SalamanderConfigurationRoots[];                                                           // description in main_window_config_persistence.cpp
+BOOL GetUpgradeInfo(BOOL* autoImportConfig, char* autoImportConfigFromKey, int autoImportConfigFromKeySize); // description in main_window_config_persistence.cpp
+BOOL FindLatestConfiguration(BOOL* deleteConfigurations, const char*& loadConfiguration);                    // description in main_window_config_persistence.cpp
+BOOL FindLanguageFromPrevVerOfSal(char* slgName);                                                            // description in main_window_config_persistence.cpp
 
 // creates and attaches a special class to the edit line/combobox 'ctrlID' that enables
 // capturing keys and sending the WM_USER_KEYDOWN message to the dialog 'hDialog'

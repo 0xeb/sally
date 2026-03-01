@@ -3,7 +3,7 @@
 
 sal_add_plugin(NAME renamer
   SOURCES
-    "${SAL_PLUGINS}/renamer/crename2.cpp"
+    "${SAL_PLUGINS}/renamer/rename_script_builder.cpp"
     "${SAL_PLUGINS}/renamer/crenamer.cpp"
     "${SAL_PLUGINS}/renamer/dialogs.cpp"
     "${SAL_PLUGINS}/renamer/editor.cpp"
@@ -13,9 +13,9 @@ sal_add_plugin(NAME renamer
     "${SAL_PLUGINS}/renamer/regexp.cpp"
     "${SAL_PLUGINS}/renamer/renamer.cpp"
     "${SAL_PLUGINS}/renamer/rendlg.cpp"
-    "${SAL_PLUGINS}/renamer/rendlg2.cpp"
-    "${SAL_PLUGINS}/renamer/rendlg3.cpp"
-    "${SAL_PLUGINS}/renamer/rendlg4.cpp"
+    "${SAL_PLUGINS}/renamer/renamer_execute_undo.cpp"
+    "${SAL_PLUGINS}/renamer/renamer_file_ops.cpp"
+    "${SAL_PLUGINS}/renamer/renamer_external_command.cpp"
     "${SAL_PLUGINS}/renamer/utils.cpp"
     "${SAL_PLUGINS}/renamer/varstr.cpp"
     # Character utilities from shared/plugcore

@@ -19,7 +19,7 @@
 
 //****************************************************************************
 //
-// CFindDialog (continued finddlg1.cpp)
+// CFindDialog (continued find_dialog_results.cpp)
 //
 
 void CFindDialog::OnHideSelection()

@@ -11,7 +11,7 @@ sal_add_plugin(NAME nethood
     "${SAL_PLUGINS}/nethood/nethood.cpp"
     "${SAL_PLUGINS}/nethood/nethooddata.cpp"
     "${SAL_PLUGINS}/nethood/nethoodfs.cpp"
-    "${SAL_PLUGINS}/nethood/nethoodfs2.cpp"
+    "${SAL_PLUGINS}/nethood/nethood_fs_operations.cpp"
     "${SAL_PLUGINS}/nethood/nethoodmenu.cpp"
     "${SAL_PLUGINS}/nethood/precomp.cpp"
     "${SAL_PLUGINS}/nethood/salutils.cpp"

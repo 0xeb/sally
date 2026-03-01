@@ -6,7 +6,7 @@
 // Google Test suite for long path support in viewer operations.
 //
 // Tests the SalCreateFileH + SalLPGetFileAttributes APIs used by the
-// internal viewer (viewer2.cpp) and file panel view/edit (fileswn5.cpp)
+// internal viewer (viewer_thread_buffering.cpp) and file panel view/edit (files_window_view_edit.cpp)
 // to open files with paths exceeding MAX_PATH (260 chars).
 //
 // Issue: https://github.com/0xeb/sally/issues/24
@@ -128,7 +128,7 @@ protected:
 // ============================================================================
 // Test: SalCreateFileH opens a file at a long path (>260 chars)
 //
-// This mirrors viewer2.cpp::FileChanged() which uses SalCreateFileH to open
+// This mirrors viewer_thread_buffering.cpp::FileChanged() which uses SalCreateFileH to open
 // the file for reading. Previously it used CreateFileW(AnsiToWide(...)) which
 // fails for paths >260 chars because it lacks the \\?\ prefix.
 // ============================================================================
@@ -162,7 +162,7 @@ TEST_F(LongPathViewerTest, SalCreateFileH_OpenReadAtLongPath)
 // ============================================================================
 // Test: SalLPGetFileAttributes works for files at long paths
 //
-// This mirrors fileswn5.cpp::ViewFile() / EditFile() which use
+// This mirrors files_window_view_edit.cpp::ViewFile() / EditFile() which use
 // SalLPGetFileAttributes to validate the file exists before opening it.
 // Previously used GetFileAttributesW(AnsiToWide(...)) which lacks \\?\ prefix.
 // ============================================================================
@@ -256,7 +256,7 @@ TEST_F(LongPathViewerTest, FindFirstFileW_LongPath)
 // ============================================================================
 // Test: DOS name fallback at long path
 //
-// Simulates the pattern in fileswn5.cpp ViewFile/EditFile: first try the
+// Simulates the pattern in files_window_view_edit.cpp ViewFile/EditFile: first try the
 // long name with SalLPGetFileAttributes, and if it fails, try the DOS name.
 // At long paths, the important thing is that SalLPGetFileAttributes succeeds
 // for existing files so the DOS fallback is never needed.

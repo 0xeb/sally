@@ -10,8 +10,8 @@ sal_add_plugin(NAME undelete
     "${SAL_SHARED}/winliblt.cpp"
     # Plugin sources
     "${SAL_PLUGINS}/undelete/dialogs.cpp"
-    "${SAL_PLUGINS}/undelete/fs1.cpp"
-    "${SAL_PLUGINS}/undelete/fs2.cpp"
+    "${SAL_PLUGINS}/undelete/fs_init.cpp"
+    "${SAL_PLUGINS}/undelete/fs_operations.cpp"
     "${SAL_PLUGINS}/undelete/restore.cpp"
     "${SAL_PLUGINS}/undelete/undelete.cpp"
     # Library sources

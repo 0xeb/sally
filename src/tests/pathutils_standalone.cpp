@@ -4,7 +4,7 @@
 //
 // pathutils standalone implementation for tests (no precomp.h dependency)
 //
-// Extracted from salamdr5.cpp, fileswn8.cpp, salamdr2.cpp
+// Extracted from salamander_path_validation.cpp, files_window_delete_email.cpp, salamander_strings_waitwindow.cpp
 //
 
 #include <windows.h>
@@ -18,7 +18,7 @@
 #define CALL_STACK_MESSAGE_NONE
 #endif
 
-// --- MakeCopyWithBackslashIfNeededW (from salamdr5.cpp) ---
+// --- MakeCopyWithBackslashIfNeededW (from salamander_path_validation.cpp) ---
 
 std::wstring MakeCopyWithBackslashIfNeededW(const wchar_t* name)
 {
@@ -37,7 +37,7 @@ std::wstring MakeCopyWithBackslashIfNeededW(const wchar_t* name)
     return result;
 }
 
-// --- NameEndsWithBackslashW (from salamdr5.cpp) ---
+// --- NameEndsWithBackslashW (from salamander_path_validation.cpp) ---
 
 BOOL NameEndsWithBackslashW(const wchar_t* name)
 {
@@ -47,7 +47,7 @@ BOOL NameEndsWithBackslashW(const wchar_t* name)
     return len > 0 && name[len - 1] == L'\\';
 }
 
-// --- PathContainsValidComponentsW (from fileswn8.cpp) ---
+// --- PathContainsValidComponentsW (from files_window_delete_email.cpp) ---
 
 BOOL PathContainsValidComponentsW(const wchar_t* path)
 {
@@ -69,7 +69,7 @@ BOOL PathContainsValidComponentsW(const wchar_t* path)
     return TRUE;
 }
 
-// --- AlterFileNameW (from salamdr2.cpp) ---
+// --- AlterFileNameW (from salamander_strings_waitwindow.cpp) ---
 
 std::wstring AlterFileNameW(const wchar_t* filename, int format, int change, bool isDir)
 {
@@ -289,7 +289,7 @@ std::wstring AlterFileNameW(const wchar_t* filename, int format, int change, boo
     return result;
 }
 
-// --- Wide path utilities (from salamdr3.cpp) ---
+// --- Wide path utilities (from salamander_path_utils.cpp) ---
 
 void SalPathAppendW(std::wstring& path, const wchar_t* name)
 {

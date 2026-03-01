@@ -272,7 +272,7 @@ TEST(AlterFileNameW, Unicode_Uppercase)
 }
 
 // ============================================================================
-// Wide path utilities from salamdr3.cpp
+// Wide path utilities from salamander_path_utils.cpp
 // ============================================================================
 
 // Declarations

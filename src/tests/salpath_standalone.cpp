@@ -8,7 +8,7 @@
 // Standalone extraction of wide path helpers for testing
 // (no precomp.h dependency)
 //
-// Functions extracted from salamdr3.cpp and salamdr1.cpp
+// Functions extracted from salamander_path_utils.cpp and salamander_entry_lifecycle.cpp
 //
 //****************************************************************************
 
@@ -20,7 +20,7 @@
 #include "../common/widepath.h"
 
 //****************************************************************************
-// From salamdr3.cpp: SalPath*W functions
+// From salamander_path_utils.cpp: SalPath*W functions
 //****************************************************************************
 
 // Wide version - appends name to path (modifies path in-place)
@@ -145,7 +145,7 @@ bool SalPathRenameExtensionW(std::wstring& path, const wchar_t* extension)
 }
 
 //****************************************************************************
-// From salamdr1.cpp: CutDirectoryW
+// From salamander_entry_lifecycle.cpp: CutDirectoryW
 //****************************************************************************
 
 // Wide version - cuts last directory from path

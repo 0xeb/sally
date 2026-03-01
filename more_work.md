@@ -19,24 +19,24 @@
 - Dump analyzed: `c:\temo\salamand.dmp` with `C:\Users\elias\Tools\dbgtools\cdb.exe`
 - Key finding:
   - Fault bucket: single-step at function epilogue (`_RTC_CheckStackVars` path)
-  - Fault location: `src/fileswn1.cpp:1281` (`IconThreadThreadFBody` return path)
+  - Fault location: `src/files_window_path_state.cpp:1281` (`IconThreadThreadFBody` return path)
   - Root cause: icon-reader path setup wrote wide data into `CWidePathBuffer` using ANSI-length math without ensuring wide capacity first.
 - Fix applied in:
   - `bb8d91b` `Fix icon reader wide-path buffer overwrite on long paths`
-  - `src/fileswn1.cpp` now computes required wide size first, calls `EnsureCapacity`, then converts safely.
+  - `src/files_window_path_state.cpp` now computes required wide size first, calls `EnsureCapacity`, then converts safely.
 - Post-fix validation:
   - Debug/Release `salamander` builds pass
   - focused gtests pass (same set listed above)
 
 ## Completed In This Cycle
 - Registry decoupling extended through:
-  - `src/mainwnd2.cpp`
-  - `src/mainwnd3.cpp`
-  - `src/plugins1.cpp`
-  - `src/salamdr5.cpp` (`CSystemPolicies`)
-  - `src/salamdr1.cpp`
+  - `src/main_window_config_persistence.cpp`
+  - `src/main_window_commands_help.cpp`
+  - `src/plugins_fs_encapsulation.cpp`
+  - `src/salamander_path_validation.cpp` (`CSystemPolicies`)
+  - `src/salamander_entry_lifecycle.cpp`
   - `src/bugreprt.cpp`
-  - `src/plugins2.cpp` (icon-list binary persistence)
+  - `src/plugins_registry_dispatch.cpp` (icon-list binary persistence)
 - Filesystem decoupling extended through:
   - `src/worker.cpp` (`COperation` path-based open/create/delete/get/set attrs on wide path now via `IFileSystem`)
   - `src/codetbl.cpp` switched from direct `CreateFileW` to `SalCreateFileH` (abstraction path)
@@ -58,7 +58,7 @@ Highest-value remaining files:
 - `src/icncache.cpp` (heavy association/icon reads + key/value enumeration; many raw `RegOpenKey*`, `RegEnum*`, `RegCloseKey` usage)
 - `src/shiconov.cpp` (shell overlay handler enumeration from registry)
 - `src/snooper.cpp` (LanMan shares key open/close + notify loop)
-- `src/mainwnd2.cpp:1131` and `src/mainwnd3.cpp:6460` still use `SHCopyKey` directly (intentional for now; not abstracted)
+- `src/main_window_config_persistence.cpp:1131` and `src/main_window_commands_help.cpp:6460` still use `SHCopyKey` directly (intentional for now; not abstracted)
 
 Special-case module:
 - `src/salmoncl.cpp` uses direct `Reg*` in startup/entrypoint code and explicitly warns not to use runtime/global-object facilities (`src/salmoncl.cpp:15-16`).
@@ -74,11 +74,11 @@ Biggest remaining file:
   - Others are straightforward get/set/delete/open replacements and can still move to `IFileSystem`.
 
 Other core files with direct file API usage:
-- `src/pack2.cpp` (~28)
-- `src/pack1.cpp` (~10)
-- `src/fileswn6.cpp` (~10)
+- `src/pack_compress_delete.cpp` (~28)
+- `src/pack_extract_scan.cpp` (~10)
+- `src/files_window_copy_move.cpp` (~10)
 - `src/safefile.cpp` (~7)
-- `src/salamdr2.cpp`, `src/salamdr3.cpp`, `src/salamdr5.cpp`, etc.
+- `src/salamander_strings_waitwindow.cpp`, `src/salamander_path_utils.cpp`, `src/salamander_path_validation.cpp`, etc.
 
 ### 3) Optional (lower priority / tooling / plugins)
 - `src/shexreg.c` (large direct registry usage; shell extension registration code)
@@ -111,7 +111,7 @@ Other core files with direct file API usage:
   - `SalCreateFileH(...)` for ANSI-path calls in app code, or
   - direct `fileSystem->CreateFile(...)` with wide path.
 - `salmoncl.cpp` startup constraints are strict; avoid introducing dependencies on globals requiring runtime init.
-- `SHCopyKey` remains in `mainwnd2.cpp`/`mainwnd3.cpp`; treat as explicit exception until a safe abstraction is introduced.
+- `SHCopyKey` remains in `main_window_config_persistence.cpp`/`main_window_commands_help.cpp`; treat as explicit exception until a safe abstraction is introduced.
 
 ## Quick Scan Commands
 Use these to re-check remaining raw usage:

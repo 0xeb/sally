@@ -193,7 +193,7 @@ void CDriveBar::Execute(DWORD id)
 
             case drvtPluginCmd:
             {
-                // code taken from fileswn3.cpp, CFilesWindow::ChangeDrive()
+                // code taken from files_window_directory_read.cpp, CFilesWindow::ChangeDrive()
                 const char* dllName = (const char*)DriveTypeParam;
                 CPluginData* data = Plugins.GetPluginData(dllName);
                 if (data != NULL) // plug-in exists, execute the command

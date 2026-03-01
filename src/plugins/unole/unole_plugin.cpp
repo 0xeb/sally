@@ -4,7 +4,7 @@
 
 #include "precomp.h"
 
-#include "unole2.h"
+#include "unole_plugin.h"
 #include "dialogs.h"
 
 #include "unole2.rh"
