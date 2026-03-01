@@ -25,7 +25,40 @@
 #include "array.h"
 
 #include "winlib.h"
+#ifdef INSIDE_SALAMANDER
 #include "darkmode.h"
+#endif
+
+#ifdef INSIDE_SALAMANDER
+#define WinLib_DarkMode_GetDialogCtlColorBrush DarkMode_GetDialogCtlColorBrush
+#define WinLib_DarkMode_OnSettingChange DarkMode_OnSettingChange
+#define WinLib_DarkMode_ApplyTitleBar DarkMode_ApplyTitleBar
+#define WinLib_DarkMode_ApplyListTreeThemeRecursive DarkMode_ApplyListTreeThemeRecursive
+#else
+static HBRUSH WinLib_DarkMode_GetDialogCtlColorBrush(UINT msg, HDC hdc, HWND hCtrl)
+{
+    UNREFERENCED_PARAMETER(msg);
+    UNREFERENCED_PARAMETER(hdc);
+    UNREFERENCED_PARAMETER(hCtrl);
+    return NULL;
+}
+
+static BOOL WinLib_DarkMode_OnSettingChange(LPARAM lParam)
+{
+    UNREFERENCED_PARAMETER(lParam);
+    return FALSE;
+}
+
+static void WinLib_DarkMode_ApplyTitleBar(HWND hwnd)
+{
+    UNREFERENCED_PARAMETER(hwnd);
+}
+
+static void WinLib_DarkMode_ApplyListTreeThemeRecursive(HWND root)
+{
+    UNREFERENCED_PARAMETER(root);
+}
+#endif
 
 // Precaution against runtime check failure in debug version: original macro version casts rgb to WORD,
 // so reports data loss (RED component)
@@ -390,7 +423,7 @@ CWindow::CWindowProcInt(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam, BOOL
                 TRACE_ET(_T("Unable to create window."));
                 return FALSE;
             }
-            DarkMode_ApplyTitleBar(hwnd);
+            WinLib_DarkMode_ApplyTitleBar(hwnd);
         }
         break;
     }
@@ -462,11 +495,11 @@ CWindow::CWindowProcInt(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam, BOOL
     }
     }
     // calling WindowProc(...) method of the corresponding window object
-    if ((uMsg == WM_SETTINGCHANGE && DarkMode_OnSettingChange(lParam)) ||
+    if ((uMsg == WM_SETTINGCHANGE && WinLib_DarkMode_OnSettingChange(lParam)) ||
         uMsg == WM_THEMECHANGED)
     {
-        DarkMode_ApplyTitleBar(hwnd);
-        DarkMode_ApplyListTreeThemeRecursive(hwnd);
+        WinLib_DarkMode_ApplyTitleBar(hwnd);
+        WinLib_DarkMode_ApplyListTreeThemeRecursive(hwnd);
     }
 
     LRESULT lResult;
@@ -675,7 +708,7 @@ CDialog::DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
     case WM_CTLCOLOREDIT:
     case WM_CTLCOLORLISTBOX:
     {
-        HBRUSH hBrush = DarkMode_GetDialogCtlColorBrush(uMsg, (HDC)wParam, (HWND)lParam);
+        HBRUSH hBrush = WinLib_DarkMode_GetDialogCtlColorBrush(uMsg, (HDC)wParam, (HWND)lParam);
         if (hBrush != NULL)
             return (INT_PTR)hBrush;
         break;
@@ -720,10 +753,10 @@ CDialog::DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
 
     case WM_SETTINGCHANGE:
     {
-        if (DarkMode_OnSettingChange(lParam))
+        if (WinLib_DarkMode_OnSettingChange(lParam))
         {
-            DarkMode_ApplyTitleBar(HWindow);
-            DarkMode_ApplyListTreeThemeRecursive(HWindow);
+            WinLib_DarkMode_ApplyTitleBar(HWindow);
+            WinLib_DarkMode_ApplyListTreeThemeRecursive(HWindow);
             InvalidateRect(HWindow, NULL, TRUE);
         }
         break;
@@ -731,8 +764,8 @@ CDialog::DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
 
     case WM_THEMECHANGED:
     {
-        DarkMode_ApplyTitleBar(HWindow);
-        DarkMode_ApplyListTreeThemeRecursive(HWindow);
+        WinLib_DarkMode_ApplyTitleBar(HWindow);
+        WinLib_DarkMode_ApplyListTreeThemeRecursive(HWindow);
         InvalidateRect(HWindow, NULL, TRUE);
         break;
     }
@@ -763,7 +796,7 @@ CDialog::CDialogProc(HWND hwndDlg, UINT uMsg, WPARAM wParam, LPARAM lParam)
                 TRACE_ET(_T("Unable to create dialog."));
                 return TRUE;
             }
-            DarkMode_ApplyTitleBar(hwndDlg);
+            WinLib_DarkMode_ApplyTitleBar(hwndDlg);
             dlg->NotifDlgJustCreated(); // introduced as place for dialog layout adjustment
         }
         break;
@@ -810,7 +843,7 @@ CDialog::CDialogProc(HWND hwndDlg, UINT uMsg, WPARAM wParam, LPARAM lParam)
         dlgRes = FALSE; // error or message didn't come between WM_INITDIALOG and WM_DESTROY
 
     if (dlg != NULL && uMsg == WM_INITDIALOG)
-        DarkMode_ApplyListTreeThemeRecursive(hwndDlg);
+        WinLib_DarkMode_ApplyListTreeThemeRecursive(hwndDlg);
 
     return dlgRes;
 }
