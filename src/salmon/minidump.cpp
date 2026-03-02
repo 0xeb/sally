@@ -13,12 +13,25 @@ BOOL GenerateMiniDump(CMinidumpParams* minidumpParams, CSalmonSharedMemory* mem,
 {
     BOOL ret = FALSE;
     *overSize = FALSE;
-    char szPath[MAX_PATH];
-    ::GetModuleFileName(NULL, szPath, MAX_PATH);
-    *(strrchr(szPath, '\\')) = 0;      // we are running from utils\\salmon.exe
-    strcat_s(szPath, "\\dbghelp.dll"); // we want a newer version, at least 6.1, which older W2K/XP do not have
+
+    // Build path to dbghelp.dll next to our executable (utils\dbghelp.dll)
+    wchar_t exePath[MAX_PATH];
+    ::GetModuleFileNameW(NULL, exePath, MAX_PATH);
+    std::wstring dllPath(exePath);
+    auto pos = dllPath.rfind(L'\\');
+    if (pos != std::wstring::npos)
+        dllPath.resize(pos);
+    dllPath += L"\\dbghelp.dll";
+
     static HMODULE hDbgHelp;
-    hDbgHelp = LoadLibrary(szPath);
+    hDbgHelp = LoadLibraryW(dllPath.c_str());
+    if (hDbgHelp == NULL)
+        hDbgHelp = LoadLibraryW(L"dbghelp.dll"); // fall back to system copy (sufficient on Win10+)
+
+    // Keep a narrow copy for error messages
+    char szPath[MAX_PATH];
+    WideCharToMultiByte(CP_ACP, 0, dllPath.c_str(), -1, szPath, MAX_PATH, NULL, NULL);
+
     if (hDbgHelp != NULL)
     {
         typedef BOOL(WINAPI * MiniDumpWriteDump_t)(HANDLE, DWORD, HANDLE, MINIDUMP_TYPE, CONST PMINIDUMP_EXCEPTION_INFORMATION,
