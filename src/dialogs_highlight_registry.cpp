@@ -433,6 +433,10 @@ CConfiguration::CConfiguration()
         QuickRenameHistory[i] = NULL;
     for (i = 0; i < EDITNEW_HISTORY_SIZE; i++)
         EditNewHistory[i] = NULL;
+    for (i = 0; i < QUICKRENAME_HISTORY_SIZE; i++)
+        QuickRenameHistoryW[i] = NULL;
+    for (i = 0; i < EDITNEW_HISTORY_SIZE; i++)
+        EditNewHistoryW[i] = NULL;
     for (i = 0; i < CONVERT_HISTORY_SIZE; i++)
         ConvertHistory[i] = NULL;
     for (i = 0; i < FILTER_HISTORY_SIZE; i++)
@@ -634,6 +638,24 @@ void CConfiguration::ClearHistory()
         {
             free(EditNewHistory[i]);
             EditNewHistory[i] = NULL;
+        }
+    }
+
+    for (i = 0; i < QUICKRENAME_HISTORY_SIZE; i++)
+    {
+        if (QuickRenameHistoryW[i] != NULL)
+        {
+            free(QuickRenameHistoryW[i]);
+            QuickRenameHistoryW[i] = NULL;
+        }
+    }
+
+    for (i = 0; i < EDITNEW_HISTORY_SIZE; i++)
+    {
+        if (EditNewHistoryW[i] != NULL)
+        {
+            free(EditNewHistoryW[i]);
+            EditNewHistoryW[i] = NULL;
         }
     }
 

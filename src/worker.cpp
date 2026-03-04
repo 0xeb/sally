@@ -12,6 +12,7 @@
 #include "common/IWorkerObserver.h"
 #include "DialogWorkerObserver.h"
 #include "common/unicode/helpers.h"
+#include "common/unicode/PathIdentityPolicy.h"
 
 #include <aclapi.h>
 #include <ntsecapi.h>
@@ -835,17 +836,16 @@ BOOL COperation::HasSameRootPath() const
     }
 }
 
+// Case-sensitive comparison of source and target paths - uses wide paths if both available
+BOOL COperation::AreSourceAndTargetExactlySamePath() const
+{
+    return sally::unicode::ArePathsExactlySame(SourceName, TargetName, SourceNameW, TargetNameW);
+}
+
 // Case-insensitive comparison of source and target paths - uses wide paths if both available
 BOOL COperation::AreSourceAndTargetSamePath() const
 {
-    if (HasWideSource() && HasWideTarget())
-    {
-        return _wcsicmp(SourceNameW.c_str(), TargetNameW.c_str()) == 0;
-    }
-    else
-    {
-        return StrICmp(SourceName, TargetName) == 0;
-    }
+    return sally::unicode::ArePathsEquivalentForCopy(SourceName, TargetName, SourceNameW, TargetNameW);
 }
 
 // FindFirstFile for target path - always returns wide find data

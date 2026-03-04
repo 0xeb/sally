@@ -18,6 +18,7 @@
 #include "filesbox.h"
 #include "ui/IPrompter.h"
 #include "common/unicode/helpers.h"
+#include "common/unicode/CopyNamePolicy.h"
 #include "common/IEnvironment.h"
 #include "common/widepath.h"
 
@@ -649,8 +650,10 @@ BOOL CFilesWindow::BuildScriptMain2(COperations* script, BOOL copy, char* target
     //  script->TargetPathSupEFS = targetSupEFS;
     CTargetPathState targetPathState = GetTargetPathState(tpsUnknown, targetPath);
     char* targetName = targetPath + strlen(targetPath);
+    const std::wstring targetDirWithBackslashW = AnsiToWide(targetPath);
     BOOL makeCopyOfName = data->MakeCopyOfName;
     std::unique_ptr<TIndirectArray<char>> usedNames; // RAII: auto-deleted when scope exits
+    std::vector<std::wstring> usedNamesW;
     if (makeCopyOfName)
         usedNames = std::make_unique<TIndirectArray<char>>(100, 50);
 
@@ -667,6 +670,8 @@ BOOL CFilesWindow::BuildScriptMain2(COperations* script, BOOL copy, char* target
     {
         char* fileName = data->At(i)->FileName;
         char* mapName = data->At(i)->MapName;
+        const wchar_t* mapNameW = NULL;
+        std::wstring mapNameWide;
         wchar_t* fileNameW = data->At(i)->FileNameW;  // Wide filename for Unicode support
 
         // Extract just the filename part from the wide path (if available)
@@ -703,10 +708,33 @@ BOOL CFilesWindow::BuildScriptMain2(COperations* script, BOOL copy, char* target
                     makeCopyOfName)                          // check if we will need a "Copy of..." name
                 {
                     strcpy(targetName, s + 1); // copy the proposed full target name into targetPath
-                    BOOL isKnown;
+                    BOOL handledWideCopyName = FALSE;
+                    if (wideNameOnly != NULL && !(attrs & FILE_ATTRIBUTE_DIRECTORY))
+                    {
+                        std::wstring copyTokenW = AnsiToWide(LoadStr(IDS_NEWNAME_COPY));
+                        if (!targetDirWithBackslashW.empty() && !copyTokenW.empty())
+                        {
+                            if (sally::unicode::TryGenerateUniqueCopyName(targetDirWithBackslashW, wideNameOnly,
+                                                                           copyTokenW, usedNamesW, mapNameWide))
+                            {
+                                if (WideCharToMultiByte(CP_ACP, 0, mapNameWide.c_str(), -1,
+                                                        mapNameBuf, mapNameBuf.Size(), "?", NULL) > 0)
+                                {
+                                    mapName = mapNameBuf;
+                                    mapNameW = mapNameWide.c_str();
+                                    handledWideCopyName = TRUE;
+                                    usedNamesW.push_back(mapNameWide);
+                                }
+                            }
+                        }
+                    }
+
+                    BOOL isKnown = FALSE;
                     // mapName must be NULL here, otherwise data->MakeCopyOfName could not be TRUE
-                    if ((isKnown = ContainsString(usedNames.get(), targetName)) != 0 ||
+                    if (!handledWideCopyName &&
+                        ((isKnown = ContainsString(usedNames.get(), targetName)) != 0 ||
                         GetFileAttributesW(AnsiToWide(targetPath).c_str()) != INVALID_FILE_ATTRIBUTES)
+                    )
                     { // name already exists, we must generate a new one
                         if (!isKnown)
                             AddStringToNames(usedNames.get(), targetName);
@@ -943,7 +971,8 @@ BOOL CFilesWindow::BuildScriptMain2(COperations* script, BOOL copy, char* target
                     // store all names of newly created files
                     if (usedNames != NULL)
                     {
-                        AddStringToNames(usedNames.get(), mapName == NULL ? s + 1 : mapName);
+                        if (mapNameW == NULL)
+                            AddStringToNames(usedNames.get(), mapName == NULL ? s + 1 : mapName);
                     }
                 }
 
@@ -986,7 +1015,7 @@ BOOL CFilesWindow::BuildScriptMain2(COperations* script, BOOL copy, char* target
                             if (!BuildScriptFile(script, type, sourcePath, sourceSupADS, targetPath,
                                                  targetPathState, targetSupADS, targetIsFAT32, NULL,
                                                  s + 1, NULL, size, NULL, mapName, attrs, NULL, TRUE,
-                                                 NULL, srcAndTgtPathsFlags, wideNameOnly))
+                                                 NULL, srcAndTgtPathsFlags, wideNameOnly, mapNameW))
                             {
                                 SetCurrentDirectoryToSystem();
                                 return FALSE; // usedNames auto-deleted by unique_ptr
@@ -2425,7 +2454,7 @@ BOOL CFilesWindow::BuildScriptFile(COperations* script, CActionType type, char* 
                                    CAttrsData* attrsData, char* mapName, DWORD sourceFileAttr,
                                    CChangeCaseData* chCaseData, BOOL onlySize,
                                    FILETIME* fileLastWriteTime, DWORD srcAndTgtPathsFlags,
-                                   wchar_t* fileNameW)
+                                   wchar_t* fileNameW, const wchar_t* mapNameW)
 {
     SLOW_CALL_STACK_MESSAGE14("CFilesWindow::BuildScriptFile(, %d, %s, %d, %s, %d, %d, %d, %s, %s, , , , %s, 0x%X, , %d, , 0x%X)",
                               type, sourcePath, sourcePathSupADS, targetPath, targetPathState, targetPathSupADS,
@@ -2507,13 +2536,18 @@ BOOL CFilesWindow::BuildScriptFile(COperations* script, CActionType type, char* 
         if (fileNameW != NULL)
         {
             op.SetSourceNameW(sourcePath, fileNameW);
-            // For target, use the same wide filename if mask is NULL or "*.*"
-            if (mapName == NULL && (mask == NULL || strcmp(mask, "*.*") == 0))
-                op.SetTargetNameW(targetPath, fileNameW);
+            if (mapNameW != NULL && mapNameW[0] != L'\0')
+                op.SetTargetNameW(targetPath, mapNameW);
+            else
+            {
+                // For target, use the same wide filename if mask is NULL or "*.*"
+                if (mapName == NULL && (mask == NULL || strcmp(mask, "*.*") == 0))
+                    op.SetTargetNameW(targetPath, fileNameW);
+            }
         }
 
-        if (type == atMove && strcmp(op.SourceName, op.TargetName) == 0 ||
-            type == atCopy && StrICmp(op.SourceName, op.TargetName) == 0)
+        if (type == atMove && op.AreSourceAndTargetExactlySamePath() ||
+            type == atCopy && op.AreSourceAndTargetSamePath())
         {
             free(op.SourceName);
             op.SourceName = NULL;

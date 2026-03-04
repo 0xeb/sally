@@ -1325,7 +1325,7 @@ public:
                          char* fileDOSName, const CQuadWord& fileSize, CAttrsData* attrsData,
                          char* mapName, DWORD sourceFileAttr, CChangeCaseData* chCaseData,
                          BOOL onlySize, FILETIME* fileLastWriteTime, DWORD srcAndTgtPathsFlags,
-                         wchar_t* fileNameW = NULL);
+                         wchar_t* fileNameW = NULL, const wchar_t* mapNameW = NULL);
     BOOL BuildScriptMain2(COperations* script, BOOL copy, char* targetDir,
                           CCopyMoveData* data);
 

@@ -331,6 +331,8 @@ struct CConfiguration
     char* CreateDirHistory[CREATEDIR_HISTORY_SIZE];
     char* QuickRenameHistory[QUICKRENAME_HISTORY_SIZE];
     char* EditNewHistory[EDITNEW_HISTORY_SIZE];
+    wchar_t* QuickRenameHistoryW[QUICKRENAME_HISTORY_SIZE];
+    wchar_t* EditNewHistoryW[EDITNEW_HISTORY_SIZE];
     char* ConvertHistory[CONVERT_HISTORY_SIZE];
     char* FilterHistory[FILTER_HISTORY_SIZE];
 

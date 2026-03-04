@@ -5,6 +5,7 @@
 #pragma once
 
 #include <string>
+#include "ui/UnicodeNameInputController.h"
 
 //
 // ****************************************************************************
@@ -38,13 +39,16 @@ protected:
     int PathBufSize;
     char** History;
     int HistoryCount;
+    wchar_t** HistoryW;
+    int HistoryWCount;
     BOOL DirectoryHelper;
     int SelectionEnd;
 
     // Unicode support for filenames that cannot be represented in ANSI
+    BOOL UseUnicodeInput;       // latch Unicode input mode across dialog retries
     std::wstring PathW;         // Unicode input path (set via SetUnicodePath)
     std::wstring ResultW;       // Unicode result (populated on OK)
-    HWND HUnicodeEdit;          // Overlay Unicode edit control (when PathW is set)
+    CUnicodeNameInputController UnicodeInput;
 
 public:
     // 'history' determines whether the dialog will contain a combobox (TRUE) or an editline (FALSE)
@@ -52,12 +56,13 @@ public:
     // 'selectionEnd' specifies up to which character the name is selected (used for quick rename), -1 == all
     CCopyMoveDialog(HWND parent, char* path, int pathBufSize, char* title,
                     CTruncatedString* subject, DWORD helpID,
-                    char* history[], int historyCount, BOOL directoryHelper);
+                    char* history[], int historyCount, BOOL directoryHelper,
+                    wchar_t* historyW[] = NULL, int historyWCount = 0);
 
     void SetSelectionEnd(int selectionEnd);
     void SetUnicodePath(const std::wstring& pathW);
     const std::wstring& GetUnicodeResult() const { return ResultW; }
-    BOOL IsUnicodeMode() const { return !PathW.empty(); }
+    BOOL IsUnicodeMode() const { return UseUnicodeInput; }
     virtual void Transfer(CTransferInfo& ti);
 
 protected:
@@ -67,7 +72,8 @@ protected:
 class CEditNewFileDialog : public CCopyMoveDialog
 {
 public:
-    CEditNewFileDialog(HWND parent, char* path, int pathBufSize, CTruncatedString* subject, char* history[], int historyCount);
+    CEditNewFileDialog(HWND parent, char* path, int pathBufSize, CTruncatedString* subject,
+                       char* history[], int historyCount, wchar_t* historyW[] = NULL, int historyWCount = 0);
 
 protected:
     virtual INT_PTR DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam);

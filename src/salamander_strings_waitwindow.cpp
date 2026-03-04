@@ -843,8 +843,9 @@ BOOL DoExpandVarString(HWND msgParent, const char* varText, BOOL validateOnly, i
                                 varLen = envVar.Size() - 1;
                             memcpy(envVar, var, varLen);
                             envVar[varLen] = 0;
-                            DWORD res = GetEnvironmentVariable(envVar, buf, buf.Size());
-                            if (res == 0 || res >= buf.Size())
+                            DWORD bufSize = (DWORD)buf.Size();
+                            DWORD res = GetEnvironmentVariable(envVar, buf, bufSize);
+                            if (res == 0 || res >= bufSize)
                             {
                                 CPathBuffer text;
                                 if (res == 0)
@@ -2857,6 +2858,71 @@ BOOL SaveHistory(HKEY hKey, const char* name, char* history[], int maxCount, BOO
                 {
                     itoa(i + 1, buf, 10);
                     SetValue(historyKey, buf, REG_SZ, history[i], (int)strlen(history[i]) + 1);
+                }
+                else
+                    break;
+            }
+        }
+        CloseKey(historyKey);
+    }
+    return TRUE;
+}
+
+// ****************************************************************************
+
+BOOL LoadHistoryW(HKEY hKey, const char* name, wchar_t* history[], int maxCount)
+{
+    HKEY historyKey;
+    int i;
+    for (i = 0; i < maxCount; i++)
+        if (history[i] != NULL)
+        {
+            free(history[i]);
+            history[i] = NULL;
+        }
+    if (OpenKey(hKey, name, historyKey))
+    {
+        char buf[10];
+        for (i = 0; i < maxCount; i++)
+        {
+            itoa(i + 1, buf, 10);
+            DWORD bufferSize;
+            if (GetSize(historyKey, buf, REG_SZ, bufferSize))
+            {
+                history[i] = (wchar_t*)malloc(bufferSize);
+                if (history[i] == NULL)
+                {
+                    TRACE_E(LOW_MEMORY);
+                    break;
+                }
+                if (!GetValue(historyKey, buf, REG_SZ, history[i], bufferSize))
+                    break;
+            }
+        }
+        CloseKey(historyKey);
+    }
+    return TRUE;
+}
+
+// ****************************************************************************
+
+BOOL SaveHistoryW(HKEY hKey, const char* name, wchar_t* history[], int maxCount, BOOL onlyClear)
+{
+    HKEY historyKey;
+    if (CreateKey(hKey, name, historyKey))
+    {
+        ClearKey(historyKey);
+
+        if (!onlyClear)
+        {
+            char buf[10];
+            int i;
+            for (i = 0; i < maxCount; i++)
+            {
+                if (history[i] != NULL)
+                {
+                    itoa(i + 1, buf, 10);
+                    SetValue(historyKey, buf, REG_SZ, history[i], (DWORD)((wcslen(history[i]) + 1) * sizeof(wchar_t)));
                 }
                 else
                     break;

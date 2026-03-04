@@ -24,7 +24,84 @@
 #include "common/fsutil.h"
 #include "ui/IPrompter.h"
 #include "common/IFileSystem.h"
+#include "common/unicode/AnsiFallbackPolicy.h"
 #include "common/unicode/helpers.h"
+#include "common/unicode/NameFallbackRecovery.h"
+#include "common/unicode/PathIdentityPolicy.h"
+#include <vector>
+
+namespace
+{
+bool WideStringUsesAnsiFallback(const std::wstring& value)
+{
+    return sally::unicode::WideStringRequiresWidePath(value) ? TRUE : FALSE;
+}
+
+BOOL FileNameInvalidForManualCreateW(const wchar_t* path)
+{
+    const wchar_t* name = wcsrchr(path, L'\\');
+    if (name != NULL)
+    {
+        name++;
+        int nameLen = (int)wcslen(name);
+        return nameLen > 0 && (*name <= L' ' || name[nameLen - 1] <= L' ' || name[nameLen - 1] == L'.');
+    }
+    return FALSE;
+}
+
+BOOL MakeValidFileNameW(wchar_t* path)
+{
+    // trim spaces at the beginning and spaces and dots at the end of the name (Explorer behavior)
+    BOOL ch = FALSE;
+    wchar_t* n = path;
+    while (*n != 0 && *n <= L' ')
+        n++;
+    if (n > path)
+    {
+        memmove(path, n, (wcslen(n) + 1) * sizeof(wchar_t));
+        ch = TRUE;
+    }
+    n = path + wcslen(path);
+    while (n > path && (*(n - 1) <= L' ' || *(n - 1) == L'.'))
+        n--;
+    if (*n != 0)
+    {
+        *n = 0;
+        ch = TRUE;
+    }
+    return ch;
+}
+
+void RepairLossyQuickRenameHistoryForCurrentName(wchar_t* historyW[], int historyCount,
+                                                 const char* currentAnsiName, const wchar_t* currentWideName)
+{
+    if (historyW == NULL || historyCount <= 0 || currentAnsiName == NULL || currentWideName == NULL || currentWideName[0] == L'\0')
+        return;
+
+    std::wstring ansiNameW = AnsiToWide(currentAnsiName);
+    if (ansiNameW.empty())
+        return;
+
+    for (int i = 0; i < historyCount; i++)
+    {
+        wchar_t* item = historyW[i];
+        if (item == NULL || item[0] == L'\0' || wcschr(item, L'?') == NULL)
+            continue;
+
+        std::wstring repaired = sally::unicode::RecoverWideCharsFromLossyInput(item, ansiNameW, currentWideName);
+        if (repaired.empty() || wcscmp(item, repaired.c_str()) == 0)
+            continue;
+
+        wchar_t* updated = (wchar_t*)malloc((repaired.length() + 1) * sizeof(wchar_t));
+        if (updated == NULL)
+            continue;
+
+        memcpy(updated, repaired.c_str(), (repaired.length() + 1) * sizeof(wchar_t));
+        free(historyW[i]);
+        historyW[i] = updated;
+    }
+}
+} // namespace
 
 //
 // ****************************************************************************
@@ -1409,8 +1486,12 @@ void CFilesWindow::EditNewFile()
     MainWindow->UpdateDefaultDir(TRUE);
 
     CPathBuffer path; // Heap-allocated for long path support
+    std::wstring pathW;
     if (Configuration.UseEditNewFileDefault)
+    {
         lstrcpyn(path, Configuration.EditNewFileDefault, path.Size());
+        pathW = AnsiToWide(path);
+    }
     else
     {
         // Try to derive name from the focused item (issue #12)
@@ -1437,7 +1518,8 @@ void CFilesWindow::EditNewFile()
                     // "Makefile" -> "Makefile-new"
                     suggestion = nameW + L"-new";
                 }
-                WideToAnsi(suggestion, path.Get(), path.Size());
+                pathW = suggestion;
+                WideToAnsi(pathW, path.Get(), path.Size());
                 usedFocused = TRUE;
             }
             else
@@ -1448,14 +1530,17 @@ void CFilesWindow::EditNewFile()
                 {
                     // "MyFolder" -> "MyFolder-new.txt"
                     std::wstring nameW = d->NameW ? d->NameW : AnsiToWide(d->Name);
-                    std::wstring suggestion = nameW + L"-new.txt";
-                    WideToAnsi(suggestion, path.Get(), path.Size());
+                    pathW = nameW + L"-new.txt";
+                    WideToAnsi(pathW, path.Get(), path.Size());
                     usedFocused = TRUE;
                 }
             }
         }
         if (!usedFocused)
+        {
             lstrcpyn(path, LoadStr(IDS_EDITNEWFILE_DEFAULTNAME), path.Size());
+            pathW = AnsiToWide(path);
+        }
     }
     CTruncatedString subject;
     subject.Set(LoadStr(IDS_NEWFILENAME), NULL);
@@ -1464,7 +1549,10 @@ void CFilesWindow::EditNewFile()
 
     while (1)
     {
-        CEditNewFileDialog dlg(HWindow, path, path.Size(), &subject, Configuration.EditNewHistory, EDITNEW_HISTORY_SIZE);
+        CEditNewFileDialog dlg(HWindow, path, path.Size(), &subject,
+                               Configuration.EditNewHistory, EDITNEW_HISTORY_SIZE,
+                               Configuration.EditNewHistoryW, EDITNEW_HISTORY_SIZE);
+        dlg.SetUnicodePath(pathW);
 
         // Some users always create .txt and are satisfied with overwriting just the extension; others create various files and want to overwrite the whole name,
         // so we compromised and introduced a dedicated option for Edit New File in the configuration.
@@ -1479,10 +1567,10 @@ void CFilesWindow::EditNewFile()
             int selectionEnd = -1;
             if (first)
             {
-                const char* dot = strrchr(path, '.');
-                if (dot != NULL && dot > path) // although ".cvspass" is an extension in Windows, Explorer selects the entire name, so we do the same
-                                               //      if (dot != NULL)
-                    selectionEnd = (int)(dot - path);
+                const wchar_t* dot = wcsrchr(pathW.c_str(), L'.');
+                if (dot != NULL && dot > pathW.c_str()) // although ".cvspass" is an extension in Windows, Explorer selects the entire name, so we do the same
+                                                        //      if (dot != NULL)
+                    selectionEnd = (int)(dot - pathW.c_str());
                 dlg.SetSelectionEnd(selectionEnd);
                 first = FALSE; // after an error we get the full file name, so we select it all
             }
@@ -1492,40 +1580,54 @@ void CFilesWindow::EditNewFile()
         {
             UpdateWindow(MainWindow->HWindow);
 
+            std::wstring inputW = dlg.GetUnicodeResult();
+            if (inputW.empty())
+                inputW = AnsiToWide(path);
+            if (!inputW.empty())
+            {
+                wchar_t* writable = &inputW[0];
+                wchar_t* lastCompNameW = wcsrchr(writable, L'\\');
+                MakeValidFileNameW(lastCompNameW != NULL ? lastCompNameW + 1 : writable);
+            }
+            pathW = inputW;
+            WideToAnsi(pathW, path.Get(), path.Size()); // keep ANSI fallback for legacy callers
+
             // clean the name from undesirable characters at the beginning and end
             // we do this only for the last component; the previous ones already exist and it doesn't matter
             // (the system handles it) or they are checked during creation and an error is shown
             // (we don't clean them, we let the user do some work, it's easy enough)
-            char* lastCompName = strrchr(path, '\\');
-            MakeValidFileName(lastCompName != NULL ? lastCompName + 1 : path);
-
             char* errText;
             int errTextID;
-            //      if (SalGetFullName(path, &errTextID, MainWindow->GetActivePanel()->Is(ptDisk) ?
-            //                         MainWindow->GetActivePanel()->GetPath() : NULL, NextFocusName))
-            if (SalGetFullName(path, &errTextID, Is(ptDisk) ? GetPath() : NULL, NextFocusName, NULL, path.Size())) // for consistency with ChangePathToDisk()
+            std::wstring nextFocusW;
+            std::wstring curDirW;
+            if (Is(ptDisk))
+                curDirW = AnsiToWide(GetPath());
+            if (SalGetFullNameW(pathW, &errTextID, Is(ptDisk) ? curDirW.c_str() : NULL, &nextFocusW, NULL, FALSE))
             {
-                CPathBuffer checkPath; // Heap-allocated for long path support
-                strcpy(checkPath, path);
-                CutDirectory(checkPath);
-                if (CheckPath(TRUE, checkPath) != ERROR_SUCCESS)
+                std::wstring checkPathW = pathW;
+                if (!CutDirectoryW(checkPathW))
+                {
+                    errText = LoadStr(IDS_PATHISINVALID);
+                }
+                else if (SalCheckPathW(TRUE, checkPathW.c_str(), ERROR_SUCCESS, TRUE, HWindow) != ERROR_SUCCESS)
                 {
                     EndStopRefresh(); // snooper will start again now
                     return;
                 }
-
-                BOOL invalidName = FileNameInvalidForManualCreate(path);
-                HANDLE hFile = INVALID_HANDLE_VALUE;
-                if (invalidName)
-                    SetLastError(ERROR_INVALID_NAME);
                 else
                 {
-                    hFile = SalCreateFileEx(path, GENERIC_READ | GENERIC_WRITE, 0, FILE_ATTRIBUTE_NORMAL, NULL);
-                    HANDLES_ADD_EX(__otQuiet, hFile != INVALID_HANDLE_VALUE, __htFile, __hoCreateFile, hFile, GetLastError(), TRUE);
-                }
-                BOOL editExisting = FALSE;
-                if (hFile == INVALID_HANDLE_VALUE && GetLastError() == ERROR_FILE_EXISTS)
-                {
+                    BOOL invalidName = FileNameInvalidForManualCreateW(pathW.c_str());
+                    HANDLE hFile = INVALID_HANDLE_VALUE;
+                    if (invalidName)
+                        SetLastError(ERROR_INVALID_NAME);
+                    else
+                    {
+                        hFile = gFileSystem->CreateFile(pathW.c_str(), GENERIC_READ | GENERIC_WRITE, 0, NULL,
+                                                        CREATE_NEW, FILE_ATTRIBUTE_NORMAL, NULL);
+                        HANDLES_ADD_EX(__otQuiet, hFile != INVALID_HANDLE_VALUE, __htFile, __hoCreateFile, hFile, GetLastError(), TRUE);
+                    }
+                    BOOL editExisting = FALSE;
+                    if (hFile == INVALID_HANDLE_VALUE && GetLastError() == ERROR_FILE_EXISTS)
                     {
                         PromptResult pr = gPrompter->ConfirmOverwrite(NULL, LoadStrW(IDS_EDITNEWALREADYEX));
                         if (pr.type == PromptResult::kYes)
@@ -1533,21 +1635,34 @@ void CFilesWindow::EditNewFile()
                         else
                             break;
                     }
+                    if (hFile != INVALID_HANDLE_VALUE || editExisting)
+                    {
+                        if (!editExisting)
+                            HANDLES(CloseHandle(hFile));
+
+                        if (!nextFocusW.empty())
+                            WideToAnsi(nextFocusW, NextFocusName, NextFocusName.Size());
+                        if (WideStringUsesAnsiFallback(pathW))
+                        {
+                            HINSTANCE openRes = ShellExecuteW(HWindow, L"open", pathW.c_str(), NULL, NULL, SW_SHOWNORMAL);
+                            if ((INT_PTR)openRes <= 32)
+                                EditFile(path);
+                        }
+                        else
+                        {
+                            EditFile(path);
+                        }
+
+                        // change only in the directory where the file was created
+                        CPathBuffer checkPathA;
+                        WideToAnsi(checkPathW, checkPathA.Get(), checkPathA.Size());
+                        MainWindow->PostChangeOnPathNotification(checkPathA, FALSE);
+
+                        break;
+                    }
+                    else
+                        errText = GetErrorText(GetLastError());
                 }
-                if (hFile != INVALID_HANDLE_VALUE || editExisting)
-                {
-                    if (!editExisting)
-                        HANDLES(CloseHandle(hFile));
-
-                    EditFile(path);
-
-                    // change only in the directory where the file was created
-                    MainWindow->PostChangeOnPathNotification(checkPath, FALSE);
-
-                    break;
-                }
-                else
-                    errText = GetErrorText(GetLastError());
             }
             else
                 errText = LoadStr(errTextID);
@@ -2124,8 +2239,10 @@ void CFilesWindow::RenameFileInternal(CFileData* f, const char* formatedFileName
         memmove(tgtPath.Get(), GetPath(), l);
         if (GetPath()[l - 1] != '\\')
             tgtPath[l++] = '\\';
-        if (strlen(finalName) + l < tgtPath.Size() && (f->NameLen + l < tgtPath.Size() ||
-                                                 f->DosName != NULL && strlen(f->DosName) + l < tgtPath.Size()))
+        int tgtPathSize = (int)tgtPath.Size();
+        if ((int)strlen(finalName) + l < tgtPathSize &&
+            ((int)f->NameLen + l < tgtPathSize ||
+             (f->DosName != NULL && (int)strlen(f->DosName) + l < tgtPathSize)))
         {
             strcpy(tgtPath + l, finalName);
             CPathBuffer path; // Heap-allocated for long path support
@@ -2133,10 +2250,17 @@ void CFilesWindow::RenameFileInternal(CFileData* f, const char* formatedFileName
             char* end = path + l;
             if (*(end - 1) != '\\')
                 *--end = '\\';
-            if (f->NameLen + l < (int)path.Size())
+            if ((int)f->NameLen + l < (int)path.Size())
                 strcpy(path + l, f->Name);
             else
                 strcpy(path + l, f->DosName);
+
+            const std::wstring emptyWidePath;
+            if (sally::unicode::ArePathsExactlySame(path, tgtPath, emptyWidePath, emptyWidePath))
+            {
+                *tryAgain = FALSE;
+                return; // no-op rename (same name)
+            }
 
             BOOL ret = FALSE;
 
@@ -2380,6 +2504,12 @@ void CFilesWindow::RenameFileInternalW(CFileData* f, const std::wstring& newName
         tgtPath += L'\\';
     tgtPath += newName;
 
+    if (sally::unicode::ArePathsExactlySame(NULL, NULL, srcPath, tgtPath))
+    {
+        *tryAgain = FALSE;
+        return; // no-op rename (same name)
+    }
+
     // Convert paths to ANSI for SalLPMoveFile (which expects ANSI and converts to wide internally)
     // For true Unicode support, we need to use the wide path directly with MoveFileW
     // Use the \\?\ prefix for long path support
@@ -2465,14 +2595,17 @@ void CFilesWindow::RenameFile(int specialIndex)
     sprintf(buff, LoadStr(IDS_RENAME_TO), LoadStr(isDir ? IDS_QUESTION_DIRECTORY : IDS_QUESTION_FILE));
     CTruncatedString subject;
     subject.Set(buff, useUnicode ? "..." : formatedFileName.Get());
+    std::wstring initialRenameNameW = (f->NameW != NULL && f->NameW[0] != L'\0') ? f->NameW : AnsiToWide(formatedFileName.Get());
+    if (useUnicode && f->NameW != NULL && f->NameW[0] != L'\0')
+    {
+        RepairLossyQuickRenameHistoryForCurrentName(Configuration.QuickRenameHistoryW, QUICKRENAME_HISTORY_SIZE,
+                                                    f->Name, f->NameW);
+    }
     CCopyMoveDialog dlg(HWindow, formatedFileName, formatedFileName.Size(), LoadStr(IDS_RENAME_TITLE),
                         &subject, IDD_RENAMEDIALOG, Configuration.QuickRenameHistory,
-                        QUICKRENAME_HISTORY_SIZE, FALSE);
-
-    if (useUnicode)
-    {
-        dlg.SetUnicodePath(f->NameW);
-    }
+                        QUICKRENAME_HISTORY_SIZE, FALSE,
+                        Configuration.QuickRenameHistoryW, QUICKRENAME_HISTORY_SIZE);
+    dlg.SetUnicodePath(initialRenameNameW);
 
     if (Is(ptDisk)) // rename on disk
     {
@@ -2532,13 +2665,21 @@ void CFilesWindow::RenameFile(int specialIndex)
 
                 BOOL tryAgain;
                 // Use Unicode path if: 1) file has Unicode name, or 2) path is too long for ANSI
+                std::wstring renameResultW = dlg.GetUnicodeResult();
+                if (useUnicode && f->NameW != NULL && !renameResultW.empty())
+                {
+                    renameResultW = sally::unicode::RecoverWideCharsFromLossyInput(renameResultW,
+                                                                                   AnsiToWide(f->Name),
+                                                                                   f->NameW);
+                }
                 BOOL pathTooLong = (strlen(GetPath()) >= MAX_PATH);
-                if ((useUnicode && !dlg.GetUnicodeResult().empty()) || pathTooLong)
+                BOOL unicodeNeedsWidePath = !renameResultW.empty() && WideStringUsesAnsiFallback(renameResultW);
+                if ((!renameResultW.empty() && (useUnicode || unicodeNeedsWidePath)) || pathTooLong)
                 {
                     std::wstring newNameW;
-                    if (useUnicode && !dlg.GetUnicodeResult().empty())
+                    if (!renameResultW.empty())
                     {
-                        newNameW = dlg.GetUnicodeResult();
+                        newNameW = renameResultW;
                     }
                     else
                     {

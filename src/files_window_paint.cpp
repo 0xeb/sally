@@ -11,6 +11,7 @@
 #include "fileswnd.h"
 #include "filesbox.h"
 #include "shiconov.h"
+#include "common/unicode/NameRenderPolicy.h"
 
 //****************************************************************************
 //
@@ -689,10 +690,14 @@ void CFilesWindow::DrawBriefDetailedItem(HDC hTgtDC, int itemIndex, RECT* itemRe
             int nameLenW = 0;
             if (useWideDisplay)
             {
-                nameLenW = (int)wcslen(f->NameW);
+                // Keep Name/Ext column splitting identical to ANSI rendering.
+                nameLenW = sally::unicode::GetWideNameLengthForNameColumn(
+                    f->NameW,
+                    isDir != FALSE,
+                    Configuration.SortDirsByExt != FALSE,
+                    IsExtensionInSeparateColumn() != FALSE);
                 // For Unicode names, we don't apply AlterFileName transformation yet
                 // (TODO: add AlterFileNameW for proper uppercase/lowercase handling)
-
             }
 
             CColumn* column = &Columns[0];
@@ -892,11 +897,9 @@ void CFilesWindow::DrawBriefDetailedItem(HDC hTgtDC, int itemIndex, RECT* itemRe
                         }
                         else if (f->UseWideName())
                         {
-                            // For Unicode filenames, find extension in NameW instead of using ANSI offset
-                            const wchar_t* extPosW = wcsrchr(f->NameW, L'.');
-                            if (extPosW != NULL && extPosW > f->NameW)
+                            const wchar_t* extPosW = sally::unicode::GetWideExtensionStart(f->NameW);
+                            if (extPosW != NULL)
                             {
-                                extPosW++; // skip the dot
                                 TransferLen = (int)wcslen(extPosW);
                                 // Copy extension to wide buffer and draw with ExtTextOutW below
                                 wmemcpy(DrawItemBuffW, extPosW, TransferLen + 1);

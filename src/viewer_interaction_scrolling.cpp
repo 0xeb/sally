@@ -1111,7 +1111,7 @@ CViewerWindow::WindowProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
                                             {
                                                 if (foundLen == 0)
                                                 {
-                                                    gPrompter->ShowInfo(LoadStrW(IDS_FINDTITLE), LoadStrW(IDS_EMPTYMATCH));
+                                                    gPrompter->ShowInfo(HWindow, LoadStrW(IDS_FINDTITLE), LoadStrW(IDS_EMPTYMATCH));
                                                     noNotFound = TRUE;
                                                     break;
                                                 }
@@ -1123,7 +1123,7 @@ CViewerWindow::WindowProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
                                         }
                                         else // error - low memory
                                         {
-                                            gPrompter->ShowError(LoadStrW(IDS_FINDTITLE), AnsiToWide(RegExp.GetLastErrorText()).c_str());
+                                            gPrompter->ShowError(HWindow, LoadStrW(IDS_FINDTITLE), AnsiToWide(RegExp.GetLastErrorText()).c_str());
                                             noNotFound = TRUE;
                                             break;
                                         }
@@ -1221,7 +1221,7 @@ CViewerWindow::WindowProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
                                             {
                                                 if (foundLen == 0)
                                                 {
-                                                    gPrompter->ShowInfo(LoadStrW(IDS_FINDTITLE), LoadStrW(IDS_EMPTYMATCH));
+                                                    gPrompter->ShowInfo(HWindow, LoadStrW(IDS_FINDTITLE), LoadStrW(IDS_EMPTYMATCH));
                                                     noNotFound = TRUE;
                                                     break;
                                                 }
@@ -1233,7 +1233,7 @@ CViewerWindow::WindowProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
                                         }
                                         else // error - low memory
                                         {
-                                            gPrompter->ShowError(LoadStrW(IDS_FINDTITLE), AnsiToWide(RegExp.GetLastErrorText()).c_str());
+                                            gPrompter->ShowError(HWindow, LoadStrW(IDS_FINDTITLE), AnsiToWide(RegExp.GetLastErrorText()).c_str());
                                             noNotFound = TRUE;
                                             break;
                                         }
@@ -1264,7 +1264,7 @@ CViewerWindow::WindowProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
                         msg = FormatStrW(LoadStrW(IDS_INVALIDREGEXP), AnsiToWide(RegExp.GetPattern()).c_str(), AnsiToWide(RegExp.GetLastErrorText()).c_str());
                     else
                         msg = AnsiToWide(RegExp.GetLastErrorText());
-                    gPrompter->ShowError(LoadStrW(IDS_FINDTITLE), msg.c_str());
+                    gPrompter->ShowError(HWindow, LoadStrW(IDS_FINDTITLE), msg.c_str());
                     noNotFound = TRUE;
                 }
             }
@@ -1429,7 +1429,7 @@ CViewerWindow::WindowProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
                 MSG msg; // discard the buffered ESC
                 while (PeekMessage(&msg, NULL, WM_KEYFIRST, WM_KEYLAST, PM_REMOVE))
                     ;
-                gPrompter->ShowInfo(LoadStrW(IDS_INFOTITLE), LoadStrW(IDS_FINDTERMINATEDBYUSER));
+                gPrompter->ShowInfo(HWindow, LoadStrW(IDS_INFOTITLE), LoadStrW(IDS_FINDTERMINATEDBYUSER));
                 found = -1;
                 noNotFound = TRUE;
             }
@@ -1441,7 +1441,7 @@ CViewerWindow::WindowProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
                 if (!noNotFound)
                 {
                     std::wstring msg = FormatStrW(LoadStrW(FindDialog.Regular ? IDS_FIND_NOREGEXPMATCH : IDS_FIND_NOMATCH), AnsiToWide(FindDialog.Text).c_str());
-                    gPrompter->ShowInfo(LoadStrW(IDS_FINDTITLE), msg.c_str());
+                    gPrompter->ShowInfo(HWindow, LoadStrW(IDS_FINDTITLE), msg.c_str());
                 }
             }
             else

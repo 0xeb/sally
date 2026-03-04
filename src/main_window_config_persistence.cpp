@@ -6,6 +6,7 @@
 #include "precomp.h"
 
 #include "ui/IPrompter.h"
+#include "ui/UnicodeHistoryUtils.h"
 #include "common/unicode/helpers.h"
 #include "common/IEnvironment.h"
 #include "common/IRegistry.h"
@@ -400,6 +401,8 @@ const char* CONFIG_FILELISTHISTORY_REG = "File List History";
 const char* CONFIG_CREATEDIRHISTORY_REG = "Create Directory History";
 const char* CONFIG_QUICKRENAMEHISTORY_REG = "Quick Rename History";
 const char* CONFIG_EDITNEWHISTORY_REG = "Edit New History";
+const char* CONFIG_QUICKRENAMEHISTORYW_REG = "Quick Rename History W";
+const char* CONFIG_EDITNEWHISTORYW_REG = "Edit New History W";
 const char* CONFIG_CONVERTHISTORY_REG = "Convert History";
 const char* CONFIG_FILTERHISTORY_REG = "Filter History";
 const char* CONFIG_WORKDIRSHISTORY_REG = "Working Directories";
@@ -448,6 +451,7 @@ const char* CONFIG_HOTPATHSBARVISIBLE_REG = "Hot Paths Bar";
 const char* CONFIG_DRIVEBARVISIBLE_REG = "Show Drive Bar";
 const char* CONFIG_DRIVEBAR2VISIBLE_REG = "Show Drive Bar2";
 const char* CONFIG_BOTTOMTOOLBARVISIBLE_REG = "Show Bottom ToolBar";
+
 const char* CONFIG_EXPLORERLOOK_REG = "Explorer Look";
 const char* CONFIG_FULLROWSELECT_REG = "Full Row Select";
 const char* CONFIG_FULLROWHIGHLIGHT_REG = "Full Row Highlight";
@@ -2178,6 +2182,10 @@ void CMainWindow::SaveConfig(HWND parent)
                             QUICKRENAME_HISTORY_SIZE, !Configuration.SaveHistory);
                 SaveHistory(actKey, CONFIG_EDITNEWHISTORY_REG, Configuration.EditNewHistory,
                             EDITNEW_HISTORY_SIZE, !Configuration.SaveHistory);
+                SaveHistoryW(actKey, CONFIG_QUICKRENAMEHISTORYW_REG, Configuration.QuickRenameHistoryW,
+                             QUICKRENAME_HISTORY_SIZE, !Configuration.SaveHistory);
+                SaveHistoryW(actKey, CONFIG_EDITNEWHISTORYW_REG, Configuration.EditNewHistoryW,
+                             EDITNEW_HISTORY_SIZE, !Configuration.SaveHistory);
                 SaveHistory(actKey, CONFIG_CONVERTHISTORY_REG, Configuration.ConvertHistory,
                             CONVERT_HISTORY_SIZE, !Configuration.SaveHistory);
                 SaveHistory(actKey, CONFIG_FILTERHISTORY_REG, Configuration.FilterHistory,
@@ -3822,6 +3830,14 @@ BOOL CMainWindow::LoadConfig(BOOL importingOldConfig, const CCommandLineParams* 
             LoadHistory(actKey, CONFIG_CREATEDIRHISTORY_REG, Configuration.CreateDirHistory, CREATEDIR_HISTORY_SIZE);
             LoadHistory(actKey, CONFIG_QUICKRENAMEHISTORY_REG, Configuration.QuickRenameHistory, QUICKRENAME_HISTORY_SIZE);
             LoadHistory(actKey, CONFIG_EDITNEWHISTORY_REG, Configuration.EditNewHistory, EDITNEW_HISTORY_SIZE);
+            LoadHistoryW(actKey, CONFIG_QUICKRENAMEHISTORYW_REG, Configuration.QuickRenameHistoryW, QUICKRENAME_HISTORY_SIZE);
+            LoadHistoryW(actKey, CONFIG_EDITNEWHISTORYW_REG, Configuration.EditNewHistoryW, EDITNEW_HISTORY_SIZE);
+            if (IsWideHistoryEmpty(Configuration.QuickRenameHistoryW, QUICKRENAME_HISTORY_SIZE))
+                SeedWideHistoryFromAnsi(Configuration.QuickRenameHistoryW, QUICKRENAME_HISTORY_SIZE,
+                                        Configuration.QuickRenameHistory, QUICKRENAME_HISTORY_SIZE);
+            if (IsWideHistoryEmpty(Configuration.EditNewHistoryW, EDITNEW_HISTORY_SIZE))
+                SeedWideHistoryFromAnsi(Configuration.EditNewHistoryW, EDITNEW_HISTORY_SIZE,
+                                        Configuration.EditNewHistory, EDITNEW_HISTORY_SIZE);
             LoadHistory(actKey, CONFIG_CONVERTHISTORY_REG, Configuration.ConvertHistory, CONVERT_HISTORY_SIZE);
             LoadHistory(actKey, CONFIG_FILTERHISTORY_REG, Configuration.FilterHistory, FILTER_HISTORY_SIZE);
             if (DirHistory != NULL)

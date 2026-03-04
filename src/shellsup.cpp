@@ -7,6 +7,8 @@
 #include "menu.h"
 #include "ui/IPrompter.h"
 #include "common/unicode/helpers.h"
+#include "common/clipboard/ClipboardOwnershipPolicy.h"
+#include "common/clipboard/HDropWideBuilder.h"
 #include "common/widepath.h"
 #include "common/IEnvironment.h"
 #include "cfgdlg.h"
@@ -23,6 +25,8 @@ extern "C"
 #include "salshlib.h"
 #include "tasklist.h"
 //#include "drivelst.h"
+
+#include <vector>
 
 //
 // ****************************************************************************
@@ -756,6 +760,115 @@ const char* EnumFileNames(int index, void* param)
     }
     else
         return NULL;
+}
+
+static BOOL CollectSelectedPathsW(CFilesWindow* panel, const int* indexes, int indexCount,
+                                  std::vector<std::wstring>& paths, BOOL& hasWideName)
+{
+    paths.clear();
+    hasWideName = FALSE;
+
+    if (panel == NULL || indexes == NULL || indexCount <= 0)
+        return FALSE;
+
+    std::wstring basePathW = AnsiToWide(panel->GetPath());
+    if (!basePathW.empty() && basePathW.back() != L'\\')
+        basePathW += L'\\';
+
+    paths.reserve(indexCount);
+    for (int i = 0; i < indexCount; i++)
+    {
+        int idx = indexes[i];
+        if (idx < 0 || idx >= panel->Dirs->Count + panel->Files->Count)
+            return FALSE;
+
+        CFileData* file = (idx < panel->Dirs->Count) ? &panel->Dirs->At(idx) : &panel->Files->At(idx - panel->Dirs->Count);
+        std::wstring nameW = (file->NameW != NULL) ? std::wstring(file->NameW) : AnsiToWide(file->Name);
+        if (nameW.empty())
+            return FALSE;
+
+        if (file->UseWideName())
+            hasWideName = TRUE;
+
+        paths.push_back(basePathW + nameW);
+    }
+
+    return TRUE;
+}
+
+static BOOL SetClipboardHDropW(HWND owner, const std::vector<std::wstring>& paths, BOOL copy, BOOL salObject)
+{
+    std::vector<BYTE> payload;
+    if (!sally::clipboard::BuildHDropWidePayload(paths, payload))
+        return FALSE;
+
+    HGLOBAL hMem = NOHANDLES(GlobalAlloc(GMEM_MOVEABLE | GMEM_DDESHARE, payload.size()));
+    if (hMem == NULL)
+        return FALSE;
+
+    void* out = HANDLES(GlobalLock(hMem));
+    if (out == NULL)
+    {
+        NOHANDLES(GlobalFree(hMem));
+        return FALSE;
+    }
+    memcpy(out, payload.data(), payload.size());
+    HANDLES(GlobalUnlock(hMem));
+
+    if (!OpenClipboard(owner))
+    {
+        NOHANDLES(GlobalFree(hMem));
+        return FALSE;
+    }
+
+    BOOL ok = FALSE;
+    if (EmptyClipboard() && SetClipboardData(CF_HDROP, hMem) != NULL)
+    {
+        hMem = NULL; // ownership transferred to the clipboard
+
+        // Set preferred drop effect and Salamander marker while the clipboard is still open.
+        UINT cfPrefDrop = RegisterClipboardFormat(CFSTR_PREFERREDDROPEFFECT);
+        UINT cfSalDataObject = RegisterClipboardFormat(SALCF_IDATAOBJECT);
+
+        HGLOBAL effect = NOHANDLES(GlobalAlloc(GMEM_MOVEABLE | GMEM_DDESHARE, sizeof(DWORD)));
+        if (effect != NULL)
+        {
+            DWORD* value = (DWORD*)HANDLES(GlobalLock(effect));
+            if (value != NULL)
+            {
+                *value = copy ? (DROPEFFECT_COPY | DROPEFFECT_LINK) : DROPEFFECT_MOVE;
+                HANDLES(GlobalUnlock(effect));
+                if (SetClipboardData(cfPrefDrop, effect) == NULL)
+                    NOHANDLES(GlobalFree(effect));
+            }
+            else
+                NOHANDLES(GlobalFree(effect));
+        }
+
+        if (salObject)
+        {
+            HGLOBAL salMarker = NOHANDLES(GlobalAlloc(GMEM_MOVEABLE | GMEM_DDESHARE, sizeof(DWORD)));
+            if (salMarker != NULL)
+            {
+                DWORD* marker = (DWORD*)HANDLES(GlobalLock(salMarker));
+                if (marker != NULL)
+                {
+                    *marker = 1;
+                    HANDLES(GlobalUnlock(salMarker));
+                    if (SetClipboardData(cfSalDataObject, salMarker) == NULL)
+                        NOHANDLES(GlobalFree(salMarker));
+                }
+                else
+                    NOHANDLES(GlobalFree(salMarker));
+            }
+        }
+
+        ok = TRUE;
+    }
+    if (hMem != NULL)
+        NOHANDLES(GlobalFree(hMem));
+    CloseClipboard();
+    return ok;
 }
 
 const char* EnumOneFileName(int index, void* param)
@@ -1686,27 +1799,57 @@ void ShellAction(CFilesWindow* panel, CShellAction action, BOOL useSelection,
             else
             {
 #endif // _WIN64
-                CTmpEnumData data;
-                data.Indexes = (count == 0) ? &index : indexes.get();
-                data.Panel = panel;
-                IContextMenu2* menu = CreateIContextMenu2(MainWindow->HWindow, panel->GetPath(), (count == 0) ? 1 : count,
-                                                          EnumFileNames, &data);
-                if (menu != NULL)
+                int idxCount = (count == 0) ? 1 : count;
+                int* idxs = (count == 0) ? &index : indexes.get();
+                BOOL clipboardSet = FALSE;
+                BOOL usedUnicodeHDropFallback = FALSE;
+
+                // For Unicode filenames, avoid shell copy/cut through ANSI name enumeration.
+                // Prefer Unicode CF_HDROP for all disk selections and fall back to shell copy/cut only on failure.
+                if (panel->Is(ptDisk))
                 {
-                    CShellExecuteWnd shellExecuteWnd;
-                    CMINVOKECOMMANDINFO ici;
-                    ici.cbSize = sizeof(CMINVOKECOMMANDINFO);
-                    ici.fMask = 0;
-                    ici.lpVerb = (action == saCopyToClipboard) ? "copy" : "cut";
-                    ici.hwnd = shellExecuteWnd.Create(MainWindow->HWindow, "SEW: ShellAction::copy_cut_clipboard verb=%s", ici.lpVerb);
-                    ici.lpParameters = NULL;
-                    ici.lpDirectory = panel->GetPath();
-                    ici.nShow = SW_SHOWNORMAL;
-                    ici.dwHotKey = 0;
-                    ici.hIcon = 0;
+                    std::vector<std::wstring> selectedPathsW;
+                    BOOL salObject = sally::clipboard::ShouldTagAsSalamanderObject(TRUE);
+                    BOOL hasWideName = FALSE;
+                    if (CollectSelectedPathsW(panel, idxs, idxCount, selectedPathsW, hasWideName))
+                    {
+                        clipboardSet = SetClipboardHDropW(MainWindow->HWindow, selectedPathsW,
+                                                          action == saCopyToClipboard,
+                                                          salObject);
+                        usedUnicodeHDropFallback = clipboardSet;
+                        if (!clipboardSet)
+                            TRACE_E("Unable to place Unicode file list on clipboard, falling back to shell copy/cut.");
+                    }
+                }
 
-                    AuxInvokeAndRelease(menu, &ici);
+                if (!clipboardSet)
+                {
+                    CTmpEnumData data;
+                    data.Indexes = idxs;
+                    data.Panel = panel;
+                    IContextMenu2* menu = CreateIContextMenu2(MainWindow->HWindow, panel->GetPath(), idxCount,
+                                                              EnumFileNames, &data);
+                    if (menu != NULL)
+                    {
+                        CShellExecuteWnd shellExecuteWnd;
+                        CMINVOKECOMMANDINFO ici;
+                        ici.cbSize = sizeof(CMINVOKECOMMANDINFO);
+                        ici.fMask = 0;
+                        ici.lpVerb = (action == saCopyToClipboard) ? "copy" : "cut";
+                        ici.hwnd = shellExecuteWnd.Create(MainWindow->HWindow, "SEW: ShellAction::copy_cut_clipboard verb=%s", ici.lpVerb);
+                        ici.lpParameters = NULL;
+                        ici.lpDirectory = panel->GetPath();
+                        ici.nShow = SW_SHOWNORMAL;
+                        ici.dwHotKey = 0;
+                        ici.hIcon = 0;
 
+                        AuxInvokeAndRelease(menu, &ici);
+                        clipboardSet = TRUE;
+                    }
+                }
+
+                if (clipboardSet)
+                {
                     // clipboard changed, let's verify...
                     IdleRefreshStates = TRUE;  // force state variable check on next Idle
                     IdleCheckClipboard = TRUE; // also check clipboard
@@ -1730,10 +1873,6 @@ void ShellAction(CFilesWindow* panel, CShellAction action, BOOL useSelection,
                     if (action != saCopyToClipboard)
                     {
                         // in CUT case set file's CutToClip bit (ghosted)
-                        int idxCount = count;
-                        int* idxs = (idxCount == 0) ? &index : indexes.get();
-                        if (idxCount == 0)
-                            idxCount = 1;
                         int i;
                         for (i = 0; i < idxCount; i++)
                         {
@@ -1787,7 +1926,8 @@ void ShellAction(CFilesWindow* panel, CShellAction action, BOOL useSelection,
                         anotherPanel->RepaintListBox(DRAWFLAG_DIRTY_ONLY | DRAWFLAG_SKIP_VISTEST);
 
                     // also set preferred drop effect + origin from Salamander
-                    SetClipCutCopyInfo(panel->HWindow, action == saCopyToClipboard, TRUE);
+                    SetClipCutCopyInfo(panel->HWindow, action == saCopyToClipboard,
+                                       sally::clipboard::ShouldTagAsSalamanderObject(usedUnicodeHDropFallback != FALSE));
                 }
 #ifndef _WIN64
             }

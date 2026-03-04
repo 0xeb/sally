@@ -6,6 +6,7 @@
 
 #include "ui/IPrompter.h"
 #include "common/unicode/helpers.h"
+#include "common/unicode/ComboSyncPolicy.h"
 #include "common/IEnvironment.h"
 #include "mainwnd.h"
 #include "plugins.h"
@@ -427,7 +428,8 @@ static LRESULT CALLBACK UnicodeEditSubclassProc(HWND hWnd, UINT uMsg, WPARAM wPa
 
 CCopyMoveDialog::CCopyMoveDialog(HWND parent, char* path, int pathBufSize, char* title,
                                  CTruncatedString* subject, DWORD helpID,
-                                 char* history[], int historyCount, BOOL directoryHelper)
+                                 char* history[], int historyCount, BOOL directoryHelper,
+                                 wchar_t* historyW[], int historyWCount)
     : CCommonDialog(HLanguage, history ? IDD_COPYMOVEDIALOG_CB : IDD_COPYMOVEDIALOG, parent)
 {
     DirectoryHelper = FALSE;
@@ -447,9 +449,11 @@ CCopyMoveDialog::CCopyMoveDialog(HWND parent, char* path, int pathBufSize, char*
     PathBufSize = pathBufSize;
     History = history;
     HistoryCount = historyCount;
+    HistoryW = historyW;
+    HistoryWCount = historyWCount;
+    UseUnicodeInput = FALSE;
     SetHelpID(helpID); // the dialog serves multiple purposes - set the proper helpID
     SelectionEnd = -1; // -1 = select all
-    HUnicodeEdit = NULL;
 }
 
 void CCopyMoveDialog::SetSelectionEnd(int selectionEnd)
@@ -459,9 +463,9 @@ void CCopyMoveDialog::SetSelectionEnd(int selectionEnd)
 
 void CCopyMoveDialog::SetUnicodePath(const std::wstring& pathW)
 {
+    UseUnicodeInput = TRUE;
     PathW = pathW;
     ResultW.clear();
-    // Unicode text will be displayed via overlay edit control created in DialogProc
 }
 
 void CCopyMoveDialog::Transfer(CTransferInfo& ti)
@@ -481,41 +485,54 @@ void CCopyMoveDialog::Transfer(CTransferInfo& ti)
             }
             else
             {
-                // Get result from overlay if it exists, otherwise from combobox
-                if (HUnicodeEdit != NULL)
+                // Get result from Unicode controller if it exists, otherwise from combobox
+                if (UnicodeInput.IsEnabled())
                 {
-                    int len = GetWindowTextLengthW(HUnicodeEdit);
-                    if (len > 0)
-                    {
-                        std::vector<wchar_t> buffer(len + 1);
-                        GetWindowTextW(HUnicodeEdit, buffer.data(), len + 1);
-                        ResultW = buffer.data();
-                    }
+                    ResultW = UnicodeInput.GetText();
+                    PathW = ResultW; // preserve latest value if this dialog instance is retried
                     // Also get ANSI version for history (lossy but needed for ANSI history)
-                    WideCharToMultiByte(CP_ACP, 0, ResultW.c_str(), -1, Path, PathBufSize, "?", NULL);
+                    if (!ResultW.empty())
+                        WideCharToMultiByte(CP_ACP, 0, ResultW.c_str(), -1, Path, PathBufSize, "?", NULL);
+                    else
+                        Path[0] = 0;
                 }
                 else
                 {
                     SendMessage(hWnd, WM_GETTEXT, PathBufSize, (LPARAM)Path);
+                    int lenW = GetWindowTextLengthW(hWnd);
+                    if (lenW > 0)
+                    {
+                        std::vector<wchar_t> buffer((size_t)lenW + 1);
+                        GetWindowTextW(hWnd, buffer.data(), lenW + 1);
+                        ResultW.assign(buffer.data());
+                    }
+                    else
+                        ResultW.clear();
                 }
                 AddValueToStdHistoryValues(History, HistoryCount, Path, FALSE);
+                if (HistoryW != NULL && HistoryWCount > 0)
+                {
+                    if (UnicodeInput.IsEnabled())
+                    {
+                        if (!ResultW.empty())
+                            AddValueToStdHistoryValuesW(HistoryW, HistoryWCount, ResultW.c_str(), FALSE);
+                    }
+                    else
+                    {
+                        std::wstring wide = ResultW.empty() ? AnsiToWide(Path) : ResultW;
+                        if (!wide.empty())
+                            AddValueToStdHistoryValuesW(HistoryW, HistoryWCount, wide.c_str(), FALSE);
+                    }
+                }
             }
         }
     }
     else
     {
         ti.EditLine(IDE_PATH, Path, PathBufSize);
-        // Get Unicode result from overlay if it exists
-        if (ti.Type == ttDataFromWindow && HUnicodeEdit != NULL)
-        {
-            int len = GetWindowTextLengthW(HUnicodeEdit);
-            if (len > 0)
-            {
-                std::vector<wchar_t> buffer(len + 1);
-                GetWindowTextW(HUnicodeEdit, buffer.data(), len + 1);
-                ResultW = buffer.data();
-            }
-        }
+        // Get Unicode result from Unicode controller if it exists
+        if (ti.Type == ttDataFromWindow && UnicodeInput.IsEnabled())
+            ResultW = UnicodeInput.GetText();
     }
 }
 
@@ -544,64 +561,20 @@ CCopyMoveDialog::DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
 
         HWND hCombo = GetDlgItem(HWindow, IDE_PATH);
 
-        // If Unicode path is set, create an overlay Unicode edit control
-        // This is needed because combobox controls from ANSI dialog templates
-        // cannot properly display Unicode text even when DialogBoxParamW is used
-        TRACE_I("CCopyMoveDialog: PathW.empty()=" << PathW.empty() << " hCombo=" << (void*)hCombo);
-        if (!PathW.empty() && hCombo != NULL)
+        // In Unicode mode replace ANSI combo with a Unicode combo (including dropdown list)
+        TRACE_I("CCopyMoveDialog: UseUnicodeInput=" << UseUnicodeInput << " hCombo=" << (void*)hCombo);
+        if (UseUnicodeInput && hCombo != NULL)
         {
-            COMBOBOXINFO cbi = { sizeof(COMBOBOXINFO) };
-            BOOL cbiOk = GetComboBoxInfo(hCombo, &cbi);
-            TRACE_I("CCopyMoveDialog: GetComboBoxInfo=" << cbiOk << " hwndItem=" << (void*)cbi.hwndItem);
-            if (cbiOk && cbi.hwndItem)
+            if (UnicodeInput.EnableForCombo(HWindow, IDE_PATH, PathW, HistoryW, HistoryWCount, PathBufSize, SelectionEnd))
             {
-                // Get the internal edit's position and size (in dialog client coords)
-                RECT editRect;
-                GetWindowRect(cbi.hwndItem, &editRect);
-                MapWindowPoints(NULL, HWindow, (LPPOINT)&editRect, 2);
-                TRACE_I("CCopyMoveDialog: editRect=" << editRect.left << "," << editRect.top << "," << editRect.right << "," << editRect.bottom);
-
-                // Get font from combobox
-                HFONT hFont = (HFONT)SendMessage(hCombo, WM_GETFONT, 0, 0);
-
-                // Create a Unicode edit control overlaid on the combobox's edit area
-                HUnicodeEdit = CreateWindowExW(
-                    0,
-                    L"EDIT",
-                    PathW.c_str(),
-                    WS_CHILD | WS_VISIBLE | ES_AUTOHSCROLL,
-                    editRect.left, editRect.top,
-                    editRect.right - editRect.left, editRect.bottom - editRect.top,
-                    HWindow,
-                    NULL,
-                    HInstance,
-                    NULL);
-                TRACE_I("CCopyMoveDialog: CreateWindowExW returned HUnicodeEdit=" << (void*)HUnicodeEdit << " GetLastError=" << GetLastError());
-
-                if (HUnicodeEdit != NULL)
-                {
-                    // Hide the combobox's internal edit control so overlay is visible
-                    ShowWindow(cbi.hwndItem, SW_HIDE);
-
-                    // Set same font as combobox
-                    if (hFont != NULL)
-                        SendMessage(HUnicodeEdit, WM_SETFONT, (WPARAM)hFont, TRUE);
-
-                    // Subclass to handle Alt+Down for dropdown
-                    SetWindowSubclass(HUnicodeEdit, UnicodeEditSubclassProc, 1, (DWORD_PTR)hCombo);
-
-                    // Set selection
-                    PostMessage(HUnicodeEdit, EM_SETSEL, 0, SelectionEnd);
-
-                    // Give focus to the overlay
-                    SetFocus(HUnicodeEdit);
-                    TRACE_I("CCopyMoveDialog: Overlay edit created and focused");
-                }
+                InstallWordBreakProc(UnicodeInput.GetControlHandle());
+                CreateKeyForwarder(HWindow, IDE_PATH);
+                TRACE_I("CCopyMoveDialog: Unicode combo created");
             }
         }
 
         // Set selection on combobox (for non-Unicode case)
-        if (HUnicodeEdit == NULL)
+        if (!UnicodeInput.IsEnabled())
         {
             PostMessage(hCombo, CB_SETEDITSEL, 0, MAKELPARAM(0, SelectionEnd));
         }
@@ -626,23 +599,21 @@ CCopyMoveDialog::DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
         return 0;
     }
 
+    case WM_DESTROY:
+    {
+        // Clear any stale HWND references before the dialog object is reused.
+        UnicodeInput.Reset();
+        break;
+    }
+
     case WM_COMMAND:
     {
-        // Handle combobox selection change - update overlay edit if present
-        if (LOWORD(wParam) == IDE_PATH && HIWORD(wParam) == CBN_SELCHANGE && HUnicodeEdit != NULL)
+        if (LOWORD(wParam) == IDE_PATH && UnicodeInput.IsEnabled())
         {
             HWND hCombo = (HWND)lParam;
-            // Get selected text from combobox and set it on overlay
-            CPathBuffer ansiText; // Heap-allocated for long path support
-            int len = (int)SendMessage(hCombo, WM_GETTEXT, ansiText.Size(), (LPARAM)ansiText.Get());
-            if (len > 0)
-            {
-                // Convert ANSI to Unicode and set on overlay
-                std::wstring wideText(ansiText.Size(), L'\0');
-                int wideLen = MultiByteToWideChar(CP_ACP, 0, ansiText, -1, &wideText[0], (int)wideText.size());
-                wideText.resize(wideLen > 0 ? wideLen - 1 : 0);  // Remove null terminator from count
-                SetWindowTextW(HUnicodeEdit, wideText.c_str());
-            }
+            BOOL isDropdownOpen = hCombo != NULL ? (BOOL)SendMessage(hCombo, CB_GETDROPPEDSTATE, 0, 0) : FALSE;
+            if (sally::unicode::ShouldSyncUnicodeComboSelection(HIWORD(wParam), isDropdownOpen))
+                UnicodeInput.SyncSelectionToEdit();
         }
         // Fall through to base class for all WM_COMMAND messages (IDOK, IDCANCEL, etc.)
     }
@@ -656,8 +627,10 @@ CCopyMoveDialog::DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
 // CEditNewFileDialog
 //
 
-CEditNewFileDialog::CEditNewFileDialog(HWND parent, char* path, int pathBufSize, CTruncatedString* subject, char* history[], int historyCount)
-    : CCopyMoveDialog(parent, path, pathBufSize, LoadStr(IDS_EDITNEWFILE), subject, IDD_EDITNEWDIALOG, history, historyCount, FALSE)
+CEditNewFileDialog::CEditNewFileDialog(HWND parent, char* path, int pathBufSize, CTruncatedString* subject,
+                                       char* history[], int historyCount, wchar_t* historyW[], int historyWCount)
+    : CCopyMoveDialog(parent, path, pathBufSize, LoadStr(IDS_EDITNEWFILE), subject, IDD_EDITNEWDIALOG,
+                      history, historyCount, FALSE, historyW, historyWCount)
 {
     ResID = IDD_COPYMOVEDIALOG_CB_BTSML;
 }
