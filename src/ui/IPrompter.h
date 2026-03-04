@@ -3,6 +3,7 @@
 #pragma once
 
 #include <cstdint>
+#include <windef.h>
 
 // UTF-16 first prompt/result definitions for UI ↔ logic decoupling.
 
@@ -33,13 +34,18 @@ public:
 
     virtual void ShowError(const wchar_t* title, const wchar_t* message) = 0;
     virtual void ShowInfo(const wchar_t* title, const wchar_t* message) = 0;
+    virtual void ShowError(HWND parent, const wchar_t* title, const wchar_t* message);
+    virtual void ShowInfo(HWND parent, const wchar_t* title, const wchar_t* message);
 
     // Error with OK/Cancel - returns kOk or kCancel
     virtual PromptResult ConfirmError(const wchar_t* title, const wchar_t* message) = 0;
+    virtual PromptResult ConfirmError(HWND parent, const wchar_t* title, const wchar_t* message);
     // Question with Yes/No - returns kYes or kNo
     virtual PromptResult AskYesNo(const wchar_t* title, const wchar_t* message) = 0;
+    virtual PromptResult AskYesNo(HWND parent, const wchar_t* title, const wchar_t* message);
     // Question with Yes/No/Cancel - returns kYes, kNo, or kCancel
     virtual PromptResult AskYesNoCancel(const wchar_t* title, const wchar_t* message) = 0;
+    virtual PromptResult AskYesNoCancel(HWND parent, const wchar_t* title, const wchar_t* message);
 
     // Question with Yes/No and "don't show again" checkbox - returns kYes or kNo
     virtual PromptResult AskYesNoWithCheckbox(const wchar_t* title, const wchar_t* message,
@@ -65,6 +71,7 @@ public:
 
     // Error with Retry/Cancel - returns kRetry or kCancel
     virtual PromptResult AskRetryCancel(const wchar_t* title, const wchar_t* message) = 0;
+    virtual PromptResult AskRetryCancel(HWND parent, const wchar_t* title, const wchar_t* message);
 
     // Error with OK and Help button - helpId is for context-sensitive help
     virtual void ShowErrorWithHelp(const wchar_t* title, const wchar_t* message, uint32_t helpId) = 0;

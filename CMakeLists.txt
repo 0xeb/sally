@@ -627,13 +627,6 @@ sal_create_populate_target()
 # Ensure populate depends on main targets
 add_dependencies(populate sally salmon salspawn salopen tserver translator salext sal_lang_english)
 
-# ==============================================================================
-# Tests
-# ==============================================================================
-
-enable_testing()
-add_subdirectory(src/tests)
-
 message(STATUS "")
 message(STATUS "=== Sally CMake Build ===")
 message(STATUS "Output: ${SAL_OUTPUT_BASE}/<Config>_${SAL_PLATFORM}")

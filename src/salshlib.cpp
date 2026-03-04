@@ -620,7 +620,6 @@ void CSalShExtPastedData::DoPasteOperation(BOOL copy, const char* tgtPath)
 
     BeginStopRefresh(); // auto-refresh takes a break
 
-    char text[1000];
     CSalamanderDirectory* archiveDir = NULL;
     CPluginDataInterfaceAbstract* pluginData = NULL;
     for (int j = 0; j < 2; j++)

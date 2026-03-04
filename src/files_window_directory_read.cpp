@@ -442,14 +442,35 @@ BOOL CFilesWindow::ReadDirectory(HWND parent, BOOL isRefresh)
                     lastEscCheckTime = GetTickCount();
                 }
 
-                // Convert wide filename to ANSI with lossy detection
+                // Convert wide filename to ANSI and detect any loss of information.
                 // Note: Using manual conversion instead of SalAnsiName class to avoid
-                // constructor-skip issues with the goto ADD_ITEM statements below
+                // constructor-skip issues with the goto ADD_ITEM statements below.
                 {
                     BOOL usedDefaultChar = FALSE;
-                    WideCharToMultiByte(CP_ACP, WC_NO_BEST_FIT_CHARS, fileDataW.cFileName, -1,
-                                        ansiFileName, MAX_PATH, NULL, &usedDefaultChar);
-                    nameConversionLossy = usedDefaultChar;
+                    int converted = WideCharToMultiByte(CP_ACP, WC_NO_BEST_FIT_CHARS, fileDataW.cFileName, -1,
+                                                        ansiFileName, MAX_PATH, NULL, &usedDefaultChar);
+                    nameConversionLossy = (converted == 0) || (usedDefaultChar == TRUE);
+                    if (converted == 0)
+                    {
+                        ansiFileName[0] = 0;
+                    }
+                    else if (!nameConversionLossy)
+                    {
+                        int roundtripLen = MultiByteToWideChar(CP_ACP, 0, ansiFileName, -1, NULL, 0);
+                        if (roundtripLen <= 0)
+                        {
+                            nameConversionLossy = TRUE;
+                        }
+                        else
+                        {
+                            std::wstring roundtrip((size_t)roundtripLen, L'\0');
+                            if (MultiByteToWideChar(CP_ACP, 0, ansiFileName, -1, &roundtrip[0], roundtripLen) <= 0 ||
+                                wcscmp(roundtrip.c_str(), fileDataW.cFileName) != 0)
+                            {
+                                nameConversionLossy = TRUE;
+                            }
+                        }
+                    }
                 }
                 st = ansiFileName;
                 len = (int)strlen(st);

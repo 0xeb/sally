@@ -1837,6 +1837,8 @@ BOOL LoadLogFont(HKEY hKey, const char* name, LOGFONT* logFont);
 BOOL SaveLogFont(HKEY hKey, const char* name, LOGFONT* logFont);
 BOOL LoadHistory(HKEY hKey, const char* name, char* history[], int maxCount);
 BOOL SaveHistory(HKEY hKey, const char* name, char* history[], int maxCount, BOOL onlyClear = FALSE);
+BOOL LoadHistoryW(HKEY hKey, const char* name, wchar_t* history[], int maxCount);
+BOOL SaveHistoryW(HKEY hKey, const char* name, wchar_t* history[], int maxCount, BOOL onlyClear = FALSE);
 BOOL LoadViewers(HKEY hKey, const char* name, CViewerMasks* viewerMasks);
 BOOL SaveViewers(HKEY hKey, const char* name, CViewerMasks* viewerMasks);
 BOOL LoadEditors(HKEY hKey, const char* name, CEditorMasks* editorMasks);
@@ -2303,6 +2305,8 @@ extern char ReadCDVolNameBuffer[SAL_MAX_LONG_PATH]; // IN/OUT buffer (root/volum
 // found value is only moved to first position in history array
 void AddValueToStdHistoryValues(char** historyArr, int historyItemsCount,
                                 const char* value, BOOL caseSensitiveValue);
+void AddValueToStdHistoryValuesW(wchar_t** historyArr, int historyItemsCount,
+                                 const wchar_t* value, BOOL caseSensitiveValue);
 
 // adds texts from shared history ('historyArr'+'historyItemsCount') to combobox ('combo');
 // performs reset of combobox content before adding (see CB_RESETCONTENT)

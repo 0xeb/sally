@@ -9,6 +9,7 @@
 
 #include "common/IClipboard.h"
 #include "ui/IPrompter.h"
+#include "ui/UnicodeHistoryUtils.h"
 #include "common/unicode/helpers.h"
 #include "common/IEnvironment.h"
 #include "common/fsutil.h"
@@ -384,6 +385,13 @@ void AddValueToStdHistoryValues(char** historyArr, int historyItemsCount,
             historyArr[0] = text;
         }
     }
+}
+
+void AddValueToStdHistoryValuesW(wchar_t** historyArr, int historyItemsCount,
+                                 const wchar_t* value, BOOL caseSensitiveValue)
+{
+    CALL_STACK_MESSAGE1("AddValueToStdHistoryValuesW()");
+    AddValueToWideHistory(historyArr, historyItemsCount, value, caseSensitiveValue);
 }
 
 void LoadComboFromStdHistoryValues(HWND combo, char** historyArr, int historyItemsCount)

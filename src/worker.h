@@ -333,6 +333,7 @@ struct COperation
     BOOL IsSourceNameInvalid(BOOL ignInvalidName = FALSE) const;
     BOOL IsTargetNameInvalid(BOOL ignInvalidName = FALSE) const;
     BOOL HasSameRootPath() const;
+    BOOL AreSourceAndTargetExactlySamePath() const;
     BOOL AreSourceAndTargetSamePath() const;
     HANDLE FindFirstTarget(WIN32_FIND_DATAW* findData) const;
     HANDLE FindFirstSource(WIN32_FIND_DATAW* findData) const;
