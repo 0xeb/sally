@@ -20,6 +20,7 @@ BOOL InitSupportLogged = FALSE;
 BOOL SupportWarningLogged = FALSE;
 BOOL CaptionColorAttrSupported = TRUE;
 BOOL TextColorAttrSupported = TRUE;
+thread_local int ListTreeThemeApplyDepth = 0;
 
 const DWORD DWMWA_USE_IMMERSIVE_DARK_MODE_NEW = 20; // Win10 1903+
 const DWORD DWMWA_USE_IMMERSIVE_DARK_MODE_OLD = 19; // older Win10 builds
@@ -404,7 +405,14 @@ void DarkMode_ApplyListTreeThemeRecursive(HWND root)
     if (root == NULL || !IsWindow(root))
         return;
 
+    // SetWindowTheme() sends WM_THEMECHANGED synchronously. Guard the theme walk so
+    // scrollbar theming does not immediately re-enter this routine and overflow.
+    if (ListTreeThemeApplyDepth > 0)
+        return;
+
+    ListTreeThemeApplyDepth++;
     BOOL useDark = DarkMode_ShouldUseDark();
     ApplyListTreeThemeToControl(root, useDark);
     EnumChildWindows(root, ApplyListTreeThemeEnumProc, (LPARAM)useDark);
+    ListTreeThemeApplyDepth--;
 }
