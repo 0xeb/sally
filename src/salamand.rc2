@@ -49,7 +49,7 @@ IDB_MENUITEMS BITMAP "res\\menuitms.bmp"
 
 IDB_LOGO_HAND RCDATA "res\\logo.svg"
 IDB_LOGO_GRAD RCDATA "res\\gradspl.svg"
-IDB_LOGO_TEXT RCDATA "res\\os.svg"
+IDB_LOGO_TEXT RCDATA "res\\sally.svg"
 IDB_ABOUT_GRAD RCDATA "res\\gradabt.svg"
 
 IDB_THROBBER RCDATA "res\\throbber.png"
