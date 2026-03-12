@@ -3,6 +3,7 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 
 #include "precomp.h"
+#include <memory>
 #include <time.h>
 
 #include "cfgdlg.h"
@@ -30,6 +31,25 @@ CSalamanderCryptAbstract* GetSalamanderCrypt();
    The following macros assume that the mode value is correct.
 */
 #define PASSWORD_MANAGER_AES_MODE 3 // DO NOT CHANGE; for example, CMasterPasswordVerifier is declared "hardcoded"
+
+struct CSecureByteArrayDeleter
+{
+    CSecureByteArrayDeleter(int size)
+        : Size(size)
+    {
+    }
+
+    void operator()(BYTE* buffer) const
+    {
+        if (buffer != NULL)
+        {
+            SecureZeroMemory(buffer, Size);
+            delete[] buffer;
+        }
+    }
+
+    int Size;
+};
 
 //****************************************************************************
 //
@@ -613,10 +633,9 @@ BOOL CPasswordManager::DecryptPassword(const BYTE* encryptedPassword, int encryp
     else
         plainMasterPassword = PlainMasterPassword.c_str();
 
-TRY_DECRYPT_AGAIN:
-
-    BYTE* tmpBuff = (BYTE*)malloc(encryptedPasswordSize + 1); // +1 for the terminator so we can call unscramble after AES
-    memcpy(tmpBuff, encryptedPassword, encryptedPasswordSize);
+    std::unique_ptr<BYTE[], CSecureByteArrayDeleter> tmpBuff(new BYTE[encryptedPasswordSize + 1],
+                                                             CSecureByteArrayDeleter(encryptedPasswordSize + 1)); // +1 for the terminator so we can call unscramble after AES
+    memcpy(tmpBuff.get(), encryptedPassword, encryptedPasswordSize);
     tmpBuff[encryptedPasswordSize] = 0; // terminator required by UnscramblePassword
 
     int pwdOffset = 1; // signature
@@ -625,17 +644,14 @@ TRY_DECRYPT_AGAIN:
         // decrypt the data with AES first
         CSalAES aes;
         WORD dummy;                                                                                                                                 // unnecessary weakness; ignore it
-        int ret = SalamanderCrypt->AESInit(&aes, PASSWORD_MANAGER_AES_MODE, plainMasterPassword, strlen(plainMasterPassword), tmpBuff + 1, &dummy); // the salt follows the signature in 16 bytes
+        int ret = SalamanderCrypt->AESInit(&aes, PASSWORD_MANAGER_AES_MODE, plainMasterPassword, strlen(plainMasterPassword), tmpBuff.get() + 1, &dummy); // the salt follows the signature in 16 bytes
         if (ret != SAL_AES_ERR_GOOD_RETURN)
             TRACE_E("CPasswordManager::DecryptPassword(): unexpected state, ret=" << ret);        // should not happen
-        SalamanderCrypt->AESDecrypt(&aes, tmpBuff + 1 + 16, encryptedPasswordSize - 1 - 16 - 10); // decrypt the password
+        SalamanderCrypt->AESDecrypt(&aes, tmpBuff.get() + 1 + 16, encryptedPasswordSize - 1 - 16 - 10); // decrypt the password
         BYTE mac[10];                                                                             // MAC is used to verify the correctness of the master password
         SalamanderCrypt->AESEnd(&aes, mac, NULL);
         if (memcmp(mac, &tmpBuff[encryptedPasswordSize - 10], 10) != 0)
         {
-            memset(tmpBuff, 0, encryptedPasswordSize); // clear the buffer that held the plain password
-            free(tmpBuff);
-
             if (usingOldPassword && UseMasterPassword && !PlainMasterPassword.empty())
             {   // handle the case where the password is encrypted with the new master password
                 // (the password cannot be decrypted with the old master password, but can with the new one,
@@ -653,20 +669,15 @@ TRY_DECRYPT_AGAIN:
         tmpBuff[encryptedPasswordSize - 10] = 0; // terminator for unscramble (placed over the first MAC byte)
     }
     // data are stored scrambled; skip the signature and optional AES salt
-    if (!UnscramblePassword((char*)tmpBuff + pwdOffset))
+    if (!UnscramblePassword((char*)tmpBuff.get() + pwdOffset))
     {
-        memset(tmpBuff, 0, encryptedPasswordSize); // clear the buffer that held the plain password
-        free(tmpBuff);
         return FALSE;
     }
 
     if (plainPassword != NULL)
     {
-        *plainPassword = DupStr((char*)tmpBuff + pwdOffset);
+        *plainPassword = DupStr((char*)tmpBuff.get() + pwdOffset);
     }
-
-    memset(tmpBuff, 0, encryptedPasswordSize); // clear the buffer that held the plain password
-    free(tmpBuff);
 
     return TRUE;
 }
