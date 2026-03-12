@@ -38,6 +38,25 @@ bool WideStringUsesAnsiFallback(const std::wstring& value)
     return sally::unicode::WideStringRequiresWidePath(value) ? TRUE : FALSE;
 }
 
+bool TryGetAnsiEditorLaunchPath(const std::wstring& pathW, char* pathA, int pathASize)
+{
+    if (pathW.empty() || pathA == NULL || pathASize <= 0)
+        return false;
+
+    if (!WideStringUsesAnsiFallback(pathW))
+    {
+        WideToAnsi(pathW, pathA, pathASize);
+        return pathA[0] != 0;
+    }
+
+    std::wstring shortPathW = GetShortPathW(pathW.c_str());
+    if (shortPathW.empty() || WideStringUsesAnsiFallback(shortPathW))
+        return false;
+
+    WideToAnsi(shortPathW, pathA, pathASize);
+    return pathA[0] != 0;
+}
+
 BOOL FileNameInvalidForManualCreateW(const wchar_t* path)
 {
     const wchar_t* name = wcsrchr(path, L'\\');
@@ -1643,15 +1662,18 @@ void CFilesWindow::EditNewFile()
 
                         if (!nextFocusW.empty())
                             WideToAnsi(nextFocusW, NextFocusName, NextFocusName.Size());
-                        if (WideStringUsesAnsiFallback(pathW))
+
+                        CPathBuffer editorPathA;
+                        if (TryGetAnsiEditorLaunchPath(pathW, editorPathA.Get(), editorPathA.Size()))
                         {
-                            HINSTANCE openRes = ShellExecuteW(HWindow, L"open", pathW.c_str(), NULL, NULL, SW_SHOWNORMAL);
-                            if ((INT_PTR)openRes <= 32)
-                                EditFile(path);
+                            EditFile(editorPathA);
                         }
                         else
                         {
-                            EditFile(path);
+                            // Wide-only names without an ANSI/8.3 alias still need a wide shell fallback.
+                            HINSTANCE openRes = ShellExecuteW(HWindow, L"open", pathW.c_str(), NULL, NULL, SW_SHOWNORMAL);
+                            if ((INT_PTR)openRes <= 32)
+                                gPrompter->ShowError(LoadStrW(IDS_ERRORTITLE), GetErrorTextW((DWORD)(INT_PTR)openRes));
                         }
 
                         // change only in the directory where the file was created
