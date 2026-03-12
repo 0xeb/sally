@@ -1,4 +1,4 @@
-﻿// WARNING: cannot be replaced by "#pragma once" because it is included from .rc file and it seems resource compiler does not support "#pragma once"
+// WARNING: cannot be replaced by "#pragma once" because it is included from .rc file and it seems resource compiler does not support "#pragma once"
 #ifndef __CHECKVER_VERSINFO_RH2
 #define __CHECKVER_VERSINFO_RH2
 
@@ -9,9 +9,9 @@
 // defines for plugin.SPL and plugin.SLG VERSIONINFO
 // look at shared\versinfo.rc
 
-#define VERSINFO_MAJOR       1
-#define VERSINFO_MINORA      2
-#define VERSINFO_MINORB      6
+#define VERSINFO_MAJOR       0
+#define VERSINFO_MINORA      0
+#define VERSINFO_MINORB      1
 
 #include "spl_vers.h" // pull in the version and build numbers
 

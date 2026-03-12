@@ -1,4 +1,4 @@
-﻿// SPDX-FileCopyrightText: 2023 Open Salamander Authors
+// SPDX-FileCopyrightText: 2023 Open Salamander Authors
 // SPDX-FileCopyrightText: 2026 Sally Authors
 // SPDX-License-Identifier: GPL-2.0-or-later
 
@@ -181,15 +181,12 @@ CDataDefaults CfgData;
 
 void EnableControls(HWND hWindow)
 {
-    // helper that toggles the checkbox states
+    // helper that toggles the remaining scheduling checkbox states
     CAutoCheckModeEnum mode = achmNever;
     int i;
     for (i = 0; i < achmCount; i++)
         if (IsDlgButtonChecked(hWindow, AutoCheckModeID[i]) == BST_CHECKED)
             mode = AutoCheckModeEval[i];
-
-    for (i = 0; i < achmCount; i++)
-        EnableWindow(GetDlgItem(hWindow, AutoCheckModeID[i]), CfgInternetConnection != inetNone);
 
     BOOL autoConnectWasEnabled = IsWindowEnabled(GetDlgItem(hWindow, IDC_CFG_AUTOCONNECT));
     EnableWindow(GetDlgItem(hWindow, IDC_CFG_AUTOCONNECT), mode != achmNever);
@@ -204,58 +201,16 @@ void EnableControls(HWND hWindow)
         CheckDlgButton(hWindow, IDC_CFG_AUTOCLOSE, BST_UNCHECKED);
     if (mode != achmNever && (!autoConnectWasEnabled || !autoCloseWasEnabled && closeEnabled)) // enable the "silent" mode by default
         CheckDlgButton(hWindow, IDC_CFG_AUTOCLOSE, BST_CHECKED);
-
-    // enable/disable logic for the list box
-    HWND hListBox = GetDlgItem(hWindow, IDC_CFG_FILTER);
-    int index = (int)SendMessage(hListBox, LB_GETCURSEL, 0, 0);
-    if (index == LB_ERR)
-    {
-        HWND hFocus = GetFocus();
-        if (hFocus == hListBox || hFocus == GetDlgItem(hWindow, IDC_CFG_REMOVE))
-        {
-            SetFocus(GetDlgItem(hWindow, IDOK));
-            SendMessage(hWindow, DM_SETDEFID, IDOK, 0);
-            SendMessage(GetDlgItem(hWindow, IDC_CFG_REMOVE), BM_SETSTYLE,
-                        BS_PUSHBUTTON, MAKELPARAM(TRUE, 0));
-        }
-        EnableWindow(GetDlgItem(hWindow, IDC_CFG_REMOVE), FALSE);
-        EnableWindow(hListBox, FALSE);
-    }
 }
 
 void LoadCfgDlgControls(HWND hWindow)
 {
-    // populate the dialog with data
-    int resID = 0;
-    switch (CfgInternetConnection)
-    {
-    case inetPhone:
-        resID = IDS_INTERNET_PHONE;
-        break;
-    case inetLAN:
-        resID = IDS_INTERNET_LAN;
-        break;
-    case inetNone:
-        resID = IDS_INTERNET_NONE;
-        break;
-    default:
-        TRACE_E("InternetConnection=" << InternetConnection);
-        break;
-    }
-    SetDlgItemText(hWindow, IDC_CFG_INTERNET, LoadStr(resID));
-
     int i;
     for (i = 0; i < achmCount; i++)
         CheckDlgButton(hWindow, AutoCheckModeID[i],
                        AutoCheckModeEval[i] == CfgData.AutoCheckMode ? BST_CHECKED : BST_UNCHECKED);
     CheckDlgButton(hWindow, IDC_CFG_AUTOCONNECT, CfgData.AutoConnect ? BST_CHECKED : BST_UNCHECKED);
     CheckDlgButton(hWindow, IDC_CFG_AUTOCLOSE, CfgData.AutoClose ? BST_CHECKED : BST_UNCHECKED);
-    CheckDlgButton(hWindow, IDC_CFG_BETA, CfgData.CheckBetaVersion ? BST_CHECKED : BST_UNCHECKED);
-    CheckDlgButton(hWindow, IDC_CFG_PB, CfgData.CheckPBVersion ? BST_CHECKED : BST_UNCHECKED);
-    CheckDlgButton(hWindow, IDC_CFG_RELEASE, CfgData.CheckReleaseVersion ? BST_CHECKED : BST_UNCHECKED);
-
-    // fill in the filter items
-    FiltersFillListBox(GetDlgItem(hWindow, IDC_CFG_FILTER));
     EnableControls(hWindow);
 }
 
@@ -302,62 +257,12 @@ INT_PTR CALLBACK CfgDlgProc(HWND hWindow, UINT uMsg, WPARAM wParam, LPARAM lPara
             return TRUE;
         }
 
-        case IDC_CFG_REMOVE:
-        {
-            HWND hListBox = GetDlgItem(hWindow, IDC_CFG_FILTER);
-            int index = (int)SendMessage(hListBox, LB_GETCURSEL, 0, 0);
-            if (index != LB_ERR)
-            {
-                char itemName[1024];
-                if (SendMessage(hListBox, LB_GETTEXT, index, (LPARAM)itemName) != LB_ERR)
-                {
-                    char buff[1024];
-                    sprintf(buff, LoadStr(IDS_REMOVE_CNFRM), itemName);
-                    int ret = SalGeneral->SalMessageBox(hWindow, buff, LoadStr(IDS_PLUGINNAME),
-                                                        MB_ICONQUESTION | MB_YESNO);
-                    if (ret == IDYES)
-                    {
-                        SendMessage(hListBox, LB_DELETESTRING, index, 0);
-                        SendMessage(hListBox, LB_SETCURSEL, 0, 0);
-                        EnableControls(hWindow);
-                    }
-                }
-            }
-            return 0;
-        }
-
-        case IDC_CFG_CHANGE:
-        {
-            int oldCfgInternetConnection = CfgInternetConnection;
-            if (OpenInternetDialog(hWindow, &CfgInternetConnection, &CfgInternetProtocol))
-            {
-                if (oldCfgInternetConnection != CfgInternetConnection)
-                {
-                    CfgData = DataDefaults[CfgInternetConnection];
-                    LoadCfgDlgControls(hWindow);
-                }
-            }
-            return 0;
-        }
-
         case IDC_CFG_DEFAULTS:
         {
-            BOOL reset = TRUE;
-            HWND hListBox = GetDlgItem(hWindow, IDC_CFG_FILTER);
-            int index = (int)SendMessage(hListBox, LB_GETCURSEL, 0, 0);
-            if (index != LB_ERR)
-            {
-                int ret = SalGeneral->SalMessageBox(hWindow, LoadStr(IDS_SETDEF_CNFRM), LoadStr(IDS_PLUGINNAME),
-                                                    MB_ICONQUESTION | MB_YESNO);
-                if (ret == IDNO)
-                    reset = FALSE;
-            }
-            if (reset)
-            {
-                DestroyFilters();
-                CfgData = DataDefaults[CfgInternetConnection];
-                LoadCfgDlgControls(hWindow);
-            }
+            CfgInternetConnection = inetLAN;
+            CfgInternetProtocol = inetpHTTP;
+            CfgData = DataDefaults[CfgInternetConnection];
+            LoadCfgDlgControls(hWindow);
             return 0;
         }
 
@@ -395,12 +300,11 @@ INT_PTR CALLBACK CfgDlgProc(HWND hWindow, UINT uMsg, WPARAM wParam, LPARAM lPara
                 MainDlgAutoOpen2 = FALSE;
             }
             Data.AutoClose = IsDlgButtonChecked(hWindow, IDC_CFG_AUTOCLOSE) == BST_CHECKED;
-            Data.CheckBetaVersion = IsDlgButtonChecked(hWindow, IDC_CFG_BETA) == BST_CHECKED;
-            Data.CheckPBVersion = IsDlgButtonChecked(hWindow, IDC_CFG_PB) == BST_CHECKED;
-            Data.CheckReleaseVersion = IsDlgButtonChecked(hWindow, IDC_CFG_RELEASE) == BST_CHECKED;
-            FiltersLoadFromListBox(GetDlgItem(hWindow, IDC_CFG_FILTER));
-            InternetConnection = CfgInternetConnection;
-            InternetProtocol = CfgInternetProtocol;
+            Data.CheckBetaVersion = FALSE;
+            Data.CheckPBVersion = FALSE;
+            Data.CheckReleaseVersion = TRUE;
+            InternetConnection = inetLAN;
+            InternetProtocol = inetpHTTP;
         }
         case IDCANCEL:
         {

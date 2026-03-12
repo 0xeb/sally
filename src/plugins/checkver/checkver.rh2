@@ -1,4 +1,4 @@
-﻿// WARNING: cannot be replaced by "#pragma once" because it is included from .rc file and it seems resource compiler does not support "#pragma once"
+// WARNING: cannot be replaced by "#pragma once" because it is included from .rc file and it seems resource compiler does not support "#pragma once"
 #ifndef __CHECKVER_RH2
 #define __CHECKVER_RH2
 
@@ -91,6 +91,11 @@
 #define IDS_FILE_OPENERROR      277
 #define IDS_FILE_READERROR      278
 #define IDS_FILE_OPENED         279
+#define IDS_CURRENT_VERSION     280
+#define IDS_LATEST_VERSION      281
+#define IDS_DOWNLOAD_RELEASE    282
+#define IDS_RELEASE_PAGE_LINK   283
+#define IDS_OPEN_RELEASE_PAGE   284
 
 // help IDs
 

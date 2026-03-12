@@ -1,4 +1,4 @@
-﻿// SPDX-FileCopyrightText: 2023 Open Salamander Authors
+// SPDX-FileCopyrightText: 2023 Open Salamander Authors
 // SPDX-FileCopyrightText: 2026 Sally Authors
 // SPDX-License-Identifier: GPL-2.0-or-later
 
@@ -459,47 +459,9 @@ LogWindowProc(HWND hWindow, UINT uMsg, WPARAM wParam, LPARAM lParam)
         int x = GET_X_LPARAM(lParam);
         int y = GET_Y_LPARAM(lParam);
         char buff[1024];
-        char item[1024];
-        BOOL link = LinkHitTest(x, y, buff, item);
-        if (link)
-        {
-            if (strcmp(buff, "DETAILS") != 0 && strcmp(buff, "FILTER") != 0)
-                ShellExecute(hWindow, "open", buff, NULL, NULL, SW_SHOWNORMAL);
-            else
-            {
-                if (ModulesHasCorrectData())
-                {
-                    if (strcmp(buff, "DETAILS") == 0)
-                    {
-                        int index = atoi(item);
-                        ModulesChangeShowDetails(index);
-                        ClearLogWindow(); // clear the log before listing new modules
-                        ModulesCreateLog(NULL, FALSE);
-                    }
-                    else
-                    {
-                        char* itemVer = strchr(item, '|');
-                        if (itemVer != NULL)
-                            *itemVer = ' ';
-                        char buff2[1024];
-                        sprintf(buff2, LoadStr(IDS_FILTERVER_CONFIRM), item);
-                        if (itemVer != NULL)
-                            *itemVer = '|';
-                        int ret = SalGeneral->SalMessageBox(HWindow, buff2, LoadStr(IDS_PLUGINNAME),
-                                                            MB_ICONQUESTION | MB_YESNO);
-                        if (ret == IDYES)
-                        {
-                            AddUniqueFilter(item);
-                            if (ModulesHasCorrectData())
-                            {
-                                ClearLogWindow(); // clear the log before listing new modules
-                                ModulesCreateLog(NULL, FALSE);
-                            }
-                        }
-                    }
-                }
-            }
-        }
+        BOOL link = LinkHitTest(x, y, buff, NULL);
+        if (link && buff[0] != 0)
+            ShellExecute(hWindow, "open", buff, NULL, NULL, SW_SHOWNORMAL);
         break;
     }
 
@@ -509,12 +471,8 @@ LogWindowProc(HWND hWindow, UINT uMsg, WPARAM wParam, LPARAM lParam)
         p.x = GET_X_LPARAM(lParam);
         p.y = GET_Y_LPARAM(lParam);
         char link[1024];
-        char item[1024];
-        LinkHitTest(p.x, p.y, link, item);
-        char* itemVer = strchr(item, '|');
-        if (itemVer != NULL)
-            *itemVer = 0;
-        if (link[0] != 0 && strcmp(link, "DETAILS") != 0 && strcmp(link, "FILTER") != 0)
+        LinkHitTest(p.x, p.y, link, NULL);
+        if (link[0] != 0)
         {
             /* used by the export_mnu.py script, which generates salmenu.mnu for the Translator
    keep synchronized with the AppendMenu() calls below...
@@ -523,35 +481,12 @@ MENU_TEMPLATE_ITEM LogWindowMenu1[] =
 	{MNTT_PB, 0
 	{MNTT_IT, IDS_CTXMENU_OPEN
 	{MNTT_IT, IDS_CTXMENU_COPY
-	{MNTT_IT, IDS_CTXMENU_FILTER
-	{MNTT_PE, 0
-};
-MENU_TEMPLATE_ITEM LogWindowMenu2[] = 
-{
-	{MNTT_PB, 0
-	{MNTT_IT, IDS_CTXMENU_DOWNLOAD
-	{MNTT_IT, IDS_CTXMENU_COPY
-	{MNTT_IT, IDS_CTXMENU_FILTER
 	{MNTT_PE, 0
 };
 */
             HMENU hMenu = CreatePopupMenu();
-            AppendMenu(hMenu, MF_STRING | MF_ENABLED, 1, LoadStr(item[0] == 0 ? IDS_CTXMENU_OPEN : IDS_CTXMENU_DOWNLOAD));
+            AppendMenu(hMenu, MF_STRING | MF_ENABLED, 1, LoadStr(IDS_CTXMENU_OPEN));
             AppendMenu(hMenu, MF_STRING | MF_ENABLED, 2, LoadStr(IDS_CTXMENU_COPY));
-            if (item[0] != 0)
-            {
-                AppendMenu(hMenu, MF_SEPARATOR, 0, "");
-                char buff[1024];
-                sprintf(buff, LoadStr(IDS_CTXMENU_FILTER), item);
-                AppendMenu(hMenu, MF_STRING | (HConfigurationDialog != NULL ? MF_GRAYED : MF_ENABLED), 3, buff);
-                if (itemVer != NULL)
-                {
-                    *itemVer = ' ';
-                    sprintf(buff, LoadStr(IDS_CTXMENU_FILTER), item);
-                    *itemVer = 0;
-                    AppendMenu(hMenu, MF_STRING | (HConfigurationDialog != NULL ? MF_GRAYED : MF_ENABLED), 4, buff);
-                }
-            }
             ClientToScreen(HWindow, &p);
             BOOL cmd = TrackPopupMenu(hMenu, TPM_RETURNCMD | TPM_RIGHTBUTTON, p.x, p.y, 0, HWindow, NULL);
             DestroyMenu(hMenu);
@@ -568,29 +503,6 @@ MENU_TEMPLATE_ITEM LogWindowMenu2[] =
                 case 2:
                 {
                     SalGeneral->CopyTextToClipboard(link, -1, TRUE, HWindow);
-                    break;
-                }
-
-                case 3:
-                case 4:
-                {
-                    char buff[1024];
-                    if (cmd == 4)
-                        *itemVer = ' ';
-                    sprintf(buff, LoadStr(cmd == 4 ? IDS_FILTERVER_CONFIRM : IDS_FILTER_CONFIRM), item);
-                    if (cmd == 4)
-                        *itemVer = '|';
-                    int ret = SalGeneral->SalMessageBox(HWindow, buff, LoadStr(IDS_PLUGINNAME),
-                                                        MB_ICONQUESTION | MB_YESNO);
-                    if (ret == IDYES)
-                    {
-                        AddUniqueFilter(item);
-                        if (ModulesHasCorrectData())
-                        {
-                            ClearLogWindow(); // clear the log before listing new modules
-                            ModulesCreateLog(NULL, FALSE);
-                        }
-                    }
                     break;
                 }
                 }
