@@ -161,177 +161,12 @@ const DWORD THIS_CONFIG_VERSION = 106; // 106 = plugins renamed from .spl to .dl
 // !!! Keep the corresponding lines in SalamanderConfigurationVersions up to date
 const char* SalamanderConfigurationRoots[SALCFG_ROOTS_COUNT + 1] =
     {
-        "Software\\Sally\\1.0",
-        "Software\\Open Salamander\\5.0",
-        "Software\\Altap\\Altap Salamander 4.0",
-        "Software\\Altap\\Altap Salamander 4.0 beta 1 (DB177)",
-        "Software\\Altap\\Altap Salamander 4.0 beta 1 (DB171)",
-        "Software\\Altap\\Altap Salamander 3.08",
-        "Software\\Altap\\Altap Salamander 4.0 beta 1 (DB168)",
-        "Software\\Altap\\Altap Salamander 3.07",
-        "Software\\Altap\\Altap Salamander 3.1 beta 1 (DB162)",
-        "Software\\Altap\\Altap Salamander 3.1 beta 1 (DB159)",
-        "Software\\Altap\\Altap Salamander 3.06",
-        "Software\\Altap\\Altap Salamander 3.1 beta 1 (DB153)",
-        "Software\\Altap\\Altap Salamander 3.05",
-        "Software\\Altap\\Altap Salamander 3.1 beta 1 (DB147)",
-        "Software\\Altap\\Altap Salamander 3.04",
-        "Software\\Altap\\Altap Salamander 3.1 beta 1 (DB141)",
-        "Software\\Altap\\Altap Salamander 3.03",
-        "Software\\Altap\\Altap Salamander 3.1 beta 1 (DB135)",
-        "Software\\Altap\\Altap Salamander 3.02",
-        "Software\\Altap\\Altap Salamander 3.1 beta 1 (DB129)",
-        "Software\\Altap\\Altap Salamander 3.01",
-        "Software\\Altap\\Altap Salamander 3.1 beta 1 (DB123)",
-        "Software\\Altap\\Altap Salamander 3.0",
-        "Software\\Altap\\Altap Salamander 3.0 beta 5 (DB117)",
-        "Software\\Altap\\Altap Salamander 3.0 beta 4",
-        "Software\\Altap\\Altap Salamander 3.0 beta 4 (DB111)",
-        "Software\\Altap\\Altap Salamander 3.0 beta 3",
-        "Software\\Altap\\Altap Salamander 3.0 beta 3 (DB105)",
-        "Software\\Altap\\Altap Salamander 3.0 beta 3 (PB103)",
-        "Software\\Altap\\Altap Salamander 3.0 beta 3 (DB100)",
-        "Software\\Altap\\Altap Salamander 3.0 beta 2",
-        "Software\\Altap\\Altap Salamander 3.0 beta 2 (DB94)",
-        "Software\\Altap\\Altap Salamander 3.0 beta 1",
-        "Software\\Altap\\Altap Salamander 3.0 beta 1 (DB88)",
-        "Software\\Altap\\Altap Salamander 3.0 beta 1 (PB87)",
-        "Software\\Altap\\Altap Salamander 3.0 beta 1 (DB83)",
-        "Software\\Altap\\Altap Salamander 3.0 beta 1 (DB80)",
-        "Software\\Altap\\Altap Salamander 3.0 beta 1 (PB79)",
-        "Software\\Altap\\Altap Salamander 3.0 beta 1 (DB76)",
-        "Software\\Altap\\Altap Salamander 3.0 beta 1 (PB75)",
-        "Software\\Altap\\Altap Salamander 2.55 beta 1 (DB 72)",
-        "Software\\Altap\\Altap Salamander 2.54",
-        "Software\\Altap\\Altap Salamander 2.54 beta 1 (DB 66)",
-        "Software\\Altap\\Altap Salamander 2.53",
-        "Software\\Altap\\Altap Salamander 2.53 (DB 60)",
-        "Software\\Altap\\Altap Salamander 2.53 beta 2",
-        "Software\\Altap\\Altap Salamander 2.53 beta 2 (IB 55)",
-        "Software\\Altap\\Altap Salamander 2.53 (DB 52)",
-        "Software\\Altap\\Altap Salamander 2.53 beta 1",
-        "Software\\Altap\\Altap Salamander 2.53 beta 1 (DB 46)",
-        "Software\\Altap\\Altap Salamander 2.53 beta 1 (PB 44)",
-        "Software\\Altap\\Altap Salamander 2.53 beta 1 (DB 41)",
-        "Software\\Altap\\Altap Salamander 2.53 beta 1 (DB 39)",
-        "Software\\Altap\\Altap Salamander 2.53 beta 1 (PB 38)",
-        "Software\\Altap\\Altap Salamander 2.53 beta 1 (DB 36)",
-        "Software\\Altap\\Altap Salamander 2.53 beta 1 (DB 33)",
-        "Software\\Altap\\Altap Salamander 2.52",
-        "Software\\Altap\\Altap Salamander 2.52 (DB 30)",
-        "Software\\Altap\\Altap Salamander 2.52 beta 2",
-        "Software\\Altap\\Altap Salamander 2.52 beta 1",
-        "Software\\Altap\\Altap Salamander 2.51",
-        "Software\\Altap\\Altap Salamander 2.5",
-        "Software\\Altap\\Altap Salamander 2.5 RC3",
-        "Software\\Altap\\Servant Salamander 2.5 RC3",
-        "Software\\Altap\\Servant Salamander 2.5 RC2",
-        "Software\\Altap\\Servant Salamander 2.5 RC1",
-        "Software\\Altap\\Servant Salamander 2.5 beta 12",
-        "Software\\Altap\\Servant Salamander 2.5 beta 11",
-        "Software\\Altap\\Servant Salamander 2.5 beta 10",
-        "Software\\Altap\\Servant Salamander 2.5 beta 9",
-        "Software\\Altap\\Servant Salamander 2.5 beta 8",
-        "Software\\Altap\\Servant Salamander 2.5 beta 7",
-        "Software\\Altap\\Servant Salamander 2.5 beta 6",
-        "Software\\Altap\\Servant Salamander 2.5 beta 5",
-        "Software\\Altap\\Servant Salamander 2.5 beta 4",
-        "Software\\Altap\\Servant Salamander 2.5 beta 3",
-        "Software\\Altap\\Servant Salamander 2.5 beta 2",
-        "Software\\Altap\\Servant Salamander 2.5 beta 1",
-        "Software\\Altap\\Servant Salamander 2.1 beta 1",
-        "Software\\Altap\\Servant Salamander 2.0",
-        "Software\\Altap\\Servant Salamander 1.6 beta 7",
-        "Software\\Altap\\Servant Salamander 1.6 beta 6",
-        "Software\\Altap\\Servant Salamander", // 1.6 beta 1 to 1.6 beta 5
-        "Software\\Salamander"                 // oldest versions (1.52 and older)
+        SAL_REG_CONFIGURATION_ROOTS
 };
 const char* SalamanderConfigurationVersions[SALCFG_ROOTS_COUNT] =
     {
-        "1.0",
-        "5.0",
-        "4.0",
-        "4.0 beta 1 (DB177)",
-        "4.0 beta 1 (DB171)",
-        "3.08",
-        "4.0 beta 1 (DB168)",
-        "3.07",
-        "3.1 beta 1 (DB162)",
-        "3.1 beta 1 (DB159)",
-        "3.06",
-        "3.1 beta 1 (DB153)",
-        "3.05",
-        "3.1 beta 1 (DB147)",
-        "3.04",
-        "3.1 beta 1 (DB141)",
-        "3.03",
-        "3.1 beta 1 (DB135)",
-        "3.02",
-        "3.1 beta 1 (DB129)",
-        "3.01",
-        "3.1 beta 1 (DB123)",
-        "3.0",
-        "3.0 beta 5 (DB117)",
-        "3.0 beta 4",
-        "3.0 beta 4 (DB111)",
-        "3.0 beta 3",
-        "3.0 beta 3 (DB105)",
-        "3.0 beta 3 (PB103)",
-        "3.0 beta 3 (DB100)",
-        "3.0 beta 2",
-        "3.0 beta 2 (DB94)",
-        "3.0 beta 1",
-        "3.0 beta 1 (DB88)",
-        "3.0 beta 1 (PB87)",
-        "3.0 beta 1 (DB83)",
-        "3.0 beta 1 (DB80)",
-        "3.0 beta 1 (PB79)",
-        "3.0 beta 1 (DB76)",
-        "3.0 beta 1 (PB75)",
-        "2.55 beta 1 (DB72)",
-        "2.54",
-        "2.54 beta 1 (DB66)",
-        "2.53",
-        "2.53 (DB60)",
-        "2.53 beta 2",
-        "2.53 beta 2 (IB55)",
-        "2.53 (DB52)",
-        "2.53 beta 1",
-        "2.53 beta 1 (DB46)",
-        "2.53 beta 1 (PB44)",
-        "2.53 beta 1 (DB41)",
-        "2.53 beta 1 (DB39)",
-        "2.53 beta 1 (PB38)",
-        "2.53 beta 1 (DB36)",
-        "2.53 beta 1 (DB33)",
-        "2.52",
-        "2.52 (DB30)",
-        "2.52 beta 2",
-        "2.52 beta 1",
-        "2.51",
-        "2.5",
-        "2.5 RC3",
-        "2.5 RC3",
-        "2.5 RC2",
-        "2.5 RC1",
-        "2.5 beta 12",
-        "2.5 beta 11",
-        "2.5 beta 10",
-        "2.5 beta 9",
-        "2.5 beta 8",
-        "2.5 beta 7",
-        "2.5 beta 6",
-        "2.5 beta 5",
-        "2.5 beta 4",
-        "2.5 beta 3",
-        "2.5 beta 2",
-        "2.5 beta 1",
-        "2.1 beta 1",
-        "2.0",
-        "1.6 beta 7",
-        "1.6 beta 6",
-        "1.6 beta 1-5",
-        "1.52"};
+        SAL_REG_CONFIGURATION_VERSIONS
+};
 
 const char* SALAMANDER_ROOT_REG = NULL; // will be set in salamander_entry_lifecycle.cpp
 
@@ -340,7 +175,7 @@ BOOL IsSetSALAMANDER_SAVE_IN_PROGRESS = FALSE;                // TRUE = the regi
 
 const char* SALAMANDER_COPY_IS_OK = "Copy Is OK"; // backup key only: value exists only if the key was copied completely
 
-const char* SALAMANDER_AUTO_IMPORT_CONFIG = "AutoImportConfig"; // value exists only during upgrade: installer overwrites the old version with the new and stores this value pointing to the old configuration key from which the configuration should be imported
+const char* SALAMANDER_AUTO_IMPORT_CONFIG = SAL_REG_VALUE_AUTO_IMPORT_CONFIG_A; // value exists only during upgrade: installer overwrites the old version with the new and stores this value pointing to the old configuration key from which the configuration should be imported
 
 const char* FINDDIALOG_WINDOW_REG = "Find Dialog Window";
 const char* SALAMANDER_WINDOW_REG = "Window";
@@ -369,7 +204,7 @@ const char* PANEL_FILTER = "Filter";
 
 const char* SALAMANDER_DEFDIRS_REG = "Default Directories";
 
-const char* SALAMANDER_CONFIG_REG = "Configuration";
+const char* SALAMANDER_CONFIG_REG = SAL_REG_SUBKEY_CONFIGURATION_A;
 const char* CONFIG_SKILLLEVEL_REG = "Skill Level";
 const char* CONFIG_FILENAMEFORMAT_REG = "File Name Format";
 const char* CONFIG_SIZEFORMAT_REG = "Size Format";
@@ -654,8 +489,8 @@ const char* EDITORS_COMMAND_REG = USERMENU_COMMAND_REG;
 const char* EDITORS_ARGUMENTS_REG = USERMENU_ARGUMENTS_REG;
 const char* EDITORS_INITDIR_REG = USERMENU_INITDIR_REG;
 
-const char* SALAMANDER_VERSION_REG = "Version";
-const char* SALAMANDER_VERSIONREG_REG = "Configuration";
+const char* SALAMANDER_VERSION_REG = SAL_REG_VALUE_VERSION_A;
+const char* SALAMANDER_VERSIONREG_REG = SAL_REG_SUBKEY_CONFIGURATION_A;
 
 const char* SALAMANDER_CUSTOMCOLORS_REG = "Custom Colors";
 
@@ -1095,7 +930,7 @@ void CheckShutdownParams()
     IRegistry* registry = GetMainWindowRegistry();
     HKEY key;
     if (registry != NULL &&
-        OpenKeyReadA(registry, HKEY_CURRENT_USER, "Control Panel\\Desktop", key).success)
+        OpenKeyReadA(registry, HKEY_CURRENT_USER, SAL_REG_KEY_CONTROL_PANEL_DESKTOP_A, key).success)
     {
         char num[100];
         DWORD value;

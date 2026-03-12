@@ -34,7 +34,7 @@ const char* AS_PROCESSLIST_EVENT_NAME = "Sally1ProcessListEvent";               
 const char* AS_PROCESSLIST_EVENT_PROCESSED_NAME = "Sally1ProcessListEventProcessed"; // fired event was processed
 
 const char* FIRST_SALAMANDER_MUTEX_NAME = "SallyFirstInstance";     // introduced since AS 2.52 beta 1
-const char* LOADSAVE_REGISTRY_MUTEX_NAME = "SallyLoadSaveRegistry"; // introduced since AS 2.52 beta 1
+const char* LOADSAVE_REGISTRY_MUTEX_NAME = SAL_REG_MUTEX_LOADSAVE_A; // introduced since AS 2.52 beta 1
 
 // path where we save bug report and minidump; later Salmon packs it into 7z and uploads to server
 CPathBuffer BugReportPath; // Heap-allocated for long path support

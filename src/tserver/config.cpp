@@ -18,8 +18,9 @@
 
 #include "registry.h"
 #include "config.h"
+#include "../registry_names.h"
 
-#define PATH_SOFTWARE_TSERVER L"Software\\Sally\\Trace Server"
+#define PATH_SOFTWARE_TSERVER SAL_REG_KEY_TRACE_SERVER_T
 
 CRegistry Registry;
 CConfigData ConfigData;

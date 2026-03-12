@@ -77,14 +77,14 @@ BOOL ReadSystemPrefersDarkApps()
 {
     HKEY hKey = NULL;
     if (RegOpenKeyEx(HKEY_CURRENT_USER,
-                     TEXT("Software\\Microsoft\\Windows\\CurrentVersion\\Themes\\Personalize"),
+                     SAL_REG_KEY_WINDOWS_THEME_PERSONALIZE_T,
                      0, KEY_READ, &hKey) != ERROR_SUCCESS)
         return FALSE;
 
     DWORD value = 1;
     DWORD valueSize = sizeof(value);
     DWORD type = 0;
-    LONG regRet = RegQueryValueEx(hKey, TEXT("AppsUseLightTheme"), NULL, &type, (LPBYTE)&value, &valueSize);
+    LONG regRet = RegQueryValueEx(hKey, SAL_REG_VALUE_APPS_USE_LIGHT_THEME_T, NULL, &type, (LPBYTE)&value, &valueSize);
     RegCloseKey(hKey);
 
     if (regRet != ERROR_SUCCESS || type != REG_DWORD)

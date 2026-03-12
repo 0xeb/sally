@@ -5,6 +5,8 @@
 
 #pragma once
 
+#include "registry_names.h"
+
 // current configuration version (see main_window_config_persistence.cpp for description)
 extern const DWORD THIS_CONFIG_VERSION;
 

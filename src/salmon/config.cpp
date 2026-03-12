@@ -8,8 +8,9 @@
 #include <wtypes.h>
 
 #include "config.h"
+#include "../registry_names.h"
 
-const char* DB_ROOT_KEY = "Software\\Open Salamander\\Bug Reporter";
+const char* DB_ROOT_KEY = SAL_REG_KEY_BUG_REPORTER_DB_A;
 const char* CONFIG_EMAIL_REG = "Email";
 
 CConfiguration Config;

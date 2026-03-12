@@ -13,6 +13,7 @@
 #define INITGUID
 #include "lstrfix.h"
 #include "shexreg.h"
+#include "registry_names.h"
 #pragma data_seg()
 
 #define NOHANDLES(function) function // obrana proti zanaseni maker HANDLES do zdrojaku pomoci CheckHnd
@@ -48,7 +49,7 @@ const char* SHEXREG_OPENSALAMANDER_DESCR = "Shell Extension (%s) for Sally " VER
 // ============================================= spolecna cast
 //
 /*
-const char *SHELLEXT_ROOT_REG = "Software\\Altap\\Servant Salamander\\Shell Extension";
+const char *SHELLEXT_ROOT_REG = SAL_REG_KEY_SHELL_EXTENSION_ROOT_A;
 const char *SHELLEXT_CONTEXTMENU = "Context Menu";
 const char *SHELLEXT_VERSION = "Version";
 
@@ -337,27 +338,27 @@ HRESULT DllUnregisterServerBody(REGSAM regView)
 
     wsprintf(key, "CLSID\\%s", shellExtIID);
     MyDeleteKey(HKEY_CLASSES_ROOT, key, regView);
-    wsprintf(key, "Software\\Classes\\CLSID\\%s", shellExtIID);
+    wsprintf(key, SAL_REG_FMT_SOFTWARE_CLASSES_CLSID_A, shellExtIID);
     MyDeleteKey(HKEY_CURRENT_USER, key, regView);
     wsprintf(key, "directory\\shellex\\CopyHookHandlers\\%s", SHEXREG_OPENSALAMANDER);
     MyDeleteKey(HKEY_CLASSES_ROOT, key, regView);
-    wsprintf(key, "Software\\Classes\\directory\\shellex\\CopyHookHandlers\\%s", SHEXREG_OPENSALAMANDER);
+    wsprintf(key, SAL_REG_FMT_SOFTWARE_CLASSES_DIRECTORY_COPY_HOOK_A, SHEXREG_OPENSALAMANDER);
     MyDeleteKey(HKEY_CURRENT_USER, key, regView);
 
 #ifdef ENABLE_SH_MENU_EXT
 
     wsprintf(key, "*\\shellex\\ContextMenuHandlers\\%s", SHEXREG_OPENSALAMANDER);
     MyDeleteKey(HKEY_CLASSES_ROOT, key, regView);
-    wsprintf(key, "Software\\Classes\\*\\shellex\\ContextMenuHandlers\\%s", SHEXREG_OPENSALAMANDER);
+    wsprintf(key, SAL_REG_FMT_SOFTWARE_CLASSES_STAR_CONTEXT_MENU_A, SHEXREG_OPENSALAMANDER);
     MyDeleteKey(HKEY_CURRENT_USER, key, regView);
     wsprintf(key, "Directory\\shellex\\ContextMenuHandlers\\%s", SHEXREG_OPENSALAMANDER);
     MyDeleteKey(HKEY_CLASSES_ROOT, key, regView);
-    wsprintf(key, "Software\\Classes\\Directory\\shellex\\ContextMenuHandlers\\%s", SHEXREG_OPENSALAMANDER);
+    wsprintf(key, SAL_REG_FMT_SOFTWARE_CLASSES_DIRECTORY_CONTEXT_MENU_A, SHEXREG_OPENSALAMANDER);
     MyDeleteKey(HKEY_CURRENT_USER, key, regView);
 
 #endif // ENABLE_SH_MENU_EXT
 
-    lstrcpy(key, "Software\\Microsoft\\Windows\\CurrentVersion\\Shell Extensions\\Approved");
+    lstrcpy(key, SAL_REG_KEY_SHELL_EXT_APPROVED_A);
     if (NOHANDLES(RegOpenKeyEx(HKEY_LOCAL_MACHINE, key, 0, KEY_READ | KEY_WRITE | regView, &hKey)) == ERROR_SUCCESS)
     {
         RegDeleteValue(hKey, shellExtIID);
@@ -532,7 +533,7 @@ BOOL SECRegisterToRegistry(const char* shellExtensionPath, BOOL doNotLoadDLL, RE
         {
             if (classesKey == HKEY_CLASSES_ROOT)
             {
-                if (NOHANDLES(RegOpenKeyEx(HKEY_CURRENT_USER, "Software\\Classes", 0,
+                if (NOHANDLES(RegOpenKeyEx(HKEY_CURRENT_USER, SAL_REG_KEY_SOFTWARE_CLASSES_A, 0,
                                            KEY_READ | KEY_WRITE | regView, &classesKey)) == ERROR_SUCCESS)
                 {
                     if (MyCreateKey(classesKey, "CLSID", &hKey, regView))
@@ -551,7 +552,7 @@ BOOL SECRegisterToRegistry(const char* shellExtensionPath, BOOL doNotLoadDLL, RE
             RegSetValueEx(hKey, NULL, 0, REG_SZ,
                           (BYTE*)shellExtensionPath, lstrlen(shellExtensionPath) + 1);
             str = "Apartment";
-            RegSetValueEx(hKey, "ThreadingModel", 0, REG_SZ, (BYTE*)str, lstrlen(str) + 1);
+            RegSetValueEx(hKey, SAL_REG_VALUE_THREADING_MODEL_A, 0, REG_SZ, (BYTE*)str, lstrlen(str) + 1);
             NOHANDLES(RegCloseKey(hKey));
         }
 
@@ -565,7 +566,7 @@ BOOL SECRegisterToRegistry(const char* shellExtensionPath, BOOL doNotLoadDLL, RE
         }
 
         // bez "As Admin" je tohle "dead code", aspon pod Vista+
-        wsprintf(key, "Software\\Microsoft\\Windows\\CurrentVersion\\Shell Extensions\\Approved");
+        wsprintf(key, SAL_REG_KEY_SHELL_EXT_APPROVED_A);
         if (MyCreateKey(HKEY_LOCAL_MACHINE, key, &hKey, regView))
         {
             char descrBuf[200];

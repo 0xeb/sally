@@ -338,7 +338,7 @@ void InitShellIconOverlays()
 
     HKEY clsIDKey;
     LONG errRet;
-    if ((errRet = HANDLES_Q(RegOpenKeyEx(HKEY_CLASSES_ROOT, "CLSID",
+    if ((errRet = HANDLES_Q(RegOpenKeyEx(HKEY_CLASSES_ROOT, SAL_REG_KEY_CLASSES_ROOT_CLSID_A,
                                          0, KEY_QUERY_VALUE, &clsIDKey))) != ERROR_SUCCESS)
     {
         TRACE_I("InitShellIconOverlays(): error opening HKEY_CLASSES_ROOT\\CLSID key: " << GetErrorText(errRet));
@@ -347,7 +347,7 @@ void InitShellIconOverlays()
 
     HKEY key;
     if ((errRet = HANDLES_Q(RegOpenKeyEx(HKEY_LOCAL_MACHINE,
-                                         "Software\\Microsoft\\Windows\\CurrentVersion\\Explorer\\ShellIconOverlayIdentifiers",
+                                         SAL_REG_KEY_SHELL_ICON_OVERLAY_IDENTIFIERS_A,
                                          0, KEY_ENUMERATE_SUB_KEYS, &key))) == ERROR_SUCCESS)
     {
         TIndirectArray<char> keyNames(15, 5);

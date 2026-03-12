@@ -10,6 +10,7 @@
 #include "pictview.rh"
 #include "pictview.rh2"
 #include "lang/lang.rh"
+#include "../../registry_names.h"
 
 //****************************************************************************
 //
@@ -446,7 +447,7 @@ void CRendererWindow::SetAsWallpaper(WORD command)
     if (FileName != NULL)
     {
         HKEY hKey;
-        if (RegOpenKeyEx(HKEY_CURRENT_USER, _T("Control Panel\\Desktop"), 0, KEY_READ | KEY_WRITE, &hKey) == ERROR_SUCCESS)
+        if (RegOpenKeyEx(HKEY_CURRENT_USER, SAL_REG_KEY_CONTROL_PANEL_DESKTOP_T, 0, KEY_READ | KEY_WRITE, &hKey) == ERROR_SUCCESS)
         {
             switch (command)
             {

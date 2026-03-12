@@ -883,7 +883,7 @@ BOOL CMainWindow::OnAssociationsChangedNotification(BOOL showWaitWnd)
     if (registry == NULL)
         registry = GetWin32Registry();
     if (registry != NULL &&
-        OpenKeyReadWriteA(registry, HKEY_CURRENT_USER, "Control Panel\\Desktop\\WindowMetrics", hKey).success)
+        OpenKeyReadWriteA(registry, HKEY_CURRENT_USER, SAL_REG_KEY_WINDOW_METRICS_A, hKey).success)
     {
         // older SHELL32.DLL versions may not export this, fileIconInit will be NULL
         FT_FileIconInit fileIconInit = NULL;
@@ -891,7 +891,7 @@ BOOL CMainWindow::OnAssociationsChangedNotification(BOOL showWaitWnd)
 
         char size[50];
         BOOL deleteVal = FALSE;
-        if (!GetStringA(registry, hKey, "Shell Icon Size", size, _countof(size)).success)
+        if (!GetStringA(registry, hKey, SAL_REG_VALUE_SHELL_ICON_SIZE_A, size, _countof(size)).success)
         {
             // The values for the icon size are Shell Icon Size and
             // Shell Small Icon Size (both are stored as strings - not
@@ -911,17 +911,17 @@ BOOL CMainWindow::OnAssociationsChangedNotification(BOOL showWaitWnd)
             IgnoreWM_SETTINGCHANGE = TRUE;
 
             sprintf(size, "%d", val - 1);
-            SetStringA(registry, hKey, "Shell Icon Size", size);
+            SetStringA(registry, hKey, SAL_REG_VALUE_SHELL_ICON_SIZE_A, size);
             SendMessage(MainWindow->HWindow, WM_SETTINGCHANGE, SPI_SETICONMETRICS, (LPARAM) "WindowMetrics");
             if (fileIconInit != NULL)
                 fileIconInit(FALSE);
             sprintf(size, "%d", val);
-            SetStringA(registry, hKey, "Shell Icon Size", size);
+            SetStringA(registry, hKey, SAL_REG_VALUE_SHELL_ICON_SIZE_A, size);
             SendMessage(MainWindow->HWindow, WM_SETTINGCHANGE, SPI_SETICONMETRICS, (LPARAM) "WindowMetrics");
             if (fileIconInit != NULL)
                 fileIconInit(TRUE);
             if (deleteVal)
-                DeleteValueA(registry, hKey, "Shell Icon Size"); // clean up after ourselves
+                DeleteValueA(registry, hKey, SAL_REG_VALUE_SHELL_ICON_SIZE_A); // clean up after ourselves
             registry->CloseKey(hKey);
 
             IgnoreWM_SETTINGCHANGE = FALSE;

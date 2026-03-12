@@ -2401,11 +2401,11 @@ BOOL InitializeGraphics(BOOL colorsOnly)
 
     HKEY hKey;
     IRegistry* registry = GetMainSalamanderRegistry();
-    if (OpenKeyReadA(registry, HKEY_CURRENT_USER, "Control Panel\\Desktop\\WindowMetrics", hKey).success)
+    if (OpenKeyReadA(registry, HKEY_CURRENT_USER, SAL_REG_KEY_WINDOW_METRICS_A, hKey).success)
     {
         // other interesting values: "Shell Icon Size", "Shell Small Icon Size"
         char buff[100];
-        if (GetStringA(registry, hKey, "Shell Icon Bpp", buff, _countof(buff)).success)
+        if (GetStringA(registry, hKey, SAL_REG_VALUE_SHELL_ICON_BPP_A, buff, _countof(buff)).success)
         {
             iconColorsCount = atoi(buff);
         }

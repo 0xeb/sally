@@ -7,8 +7,9 @@
 #include "wndframe.h"
 #include "config.h"
 #include "translator.h"
+#include "../registry_names.h"
 
-const char* DB_ROOT_KEY = "Software\\Open Salamander\\Translator";
+const char* DB_ROOT_KEY = SAL_REG_KEY_TRANSLATOR_A;
 const char* WINDOW_LEFT_REG = "Left";
 const char* WINDOW_RIGHT_REG = "Right";
 const char* WINDOW_TOP_REG = "Top";

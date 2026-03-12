@@ -3,6 +3,7 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 
 #include "precomp.h"
+#include "../../registry_names.h"
 
 // enables dumping of blocks that remain allocated on the heap after the plugin finishes
 // #define DUMP_MEM
@@ -327,14 +328,14 @@ void CPluginInterface::LoadConfiguration(HWND parent, HKEY regKey, CSalamanderRe
         }
 
         // Counter dialog settings
-        if (registry->OpenKey(regKey, "Counter", subKey))
+        if (registry->OpenKey(regKey, SAL_REG_SUBKEY_COUNTER_A, subKey))
         {
-            registry->GetValue(subKey, "Start", REG_DWORD, &LastCounterStart, sizeof(int));
-            registry->GetValue(subKey, "Step", REG_BINARY, &LastCounterStep, sizeof(double));
-            registry->GetValue(subKey, "Base", REG_DWORD, &LastCounterBase, sizeof(int));
-            registry->GetValue(subKey, "MinWidth", REG_DWORD, &LastCounterMinWidth, sizeof(int));
-            registry->GetValue(subKey, "Fill", REG_DWORD, &LastCounterFill, sizeof(int));
-            registry->GetValue(subKey, "Left", REG_DWORD, &LastCounterLeft, sizeof(BOOL));
+            registry->GetValue(subKey, SAL_REG_VALUE_START_A, REG_DWORD, &LastCounterStart, sizeof(int));
+            registry->GetValue(subKey, SAL_REG_VALUE_STEP_A, REG_BINARY, &LastCounterStep, sizeof(double));
+            registry->GetValue(subKey, SAL_REG_VALUE_BASE_A, REG_DWORD, &LastCounterBase, sizeof(int));
+            registry->GetValue(subKey, SAL_REG_VALUE_MIN_WIDTH_A, REG_DWORD, &LastCounterMinWidth, sizeof(int));
+            registry->GetValue(subKey, SAL_REG_VALUE_FILL_A, REG_DWORD, &LastCounterFill, sizeof(int));
+            registry->GetValue(subKey, SAL_REG_VALUE_LEFT_A, REG_DWORD, &LastCounterLeft, sizeof(BOOL));
             registry->CloseKey(subKey);
         }
 
@@ -419,14 +420,14 @@ void CPluginInterface::SaveConfiguration(HWND parent, HKEY regKey, CSalamanderRe
         registry->CloseKey(subKey);
     }
     // Counter dialog settings
-    if (registry->CreateKey(regKey, "Counter", subKey))
+    if (registry->CreateKey(regKey, SAL_REG_SUBKEY_COUNTER_A, subKey))
     {
-        registry->SetValue(subKey, "Start", REG_DWORD, &LastCounterStart, sizeof(int));
-        registry->SetValue(subKey, "Step", REG_BINARY, &LastCounterStep, sizeof(double));
-        registry->SetValue(subKey, "Base", REG_DWORD, &LastCounterBase, sizeof(int));
-        registry->SetValue(subKey, "MinWidth", REG_DWORD, &LastCounterMinWidth, sizeof(int));
-        registry->SetValue(subKey, "Fill", REG_DWORD, &LastCounterFill, sizeof(int));
-        registry->SetValue(subKey, "Left", REG_DWORD, &LastCounterLeft, sizeof(BOOL));
+        registry->SetValue(subKey, SAL_REG_VALUE_START_A, REG_DWORD, &LastCounterStart, sizeof(int));
+        registry->SetValue(subKey, SAL_REG_VALUE_STEP_A, REG_BINARY, &LastCounterStep, sizeof(double));
+        registry->SetValue(subKey, SAL_REG_VALUE_BASE_A, REG_DWORD, &LastCounterBase, sizeof(int));
+        registry->SetValue(subKey, SAL_REG_VALUE_MIN_WIDTH_A, REG_DWORD, &LastCounterMinWidth, sizeof(int));
+        registry->SetValue(subKey, SAL_REG_VALUE_FILL_A, REG_DWORD, &LastCounterFill, sizeof(int));
+        registry->SetValue(subKey, SAL_REG_VALUE_LEFT_A, REG_DWORD, &LastCounterLeft, sizeof(BOOL));
         registry->CloseKey(subKey);
     }
     registry->SetValue(regKey, CONFIG_COMMAND, REG_SZ, Command, -1);

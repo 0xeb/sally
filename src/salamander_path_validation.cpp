@@ -1687,41 +1687,41 @@ void CSystemPolicies::LoadFromRegistry()
     // pull restrictions
     IRegistry* registry = GetSystemPoliciesRegistry();
     HKEY hKey;
-    if (OpenKeyReadA(registry, HKEY_CURRENT_USER, "Software\\Microsoft\\Windows\\CurrentVersion\\Policies\\Explorer", hKey).success)
+    if (OpenKeyReadA(registry, HKEY_CURRENT_USER, SAL_REG_KEY_POLICIES_EXPLORER_CURRENT_USER_A, hKey).success)
     {
         // according to MSDN values can be DWORD and BINARY:
         // It is a REG_DWORD or 4-byte REG_BINARY data value, found under the same key.
-        GetValueDontCheckTypeViaRegistry(registry, hKey, "NoRun", /*REG_DWORD,*/ &NoRun, sizeof(DWORD));
-        GetValueDontCheckTypeViaRegistry(registry, hKey, "NoDrives", /*REG_DWORD,*/ &NoDrives, sizeof(DWORD));
+        GetValueDontCheckTypeViaRegistry(registry, hKey, SAL_REG_VALUE_NO_RUN_A, /*REG_DWORD,*/ &NoRun, sizeof(DWORD));
+        GetValueDontCheckTypeViaRegistry(registry, hKey, SAL_REG_VALUE_NO_DRIVES_A, /*REG_DWORD,*/ &NoDrives, sizeof(DWORD));
         //GetValueDontCheckTypeViaRegistry(registry, hKey, "NoViewOnDrive", /*REG_DWORD,*/ &NoViewOnDrive, sizeof(DWORD));
-        GetValueDontCheckTypeViaRegistry(registry, hKey, "NoFind", /*REG_DWORD,*/ &NoFind, sizeof(DWORD));
-        GetValueDontCheckTypeViaRegistry(registry, hKey, "NoShellSearchButton", /*REG_DWORD,*/ &NoShellSearchButton, sizeof(DWORD));
-        GetValueDontCheckTypeViaRegistry(registry, hKey, "NoNetHood", /*REG_DWORD,*/ &NoNetHood, sizeof(DWORD));
+        GetValueDontCheckTypeViaRegistry(registry, hKey, SAL_REG_VALUE_NO_FIND_A, /*REG_DWORD,*/ &NoFind, sizeof(DWORD));
+        GetValueDontCheckTypeViaRegistry(registry, hKey, SAL_REG_VALUE_NO_SHELL_SEARCH_BUTTON_A, /*REG_DWORD,*/ &NoShellSearchButton, sizeof(DWORD));
+        GetValueDontCheckTypeViaRegistry(registry, hKey, SAL_REG_VALUE_NO_NET_HOOD_A, /*REG_DWORD,*/ &NoNetHood, sizeof(DWORD));
         //GetValueDontCheckTypeViaRegistry(registry, hKey, "NoComputersNearMe", /*REG_DWORD,*/ &NoComputersNearMe, sizeof(DWORD));
-        GetValueDontCheckTypeViaRegistry(registry, hKey, "NoNetConnectDisconnect", /*REG_DWORD,*/ &NoNetConnectDisconnect, sizeof(DWORD));
-        GetValueDontCheckTypeViaRegistry(registry, hKey, "RestrictRun", /*REG_DWORD,*/ &RestrictRun, sizeof(DWORD));
-        if (RestrictRun && !LoadList(&RestrictRunList, HKEY_CURRENT_USER, "Software\\Microsoft\\Windows\\CurrentVersion\\Policies\\Explorer\\RestrictRun"))
+        GetValueDontCheckTypeViaRegistry(registry, hKey, SAL_REG_VALUE_NO_NET_CONNECT_DISCONNECT_A, /*REG_DWORD,*/ &NoNetConnectDisconnect, sizeof(DWORD));
+        GetValueDontCheckTypeViaRegistry(registry, hKey, SAL_REG_VALUE_RESTRICT_RUN_A, /*REG_DWORD,*/ &RestrictRun, sizeof(DWORD));
+        if (RestrictRun && !LoadList(&RestrictRunList, HKEY_CURRENT_USER, SAL_REG_KEY_POLICIES_EXPLORER_RESTRICT_RUN_CURRENT_USER_A))
             RestrictRun = 0; // low memory; disable this option
-        GetValueDontCheckTypeViaRegistry(registry, hKey, "DisallowRun", /*REG_DWORD,*/ &DisallowRun, sizeof(DWORD));
-        if (DisallowRun && !LoadList(&DisallowRunList, HKEY_CURRENT_USER, "Software\\Microsoft\\Windows\\CurrentVersion\\Policies\\Explorer\\DisallowRun"))
+        GetValueDontCheckTypeViaRegistry(registry, hKey, SAL_REG_VALUE_DISALLOW_RUN_A, /*REG_DWORD,*/ &DisallowRun, sizeof(DWORD));
+        if (DisallowRun && !LoadList(&DisallowRunList, HKEY_CURRENT_USER, SAL_REG_KEY_POLICIES_EXPLORER_DISALLOW_RUN_CURRENT_USER_A))
             DisallowRun = 0; // low memory; disable this option
         registry->CloseKey(hKey);
     }
 
-    //  if (OpenKeyReadA(registry, HKEY_CURRENT_USER, "Software\\Microsoft\\Windows\\CurrentVersion\\Policies\\Network", hKey).success)
+    //  if (OpenKeyReadA(registry, HKEY_CURRENT_USER, SAL_REG_KEY_POLICIES_NETWORK_CURRENT_USER_A, hKey).success)
     //  {
     //GetValueDontCheckTypeViaRegistry(registry, hKey, "NoEntireNetwork", /*REG_DWORD,*/ &NoEntireNetwork, sizeof(DWORD));
     //    registry->CloseKey(hKey);
     //  }
 
-    if (OpenKeyReadA(registry, HKEY_CURRENT_USER, "SOFTWARE\\Policies\\Microsoft\\Windows\\Explorer", hKey).success)
+    if (OpenKeyReadA(registry, HKEY_CURRENT_USER, SAL_REG_KEY_POLICIES_EXPLORER_MACHINE_A, hKey).success)
     {
-        GetValueDontCheckTypeViaRegistry(registry, hKey, "NoDotBreakInLogicalCompare", /*REG_DWORD,*/ &NoDotBreakInLogicalCompare, sizeof(DWORD));
+        GetValueDontCheckTypeViaRegistry(registry, hKey, SAL_REG_VALUE_NO_DOT_BREAK_IN_LOGICAL_COMPARE_A, /*REG_DWORD,*/ &NoDotBreakInLogicalCompare, sizeof(DWORD));
         registry->CloseKey(hKey);
     }
-    if (OpenKeyReadA(registry, HKEY_LOCAL_MACHINE, "SOFTWARE\\Policies\\Microsoft\\Windows\\Explorer", hKey).success)
+    if (OpenKeyReadA(registry, HKEY_LOCAL_MACHINE, SAL_REG_KEY_POLICIES_EXPLORER_MACHINE_A, hKey).success)
     {
-        GetValueDontCheckTypeViaRegistry(registry, hKey, "NoDotBreakInLogicalCompare", /*REG_DWORD,*/ &NoDotBreakInLogicalCompare, sizeof(DWORD));
+        GetValueDontCheckTypeViaRegistry(registry, hKey, SAL_REG_VALUE_NO_DOT_BREAK_IN_LOGICAL_COMPARE_A, /*REG_DWORD,*/ &NoDotBreakInLogicalCompare, sizeof(DWORD));
         registry->CloseKey(hKey);
     }
 }

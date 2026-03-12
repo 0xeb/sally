@@ -761,7 +761,7 @@ BOOL GetIconFromAssocAux(BOOL initFlagAndIndexes, HKEY root, const char* keyName
 
     if (size - 1 + 7 <= keyNameBuf.Size()) // test na moznost otevirani pres asociace
     {
-        memmove(keyNameBuf + size - 1, "\\Shell", 7);
+        memmove(keyNameBuf + size - 1, SAL_REG_SUBKEY_SHELL_A, sizeof(SAL_REG_SUBKEY_SHELL_A));
         if (HANDLES_Q(RegOpenKey(root, keyNameBuf, &openKey)) == ERROR_SUCCESS)
         { // if "\\shell" contains any subkey, it can be opened (association on Enter)
             DWORD keys;
@@ -777,7 +777,7 @@ BOOL GetIconFromAssocAux(BOOL initFlagAndIndexes, HKEY root, const char* keyName
 
     if (size - 1 + 21 <= keyNameBuf.Size())
     {
-        memmove(keyNameBuf + size - 1, "\\ShellEx\\IconHandler", 21);
+        memmove(keyNameBuf + size - 1, SAL_REG_SUBKEY_SHELLEX_ICON_HANDLER_A, sizeof(SAL_REG_SUBKEY_SHELLEX_ICON_HANDLER_A));
         // if contains "\\ShellEx\\IconHandler", must be extracted from file
         if (HANDLES_Q(RegOpenKey(root, keyNameBuf, &openKey)) == ERROR_SUCCESS)
         {
@@ -790,13 +790,13 @@ BOOL GetIconFromAssocAux(BOOL initFlagAndIndexes, HKEY root, const char* keyName
 
     if (!found && size - 1 + 13 <= keyNameBuf.Size())
     {
-        memmove(keyNameBuf.Get() + size - 1, "\\DefaultIcon", 13);
+        memmove(keyNameBuf.Get() + size - 1, SAL_REG_SUBKEY_DEFAULT_ICON_A, sizeof(SAL_REG_SUBKEY_DEFAULT_ICON_A));
         if (HANDLES_Q(RegOpenKey(root, keyNameBuf, &openKey)) == ERROR_SUCCESS)
         {
             CPathBuffer buf; // Heap-allocated for long path support
             size = buf.Size(); // getting path to icon
             DWORD type2 = REG_SZ;
-            DWORD err = SalRegQueryValueEx(openKey, "", 0, &type2,
+            DWORD err = SalRegQueryValueEx(openKey, SAL_REG_VALUE_DEFAULT_A, 0, &type2,
                                            (LPBYTE)buf.Get(), (LPDWORD)&size);
             if (err == ERROR_SUCCESS && size > 1)
             {
@@ -1168,7 +1168,7 @@ void CAssociations::ReadAssociations(BOOL showWaitWnd)
     CPathBuffer errBuf;
 
     HKEY systemFileAssoc = NULL;
-    if (HANDLES_Q(RegOpenKey(HKEY_CLASSES_ROOT, "SystemFileAssociations", &systemFileAssoc)) != ERROR_SUCCESS)
+    if (HANDLES_Q(RegOpenKey(HKEY_CLASSES_ROOT, SAL_REG_KEY_SYSTEM_FILE_ASSOCIATIONS_A, &systemFileAssoc)) != ERROR_SUCCESS)
     {
         systemFileAssoc = NULL;
     }
@@ -1176,7 +1176,7 @@ void CAssociations::ReadAssociations(BOOL showWaitWnd)
     // Windows 2000 and newer also have "Open With..." associations stored for each user separately
     // in key HKEY_CURRENT_USER\Software\Microsoft\Windows\CurrentVersion\Explorer\FileExts
     HKEY explorerFileExts;
-    if (HANDLES_Q(RegOpenKey(HKEY_CURRENT_USER, "Software\\Microsoft\\Windows\\CurrentVersion\\Explorer\\FileExts",
+    if (HANDLES_Q(RegOpenKey(HKEY_CURRENT_USER, SAL_REG_KEY_EXPLORER_FILEEXTS_A,
                              &explorerFileExts)) != ERROR_SUCCESS)
     {
         explorerFileExts = NULL;
@@ -1198,7 +1198,7 @@ void CAssociations::ReadAssociations(BOOL showWaitWnd)
                 data.SetIndexAll(-1);
                 type[0] = 0;
                 BOOL tryPerceivedType = FALSE;
-                BOOL addExt = (SalRegQueryValue(extKey, "", extType, &size) == ERROR_SUCCESS && size > 1);
+                BOOL addExt = (SalRegQueryValue(extKey, SAL_REG_VALUE_DEFAULT_A, extType, &size) == ERROR_SUCCESS && size > 1);
                 if (addExt)
                 {
                     // test for icon type (static/dynamic see .h)
@@ -1214,7 +1214,7 @@ void CAssociations::ReadAssociations(BOOL showWaitWnd)
                     else
                     { // also try the key from the PerceivedType value (if defined)
                         size = extType.Size();
-                        if (SalRegQueryValueEx(extKey, "PerceivedType", NULL, NULL, (BYTE*)extType.Get(), (DWORD*)&size) == ERROR_SUCCESS && size > 1)
+                        if (SalRegQueryValueEx(extKey, SAL_REG_VALUE_PERCEIVED_TYPE_A, NULL, NULL, (BYTE*)extType.Get(), (DWORD*)&size) == ERROR_SUCCESS && size > 1)
                         {
                             extType[extType.Size() - 1] = 0; // just to be sure (value may not be string type, then null-terminator may be missing)
                             if (GetIconFromAssocAux(FALSE, systemFileAssoc, extType, (LONG)strlen(extType) + 1, data, iconLocation, iconLocation.Size(), NULL, 0))
@@ -1321,10 +1321,10 @@ void CAssociations::ReadAssociations(BOOL showWaitWnd)
 
                     int index;
                     BOOL found = GetIndex(e, index);
-                    if (WindowsVistaAndLater && HANDLES_Q(RegOpenKey(extKey, "UserChoice", &openKey)) == ERROR_SUCCESS)
+                    if (WindowsVistaAndLater && HANDLES_Q(RegOpenKey(extKey, SAL_REG_SUBKEY_USER_CHOICE_A, &openKey)) == ERROR_SUCCESS)
                     {                    // try if associated via UserChoice key, if so, it's the highest priority record, so we possibly overwrite the existing association
                         size = extType.Size(); // getting association type
-                        if (SalRegQueryValueEx(openKey, "Progid", NULL, NULL, (BYTE*)extType.Get(), (DWORD*)&size) == ERROR_SUCCESS && size > 1)
+                        if (SalRegQueryValueEx(openKey, SAL_REG_VALUE_PROGID_A, NULL, NULL, (BYTE*)extType.Get(), (DWORD*)&size) == ERROR_SUCCESS && size > 1)
                         {
                             extType[extType.Size() - 1] = 0; // just to be sure (value may not be string type, then null-terminator may be missing)
 
@@ -1338,7 +1338,7 @@ void CAssociations::ReadAssociations(BOOL showWaitWnd)
                     }
                     if (!found) // also try if associated via OpenWithProgids key
                     {
-                        if (WindowsVistaAndLater && HANDLES_Q(RegOpenKey(extKey, "OpenWithProgids", &openKey)) == ERROR_SUCCESS)
+                        if (WindowsVistaAndLater && HANDLES_Q(RegOpenKey(extKey, SAL_REG_SUBKEY_OPEN_WITH_PROGIDS_A, &openKey)) == ERROR_SUCCESS)
                         {
                             DWORD j = 0;
                             size = extType.Size(); // getting association type
@@ -1361,7 +1361,7 @@ void CAssociations::ReadAssociations(BOOL showWaitWnd)
                         }
                     }
 
-                    if (SalRegQueryValueEx(extKey, "Application", NULL, NULL, NULL, NULL) == ERROR_SUCCESS)
+                    if (SalRegQueryValueEx(extKey, SAL_REG_VALUE_APPLICATION_A, NULL, NULL, NULL, NULL) == ERROR_SUCCESS)
                     {
                         if (found) // found, set that it has association
                         {

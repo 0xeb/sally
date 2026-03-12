@@ -99,7 +99,7 @@ BOOL GetUserName(const char* drive, const char* remoteName, char* userName, DWOR
         return FALSE; // well, nothing ...
 
     HKEY network;
-    if (!OpenKeyReadA(registry, HKEY_CURRENT_USER, "Network", network).success)
+    if (!OpenKeyReadA(registry, HKEY_CURRENT_USER, SAL_REG_KEY_NETWORK_A, network).success)
         return FALSE; // well, nothing ...
 
     BOOL ret = FALSE;
@@ -110,18 +110,18 @@ BOOL GetUserName(const char* drive, const char* remoteName, char* userName, DWOR
     keyName[1] = 0;
     if (OpenKeyReadA(registry, network, keyName, driveKey).success)
     {
-        RegistryResult res = GetStringA(registry, driveKey, "RemotePath", keyName.Get(), keyName.Size());
+        RegistryResult res = GetStringA(registry, driveKey, SAL_REG_VALUE_REMOTE_PATH_A, keyName.Get(), keyName.Size());
         if (res.success && IsTheSamePath(keyName, remoteName))
         {
             ret = TRUE; // we will announce success, even if the user name is not defined (the current user should be used)
 
-            res = GetStringA(registry, driveKey, "UserName", userName, userBufSize);
+            res = GetStringA(registry, driveKey, SAL_REG_VALUE_USER_NAME_A, userName, userBufSize);
             if (res.success && userName[0] != 0) // do we have a user?
                 TRACE_I("Found user name: " << keyName << ", " << userName);
             else
                 userName[0] = 0;
 
-            res = GetStringA(registry, driveKey, "ProviderName", providerBuf, providerBufSize);
+            res = GetStringA(registry, driveKey, SAL_REG_VALUE_PROVIDER_NAME_A, providerBuf, providerBufSize);
             if (!res.success) // if we do not have a provider, we will reset the buffer
                 providerBuf[0] = 0;
         }
@@ -1496,12 +1496,12 @@ void InitOneDrivePath()
         for (int i = 0; !done && i < 2; i++) // theoretically only needed for Windows 8 and lower (from 8.1 we have FOLDERID_SkyDrive)
         {
             const char* oneDriveKey = Windows8_1AndLater && !Windows10AndLater
-                                          ? (i == 0 ? "Software\\Microsoft\\Windows\\CurrentVersion\\OneDrive" : // jen Win 8.1
-                                                 "Software\\Microsoft\\Windows\\CurrentVersion\\SkyDrive")
-                                          : (i == 0 ? "Software\\Microsoft\\OneDrive" : "Software\\Microsoft\\SkyDrive"); // krom Win 8.1
+                                          ? (i == 0 ? SAL_REG_KEY_WIN81_ONEDRIVE_A : // jen Win 8.1
+                                                 SAL_REG_KEY_WIN81_SKYDRIVE_A)
+                                          : (i == 0 ? SAL_REG_KEY_ONEDRIVE_A : SAL_REG_KEY_SKYDRIVE_A); // krom Win 8.1
             if (OpenKeyReadA(registry, HKEY_CURRENT_USER, oneDriveKey, hKey).success)
             {
-                RegistryResult result = GetStringA(registry, hKey, "UserFolder", path.Get(), path.Size());
+                RegistryResult result = GetStringA(registry, hKey, SAL_REG_VALUE_USER_FOLDER_A, path.Get(), path.Size());
                 if (result.success && path[0] != 0)
                 {
                     //TRACE_I("OneDrive path (UserFolder): " << path);
@@ -1516,7 +1516,7 @@ void InitOneDrivePath()
     // we will load OneDrive Business storages from the registry
     OneDriveBusinessStorages.DestroyMembers();
     if (registry != NULL &&
-        OpenKeyReadA(registry, HKEY_CURRENT_USER, "Software\\Microsoft\\OneDrive\\Accounts", hKey).success)
+        OpenKeyReadA(registry, HKEY_CURRENT_USER, SAL_REG_KEY_ONEDRIVE_ACCOUNTS_A, hKey).success)
     {
         std::vector<std::wstring> accountKeys;
         if (registry->EnumSubKeys(hKey, accountKeys).success)
@@ -1530,10 +1530,10 @@ void InitOneDrivePath()
                     if (registry->OpenKeyRead(hKey, keyName.c_str(), hAccount).success)
                     {
                         char disp[ONEDRIVE_MAXBUSINESSDISPLAYNAME];
-                        RegistryResult result = GetStringA(registry, hAccount, "DisplayName", disp, sizeof(disp));
+                        RegistryResult result = GetStringA(registry, hAccount, SAL_REG_VALUE_DISPLAY_NAME_A, disp, sizeof(disp));
                         if (result.success && disp[0] != 0)
                         {
-                            result = GetStringA(registry, hAccount, "UserFolder", path.Get(), path.Size());
+                            result = GetStringA(registry, hAccount, SAL_REG_VALUE_USER_FOLDER_A, path.Get(), path.Size());
                             if (result.success && path[0] != 0)
                             { // we will collect everything that has DisplayName and UserFolder, no matter what it is, we will offer it to the user under "OneDrive"
                                 //TRACE_I("OneDrive Business: DisplayName: " << disp << ", UserFolder: " << path);

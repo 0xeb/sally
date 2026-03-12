@@ -12,6 +12,7 @@
 */
 
 #include "precomp.h"
+#include "../../registry_names.h"
 #include "icons.h"
 #include "nethood.h"
 #include "nethoodfs.h"
@@ -322,7 +323,7 @@ bool CNethoodIcons::LoadSystemIcons()
 
     err = HANDLES_Q(RegOpenKeyEx(
         HKEY_LOCAL_MACHINE,
-        TEXT("Software\\Microsoft\\Windows\\CurrentVersion\\Explorer\\Shell Icons"),
+        SAL_REG_KEY_EXPLORER_SHELL_ICONS_T,
         0,
         KEY_READ,
         &hkeyShellIcons));

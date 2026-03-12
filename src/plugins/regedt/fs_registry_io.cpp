@@ -3,6 +3,7 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 
 #include "precomp.h"
+#include "../../registry_names.h"
 
 // ****************************************************************************
 //
@@ -1106,14 +1107,14 @@ void CPluginFSInterface::OpenActiveFolder(const char* fsName, HWND parent)
     // store the current panel path into the LastKey value for RegEdit
     HKEY hKey;
     DWORD disp;
-    RegCreateKeyEx(HKEY_CURRENT_USER, "Software\\Microsoft\\Windows\\CurrentVersion\\Applets\\Regedit", 0, NULL,
+    RegCreateKeyEx(HKEY_CURRENT_USER, SAL_REG_KEY_REGEDIT_APPLET_A, 0, NULL,
                    REG_OPTION_NON_VOLATILE, KEY_CREATE_SUB_KEY | KEY_WRITE, NULL, &hKey, &disp);
     CPathBuffer path; // Heap-allocated for long path support
     GetCurrentPath(path);
     const char* path2 = path;
     if (*path2 == '\\')
         path2++;
-    RegSetValueEx(hKey, "LastKey", 0, REG_SZ, (LPBYTE)path2, lstrlen(path2) + 1);
+    RegSetValueEx(hKey, SAL_REG_VALUE_LAST_KEY_A, 0, REG_SZ, (LPBYTE)path2, lstrlen(path2) + 1);
     RegCloseKey(hKey);
 
     // launch regedit with optional elevation (Vista/7)

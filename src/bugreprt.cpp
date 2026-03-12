@@ -1832,7 +1832,7 @@ void CCallStack::PrintBugReport(EXCEPTION_POINTERS* Exception, DWORD ThreadID, D
     IRegistry* registry = GetBugReportRegistry();
     __try
     {
-        if (OpenKeyReadA(registry, HKEY_LOCAL_MACHINE, "Software\\Microsoft\\Internet Explorer", hKey).success)
+        if (OpenKeyReadA(registry, HKEY_LOCAL_MACHINE, SAL_REG_KEY_MICROSOFT_IE_A, hKey).success)
         {
             static char iver[50];
             static char build[50];
@@ -1840,9 +1840,9 @@ void CCallStack::PrintBugReport(EXCEPTION_POINTERS* Exception, DWORD ThreadID, D
             iver[0] = 0;
             build[0] = 0;
             version[0] = 0;
-            GetStringA(registry, hKey, "IVer", iver, _countof(iver));
-            GetStringA(registry, hKey, "Build", build, _countof(build));
-            GetStringA(registry, hKey, "Version", version, _countof(version));
+            GetStringA(registry, hKey, SAL_REG_VALUE_IE_IVER_A, iver, _countof(iver));
+            GetStringA(registry, hKey, SAL_REG_VALUE_BUILD_A, build, _countof(build));
+            GetStringA(registry, hKey, SAL_REG_VALUE_VERSION_A, version, _countof(version));
 
             if (iver[0] != 0 || build[0] != 0 || version[0] != 0)
             {
@@ -1874,16 +1874,16 @@ void CCallStack::PrintBugReport(EXCEPTION_POINTERS* Exception, DWORD ThreadID, D
         PrintLine(param, buf, TRUE);
 
         if (OpenKeyReadA(registry, HKEY_LOCAL_MACHINE,
-                         "SOFTWARE\\Microsoft\\Windows NT\\CurrentVersion", hKey).success)
+                         SAL_REG_KEY_WINDOWS_NT_CURRENT_VERSION_A, hKey).success)
         {
             char myBuff[100];
 
-            if (GetStringA(registry, hKey, "ProductName", myBuff, _countof(myBuff)).success)
+            if (GetStringA(registry, hKey, SAL_REG_VALUE_WINDOWS_PRODUCT_NAME_A, myBuff, _countof(myBuff)).success)
             {
                 sprintf(buf, "ProductName (from registry): %s", myBuff);
                 PrintLine(param, buf, TRUE);
             }
-            if (GetStringA(registry, hKey, "CurrentVersion", myBuff, _countof(myBuff)).success)
+            if (GetStringA(registry, hKey, SAL_REG_VALUE_WINDOWS_CURRENT_VERSION_A, myBuff, _countof(myBuff)).success)
             {
                 sprintf(buf, "CurrentVersion (from registry): %s", myBuff);
                 PrintLine(param, buf, TRUE);
@@ -1971,18 +1971,18 @@ void CCallStack::PrintBugReport(EXCEPTION_POINTERS* Exception, DWORD ThreadID, D
         sprintf(buf, "Processor Level: %u", si.wProcessorLevel);
         PrintLine(param, buf, TRUE);
         if (OpenKeyReadA(registry, HKEY_LOCAL_MACHINE,
-                         "Hardware\\Description\\System\\CentralProcessor\\0", hKey).success)
+                         SAL_REG_KEY_HARDWARE_CPU0_A, hKey).success)
         {
             static char processorName[200];
             static char vendorName[200];
             DWORD mhz;
 
-            if (!GetStringA(registry, hKey, "ProcessorNameString", processorName, _countof(processorName)).success)
-                if (!GetStringA(registry, hKey, "Identifier", processorName, _countof(processorName)).success) // probably unnecessary on W2K+
+            if (!GetStringA(registry, hKey, SAL_REG_VALUE_PROCESSOR_NAME_STRING_A, processorName, _countof(processorName)).success)
+                if (!GetStringA(registry, hKey, SAL_REG_VALUE_IDENTIFIER_A, processorName, _countof(processorName)).success) // probably unnecessary on W2K+
                     processorName[0] = 0;
-            if (!GetStringA(registry, hKey, "VendorIdentifier", vendorName, _countof(vendorName)).success)
+            if (!GetStringA(registry, hKey, SAL_REG_VALUE_VENDOR_IDENTIFIER_A, vendorName, _countof(vendorName)).success)
                 vendorName[0] = 0;
-            if (!GetDWordA(registry, hKey, "~MHz", mhz).success)
+            if (!GetDWordA(registry, hKey, SAL_REG_VALUE_PROCESSOR_SPEED_MHZ_A, mhz).success)
             {
                 if (!GetProcessorSpeed(&mhz))
                     mhz = 0;
@@ -2035,13 +2035,13 @@ void CCallStack::PrintBugReport(EXCEPTION_POINTERS* Exception, DWORD ThreadID, D
         }
 
         if (OpenKeyReadA(registry, HKEY_LOCAL_MACHINE,
-                         "Hardware\\Description\\System", hKey).success)
+                         SAL_REG_KEY_HARDWARE_DESCRIPTION_SYSTEM_A, hKey).success)
         {
             static char bios[200];
 
             DWORD bufferSize = 200;
             bios[0] = 0;
-            SalRegQueryValueEx(hKey, "SystemBiosVersion", NULL, NULL, (BYTE*)bios, &bufferSize);
+            SalRegQueryValueEx(hKey, SAL_REG_VALUE_SYSTEM_BIOS_VERSION_A, NULL, NULL, (BYTE*)bios, &bufferSize);
             bios[_countof(bios) - 1] = 0; // at least terminate the buffer with a zero
             if (bios[0] != 0)
             {
@@ -2051,7 +2051,7 @@ void CCallStack::PrintBugReport(EXCEPTION_POINTERS* Exception, DWORD ThreadID, D
 
             bufferSize = 200;
             bios[0] = 0;
-            SalRegQueryValueEx(hKey, "SystemBiosDate", NULL, NULL, (BYTE*)bios, &bufferSize);
+            SalRegQueryValueEx(hKey, SAL_REG_VALUE_SYSTEM_BIOS_DATE_A, NULL, NULL, (BYTE*)bios, &bufferSize);
             bios[_countof(bios) - 1] = 0; // at least terminate the buffer with a zero
             if (bios[0] != 0)
             {
