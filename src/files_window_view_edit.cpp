@@ -28,6 +28,7 @@
 #include "common/unicode/helpers.h"
 #include "common/unicode/NameFallbackRecovery.h"
 #include "common/unicode/PathIdentityPolicy.h"
+#include "common/unicode/RenameRetryPolicy.h"
 #include <vector>
 
 namespace
@@ -2556,7 +2557,7 @@ void CFilesWindow::RenameFileInternalW(CFileData* f, const std::wstring& newName
     {
         if (err != ERROR_SUCCESS)
             gPrompter->ShowError(LoadStrW(IDS_ERRORRENAMINGFILE), GetErrorTextW(err));
-        *tryAgain = FALSE; // Don't retry on error for Unicode files
+        *tryAgain = sally::unicode::ShouldRetryUnicodeRenameAfterError(err);
     }
 
     if (handsOFF)
