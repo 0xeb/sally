@@ -9,10 +9,13 @@
 #include "cmark-gfm-core-extensions.h"
 #include "registry.h"
 
+#include "darkmode.h"
+#include "registry_names.h"
 #include "webviewer.h"
 #include "dbg.h"
 
 #include "markdown.h"
+#include "markdown_document.h"
 
 static std::string LoadMarkdownCSS()
 {
@@ -89,6 +92,75 @@ static const char* extension_names[] = {
     nullptr,
 };
 
+static BOOL ReadRegistryDword(HKEY rootKey, const char* subKey, const char* valueName, DWORD* value)
+{
+    HKEY hKey = NULL;
+    if (RegOpenKeyExA(rootKey, subKey, 0, KEY_READ, &hKey) != ERROR_SUCCESS)
+        return FALSE;
+
+    DWORD type = 0;
+    DWORD size = sizeof(*value);
+    LONG result = RegQueryValueExA(hKey, valueName, NULL, &type, (LPBYTE)value, &size);
+    RegCloseKey(hKey);
+
+    return result == ERROR_SUCCESS && type == REG_DWORD;
+}
+
+static BOOL ReadSystemPrefersDarkApps()
+{
+    DWORD value = 1;
+    if (!ReadRegistryDword(HKEY_CURRENT_USER,
+                           SAL_REG_KEY_WINDOWS_THEME_PERSONALIZE_A,
+                           SAL_REG_VALUE_APPS_USE_LIGHT_THEME_A,
+                           &value))
+    {
+        return FALSE;
+    }
+
+    return value == 0;
+}
+
+static BOOL ReadConfiguredThemeMode(int* themeMode)
+{
+    static const char* kConfigRoots[] = {
+        SAL_REG_ROOT_SALLY_1_0_A "\\" SAL_REG_SUBKEY_CONFIGURATION_A,
+        SAL_REG_ROOT_OPENSAL_5_0_A "\\" SAL_REG_SUBKEY_CONFIGURATION_A,
+    };
+
+    for (const char* configRoot : kConfigRoots)
+    {
+        DWORD value = THEME_MODE_LIGHT;
+        if (ReadRegistryDword(HKEY_CURRENT_USER, configRoot, "Theme mode", &value))
+        {
+            if (value > THEME_MODE_SYSTEM)
+                value = THEME_MODE_LIGHT;
+            *themeMode = (int)value;
+            return TRUE;
+        }
+    }
+
+    return FALSE;
+}
+
+static bool ShouldUseDarkMarkdownTheme()
+{
+    int themeMode = THEME_MODE_LIGHT;
+    if (!ReadConfiguredThemeMode(&themeMode))
+        return false;
+
+    switch (themeMode)
+    {
+    case THEME_MODE_DARK:
+        return true;
+
+    case THEME_MODE_SYSTEM:
+        return ReadSystemPrefersDarkApps() != FALSE;
+
+    default:
+        return false;
+    }
+}
+
 std::string ConvertMarkdownToHTML(const std::wstring& filePath)
 {
     cmark_gfm_core_extensions_ensure_registered();
@@ -138,17 +210,9 @@ std::string ConvertMarkdownToHTML(const std::wstring& filePath)
     std::string css = LoadMarkdownCSS();
     std::wstring dir = GetDirectoryFromPath(filePath);
     std::string baseHref = MakeBaseHref(dir);
+    bool useDarkTheme = ShouldUseDarkMarkdownTheme();
 
-    std::string result;
-    result.reserve(css.size() + strlen(html) + 512);
-    result += "<!DOCTYPE html><html lang=\"en\" dir=\"ltr\"><head><meta charset=\"utf-8\">\n";
-    result += "<base href=\"";
-    result += baseHref;
-    result += "\">\n<style>\n";
-    result += css;
-    result += "\n</style></head><body><article class=\"markdown-body\">\n";
-    result += html;
-    result += "</article></body></html>\n";
+    std::string result = BuildMarkdownHtmlDocument(baseHref, css, html, useDarkTheme);
 
     free(html);
     cmark_release_plugins();

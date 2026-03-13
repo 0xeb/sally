@@ -42,6 +42,7 @@ sal_add_plugin(NAME webviewer
     "${SAL_PLUGINS}/webviewer/cmark-gfm/src/xml.c"
     "${SAL_PLUGINS}/webviewer/webviewer.cpp"
     "${SAL_PLUGINS}/webviewer/markdown.cpp"
+    "${SAL_PLUGINS}/webviewer/markdown_document.cpp"
     "${SAL_PLUGINS}/webviewer/precomp.cpp"
   RC "${SAL_PLUGINS}/webviewer/webviewer.rc"
   DEF "${SAL_PLUGINS}/webviewer/webviewer.def"
@@ -61,3 +62,4 @@ file(GLOB CMARK_C_SOURCES
   "${SAL_PLUGINS}/webviewer/cmark-gfm/src/*.c"
 )
 set_source_files_properties(${CMARK_C_SOURCES} PROPERTIES SKIP_PRECOMPILE_HEADERS ON)
+set_source_files_properties("${SAL_PLUGINS}/webviewer/markdown_document.cpp" PROPERTIES SKIP_PRECOMPILE_HEADERS ON)
