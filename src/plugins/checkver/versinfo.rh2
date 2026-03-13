@@ -9,9 +9,11 @@
 // defines for plugin.SPL and plugin.SLG VERSIONINFO
 // look at shared\versinfo.rc
 
-#define VERSINFO_MAJOR       0
-#define VERSINFO_MINORA      0
-#define VERSINFO_MINORB      1
+// Bump CheckVer's file version when updater resources/protocol handling change
+// so stale language files are rejected by VERSIONINFO validation.
+#define VERSINFO_MAJOR       1
+#define VERSINFO_MINORA      2
+#define VERSINFO_MINORB      7
 
 #include "spl_vers.h" // pull in the version and build numbers
 
@@ -29,7 +31,7 @@
 #endif
 
 // for SLG translators
-#define VERSINFO_SLG_WEB     "github.com/0xeb/sally"
+#define VERSINFO_SLG_WEB     "https://github.com/0xeb/sally"
 #define VERSINFO_SLG_COMMENT "English version"
 
 #endif // __CHECKVER_VERSINFO_RH2

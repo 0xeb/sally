@@ -264,7 +264,7 @@ CPluginInterfaceAbstract* WINAPI SalamanderPluginEntry(CSalamanderPluginEntryAbs
                                    String<char>::LoadStr(IDS_DESCRIPTION),
                                    "UNDELETE" /* DO NOT TRANSLATE! */, NULL, "del");
 
-    salamander->SetPluginHomePageURL("github.com/0xeb/sally");
+    salamander->SetPluginHomePageURL("https://github.com/0xeb/sally");
 
     // get our FS-name (it could be different than "del", Salamander could change it)
     SalamanderGeneral->GetPluginFSName(AssignedFSName, 0);

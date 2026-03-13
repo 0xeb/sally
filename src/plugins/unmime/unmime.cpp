@@ -108,7 +108,7 @@ CPluginInterfaceAbstract* WINAPI SalamanderPluginEntry(CSalamanderPluginEntryAbs
                                    LoadStr(IDS_PLUGIN_DESCRIPTION),
                                    "UnMIME" /* neprekladat! */, "eml;b64;uue;xxe;hqx;ntx;cnm");
 
-    salamander->SetPluginHomePageURL("github.com/0xeb/sally");
+    salamander->SetPluginHomePageURL("https://github.com/0xeb/sally");
 
     return &PluginInterface;
 }

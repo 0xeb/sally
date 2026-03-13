@@ -36,7 +36,7 @@
 #endif
 
 // for SLG translators
-#define VERSINFO_SLG_WEB     "github.com/0xeb/sally"
+#define VERSINFO_SLG_WEB     "https://github.com/0xeb/sally"
 #define VERSINFO_SLG_COMMENT "English version"
 
 #endif // __AUTOMATION_VERSINFO_RH2

@@ -32,7 +32,7 @@ const char* CONFIG_PATHFORMAT = "Tooltip Path Format";
 
 char* LoadStr(int resID);
 
-TCHAR szPluginWebsite[] = TEXT("github.com/0xeb/sally"); // original domain not running: http://salamander.diskmap.net
+TCHAR szPluginWebsite[] = TEXT("https://github.com/0xeb/sally"); // original domain not running: http://salamander.diskmap.net
 
 HINSTANCE DLLInstance = NULL; // handle to SPL - language-independent resources
 HINSTANCE HLanguage = NULL;   // handle to SLG - language-dependent resources

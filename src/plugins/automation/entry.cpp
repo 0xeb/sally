@@ -127,7 +127,7 @@ CPluginInterfaceAbstract*
         NULL);
 
     // Setup plugin home page.
-    salamander->SetPluginHomePageURL("github.com/0xeb/sally");
+    salamander->SetPluginHomePageURL("https://github.com/0xeb/sally");
 
     return &g_oAutomationPlugin;
 }

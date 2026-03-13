@@ -176,7 +176,7 @@ CPluginInterfaceAbstract* WINAPI SalamanderPluginEntry(CSalamanderPluginEntryAbs
                                    "ZIP" /* neprekladat! */, "zip;pk3;pk4;jar");
 
     // register the plugin home page URL
-    salamander->SetPluginHomePageURL("github.com/0xeb/sally");
+    salamander->SetPluginHomePageURL("https://github.com/0xeb/sally");
 
     return &PluginInterface;
 }

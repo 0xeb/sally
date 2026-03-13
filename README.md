@@ -67,6 +67,8 @@ cmake --build build --config RelWithDebInfo --target populate
 
 Output: `build/out/sally/<Config>_<Arch>/`
 
+When you run Sally from `build/out`, rebuild and repopulate that exact configuration first. For example, use `cmake --build build --config Release --target populate` before launching `build/out/sally/Release_x64/` so plugin DLLs and `.slg` language files stay in sync.
+
 ### Other Architectures
 
 | Preset | Description |

@@ -146,7 +146,7 @@ CPluginInterfaceAbstract* WINAPI SalamanderPluginEntry(CSalamanderPluginEntryAbs
                                    NULL, "pak");
 
     // set the plugin home page URL
-    salamander->SetPluginHomePageURL("github.com/0xeb/sally");
+    salamander->SetPluginHomePageURL("https://github.com/0xeb/sally");
 
     return &PluginInterface;
 }

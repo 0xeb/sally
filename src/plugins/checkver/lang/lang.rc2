@@ -28,7 +28,7 @@ STRINGTABLE
  IDS_ABORT_DOWNLOAD, "Plugin is working with Internet.\nDo you want to abort this Internet session?"
  IDS_INET_INIT, "Initializing Internet connection..."
  IDS_INET_INIT_FAILED, "Initializing failed: %s"
- IDS_INET_CONNECT, "Connecting to \tugithub.com/0xeb/sally/releases\tlhttps://github.com/0xeb/sally/releases\tn..."
+ IDS_INET_CONNECT, "Connecting to \tuGitHub Releases API\tlhttps://api.github.com/repos/0xeb/sally/releases/latest\tn..."
  IDS_INET_CONNECT_FAILED, "Connecting failed: %s"
  IDS_INET_READ, "Reading information about new versions..."
  IDS_INET_READ_FAILED, "Reading failed: %s"

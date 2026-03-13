@@ -100,7 +100,7 @@ CPluginInterfaceAbstract* WINAPI SalamanderPluginEntry(CSalamanderPluginEntryAbs
                                    LoadStr(IDS_PLUGIN_DESCRIPTION),
                                    "File Comparator" /* do not translate! */);
 
-    salamander->SetPluginHomePageURL("github.com/0xeb/sally");
+    salamander->SetPluginHomePageURL("https://github.com/0xeb/sally");
 
     // must be after salamander->SetBasicPluginData because worker threads use the plugin
     // version at startup and salamander->SetBasicPluginData updates that value (it used to

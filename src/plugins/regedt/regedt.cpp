@@ -259,7 +259,7 @@ CPluginInterfaceAbstract* WINAPI SalamanderPluginEntry(CSalamanderPluginEntryAbs
                                    NULL,
                                    "reg");
 
-    salamander->SetPluginHomePageURL("github.com/0xeb/sally");
+    salamander->SetPluginHomePageURL("https://github.com/0xeb/sally");
 
     // obtain our FS name (it may differ from "reg"; Salamander can adjust it)
     SG->GetPluginFSName(AssignedFSName, 0);

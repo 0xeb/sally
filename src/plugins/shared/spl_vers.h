@@ -1,4 +1,4 @@
-﻿// SPDX-FileCopyrightText: 2023 Open Salamander Authors
+// SPDX-FileCopyrightText: 2023 Open Salamander Authors
 // SPDX-FileCopyrightText: 2026 Sally Authors
 // SPDX-License-Identifier: GPL-2.0-or-later
 
@@ -101,10 +101,11 @@
 // 181 - 4.0 (SDK)
 // 182 - 4.0 (CB182)
 // 183 - 5.0
+// 184 - 1.0.5
 
 // ! IMPORTANT: new build numbers must be written to the "default" branch first,
 //              and only then to the side branch (complete list is only in "default" branch)
-#define VERSINFO_BUILDNUMBER 183
+#define VERSINFO_BUILDNUMBER 184
 
 // VERSINFO_BETAVERSION_TXT:
 //
