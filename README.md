@@ -38,11 +38,6 @@ Sally is an independent fork of [Open Salamander](https://github.com/OpenSalaman
 - Runs under Wine on Linux (`imageres.dll` dependency made optional)
 - Consent-based loading of legacy Altap Salamander 4.0 plugins
 
-**Code Quality**
-- Czech-to-English comment translation across the entire codebase
-- Modern C++ idioms: `std::wstring`, RAII, `std::unique_ptr`
-- Fixed heap corruption bugs, buffer overflows, and Win32 API pitfalls
-
 ## Downloads
 
 Pre-built binaries are available on the [Releases](https://github.com/0xeb/sally/releases) page.
